@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
@@ -18,18 +18,27 @@ import {
 export function Navbar() {
     const router = useRouter();
     const [user, setUser] = useState<any>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
-        // Check initial user
         const checkUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                setIsAdmin(profile?.role === 'admin');
+            }
         };
         checkUser();
 
-        // Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setUser(session?.user ?? null);
+            if (session?.user) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+                setIsAdmin(profile?.role === 'admin');
+            } else {
+                setIsAdmin(false);
+            }
         });
 
         return () => subscription.unsubscribe();
@@ -78,6 +87,11 @@ export function Navbar() {
                                 <DropdownMenuItem onClick={() => router.push('/dashboard')}>
                                     <LayoutDashboard className="mr-2 h-4 w-4" /> แดชบอร์ด
                                 </DropdownMenuItem>
+                                {isAdmin && (
+                                    <DropdownMenuItem onClick={() => router.push('/admin')}>
+                                        <ShieldCheck className="mr-2 h-4 w-4 text-red-500" /> <span className="text-red-500 font-bold">Admin Panel</span>
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={handleLogout} className="text-red-500 focus:text-red-500">
                                     <LogOut className="mr-2 h-4 w-4" /> ออกจากระบบ
                                 </DropdownMenuItem>
