@@ -15,6 +15,17 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
+    // Redirect if already logged in
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                router.replace('/dashboard');
+            }
+        };
+        checkSession();
+    }, [router]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -30,11 +41,11 @@ export default function LoginPage() {
                 throw error;
             }
 
-            router.push('/dashboard');
+            // Force hard refresh to update all Server Components
             router.refresh();
+            router.push('/dashboard');
         } catch (err: any) {
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };
