@@ -1,7 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package } from 'lucide-react';
+import { Package, Calendar } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
-export default function AdminDashboardPage() {
+export const revalidate = 0;
+
+export default async function AdminDashboardPage() {
+    // Fetch summary stats
+    const { count: productCount } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true });
+
+    // Fetch recent products
+    const { data: recentProducts } = await supabase
+        .from('products')
+        .select('name, price_lifetime, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
     return (
         <div className="space-y-8">
             <div>
@@ -16,14 +31,35 @@ export default function AdminDashboardPage() {
                         <Package className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">--</div>
-                        <p className="text-xs text-muted-foreground">สินค้าในระบบ</p>
+                        <div className="text-2xl font-bold">{productCount ?? 0}</div>
+                        <p className="text-xs text-muted-foreground">รายการ</p>
                     </CardContent>
                 </Card>
             </div>
 
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-200">
-                ยินดีต้อนรับกลับครับแอดมิน! เลือกเมนู <strong>"จัดการสินค้า"</strong> ด้านซ้ายเพื่อเริ่มเพิ่ม/แก้ไข EA ได้เลยครับ
+            <div className="space-y-4">
+                <h2 className="text-xl font-semibold">สินค้าล่าสุด</h2>
+                <div className="grid gap-4">
+                    {recentProducts?.map((product: any, i: number) => (
+                        <Card key={i} className="flex items-center justify-between p-4">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-primary/10 p-2 rounded-full">
+                                    <Package className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                    <p className="font-medium">{product.name}</p>
+                                    <p className="text-xs text-muted-foreground flex items-center">
+                                        <Calendar className="mr-1 h-3 w-3" />
+                                        {new Date(product.created_at).toLocaleDateString('th-TH')}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="font-bold">
+                                ฿{product.price_lifetime.toLocaleString()}
+                            </div>
+                        </Card>
+                    ))}
+                </div>
             </div>
         </div>
     );
