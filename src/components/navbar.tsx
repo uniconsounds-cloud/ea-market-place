@@ -21,23 +21,32 @@ export function Navbar() {
     const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
-        const checkUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
-            if (user) {
-                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                setIsAdmin(profile?.role === 'admin');
-            }
-        };
-        checkUser();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+        // Consolidated function to fetch user and role
+        const fetchUserData = async (sessionUser: any) => {
+            if (sessionUser) {
+                setUser(sessionUser);
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', sessionUser.id).single();
                 setIsAdmin(profile?.role === 'admin');
             } else {
+                setUser(null);
                 setIsAdmin(false);
+            }
+        };
+
+        // Check initial session
+        const initSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            fetchUserData(session?.user ?? null);
+        };
+        initSession();
+
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT') {
+                setUser(null);
+                setIsAdmin(false);
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                fetchUserData(session?.user ?? null);
             }
         });
 
@@ -45,10 +54,16 @@ export function Navbar() {
     }, []);
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        // 1. Immediate UI update
         setUser(null);
-        router.push('/');
-        router.refresh(); // Refresh to ensure server components update if needed
+        setIsAdmin(false);
+
+        // 2. Perform actua logout
+        await supabase.auth.signOut();
+
+        // 3. Redirect and refresh
+        router.replace('/');
+        router.refresh();
     };
 
     return (
