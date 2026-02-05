@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,11 @@ import { ArrowLeft, Upload, Loader2, Save } from 'lucide-react';
 import Link from 'next/link';
 
 // Use 'new' as a special ID for creating
-export default function ProductFormPage({ params }: { params: { id: string } }) {
+export default function ProductFormPage() {
     const router = useRouter();
-    const isNew = params.id === 'new';
+    const params = useParams();
+    const id = params?.id as string; // useParams returns string | string[]
+    const isNew = id === 'new';
 
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -28,13 +30,13 @@ export default function ProductFormPage({ params }: { params: { id: string } }) 
     });
 
     useEffect(() => {
-        if (!isNew) {
+        if (!isNew && id) {
             fetchProduct();
         }
-    }, [params.id]);
+    }, [id]);
 
     const fetchProduct = async () => {
-        const { data } = await supabase.from('products').select('*').eq('id', params.id).single();
+        const { data } = await supabase.from('products').select('*').eq('id', id).single();
         if (data) {
             setFormData({
                 name: data.name,
@@ -104,7 +106,7 @@ export default function ProductFormPage({ params }: { params: { id: string } }) 
                 const { error: insertError } = await supabase.from('products').insert([payload]);
                 error = insertError;
             } else {
-                const { error: updateError } = await supabase.from('products').update(payload).eq('id', params.id);
+                const { error: updateError } = await supabase.from('products').update(payload).eq('id', id);
                 error = updateError;
             }
 
@@ -163,7 +165,7 @@ export default function ProductFormPage({ params }: { params: { id: string } }) 
                                     </div>
                                 </label>
                                 <p className="text-xs text-muted-foreground mt-2">
-                                    รองรับไฟล์ JPG, PNG (แนะนำขนาด 500x500px)
+                                    รองรับไฟล์ JPG, PNG (แนะนำขนาด 1280x1280px หรือรูปแนวนอน)
                                 </p>
                             </div>
                         </div>
