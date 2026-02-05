@@ -4,10 +4,17 @@ import { ProductCard } from '@/components/product-card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { MOCK_PRODUCTS } from '@/lib/data';
+import { supabase } from '@/lib/supabaseClient';
 
+export const revalidate = 0; // Disable static caching for real-time updates
 
-export default function Home() {
+export default async function Home() {
+  const { data: products } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
   return (
     <main className="min-h-screen flex flex-col bg-background selection:bg-primary/30">
       <Navbar />
@@ -56,7 +63,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {MOCK_PRODUCTS.map((product) => (
+            {products?.map((product: any) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>

@@ -4,10 +4,13 @@ import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Check, ShieldCheck, Zap } from 'lucide-react';
-import { MOCK_PRODUCTS } from '@/lib/data';
+import { supabase } from '@/lib/supabaseClient';
 
-export default function ProductPage({ params }: { params: { id: string } }) {
-    const product = MOCK_PRODUCTS.find((p) => p.id === params.id);
+export const revalidate = 0;
+
+export default async function ProductPage(props: { params: Promise<{ id: string }> }) {
+    const params = await props.params;
+    const { data: product } = await supabase.from('products').select('*').eq('id', params.id).single();
 
     if (!product) {
         notFound();
@@ -59,7 +62,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         <div className="mb-8">
                             <h3 className="font-semibold mb-3">ฟีเจอร์เด่น</h3>
                             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {product.features?.map((feature, i) => (
+                                {product.features?.map((feature: string, i: number) => (
                                     <li key={i} className="flex items-center text-sm">
                                         <Check className="w-4 h-4 mr-2 text-accent" />
                                         {feature}
@@ -112,8 +115,4 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 }
 
 // Generate static params for these mock products to avoid 404 on static export if needed
-export function generateStaticParams() {
-    return MOCK_PRODUCTS.map((p) => ({
-        id: p.id,
-    }));
-}
+
