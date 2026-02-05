@@ -28,13 +28,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 return;
             }
 
-            // Simulate Payment Process (Mock)
-            // in real app: Redirect to Stripe / Show QR Code Modal
-            alert(`[Mock Payment]\n\nProduct: ${product.name}\nType: ${selectedType}\nPrice: ${selectedType === 'monthly' ? product.price_monthly : product.price_lifetime}\n\nThis would open a QR Code or Redirect to Payment Gateway.`);
-
-            // Allow them to "succeed" for demo?
-            // redirect to dashboard?
-            // router.push('/dashboard');
+            // Redirect to Checkout Page
+            // Optionally pass selectedType via query param if needed, 
+            // but for now the checkout page has its own selection.
+            router.push(`/checkout/${product.id}`);
 
         } catch (error) {
             console.error(error);
