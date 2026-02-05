@@ -5,6 +5,7 @@ import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Check, ShieldCheck, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { ProductPurchaseSection } from '@/components/product-purchase-section';
 
 export const revalidate = 0;
 
@@ -77,46 +78,18 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                             </ul>
                         </div>
 
-                        <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg">
-                            <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                {/* Monthly Option */}
-                                <div className="relative border border-border rounded-lg p-4 hover:border-primary/50 cursor-pointer transition-colors bg-background/50">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-semibold">รายเดือน</span>
-                                        <Zap className="w-4 h-4 text-gray-400" />
-                                    </div>
-                                    <div className="text-2xl font-bold">฿{product.price_monthly.toLocaleString()}</div>
-                                    <p className="text-xs text-muted-foreground">ชำระทุกเดือน ยกเลิกได้ตลอดเวลา</p>
-                                </div>
-
-                                {/* Lifetime Option */}
-                                <div className="relative border-2 border-accent/50 rounded-lg p-4 bg-accent/5 cursor-pointer hover:bg-accent/10 transition-colors">
-                                    <div className="absolute -top-3 right-4 bg-accent text-black text-xs font-bold px-2 py-0.5 rounded-full">
-                                        คุ้มค่าที่สุด
-                                    </div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-semibold text-accent">ถาวร (Lifetime)</span>
-                                        <Zap className="w-4 h-4 text-accent" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</div>
-                                    <p className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</p>
-                                </div>
-                            </div>
-
-                            <Button size="lg" className="w-full text-base font-semibold shadow-xl shadow-blue-900/20">
-                                ซื้อลิขสิทธิ์ทันที
-                            </Button>
-                            <p className="text-center text-xs text-muted-foreground mt-3">
-                                ชำระเงินปลอดภัยผ่าน QR Code / บัตรเครดิต รับสินค้าทันที
-                            </p>
                         </div>
+
+                        <ProductPurchaseSection product={product} />
                     </div>
                 </div>
             </div>
             <Footer />
-        </main>
+                    </div >
+                </div >
+            </div >
+        <Footer />
+        </main >
     );
 }
 
