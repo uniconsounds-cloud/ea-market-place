@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0a;
+  --color-foreground: #ededed;
+
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #1f2937;
+  --color-secondary-foreground: #f3f4f6;
+
+  --color-accent: #d4af37;
+  --color-accent-foreground: #000000;
+
+  --color-muted: #262626;
+  --color-muted-foreground: #a3a3a3;
+
+  --color-card: #121212;
+  --color-card-foreground: #ededed;
+
+  --color-border: #333333;
+
+  --font-inter: Inter, sans-serif;
+
+  /* Background images if needed */
+  /* --image-gradient-radial: radial-gradient(var(--tw-gradient-stops)); */
+}
+
+/* Custom Utilities */
+@utility glass-card {
+  @apply bg-card/70 backdrop-blur-md border border-border shadow-lg;
+}
+
+@utility text-glow {
+  text-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+}
+
+@utility gold-glow {
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-inter;
+  }
+}
