@@ -78,18 +78,12 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                             </ul>
                         </div>
 
-                        </div>
-
                         <ProductPurchaseSection product={product} />
                     </div>
                 </div>
             </div>
             <Footer />
-                    </div >
-                </div >
-            </div >
-        <Footer />
-        </main >
+        </main>
     );
 }
 
