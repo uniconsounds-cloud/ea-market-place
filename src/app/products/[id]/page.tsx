@@ -30,8 +30,14 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                     <div className="space-y-6">
                         <div className="aspect-video bg-gradient-to-br from-gray-900 to-black rounded-xl border border-border/50 flex items-center justify-center relative overflow-hidden shadow-2xl">
                             <div className="text-6xl font-bold text-white/10">{product.name.substring(0, 2)}</div>
-                            {/* If specific image exists */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
+                            {product.image_url && (
+                                <img
+                                    src={product.image_url}
+                                    alt={product.name}
+                                    className="absolute inset-0 w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-700"
+                                />
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent pointer-events-none" />
                         </div>
 
                         <div className="bg-card p-6 rounded-xl border border-border/50">
