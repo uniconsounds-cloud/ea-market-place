@@ -1,8 +1,47 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/navigation';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export function Navbar() {
+    const router = useRouter();
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        // Check initial user
+        const checkUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        checkUser();
+
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        router.push('/');
+        router.refresh(); // Refresh to ensure server components update if needed
+    };
+
     return (
         <nav className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -25,12 +64,35 @@ export function Navbar() {
                     <Button variant="ghost" size="icon">
                         <ShoppingCart className="h-5 w-5" />
                     </Button>
-                    <Link href="/login">
-                        <Button variant="outline" className="hidden sm:inline-flex">เข้าสู่ระบบ</Button>
-                    </Link>
-                    <Link href="/register">
-                        <Button variant="gold">สมัครสมาชิก</Button>
-                    </Link>
+
+                    {user ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="rounded-full bg-secondary/50">
+                                    <User className="h-5 w-5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>บัญชีผู้ใช้</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                                    <LayoutDashboard className="mr-2 h-4 w-4" /> แดชบอร์ด
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleLogout} className="text-red-500 focus:text-red-500">
+                                    <LogOut className="mr-2 h-4 w-4" /> ออกจากระบบ
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : (
+                        <>
+                            <Link href="/login">
+                                <Button variant="outline" className="hidden sm:inline-flex">เข้าสู่ระบบ</Button>
+                            </Link>
+                            <Link href="/register">
+                                <Button variant="gold">สมัครสมาชิก</Button>
+                            </Link>
+                        </>
+                    )}
                 </div>
             </div>
         </nav>
