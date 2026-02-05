@@ -19,7 +19,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
             <div className="flex-1 container mx-auto px-4 py-12">
                 <Link href="/" className="text-sm text-muted-foreground hover:text-foreground mb-8 inline-block">
-                    &larr; Back to Marketplace
+                    &larr; กลับไปหน้าร้านค้า
                 </Link>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -34,11 +34,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         <div className="bg-card p-6 rounded-xl border border-border/50">
                             <h3 className="font-semibold mb-4 flex items-center">
                                 <ShieldCheck className="w-5 h-5 mr-2 text-primary" />
-                                Verification Guarantee
+                                รับประกันคุณภาพ
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                                This EA has been verified on live accounts for over 6 months.
-                                Includes 24/7 support and free updates.
+                                EA ตัวนี้ได้รับการตรวจสอบบนบัญชีจริงแล้ว พร้อมทีมงาน Support ดูแลตลอด 24/7 และอัปเดตฟรีตลอดอายุการใช้งาน
                             </p>
                         </div>
                     </div>
@@ -49,7 +48,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                             <h1 className="text-4xl font-bold mb-2">{product.name}</h1>
                             <div className="flex items-center gap-2 text-sm">
                                 <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full">v{product.version}</span>
-                                <span className="text-muted-foreground">Updated recently</span>
+                                <span className="text-muted-foreground">อัปเดตล่าสุดเร็วๆ นี้</span>
                             </div>
                         </div>
 
@@ -58,7 +57,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         </p>
 
                         <div className="mb-8">
-                            <h3 className="font-semibold mb-3">Key Features</h3>
+                            <h3 className="font-semibold mb-3">ฟีเจอร์เด่น</h3>
                             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {product.features?.map((feature, i) => (
                                     <li key={i} className="flex items-center text-sm">
@@ -70,38 +69,38 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         </div>
 
                         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg">
-                            <h3 className="text-lg font-bold mb-4">Choose License</h3>
+                            <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                                 {/* Monthly Option */}
                                 <div className="relative border border-border rounded-lg p-4 hover:border-primary/50 cursor-pointer transition-colors bg-background/50">
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="font-semibold">Monthly</span>
+                                        <span className="font-semibold">รายเดือน</span>
                                         <Zap className="w-4 h-4 text-gray-400" />
                                     </div>
-                                    <div className="text-2xl font-bold">${product.price_monthly}</div>
-                                    <p className="text-xs text-muted-foreground">Billed monthly. Cancel anytime.</p>
+                                    <div className="text-2xl font-bold">฿{product.price_monthly.toLocaleString()}</div>
+                                    <p className="text-xs text-muted-foreground">ชำระทุกเดือน ยกเลิกได้ตลอดเวลา</p>
                                 </div>
 
                                 {/* Lifetime Option */}
                                 <div className="relative border-2 border-accent/50 rounded-lg p-4 bg-accent/5 cursor-pointer hover:bg-accent/10 transition-colors">
                                     <div className="absolute -top-3 right-4 bg-accent text-black text-xs font-bold px-2 py-0.5 rounded-full">
-                                        BEST VALUE
+                                        คุ้มค่าที่สุด
                                     </div>
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="font-semibold text-accent">Lifetime</span>
+                                        <span className="font-semibold text-accent">ถาวร (Lifetime)</span>
                                         <Zap className="w-4 h-4 text-accent" />
                                     </div>
-                                    <div className="text-2xl font-bold text-accent gold-glow">${product.price_lifetime}</div>
-                                    <p className="text-xs text-muted-foreground">One-time payment. Forever access.</p>
+                                    <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</div>
+                                    <p className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</p>
                                 </div>
                             </div>
 
                             <Button size="lg" className="w-full text-base font-semibold shadow-xl shadow-blue-900/20">
-                                Buy License Now
+                                ซื้อลิขสิทธิ์ทันที
                             </Button>
                             <p className="text-center text-xs text-muted-foreground mt-3">
-                                Secure payment via Stripe / QR Code. Instant delivery.
+                                ชำระเงินปลอดภัยผ่าน QR Code / บัตรเครดิต รับสินค้าทันที
                             </p>
                         </div>
                     </div>

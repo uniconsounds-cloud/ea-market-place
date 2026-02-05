@@ -45,8 +45,8 @@ export default function LoginPage() {
             <div className="flex-1 flex items-center justify-center p-4">
                 <div className="glass-card w-full max-w-md p-8 rounded-xl border border-border">
                     <div className="text-center mb-8">
-                        <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
-                        <p className="text-muted-foreground">Sign in to your account</p>
+                        <h1 className="text-2xl font-bold mb-2">ยินดีต้อนรับกลับมา</h1>
+                        <p className="text-muted-foreground">เข้าสู่ระบบเพื่อจัดการ License ของคุณ</p>
                     </div>
 
                     {error && (
@@ -57,7 +57,7 @@ export default function LoginPage() {
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="email">Email</label>
+                            <label className="text-sm font-medium" htmlFor="email">อีเมล</label>
                             <input
                                 id="email"
                                 type="email"
@@ -70,8 +70,8 @@ export default function LoginPage() {
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium" htmlFor="password">Password</label>
-                                <Link href="#" className="text-xs text-primary hover:underline">Forgot password?</Link>
+                                <label className="text-sm font-medium" htmlFor="password">รหัสผ่าน</label>
+                                <Link href="#" className="text-xs text-primary hover:underline">ลืมรหัสผ่าน?</Link>
                             </div>
                             <input
                                 id="password"
@@ -84,14 +84,14 @@ export default function LoginPage() {
                         </div>
 
                         <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? 'Signing in...' : 'Sign In'}
+                            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
                         </Button>
                     </form>
 
                     <div className="mt-6 text-center text-sm">
-                        <span className="text-muted-foreground">Don't have an account? </span>
+                        <span className="text-muted-foreground">ยังไม่มีบัญชีใช่ไหม? </span>
                         <Link href="/register" className="text-primary hover:underline font-medium">
-                            Register
+                            สมัครสมาชิก
                         </Link>
                     </div>
                 </div>

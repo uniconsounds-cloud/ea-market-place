@@ -8,13 +8,13 @@ export function Footer() {
                     <div className="space-y-3">
                         <h3 className="text-lg font-bold">EA Market</h3>
                         <p className="text-sm text-muted-foreground">
-                            Premium Expert Advisors for professional traders.
-                            Automate your trading with our verified algorithms.
+                            แหล่งรวม Expert Advisors ระดับพรีเมียมสำหรับนักเทรดมืออาชีพ
+                            ช่วยให้การเทรดของคุณเป็นอัตโนมัติด้วยอัลกอริทึมที่ผ่านการตรวจสอบแล้ว
                         </p>
                     </div>
 
                     <div>
-                        <h4 className="font-semibold mb-3">Products</h4>
+                        <h4 className="font-semibold mb-3">สินค้า</h4>
                         <ul className="space-y-2 text-sm text-muted-foreground">
                             <li><Link href="/" className="hover:text-foreground">Gold Scalper</Link></li>
                             <li><Link href="/" className="hover:text-foreground">Trend Hunter</Link></li>
@@ -23,25 +23,25 @@ export function Footer() {
                     </div>
 
                     <div>
-                        <h4 className="font-semibold mb-3">Support</h4>
+                        <h4 className="font-semibold mb-3">ช่วยเหลือ</h4>
                         <ul className="space-y-2 text-sm text-muted-foreground">
-                            <li><Link href="#" className="hover:text-foreground">Documentation</Link></li>
-                            <li><Link href="#" className="hover:text-foreground">Installation Guide</Link></li>
-                            <li><Link href="#" className="hover:text-foreground">Contact Us</Link></li>
+                            <li><Link href="#" className="hover:text-foreground">คู่มือการใช้งาน</Link></li>
+                            <li><Link href="#" className="hover:text-foreground">วิธีการติดตั้ง</Link></li>
+                            <li><Link href="#" className="hover:text-foreground">ติดต่อเรา</Link></li>
                         </ul>
                     </div>
 
                     <div>
-                        <h4 className="font-semibold mb-3">Legal</h4>
+                        <h4 className="font-semibold mb-3">กฎหมาย</h4>
                         <ul className="space-y-2 text-sm text-muted-foreground">
-                            <li><Link href="#" className="hover:text-foreground">Terms of Service</Link></li>
-                            <li><Link href="#" className="hover:text-foreground">Privacy Policy</Link></li>
-                            <li><Link href="#" className="hover:text-foreground">Risk Warning</Link></li>
+                            <li><Link href="#" className="hover:text-foreground">ข้อกำหนดการใช้งาน</Link></li>
+                            <li><Link href="#" className="hover:text-foreground">นโยบายความเป็นส่วนตัว</Link></li>
+                            <li><Link href="#" className="hover:text-foreground">คำเตือนความเสี่ยง</Link></li>
                         </ul>
                     </div>
                 </div>
                 <div className="mt-8 pt-8 border-t border-border/50 text-center text-sm text-muted-foreground">
-                    © {new Date().getFullYear()} EA Market. All rights reserved.
+                    © {new Date().getFullYear()} EA Market. สงวนลิขสิทธิ์
                 </div>
             </div>
         </footer>

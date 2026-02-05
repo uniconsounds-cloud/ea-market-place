@@ -50,19 +50,19 @@ export function ProductCard({ product }: { product: Product }) {
                 <div className="mt-auto space-y-4">
                     <div className="flex items-center justify-between border-t border-border/50 pt-4">
                         <div className="text-center">
-                            <span className="text-xs text-muted-foreground block">Monthly</span>
-                            <span className="text-lg font-bold text-white">${product.price_monthly}</span>
+                            <span className="text-xs text-muted-foreground block">รายเดือน</span>
+                            <span className="text-lg font-bold text-white">฿{product.price_monthly.toLocaleString()}</span>
                         </div>
                         <div className="h-8 w-[1px] bg-border/50" />
                         <div className="text-center">
-                            <span className="text-xs text-muted-foreground block">Lifetime</span>
-                            <span className="text-lg font-bold text-accent gold-glow">${product.price_lifetime}</span>
+                            <span className="text-xs text-muted-foreground block">ถาวร (Lifetime)</span>
+                            <span className="text-lg font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</span>
                         </div>
                     </div>
 
                     <Link href={`/products/${product.id}`} className="block">
                         <Button className="w-full group" variant="default">
-                            View Details
+                            ดูรายละเอียด
                             <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                         </Button>
                     </Link>

@@ -1,95 +1,89 @@
-import { Button } from '@/components/ui/button';
-import { MOCK_PRODUCTS } from '@/lib/data';
-import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Activity, CreditCard, Key, ShoppingCart } from 'lucide-react';
 
-export default function Dashboard() {
-    // Mock User Data
-    const stats = {
-        activeLicenses: 2,
-        totalSpent: 450,
-        nextBilling: 'Feb 28, 2026'
-    };
-
-    const myLicenses = [
-        {
-            id: 'lic_1',
-            product: MOCK_PRODUCTS[0],
-            account: '88192301',
-            status: 'active',
-            type: 'lifetime'
-        },
-        {
-            id: 'lic_2',
-            product: MOCK_PRODUCTS[1],
-            account: 'PENDING',
-            status: 'pending_setup',
-            type: 'monthly'
-        }
-    ];
-
+export default function DashboardPage() {
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Manage your EAs and trading accounts</p>
+                <h1 className="text-3xl font-bold">ภาพรวมบัญชี</h1>
+                <p className="text-muted-foreground">ยินดีต้อนรับกลับมา, นี่คือสถานะล่าสุดของคุณ</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <div className="p-6 rounded-xl bg-card border border-border">
-                    <h3 className="text-sm font-medium text-muted-foreground">Active Licenses</h3>
-                    <div className="text-2xl font-bold mt-2">{stats.activeLicenses}</div>
-                </div>
-                <div className="p-6 rounded-xl bg-card border border-border">
-                    <h3 className="text-sm font-medium text-muted-foreground">Total Invested</h3>
-                    <div className="text-2xl font-bold mt-2 text-primary">${stats.totalSpent}</div>
-                </div>
-                <div className="p-6 rounded-xl bg-card border border-border">
-                    <h3 className="text-sm font-medium text-muted-foreground">Next Billing</h3>
-                    <div className="text-2xl font-bold mt-2">{stats.nextBilling}</div>
-                </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">License ที่ใช้งาน</CardTitle>
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">3</div>
+                        <p className="text-xs text-muted-foreground">+1 จากเดือนที่แล้ว</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">ยอดลงทุนรวม</CardTitle>
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">฿15,200</div>
+                        <p className="text-xs text-muted-foreground">+20% จากเดือนที่แล้ว</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">สถานะ Account</CardTitle>
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-500">Active</div>
+                        <p className="text-xs text-muted-foreground">เชื่อมต่อปกติ</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">สินค้าทั้งหมด</CardTitle>
+                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">12</div>
+                        <p className="text-xs text-muted-foreground">มีสินค้าใหม่ 2 รายการ</p>
+                    </CardContent>
+                </Card>
             </div>
 
-            <div>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Recent Licenses</h2>
-                    <Link href="/dashboard/licenses">
-                        <Button variant="ghost" size="sm">View All</Button>
-                    </Link>
-                </div>
-
-                <div className="rounded-xl border border-border bg-card/50 overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
-                            <tr>
-                                <th className="px-6 py-3">Product</th>
-                                <th className="px-6 py-3">Account #</th>
-                                <th className="px-6 py-3">Type</th>
-                                <th className="px-6 py-3">Status</th>
-                                <th className="px-6 py-3">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {myLicenses.map((lic) => (
-                                <tr key={lic.id} className="hover:bg-muted/10 transition-colors">
-                                    <td className="px-6 py-4 font-medium">{lic.product.name}</td>
-                                    <td className="px-6 py-4 font-mono">{lic.account}</td>
-                                    <td className="px-6 py-4 capitalize">{lic.type}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${lic.status === 'active'
-                                                ? 'bg-green-500/10 text-green-500'
-                                                : 'bg-yellow-500/10 text-yellow-500'
-                                            }`}>
-                                            {lic.status.replace('_', ' ')}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <Button size="sm" variant="outline">Manage</Button>
-                                    </td>
-                                </tr>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                <Card className="col-span-full">
+                    <CardHeader>
+                        <CardTitle>License ล่าสุดของคุณ</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-8">
+                            {[
+                                { name: 'Gold Scalper Pro', type: 'รายเดือน', status: 'Active', expiry: '29 ก.พ. 2026' },
+                                { name: 'Trend Hunter EA', type: 'ถาวร', status: 'Active', expiry: 'ตลอดชีพ' },
+                                { name: 'Grid Master', type: 'รายเดือน', status: 'Expired', expiry: '15 ม.ค. 2026' },
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-center">
+                                    <div className="ml-4 space-y-1">
+                                        <p className="text-sm font-medium leading-none">{item.name}</p>
+                                        <p className="text-sm text-muted-foreground">{item.type}</p>
+                                    </div>
+                                    <div className="ml-auto font-medium text-sm">
+                                        {item.status === 'Active' ? (
+                                            <span className="text-green-500">ใช้งานได้</span>
+                                        ) : (
+                                            <span className="text-red-500">หมดอายุ</span>
+                                        )}
+                                    </div>
+                                    <div className="ml-8 text-sm text-muted-foreground w-24 text-right">
+                                        {item.expiry}
+                                    </div>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

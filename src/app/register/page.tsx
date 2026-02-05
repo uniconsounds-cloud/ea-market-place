@@ -37,7 +37,7 @@ export default function RegisterPage() {
             }
 
             // Check if email confirmation is required (default in Supabase)
-            alert("Registration successful! Please check your email to verify your account.");
+            alert("สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชีของคุณ");
             router.push('/login');
         } catch (err: any) {
             setError(err.message);
@@ -52,8 +52,8 @@ export default function RegisterPage() {
             <div className="flex-1 flex items-center justify-center p-4">
                 <div className="glass-card w-full max-w-md p-8 rounded-xl border border-border">
                     <div className="text-center mb-8">
-                        <h1 className="text-2xl font-bold mb-2">Create Account</h1>
-                        <p className="text-muted-foreground">Join thousands of professional traders</p>
+                        <h1 className="text-2xl font-bold mb-2">สร้างบัญชีใหม่</h1>
+                        <p className="text-muted-foreground">เข้าร่วมสังคมนักเทรดมืออาชีพวันนี้</p>
                     </div>
 
                     {error && (
@@ -64,19 +64,19 @@ export default function RegisterPage() {
 
                     <form onSubmit={handleRegister} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="fullName">Full Name</label>
+                            <label className="text-sm font-medium" htmlFor="fullName">ชื่อ-นามสกุล</label>
                             <input
                                 id="fullName"
                                 type="text"
                                 required
                                 className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                placeholder="John Doe"
+                                placeholder="สมชาย ใจดี"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="email">Email</label>
+                            <label className="text-sm font-medium" htmlFor="email">อีเมล</label>
                             <input
                                 id="email"
                                 type="email"
@@ -88,7 +88,7 @@ export default function RegisterPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="password">Password</label>
+                            <label className="text-sm font-medium" htmlFor="password">รหัสผ่าน</label>
                             <input
                                 id="password"
                                 type="password"
@@ -100,14 +100,14 @@ export default function RegisterPage() {
                         </div>
 
                         <Button type="submit" className="w-full" variant="gold" disabled={loading}>
-                            {loading ? 'Creating Account...' : 'Sign Up'}
+                            {loading ? 'กำลังสร้างบัญชี...' : 'ยืนยันการสมัคร'}
                         </Button>
                     </form>
 
                     <div className="mt-6 text-center text-sm">
-                        <span className="text-muted-foreground">Already have an account? </span>
+                        <span className="text-muted-foreground">มีบัญชีอยู่แล้ว? </span>
                         <Link href="/login" className="text-primary hover:underline font-medium">
-                            Sign In
+                            เข้าสู่ระบบ
                         </Link>
                     </div>
                 </div>

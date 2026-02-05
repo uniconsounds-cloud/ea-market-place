@@ -16,9 +16,9 @@ export function Navbar() {
                 </div>
 
                 <div className="hidden md:flex gap-6 items-center text-sm font-medium text-muted-foreground">
-                    <Link href="/" className="hover:text-foreground transition-colors">Marketplace</Link>
-                    <Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link>
-                    <Link href="#" className="hover:text-foreground transition-colors">Support</Link>
+                    <Link href="/" className="hover:text-foreground transition-colors">ร้านค้า</Link>
+                    <Link href="/dashboard" className="hover:text-foreground transition-colors">แดชบอร์ด</Link>
+                    <Link href="#" className="hover:text-foreground transition-colors">ช่วยเหลือ</Link>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -26,10 +26,10 @@ export function Navbar() {
                         <ShoppingCart className="h-5 w-5" />
                     </Button>
                     <Link href="/login">
-                        <Button variant="outline" className="hidden sm:inline-flex">Sign In</Button>
+                        <Button variant="outline" className="hidden sm:inline-flex">เข้าสู่ระบบ</Button>
                     </Link>
                     <Link href="/register">
-                        <Button variant="gold">Get Started</Button>
+                        <Button variant="gold">สมัครสมาชิก</Button>
                     </Link>
                 </div>
             </div>
