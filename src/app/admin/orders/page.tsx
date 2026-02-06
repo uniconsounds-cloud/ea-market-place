@@ -31,7 +31,27 @@ export default function AdminOrdersPage() {
             console.error('Error fetching orders:', error);
         }
 
-        if (data) setOrders(data);
+        if (data && data.length > 0) {
+            setOrders(data);
+        } else {
+            // Fallback: Fetch raw orders if joins fail (or if no joined data found)
+            console.log('Main fetch returned empty. Trying raw fetch...');
+            const { data: rawData, error: rawError } = await supabase
+                .from('orders')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (rawData) {
+                console.log('Raw fetch result:', rawData);
+                // Map raw data to match structure (partially) so it renders
+                const mappedData = rawData.map(o => ({
+                    ...o,
+                    products: { name: 'Raw Product (' + o.product_id + ')', price_monthly: 0, price_lifetime: 0 },
+                    profiles: { full_name: 'Raw User', email: o.user_id }
+                }));
+                setOrders(mappedData);
+            }
+        }
         setLoading(false);
     };
 
