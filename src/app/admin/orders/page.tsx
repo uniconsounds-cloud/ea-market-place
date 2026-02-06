@@ -18,12 +18,13 @@ export default function AdminOrdersPage() {
     const fetchOrders = async () => {
         setLoading(true);
 
+        // Use explicit foreign key names to avoid ambiguity
         const { data, error } = await supabase
             .from('orders')
             .select(`
                 *,
-                products (name, price_monthly, price_lifetime),
-                profiles (full_name, email)
+                products!orders_product_id_fkey (name, price_monthly, price_lifetime),
+                profiles!orders_user_id_profiles_fkey (full_name, email)
             `)
             .order('created_at', { ascending: false });
 
