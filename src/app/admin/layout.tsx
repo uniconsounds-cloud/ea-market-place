@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -67,10 +67,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             ภาพรวม
                         </Button>
                     </Link>
+
                     <Link href="/admin/products">
                         <Button variant="ghost" className="w-full justify-start">
                             <Package className="mr-2 h-4 w-4" />
                             จัดการสินค้า
+                        </Button>
+                    </Link>
+                    <Link href="/admin/orders">
+                        <Button variant="ghost" className="w-full justify-start">
+                            <FileText className="mr-2 h-4 w-4" />
+                            รายการสั่งซื้อ
                         </Button>
                     </Link>
                 </nav>
@@ -87,6 +94,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="flex-1 md:ml-64 p-8">
                 {children}
             </div>
-        </div>
+        </div >
     );
 }
