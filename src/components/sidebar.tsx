@@ -65,7 +65,13 @@ export function SidebarContent({
                 })}
             </nav>
 
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border space-y-2">
+                <Link href="/" onClick={onClose}>
+                    <Button variant="outline" className="w-full justify-start gap-3">
+                        <Home className="h-4 w-4" />
+                        กลับหน้าหลัก
+                    </Button>
+                </Link>
                 <Button variant="ghost" className="w-full justify-start gap-3 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={handleSignOut}>
                     <LogOut className="h-4 w-4" />
                     ออกจากระบบ
