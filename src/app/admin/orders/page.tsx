@@ -21,10 +21,15 @@ export default function AdminOrdersPage() {
             .from('orders')
             .select(`
                 *,
-                products (name, price_ monthly, price_lifetime),
+                products (name, price_monthly, price_lifetime),
                 profiles (full_name, email)
             `)
             .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching orders:', error);
+            // alert('Error fetching orders: ' + error.message); // Optional: alert user
+        }
 
         if (data) setOrders(data);
         setLoading(false);
@@ -131,8 +136,8 @@ export default function AdminOrdersPage() {
                                     <div className="flex justify-between">
                                         <h3 className="font-bold text-lg">{order.products?.name || 'Unknown Product'}</h3>
                                         <span className={`px-2 py-0.5 rounded text-xs uppercase font-bold ${order.status === 'completed' ? 'bg-green-500/20 text-green-500' :
-                                                order.status === 'rejected' ? 'bg-red-500/20 text-red-500' :
-                                                    'bg-yellow-500/20 text-yellow-500'
+                                            order.status === 'rejected' ? 'bg-red-500/20 text-red-500' :
+                                                'bg-yellow-500/20 text-yellow-500'
                                             }`}>
                                             {order.status}
                                         </span>
