@@ -13,15 +13,23 @@ interface ProductPurchaseSectionProps {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import { Checkbox } from '@/components/ui/checkbox';
+
 export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps) {
     const router = useRouter();
     const [selectedType, setSelectedType] = useState<'monthly' | 'lifetime'>('lifetime');
     const [accountNumber, setAccountNumber] = useState('');
+    const [riskAccepted, setRiskAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const handlePurchase = async () => {
         if (!accountNumber.trim()) {
             alert('กรุณากรอกหมายเลขพอร์ต (Account Number)');
+            return;
+        }
+
+        if (!riskAccepted) {
+            alert('กรุณายอมรับความเสี่ยงและข้อตกลงก่อนดำเนินการต่อ');
             return;
         }
 
@@ -73,6 +81,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 </p>
             </div>
 
+            {/* License Type Selection */}
             <div>
                 <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -103,6 +112,44 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         </div>
                         <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Risk Disclosure Section */}
+            <div className="space-y-4 pt-4 border-t border-border">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 h-32 overflow-y-auto text-xs text-muted-foreground">
+                    <h4 className="font-bold text-destructive mb-2 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> คำเตือนความเสี่ยง (Risk Disclosure)
+                    </h4>
+                    <p className="mb-2">
+                        การลงทุนในตลาด Forex และการใช้งาน Expert Advisor (EA) มีความเสี่ยงสูง ผู้ลงทุนอาจสูญเสียเงินลงทุนทั้งหมด ผลการดำเนินงานในอดีตมิได้เป็นสิ่งยืนยันถึงผลการดำเนินงานในอนาคต
+                    </p>
+                    <p className="mb-2">
+                        ผู้ใช้งานควรทำความเข้าใจลักษณะสินค้า เงื่อนไขผลตอบแทน และความเสี่ยงก่อนตัดสินใจลงทุน
+                        ทาง EA Market Place ไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการใช้งานซอฟต์แวร์นี้ การตัดสินใจลงทุนเป็นความรับผิดชอบของผู้ใช้งานแต่เพียงผู้เดียว
+                    </p>
+                    <p>
+                        การซื้อ License เป็นการซื้อสิทธิ์การใช้งานซอฟต์แวร์เท่านั้น ไม่ใช่การระดมทุนหรือการการันตีผลกำไร
+                    </p>
+                </div>
+
+                <div className="flex items-start space-x-3 p-2">
+                    <Checkbox
+                        id="risk-agreement"
+                        checked={riskAccepted}
+                        onCheckedChange={(checked) => setRiskAccepted(checked as boolean)}
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                        <Label
+                            htmlFor="risk-agreement"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                            ข้าพเจ้าได้อ่านและยอมรับความเสี่ยง รวมถึงข้อตกลงในการใช้งาน
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                            คุณต้องยอมรับข้อตกลงก่อนดำเนินการต่อ
+                        </p>
                     </div>
                 </div>
             </div>
