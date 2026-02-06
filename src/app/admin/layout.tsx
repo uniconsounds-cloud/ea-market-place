@@ -51,29 +51,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (!isAdmin) return null;
 
-    const SidebarContent = () => (
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+    const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
         <div className="flex flex-col h-full bg-card">
             <div className="h-16 flex items-center px-6 border-b border-border">
-                <Link href="/admin" className="font-bold text-xl flex items-center gap-2">
+                <Link href="/admin" className="font-bold text-xl flex items-center gap-2" onClick={() => mobile && setIsSheetOpen(false)}>
                     <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">ADMIN</span>
                     Panel
                 </Link>
             </div>
             <nav className="flex-1 p-4 space-y-2">
-                <Link href="/admin">
+                <Link href="/admin" onClick={() => mobile && setIsSheetOpen(false)}>
                     <Button variant="ghost" className="w-full justify-start">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         ภาพรวม
                     </Button>
                 </Link>
 
-                <Link href="/admin/products">
+                <Link href="/admin/products" onClick={() => mobile && setIsSheetOpen(false)}>
                     <Button variant="ghost" className="w-full justify-start">
                         <Package className="mr-2 h-4 w-4" />
                         จัดการสินค้า
                     </Button>
                 </Link>
-                <Link href="/admin/orders">
+                <Link href="/admin/orders" onClick={() => mobile && setIsSheetOpen(false)}>
                     <Button variant="ghost" className="w-full justify-start">
                         <FileText className="mr-2 h-4 w-4" />
                         รายการสั่งซื้อ
@@ -81,7 +83,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </Link>
             </nav>
             <div className="p-4 border-t border-border">
-                <Link href="/">
+                <Link href="/" onClick={() => mobile && setIsSheetOpen(false)}>
                     <Button variant="outline" className="w-full">
                         <LogOut className="mr-2 h-4 w-4" /> กลับหน้าร้านค้า
                     </Button>
@@ -103,14 +105,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded">ADMIN</span>
                     Panel
                 </div>
-                <Sheet>
+                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
                         <Button variant="ghost" size="icon">
                             <Menu className="h-5 w-5" />
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-64">
-                        <SidebarContent />
+                        <SidebarContent mobile />
                     </SheetContent>
                 </Sheet>
             </div>
