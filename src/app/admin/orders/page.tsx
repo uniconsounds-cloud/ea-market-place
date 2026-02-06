@@ -17,7 +17,7 @@ export default function AdminOrdersPage() {
 
     const fetchOrders = async () => {
         setLoading(true);
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('orders')
             .select(`
                 *,
