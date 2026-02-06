@@ -19,6 +19,7 @@ export function Navbar() {
     const router = useRouter();
     const [user, setUser] = useState<any>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         // Consolidated function to fetch user and role
@@ -31,6 +32,7 @@ export function Navbar() {
                 setUser(null);
                 setIsAdmin(false);
             }
+            setLoading(false);
         };
 
         // Check initial session
@@ -89,7 +91,9 @@ export function Navbar() {
                         <ShoppingCart className="h-5 w-5" />
                     </Button>
 
-                    {user ? (
+                    {loading ? (
+                        <div className="h-10 w-20 bg-muted/20 animate-pulse rounded-md"></div>
+                    ) : user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="rounded-full bg-secondary/50">
