@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
@@ -50,48 +51,72 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (!isAdmin) return null;
 
+    const SidebarContent = () => (
+        <div className="flex flex-col h-full bg-card">
+            <div className="h-16 flex items-center px-6 border-b border-border">
+                <Link href="/admin" className="font-bold text-xl flex items-center gap-2">
+                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">ADMIN</span>
+                    Panel
+                </Link>
+            </div>
+            <nav className="flex-1 p-4 space-y-2">
+                <Link href="/admin">
+                    <Button variant="ghost" className="w-full justify-start">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        ภาพรวม
+                    </Button>
+                </Link>
+
+                <Link href="/admin/products">
+                    <Button variant="ghost" className="w-full justify-start">
+                        <Package className="mr-2 h-4 w-4" />
+                        จัดการสินค้า
+                    </Button>
+                </Link>
+                <Link href="/admin/orders">
+                    <Button variant="ghost" className="w-full justify-start">
+                        <FileText className="mr-2 h-4 w-4" />
+                        รายการสั่งซื้อ
+                    </Button>
+                </Link>
+            </nav>
+            <div className="p-4 border-t border-border">
+                <Link href="/">
+                    <Button variant="outline" className="w-full">
+                        <LogOut className="mr-2 h-4 w-4" /> กลับหน้าร้านค้า
+                    </Button>
+                </Link>
+            </div>
+        </div>
+    );
+
     return (
         <div className="flex min-h-screen bg-background">
-            {/* Admin Sidebar */}
-            <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col fixed h-full">
-                <div className="h-16 flex items-center px-6 border-b border-border">
-                    <Link href="/admin" className="font-bold text-xl flex items-center gap-2">
-                        <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">ADMIN</span>
-                        Panel
-                    </Link>
-                </div>
-                <nav className="flex-1 p-4 space-y-2">
-                    <Link href="/admin">
-                        <Button variant="ghost" className="w-full justify-start">
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            ภาพรวม
-                        </Button>
-                    </Link>
-
-                    <Link href="/admin/products">
-                        <Button variant="ghost" className="w-full justify-start">
-                            <Package className="mr-2 h-4 w-4" />
-                            จัดการสินค้า
-                        </Button>
-                    </Link>
-                    <Link href="/admin/orders">
-                        <Button variant="ghost" className="w-full justify-start">
-                            <FileText className="mr-2 h-4 w-4" />
-                            รายการสั่งซื้อ
-                        </Button>
-                    </Link>
-                </nav>
-                <div className="p-4 border-t border-border">
-                    <Link href="/">
-                        <Button variant="outline" className="w-full">
-                            <LogOut className="mr-2 h-4 w-4" /> กลับหน้าร้านค้า
-                        </Button>
-                    </Link>
-                </div>
+            {/* Desktop Sidebar */}
+            <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col fixed h-full z-50">
+                <SidebarContent />
             </aside>
 
+            {/* Mobile Header */}
+            <div className="md:hidden fixed top-0 left-0 right-0 h-16 border-b border-border bg-card flex items-center px-4 z-50 justify-between">
+                <div className="font-bold text-lg flex items-center gap-2">
+                    <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded">ADMIN</span>
+                    Panel
+                </div>
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Menu className="h-5 w-5" />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-64">
+                        <SidebarContent />
+                    </SheetContent>
+                </Sheet>
+            </div>
+
             {/* Main Content */}
-            <div className="flex-1 md:ml-64 p-8">
+            <div className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 w-full">
                 {children}
             </div>
         </div >
