@@ -199,7 +199,7 @@ export default function SettingsPage() {
                         />
                     </div>
 
-                    <Button type="submit" variant="secondary" disabled={savingPassword} className="w-full sm:w-auto">
+                    <Button type="submit" variant="outline" disabled={savingPassword} className="w-full sm:w-auto">
                         {savingPassword ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
