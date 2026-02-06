@@ -11,12 +11,20 @@ export default function AdminOrdersPage() {
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
     useEffect(() => {
         fetchOrders();
     }, []);
 
     const fetchOrders = async () => {
         setLoading(true);
+        setErrorMsg(null);
+
+        // Diagnostic: Fetch raw orders count first
+        const { count, error: countError } = await supabase.from('orders').select('*', { count: 'exact', head: true });
+        console.log('Diagnostic: Raw orders count:', count, 'Error:', countError);
+
         const { data, error } = await supabase
             .from('orders')
             .select(`
@@ -28,7 +36,7 @@ export default function AdminOrdersPage() {
 
         if (error) {
             console.error('Error fetching orders:', error);
-            // alert('Error fetching orders: ' + error.message); // Optional: alert user
+            setErrorMsg('Error: ' + error.message + ' (Check console for details)');
         }
 
         if (data) setOrders(data);
@@ -110,6 +118,12 @@ export default function AdminOrdersPage() {
                 </div>
                 <Button variant="outline" onClick={fetchOrders}><Search className="w-4 h-4 mr-2" /> Refresh</Button>
             </div>
+
+            {errorMsg && (
+                <div className="p-4 bg-red-500/20 border border-red-500/50 text-red-500 rounded-md">
+                    {errorMsg}
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
