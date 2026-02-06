@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 
 const sidebarItems = [
     { href: '/dashboard', label: 'ภาพรวม', icon: LayoutDashboard },
-    { href: '/dashboard/licenses', label: 'License ของฉัน', icon: Key },
+    // { href: '/dashboard/licenses', label: 'License ของฉัน', icon: Key }, // Removed as per request
     { href: '/dashboard/billing', label: 'การชำระเงิน', icon: CreditCard },
     { href: '/dashboard/settings', label: 'ตั้งค่าบัญชี', icon: Settings },
 ];

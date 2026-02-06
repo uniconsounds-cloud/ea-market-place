@@ -146,6 +146,9 @@ export default function DashboardPage() {
                                             <p className="text-sm text-muted-foreground">
                                                 {item.type === 'monthly' ? 'รายเดือน' : 'ถาวร'}
                                             </p>
+                                            <p className="text-sm font-mono text-accent">
+                                                Port: {item.account_number || '-'}
+                                            </p>
                                         </div>
                                         <div className="ml-auto font-medium text-sm">
                                             {item.is_active ? (
