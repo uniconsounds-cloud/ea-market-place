@@ -87,9 +87,11 @@ export function Navbar() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon">
-                        <ShoppingCart className="h-5 w-5" />
-                    </Button>
+                    <Link href="/dashboard/billing">
+                        <Button variant="ghost" size="icon">
+                            <ShoppingCart className="h-5 w-5" />
+                        </Button>
+                    </Link>
 
                     {loading ? (
                         <div className="h-10 w-20 bg-muted/20 animate-pulse rounded-md"></div>
