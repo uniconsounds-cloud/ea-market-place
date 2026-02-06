@@ -1,45 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Upload, BadgeCheck, QrCode } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, BadgeCheck, QrCode } from 'lucide-react';
 
 export default function CheckoutPage(props: { params: Promise<{ id: string }> }) {
-    // Unwrap params using React.use() or await in async component. 
-    // Since this is a client component, we need to handle the promise or just use 'useParams' from next/navigation
-    // But `props.params` is a standard way in Next.js 15+ for Server Components. 
-    // For Client Component, it's safer to use `useParams` hook or await props in a parent Server Component.
-    // Let's make this a Client Component that fetches data, simpler for now.
-
-    // Actually, let's use the hook for params
-    return <CheckoutContent paramsPromise={props.params} />;
+    // Unwrap params using React.use()
+    const params = use(props.params);
+    return <CheckoutContent productId={params.id} />;
 }
 
-function CheckoutContent({ paramsPromise }: { paramsPromise: Promise<{ id: string }> }) {
+function CheckoutContent({ productId }: { productId: string }) {
     const router = useRouter();
-    const [id, setId] = useState<string>('');
+    const searchParams = useSearchParams();
+
+    // Initial state from URL params
+    const initialPlan = (searchParams.get('plan') as 'monthly' | 'lifetime') || 'lifetime';
+    const initialAccountNumber = searchParams.get('accountNumber') || '';
+
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [planType, setPlanType] = useState<'monthly' | 'lifetime'>('lifetime');
+    const [planType, setPlanType] = useState<'monthly' | 'lifetime'>(initialPlan);
+    const [accountNumber, setAccountNumber] = useState(initialAccountNumber);
     const [slipFile, setSlipFile] = useState<File | null>(null);
 
     useEffect(() => {
-        paramsPromise.then((p) => {
-            setId(p.id);
-            fetchProduct(p.id);
-        });
-    }, [paramsPromise]);
+        fetchProduct(productId);
+    }, [productId]);
 
-    const fetchProduct = async (productId: string) => {
-        const { data } = await supabase.from('products').select('*').eq('id', productId).single();
+    const fetchProduct = async (id: string) => {
+        const { data } = await supabase.from('products').select('*').eq('id', id).single();
         if (data) {
             setProduct(data);
         } else {
@@ -51,21 +48,13 @@ function CheckoutContent({ paramsPromise }: { paramsPromise: Promise<{ id: strin
 
     const handleUpload = async (userId: string) => {
         if (!slipFile) return null;
-
-        // Sanitize filename to avoid "Invalid Key" errors
         const fileExt = slipFile.name.split('.').pop();
         const randomString = Math.random().toString(36).substring(2, 15);
         const fileName = `${userId}/${Date.now()}_${randomString}.${fileExt}`;
 
         try {
-            const { data, error } = await supabase.storage.from('slips').upload(fileName, slipFile);
-
-            if (error) {
-                console.error('Upload info:', { bucket: 'slips', fileName, error });
-                // If bucket not found, it gives a specific error usually.
-                // "Invalid key" is usually bad chars.
-                throw error;
-            }
+            const { error } = await supabase.storage.from('slips').upload(fileName, slipFile);
+            if (error) throw error;
         } catch (originalError: any) {
             console.error('Upload Block Error:', originalError);
             throw new Error(`Upload failed: ${originalError.message || 'Unknown error'}`);
@@ -78,6 +67,10 @@ function CheckoutContent({ paramsPromise }: { paramsPromise: Promise<{ id: strin
     const handleSubmit = async () => {
         if (!slipFile) {
             alert('กรุณาแนบสลิปโอนเงิน');
+            return;
+        }
+        if (!accountNumber.trim()) {
+            alert('กรุณากรอกหมายเลขพอร์ต (Account Number)');
             return;
         }
 
@@ -99,7 +92,8 @@ function CheckoutContent({ paramsPromise }: { paramsPromise: Promise<{ id: strin
                 amount: planType === 'monthly' ? product.price_monthly : product.price_lifetime,
                 status: 'pending',
                 slip_url: slipUrl,
-                plan_type: planType
+                plan_type: planType,
+                account_number: accountNumber.trim() // Save account number
             });
 
             if (error) throw error;
@@ -137,34 +131,49 @@ function CheckoutContent({ paramsPromise }: { paramsPromise: Promise<{ id: strin
                     </CardContent>
                 </Card>
 
-                {/* Plan Selection */}
+                {/* Account Number & Plan */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>รูปแบบลิขสิทธิ์</CardTitle>
+                        <CardTitle>ข้อมูลการใช้งาน</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <RadioGroup defaultValue="lifetime" onValueChange={(v: any) => setPlanType(v)} className="grid grid-cols-2 gap-4">
-                            <div>
-                                <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" />
-                                <Label
-                                    htmlFor="monthly"
-                                    className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
-                                >
-                                    <span className="mb-2 text-sm font-semibold">รายเดือน</span>
-                                    <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
-                                </Label>
-                            </div>
-                            <div>
-                                <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" />
-                                <Label
-                                    htmlFor="lifetime"
-                                    className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
-                                >
-                                    <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
-                                    <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
-                                </Label>
-                            </div>
-                        </RadioGroup>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="accountNumber">หมายเลขพอร์ต (Account Number)</Label>
+                            <Input
+                                id="accountNumber"
+                                value={accountNumber}
+                                onChange={(e) => setAccountNumber(e.target.value)}
+                                placeholder="Ex. 12345678"
+                                className="font-mono"
+                            />
+                            <p className="text-xs text-muted-foreground">โปรดตรวจสอบให้ถูกต้อง (ระบบจะอนุญาตให้ใช้สิทธิ์เฉพาะเลขพอร์ตนี้)</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>แพ็กเกจที่เลือก</Label>
+                            <RadioGroup value={planType} onValueChange={(v: any) => setPlanType(v)} className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" />
+                                    <Label
+                                        htmlFor="monthly"
+                                        className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
+                                    >
+                                        <span className="mb-2 text-sm font-semibold">รายเดือน</span>
+                                        <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
+                                    </Label>
+                                </div>
+                                <div>
+                                    <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" />
+                                    <Label
+                                        htmlFor="lifetime"
+                                        className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
+                                    >
+                                        <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
+                                        <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
                     </CardContent>
                 </Card>
 

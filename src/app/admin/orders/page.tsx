@@ -89,7 +89,7 @@ export default function AdminOrdersPage() {
                     type: order.plan_type || 'lifetime',
                     is_active: true,
                     expiry_date: expiryDate,
-                    account_number: '' // User fills this later
+                    account_number: order.account_number || '' // Use account number from order
                 });
 
             if (licenseError) throw licenseError;
@@ -168,6 +168,9 @@ export default function AdminOrdersPage() {
                                     </p>
                                     <p className="text-sm text-muted-foreground">
                                         ประเภท: <span className="text-primary font-medium uppercase">{order.plan_type}</span>
+                                    </p>
+                                    <p className="text-sm font-semibold text-accent">
+                                        Account No: {order.account_number || '-'}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
                                         วันที่: {new Date(order.created_at).toLocaleString('th-TH')}
