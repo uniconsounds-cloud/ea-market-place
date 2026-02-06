@@ -52,12 +52,23 @@ function CheckoutContent({ paramsPromise }: { paramsPromise: Promise<{ id: strin
     const handleUpload = async (userId: string) => {
         if (!slipFile) return null;
 
-        const fileName = `${userId}/${Date.now()}_${slipFile.name}`;
-        const { data, error } = await supabase.storage.from('slips').upload(fileName, slipFile);
+        // Sanitize filename to avoid "Invalid Key" errors
+        const fileExt = slipFile.name.split('.').pop();
+        const randomString = Math.random().toString(36).substring(2, 15);
+        const fileName = `${userId}/${Date.now()}_${randomString}.${fileExt}`;
 
-        if (error) {
-            console.error('Upload error:', error);
-            throw error;
+        try {
+            const { data, error } = await supabase.storage.from('slips').upload(fileName, slipFile);
+
+            if (error) {
+                console.error('Upload info:', { bucket: 'slips', fileName, error });
+                // If bucket not found, it gives a specific error usually.
+                // "Invalid key" is usually bad chars.
+                throw error;
+            }
+        } catch (originalError: any) {
+            console.error('Upload Block Error:', originalError);
+            throw new Error(`Upload failed: ${originalError.message || 'Unknown error'}`);
         }
 
         const { data: { publicUrl } } = supabase.storage.from('slips').getPublicUrl(fileName);
