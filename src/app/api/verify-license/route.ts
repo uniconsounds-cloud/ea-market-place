@@ -19,12 +19,33 @@ export async function POST(req: Request) {
         }
 
         // 2. Query Supabase
-        // We look for a license that matches product + account_number
+        // We look for a license that matches product (by UUID OR Key) + account_number
+
+        let targetProductUUID = product_id;
+
+        // If product_id is NOT a UUID (simple check), try to resolve it from product_key
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product_id);
+
+        if (!isUUID) {
+            const { data: product } = await supabase
+                .from('products')
+                .select('id')
+                .eq('product_key', product_id)
+                .single();
+
+            if (product) {
+                targetProductUUID = product.id;
+            } else {
+                // Product Key not found
+                return NextResponse.json({ status: 'invalid', message: 'Invalid Product ID/Key' }, { status: 200 });
+            }
+        }
+
         const { data: license, error } = await supabase
             .from('licenses')
             .select('*')
             .eq('account_number', account_number)
-            .eq('product_id', product_id)
+            .eq('product_id', targetProductUUID)
             .eq('is_active', true)
             .single();
 

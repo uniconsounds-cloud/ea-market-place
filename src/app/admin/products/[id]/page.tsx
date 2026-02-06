@@ -20,6 +20,7 @@ export default function ProductFormPage() {
 
     const [formData, setFormData] = useState({
         name: '',
+        product_key: '', // Added product_key
         description: '',
         price_monthly: '',
         price_lifetime: '',
@@ -40,16 +41,19 @@ export default function ProductFormPage() {
         if (data) {
             setFormData({
                 name: data.name,
+                product_key: data.product_key || '', // Fetch product_key
                 description: data.description || '',
                 price_monthly: data.price_monthly,
                 price_lifetime: data.price_lifetime,
                 image_url: data.image_url || '',
-                video_url: data.file_url || '', // reusing file_url for demo or video
+                video_url: data.file_url || '',
                 version: data.version || '1.0',
                 is_active: data.is_active
             });
         }
     };
+
+    // ... (handleChange and handleImageUpload remain the same) ...
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -92,6 +96,7 @@ export default function ProductFormPage() {
         try {
             const payload = {
                 name: formData.name,
+                product_key: formData.product_key || null, // Create payload
                 description: formData.description,
                 price_monthly: parseFloat(formData.price_monthly),
                 price_lifetime: parseFloat(formData.price_lifetime),
@@ -124,6 +129,7 @@ export default function ProductFormPage() {
 
     return (
         <div className="max-w-3xl mx-auto space-y-8">
+            {/* Same Header */}
             <div className="flex items-center gap-4">
                 <Link href="/admin/products">
                     <Button variant="ghost" size="icon">
@@ -138,10 +144,12 @@ export default function ProductFormPage() {
             <div className="bg-card p-8 rounded-xl border border-border">
                 <form onSubmit={handleSubmit} className="space-y-6">
 
-                    {/* Image Upload */}
+                    {/* Image Upload Block (Unchanged) */}
+
                     <div className="space-y-2">
                         <label className="text-sm font-medium">รูปภาพสินค้า</label>
                         <div className="flex items-center gap-4">
+                            {/* ... (Image preview content) ... */}
                             <div className="h-32 w-32 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-dashed border-gray-600">
                                 {formData.image_url ? (
                                     <img src={formData.image_url} alt="Preview" className="h-full w-full object-cover" />
@@ -171,15 +179,28 @@ export default function ProductFormPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">ชื่อ EA</label>
-                        <Input
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            required
-                            placeholder="Ex. Gold Scalper Pro"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">ชื่อ EA</label>
+                            <Input
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                required
+                                placeholder="Ex. Gold Scalper Pro"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Product Key (สำหรับ EA)</label>
+                            <Input
+                                name="product_key"
+                                value={formData.product_key}
+                                onChange={handleChange}
+                                placeholder="Ex. GOLD-EA-V1"
+                                className="font-mono"
+                            />
+                            <p className="text-[10px] text-muted-foreground">ใช้ใส่ในโค้ด EA (ถ้าว่างไว้จะใช้ UUID)</p>
+                        </div>
                     </div>
 
                     <div className="space-y-2">

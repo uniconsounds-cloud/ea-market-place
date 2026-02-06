@@ -84,3 +84,11 @@ using (auth.uid() in (select id from profiles where role = 'admin'));
 insert into products (name, description, price_monthly, price_lifetime, image_url, is_active)
 select 'Gold Scalper Pro', 'Advanced EA for Gold trading. High Winrate.', 990.00, 9900.00, '/images/ea1.jpg', true
 where not exists (select 1 from products where name = 'Gold Scalper Pro');
+
+-- 5. Add product_key for EA Integration
+do $$ 
+begin 
+  if not exists (select 1 from information_schema.columns where table_name = 'products' and column_name = 'product_key') then
+    alter table products add column product_key text unique;
+  end if;
+end $$;
