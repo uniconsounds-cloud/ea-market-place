@@ -37,6 +37,42 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         try {
             const { data: { user } } = await supabase.auth.getUser();
 
+            if (user) {
+                // 1. Check for duplicate License
+                const { data: existingLicense } = await supabase
+                    .from('licenses')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('product_id', product.id)
+                    .eq('account_number', accountNumber.trim())
+                    .single();
+
+                if (existingLicense) {
+                    alert('คุณมี License สำหรับหมายเลขพอร์ตนี้แล้ว');
+                    setLoading(false);
+                    return;
+                }
+
+                // 2. Check for pending/completed Order (Duplicate request)
+                const { data: existingOrder } = await supabase
+                    .from('orders')
+                    .select('id, status')
+                    .eq('user_id', user.id)
+                    .eq('product_id', product.id)
+                    .eq('account_number', accountNumber.trim())
+                    .in('status', ['pending', 'completed']) // Check both pending and completed
+                    .maybeSingle();
+
+                if (existingOrder) {
+                    const msg = existingOrder.status === 'pending'
+                        ? 'คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว'
+                        : 'คุณได้ซื้อสินค้านี้สำหรับพอร์ตนี้ไปแล้ว';
+                    alert(msg);
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const queryParams = new URLSearchParams({
                 plan: selectedType,
                 accountNumber: accountNumber.trim()
