@@ -106,8 +106,13 @@ export default function BillingPage() {
                                     </div>
                                     <div className="text-right">
                                         <div className="font-bold">฿{(order.amount || 0).toLocaleString()}</div>
-                                        <div className={`text-xs ${order.status === 'completed' ? 'text-green-500' : 'text-yellow-500'}`}>
-                                            {order.status === 'completed' ? 'ชำระแล้ว' : 'รอตรวจสอบ'}
+                                        <div className={`text-xs ${order.status === 'completed' ? 'text-green-500' :
+                                                order.status === 'rejected' ? 'text-red-500' :
+                                                    'text-yellow-500'
+                                            }`}>
+                                            {order.status === 'completed' ? 'ชำระแล้ว' :
+                                                order.status === 'rejected' ? 'ถูกปฏิเสธ' :
+                                                    'รอตรวจสอบ'}
                                         </div>
                                     </div>
                                 </div>
