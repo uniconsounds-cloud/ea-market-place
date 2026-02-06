@@ -4,13 +4,58 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+
+// Sidebar Component extracted to avoid re-creation on every render
+const SidebarContent = ({
+    mobile = false,
+    onClose
+}: {
+    mobile?: boolean;
+    onClose?: () => void;
+}) => (
+    <div className="flex flex-col h-full bg-card">
+        <div className="h-16 flex items-center px-6 border-b border-border">
+            <Link href="/admin" className="font-bold text-xl flex items-center gap-2" onClick={onClose}>
+                <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">ADMIN</span>
+                Panel
+            </Link>
+        </div>
+        <nav className="flex-1 p-4 space-y-2">
+            <Link href="/admin" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    ภาพรวม
+                </Button>
+            </Link>
+
+            <Link href="/admin/products" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <Package className="mr-2 h-4 w-4" />
+                    จัดการสินค้า
+                </Button>
+            </Link>
+            <Link href="/admin/orders" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <FileText className="mr-2 h-4 w-4" />
+                    รายการสั่งซื้อ
+                </Button>
+            </Link>
+        </nav>
+        <div className="p-4 border-t border-border">
+            <Link href="/" onClick={onClose}>
+                <Button variant="outline" className="w-full">
+                    <LogOut className="mr-2 h-4 w-4" /> กลับหน้าร้านค้า
+                </Button>
+            </Link>
+        </div>
+    </div>
+);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -51,47 +96,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (!isAdmin) return null;
 
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
-
-    const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
-        <div className="flex flex-col h-full bg-card">
-            <div className="h-16 flex items-center px-6 border-b border-border">
-                <Link href="/admin" className="font-bold text-xl flex items-center gap-2" onClick={() => mobile && setIsSheetOpen(false)}>
-                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded">ADMIN</span>
-                    Panel
-                </Link>
-            </div>
-            <nav className="flex-1 p-4 space-y-2">
-                <Link href="/admin" onClick={() => mobile && setIsSheetOpen(false)}>
-                    <Button variant="ghost" className="w-full justify-start">
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        ภาพรวม
-                    </Button>
-                </Link>
-
-                <Link href="/admin/products" onClick={() => mobile && setIsSheetOpen(false)}>
-                    <Button variant="ghost" className="w-full justify-start">
-                        <Package className="mr-2 h-4 w-4" />
-                        จัดการสินค้า
-                    </Button>
-                </Link>
-                <Link href="/admin/orders" onClick={() => mobile && setIsSheetOpen(false)}>
-                    <Button variant="ghost" className="w-full justify-start">
-                        <FileText className="mr-2 h-4 w-4" />
-                        รายการสั่งซื้อ
-                    </Button>
-                </Link>
-            </nav>
-            <div className="p-4 border-t border-border">
-                <Link href="/" onClick={() => mobile && setIsSheetOpen(false)}>
-                    <Button variant="outline" className="w-full">
-                        <LogOut className="mr-2 h-4 w-4" /> กลับหน้าร้านค้า
-                    </Button>
-                </Link>
-            </div>
-        </div>
-    );
-
     return (
         <div className="flex min-h-screen bg-background">
             {/* Desktop Sidebar */}
@@ -112,7 +116,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-64">
-                        <SidebarContent mobile />
+                        <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
+                        <SidebarContent mobile onClose={() => setIsSheetOpen(false)} />
                     </SheetContent>
                 </Sheet>
             </div>
