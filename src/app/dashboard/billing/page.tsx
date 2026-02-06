@@ -97,8 +97,10 @@ export default function BillingPage() {
                                 <div key={order.id} className="flex justify-between items-center py-3 border-b border-border/50 last:border-0">
                                     <div>
                                         <div className="font-medium">{order.products?.name || 'Order #' + order.id.slice(0, 8)}</div>
-                                        <div className="text-xs text-muted-foreground">
                                             {new Date(order.created_at).toLocaleDateString('th-TH')}
+                                        </div>
+                                        <div className="text-xs font-mono text-muted-foreground mt-1">
+                                            Port: {order.account_number || '-'}
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -108,15 +110,15 @@ export default function BillingPage() {
                                         </div>
                                     </div>
                                 </div>
-                            ))
-                        ) : (
-                            <div className="text-center py-8 text-muted-foreground text-sm">
-                                ยังไม่มีประวัติการสั่งซื้อ
-                            </div>
-                        )}
+                    ))
+                    ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                        ยังไม่มีประวัติการสั่งซื้อ
                     </div>
+                        )}
                 </div>
             </div>
         </div>
+        </div >
     );
 }
