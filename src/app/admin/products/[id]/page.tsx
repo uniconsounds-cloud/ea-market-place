@@ -23,6 +23,7 @@ export default function ProductFormPage() {
         product_key: '', // Added product_key
         description: '',
         price_monthly: '',
+        price_quarterly: '', // Added price_quarterly
         price_lifetime: '',
         image_url: '',
         video_url: '',
@@ -44,6 +45,7 @@ export default function ProductFormPage() {
                 product_key: data.product_key || '', // Fetch product_key
                 description: data.description || '',
                 price_monthly: data.price_monthly,
+                price_quarterly: data.price_quarterly || '',
                 price_lifetime: data.price_lifetime,
                 image_url: data.image_url || '',
                 video_url: data.file_url || '',
@@ -99,6 +101,7 @@ export default function ProductFormPage() {
                 product_key: formData.product_key || null, // Create payload
                 description: formData.description,
                 price_monthly: parseFloat(formData.price_monthly),
+                price_quarterly: formData.price_quarterly ? parseFloat(formData.price_quarterly) : null,
                 price_lifetime: parseFloat(formData.price_lifetime),
                 image_url: formData.image_url,
                 file_url: formData.video_url,
@@ -215,7 +218,7 @@ export default function ProductFormPage() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">ราคา (รายเดือน) ฿</label>
                             <Input
@@ -224,6 +227,15 @@ export default function ProductFormPage() {
                                 value={formData.price_monthly}
                                 onChange={handleChange}
                                 required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">ราคา (3 เดือน) ฿</label>
+                            <Input
+                                type="number"
+                                name="price_quarterly"
+                                value={formData.price_quarterly}
+                                onChange={handleChange}
                             />
                         </div>
                         <div className="space-y-2">

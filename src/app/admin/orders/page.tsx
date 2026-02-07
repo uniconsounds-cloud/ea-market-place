@@ -68,7 +68,7 @@ export default function AdminOrdersPage() {
     };
 
     const handleApprove = async (order: any) => {
-        if (!confirm('ยืนยันอนุมัติคำสั่งซื้อนี้? License จะถูกสร้างทันที')) return;
+        if (!confirm('ยืนยันอนุมัติคำสั่งซื้อนี้? License จะถูกสร้าง/ต่ออายุทันที')) return;
 
         setProcessingId(order.id);
         try {
@@ -79,29 +79,70 @@ export default function AdminOrdersPage() {
 
             if (orderError) throw orderError;
 
+            // Check for existing license
+            const { data: existingLicense } = await supabase
+                .from('licenses')
+                .select('*')
+                .eq('user_id', order.user_id)
+                .eq('product_id', order.product_id)
+                .eq('account_number', order.account_number)
+                .single();
+
             let expiryDate = null;
+            let startDate = new Date();
+
+            if (existingLicense) {
+                // RENEWAL LOGIC
+                // extend from current expiry if it's in the future, otherwise from today
+                const currentExpiry = new Date(existingLicense.expiry_date);
+                if (currentExpiry > startDate) {
+                    startDate = currentExpiry;
+                }
+            }
+
             if (order.plan_type === 'monthly') {
-                const date = new Date();
+                const date = new Date(startDate);
                 date.setMonth(date.getMonth() + 1);
+                expiryDate = date.toISOString();
+            } else if (order.plan_type === 'quarterly') {
+                const date = new Date(startDate);
+                date.setMonth(date.getMonth() + 3);
                 expiryDate = date.toISOString();
             } else {
                 expiryDate = new Date(9999, 11, 31).toISOString();
             }
 
-            const { error: licenseError } = await supabase
-                .from('licenses')
-                .insert({
-                    user_id: order.user_id,
-                    product_id: order.product_id,
-                    type: order.plan_type || 'lifetime',
-                    is_active: true,
-                    expiry_date: expiryDate,
-                    account_number: order.account_number || ''
-                });
+            if (existingLicense) {
+                // Update existing license
+                const { error: updateError } = await supabase
+                    .from('licenses')
+                    .update({
+                        type: order.plan_type || 'lifetime',
+                        is_active: true,
+                        expiry_date: expiryDate
+                    })
+                    .eq('id', existingLicense.id);
 
-            if (licenseError) throw licenseError;
+                if (updateError) throw updateError;
+                alert('อนุมัติเรียบร้อย! License ถูกต่ออายุแล้ว');
 
-            alert('อนุมัติเรียบร้อย! License ถูกสร้างแล้ว');
+            } else {
+                // Create new license
+                const { error: licenseError } = await supabase
+                    .from('licenses')
+                    .insert({
+                        user_id: order.user_id,
+                        product_id: order.product_id,
+                        type: order.plan_type || 'lifetime',
+                        is_active: true,
+                        expiry_date: expiryDate,
+                        account_number: order.account_number || ''
+                    });
+
+                if (licenseError) throw licenseError;
+                alert('อนุมัติเรียบร้อย! License ถูกสร้างแล้ว');
+            }
+
             fetchOrders();
 
         } catch (error: any) {
@@ -243,8 +284,8 @@ export default function AdminOrdersPage() {
                                                 <div className="text-right">
                                                     <div className="text-xl font-bold font-mono">฿{order.amount?.toLocaleString()}</div>
                                                     <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${order.status === 'completed' ? 'bg-green-500/20 text-green-500' :
-                                                            order.status === 'rejected' ? 'bg-red-500/20 text-red-500' :
-                                                                'bg-yellow-500/20 text-yellow-500'
+                                                        order.status === 'rejected' ? 'bg-red-500/20 text-red-500' :
+                                                            'bg-yellow-500/20 text-yellow-500'
                                                         }`}>
                                                         {order.status}
                                                     </span>

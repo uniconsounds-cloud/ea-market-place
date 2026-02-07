@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Zap, Check, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -17,10 +17,39 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps) {
     const router = useRouter();
-    const [selectedType, setSelectedType] = useState<'monthly' | 'lifetime'>('lifetime');
+    const [selectedType, setSelectedType] = useState<'monthly' | 'quarterly' | 'lifetime'>('lifetime');
     const [accountNumber, setAccountNumber] = useState('');
     const [riskAccepted, setRiskAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // New State for active licenses
+    const [userLicenses, setUserLicenses] = useState<any[]>([]);
+    const [isRenewal, setIsRenewal] = useState(false);
+
+    // Fetch user licenses on mount
+    useEffect(() => {
+        const fetchLicenses = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase
+                    .from('licenses')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('product_id', product.id)
+                    .eq('is_active', true);
+
+                if (data) setUserLicenses(data);
+            }
+        };
+        fetchLicenses();
+    }, [product.id]);
+
+    // Check if entered account number matches an existing license
+    useEffect(() => {
+        const existing = userLicenses.find(l => l.account_number === accountNumber.trim());
+        setIsRenewal(!!existing);
+    }, [accountNumber, userLicenses]);
+
 
     const handlePurchase = async () => {
         if (!accountNumber.trim()) {
@@ -38,36 +67,38 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             const { data: { user } } = await supabase.auth.getUser();
 
             if (user) {
-                // 1. Check for duplicate License
-                const { data: existingLicense } = await supabase
-                    .from('licenses')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .eq('product_id', product.id)
-                    .eq('account_number', accountNumber.trim())
-                    .single();
+                // 1. Check for duplicate License (SKIP IF RENEWAL)
+                if (!isRenewal) {
+                    const { data: existingLicense } = await supabase
+                        .from('licenses')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .eq('product_id', product.id)
+                        .eq('account_number', accountNumber.trim())
+                        .single();
 
-                if (existingLicense) {
-                    alert('คุณมี License สำหรับหมายเลขพอร์ตนี้แล้ว');
-                    setLoading(false);
-                    return;
+                    if (existingLicense) {
+                        alert('คุณมี License สำหรับหมายเลขพอร์ตนี้แล้ว (สามารถเลือกต่ออายุได้)');
+                        setIsRenewal(true);
+                        setLoading(false);
+                        return;
+                    }
                 }
 
-                // 2. Check for pending/completed Order (Duplicate request)
+                // 2. Check for pending/completed Order (Duplicate request in short time)
+                // We might want to allow multiple pending orders if they are for renewals, 
+                // but generally safer to block duplicates unless status is rejected.
                 const { data: existingOrder } = await supabase
                     .from('orders')
                     .select('id, status')
                     .eq('user_id', user.id)
                     .eq('product_id', product.id)
                     .eq('account_number', accountNumber.trim())
-                    .in('status', ['pending', 'completed']) // Check both pending and completed
+                    .eq('status', 'pending') // Only block pending
                     .maybeSingle();
 
                 if (existingOrder) {
-                    const msg = existingOrder.status === 'pending'
-                        ? 'คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว'
-                        : 'คุณได้ซื้อสินค้านี้สำหรับพอร์ตนี้ไปแล้ว';
-                    alert(msg);
+                    alert('คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว');
                     setLoading(false);
                     return;
                 }
@@ -97,21 +128,70 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         }
     };
 
+    // Helper for progress bar
+    const calculateDaysRemaining = (expiryDate: string, type: string) => {
+        if (type === 'lifetime') return 999;
+        const now = new Date();
+        const expiry = new Date(expiryDate);
+        const diffTime = expiry.getTime() - now.getTime();
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    };
+
     return (
         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg space-y-6">
+
+            {/* Active Ports Display */}
+            {userLicenses.length > 0 && (
+                <div className="space-y-3 mb-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        พอร์ตที่คุณใช้งานอยู่ (คลิกเพื่อต่ออายุ)
+                    </h4>
+                    <div className="space-y-2">
+                        {userLicenses.map((license) => {
+                            const days = calculateDaysRemaining(license.expiry_date, license.type);
+                            return (
+                                <div
+                                    key={license.id}
+                                    className={`text-sm p-2 rounded border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
+                                    onClick={() => setAccountNumber(license.account_number)}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold">{license.account_number}</span>
+                                        {license.type !== 'lifetime' && (
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${days <= 7 ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
+                                                เหลือ {days} วัน
+                                            </span>
+                                        )}
+                                        {license.type === 'lifetime' && <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">Lifetime</span>}
+                                    </div>
+                                    {accountNumber === license.account_number && <Check className="w-3 h-3 text-primary" />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Account Number Input */}
             <div className="space-y-2">
                 <Label htmlFor="accountNumber" className="text-base font-semibold">
                     หมายเลขพอร์ต (Account Number) <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                    id="accountNumber"
-                    placeholder="Ex. 12345678"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    className="bg-background/50 border-input font-mono text-lg"
-                />
+                <div className="relative">
+                    <Input
+                        id="accountNumber"
+                        placeholder="Ex. 12345678"
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        className={`bg-background/50 border-input font-mono text-lg ${isRenewal ? 'border-green-500 ring-1 ring-green-500/50' : ''}`}
+                    />
+                    {isRenewal && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-500 font-medium flex items-center gap-1 bg-background px-2">
+                            <Check className="w-3 h-3" /> ต่ออายุ
+                        </div>
+                    )}
+                </div>
                 <p className="text-xs text-muted-foreground">
                     ระบุหมายเลขบัญชีเทรดที่ต้องการใช้งาน (1 หมายเลข)
                 </p>
@@ -120,19 +200,50 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             {/* License Type Selection */}
             <div>
                 <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 gap-3 mb-6">
                     {/* Monthly Option */}
                     <div
                         className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'monthly' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-background/50 hover:border-primary/50'}`}
                         onClick={() => setSelectedType('monthly')}
                     >
-                        <div className="flex justify-between items-center mb-2">
-                            <span className={`font-semibold ${selectedType === 'monthly' ? 'text-primary' : ''}`}>รายเดือน</span>
-                            {selectedType === 'monthly' ? <Check className="w-4 h-4 text-primary" /> : <Zap className="w-4 h-4 text-gray-400" />}
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'monthly' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                                    {selectedType === 'monthly' && <div className="w-2 h-2 bg-black rounded-full" />}
+                                </div>
+                                <div>
+                                    <span className={`font-semibold block ${selectedType === 'monthly' ? 'text-primary' : ''}`}>รายเดือน (1 Month)</span>
+                                    <span className="text-xs text-muted-foreground">เหมาะสำหรับทดลองใช้</span>
+                                </div>
+                            </div>
+                            <div className="text-xl font-bold">฿{product.price_monthly?.toLocaleString()}</div>
                         </div>
-                        <div className="text-2xl font-bold">฿{product.price_monthly.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">ชำระทุกเดือน ยกเลิกได้ตลอดเวลา</p>
                     </div>
+
+                    {/* Quarterly Option */}
+                    {product.price_quarterly && (
+                        <div
+                            className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'quarterly' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-background/50 hover:border-primary/50'}`}
+                            onClick={() => setSelectedType('quarterly')}
+                        >
+                            {/* Best Value Tag for Quarterly if needed */}
+                            <div className="absolute -top-2 right-4 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                แนะนำ
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'quarterly' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                                        {selectedType === 'quarterly' && <div className="w-2 h-2 bg-black rounded-full" />}
+                                    </div>
+                                    <div>
+                                        <span className={`font-semibold block ${selectedType === 'quarterly' ? 'text-primary' : ''}`}>ราย 3 เดือน (Quarterly)</span>
+                                        <span className="text-xs text-muted-foreground">ประหยัดกว่ารายเดือน</span>
+                                    </div>
+                                </div>
+                                <div className="text-xl font-bold">฿{product.price_quarterly?.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Lifetime Option */}
                     <div
@@ -142,12 +253,18 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         <div className="absolute -top-3 right-4 bg-accent text-black text-xs font-bold px-2 py-0.5 rounded-full shadow-lg shadow-yellow-500/20">
                             คุ้มค่าที่สุด
                         </div>
-                        <div className="flex justify-between items-center mb-2">
-                            <span className={`font-semibold ${selectedType === 'lifetime' ? 'text-accent' : 'text-accent/80'}`}>ถาวร (Lifetime)</span>
-                            {selectedType === 'lifetime' ? <Check className="w-4 h-4 text-accent" /> : <Zap className="w-4 h-4 text-accent" />}
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'lifetime' ? 'border-accent bg-accent' : 'border-muted-foreground'}`}>
+                                    {selectedType === 'lifetime' && <div className="w-2 h-2 bg-black rounded-full" />}
+                                </div>
+                                <div>
+                                    <span className={`font-semibold block ${selectedType === 'lifetime' ? 'text-accent' : 'text-accent/80'}`}>ถาวร (Lifetime)</span>
+                                    <span className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</span>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime?.toLocaleString()}</div>
                         </div>
-                        <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</p>
                     </div>
                 </div>
             </div>
@@ -192,11 +309,11 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             <Button
                 size="lg"
-                className="w-full text-base font-semibold shadow-xl shadow-blue-900/20"
+                className={`w-full text-base font-semibold shadow-xl transition-all duration-300 ${isRenewal ? 'bg-green-600 hover:bg-green-700 shadow-green-900/20' : 'shadow-blue-900/20'}`}
                 onClick={handlePurchase}
                 disabled={loading}
             >
-                {loading ? 'กำลังดำเนินการ...' : 'ดำเนินการต่อ'}
+                {loading ? 'กำลังดำเนินการ...' : isRenewal ? 'ต่ออายุ License (Renew)' : 'ดำเนินการต่อ'}
             </Button>
             <p className="text-center text-xs text-muted-foreground mt-3 flex items-center justify-center gap-1">
                 <AlertCircle className="w-3 h-3" />

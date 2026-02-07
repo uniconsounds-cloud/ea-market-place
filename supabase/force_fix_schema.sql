@@ -91,4 +91,9 @@ begin
   if not exists (select 1 from information_schema.columns where table_name = 'products' and column_name = 'product_key') then
     alter table products add column product_key text unique;
   end if;
+
+  -- Add 'price_quarterly'
+  if not exists (select 1 from information_schema.columns where table_name = 'products' and column_name = 'price_quarterly') then
+    alter table products add column price_quarterly numeric;
+  end if;
 end $$;
