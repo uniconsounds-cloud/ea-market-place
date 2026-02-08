@@ -272,80 +272,80 @@ export default function ProductFormPage() {
                         </div>
                     </div>
 
-            </div>
 
-            <div className="space-y-2">
-                <label className="text-sm font-medium">รายละเอียด</label>
-                <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows={4}
-                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="รายละเอียดของระบบ..."
-                />
-            </div>
 
-            <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">ราคา (รายเดือน) ฿</label>
-                    <Input
-                        type="number"
-                        name="price_monthly"
-                        value={formData.price_monthly}
-                        onChange={handleChange}
-                        required
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">ราคา (3 เดือน) ฿</label>
-                    <Input
-                        type="number"
-                        name="price_quarterly"
-                        value={formData.price_quarterly}
-                        onChange={handleChange}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">ราคา (ถาวร) ฿</label>
-                    <Input
-                        type="number"
-                        name="price_lifetime"
-                        value={formData.price_lifetime}
-                        onChange={handleChange}
-                        required
-                    />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Version</label>
-                    <Input
-                        name="version"
-                        value={formData.version}
-                        onChange={handleChange}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">สถานะ</label>
-                    <div className="flex items-center gap-2 h-10">
-                        <input
-                            type="checkbox"
-                            checked={formData.is_active}
-                            onChange={(e) => setFormData(p => ({ ...p, is_active: e.target.checked }))}
-                            className="h-5 w-5"
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">รายละเอียด</label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleChange}
+                            rows={4}
+                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="รายละเอียดของระบบ..."
                         />
-                        <span className="text-sm">เปิดขาย</span>
                     </div>
-                </div>
-            </div>
 
-            <Button type="submit" className="w-full" disabled={loading || uploading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                บันทึกข้อมูล
-            </Button>
-        </form>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">ราคา (รายเดือน) ฿</label>
+                            <Input
+                                type="number"
+                                name="price_monthly"
+                                value={formData.price_monthly}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">ราคา (3 เดือน) ฿</label>
+                            <Input
+                                type="number"
+                                name="price_quarterly"
+                                value={formData.price_quarterly}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">ราคา (ถาวร) ฿</label>
+                            <Input
+                                type="number"
+                                name="price_lifetime"
+                                value={formData.price_lifetime}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Version</label>
+                            <Input
+                                name="version"
+                                value={formData.version}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">สถานะ</label>
+                            <div className="flex items-center gap-2 h-10">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.is_active}
+                                    onChange={(e) => setFormData(p => ({ ...p, is_active: e.target.checked }))}
+                                    className="h-5 w-5"
+                                />
+                                <span className="text-sm">เปิดขาย</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={loading || uploading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        บันทึกข้อมูล
+                    </Button>
+                </form>
             </div >
         </div >
     );
