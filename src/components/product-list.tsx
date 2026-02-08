@@ -13,11 +13,14 @@ interface ProductListProps {
 
 export function ProductList({ initialProducts }: ProductListProps) {
     const [products, setProducts] = useState(initialProducts);
+    const [isOpen, setIsOpen] = useState(false);
     const [filters, setFilters] = useState({
         platform: '',
         asset_class: '',
         strategy: ''
     });
+
+    // ... (categories definition remains same) ...
 
     const categories = {
         platform: [
@@ -75,74 +78,118 @@ export function ProductList({ initialProducts }: ProductListProps) {
 
     const hasFilters = filters.platform || filters.asset_class || filters.strategy;
 
+    // Helper to get label
+    const getLabel = (category: string, id: string) => {
+        return categories[category as keyof typeof categories].find(c => c.id === id)?.label || id;
+    };
+
     return (
-        <div className="space-y-8">
-            {/* Filters */}
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 sticky top-20 z-20 shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold flex items-center gap-2">
-                        <Filter className="w-4 h-4" /> ตัวกรอง (Filters)
-                    </h3>
-                    {hasFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs hover:bg-destructive/10 hover:text-destructive">
-                            <X className="w-3 h-3 mr-1" /> ล้างตัวกรอง
+        <div className="space-y-6">
+            {/* Filter Toggle & Summary Bar */}
+            <div className="flex flex-wrap items-center gap-3">
+                <Button
+                    variant={isOpen ? "default" : "outline"}
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="gap-2"
+                >
+                    <Filter className="w-4 h-4" />
+                    {isOpen ? 'ซ่อนตัวกรอง' : 'ตัวกรองสินค้า'}
+                </Button>
+
+                {/* Active Filters Summary (Show when collapsed or expanded) */}
+                {hasFilters && (
+                    <div className="flex flex-wrap gap-2 items-center">
+                        <div className="h-6 w-[1px] bg-border mx-1" />
+                        {filters.platform && (
+                            <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1">
+                                Platform: {getLabel('platform', filters.platform)}
+                                <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleFilterChange('platform', filters.platform)} />
+                            </Badge>
+                        )}
+                        {filters.asset_class && (
+                            <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20">
+                                Asset: {getLabel('asset_class', filters.asset_class)}
+                                <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleFilterChange('asset_class', filters.asset_class)} />
+                            </Badge>
+                        )}
+                        {filters.strategy && (
+                            <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20">
+                                Strategy: {getLabel('strategy', filters.strategy)}
+                                <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleFilterChange('strategy', filters.strategy)} />
+                            </Badge>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-destructive px-2">
+                            ล้างทั้งหมด
                         </Button>
-                    )}
-                </div>
-
-                <div className="space-y-4">
-                    {/* Platform */}
-                    <div>
-                        <Label className="text-xs text-muted-foreground mb-2 block">Platform</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {categories.platform.map((item) => (
-                                <Badge
-                                    key={item.id}
-                                    variant={filters.platform === item.id ? 'default' : 'outline'}
-                                    className={`cursor-pointer hover:opacity-80 transition-all ${filters.platform === item.id ? 'bg-primary' : 'bg-background hover:bg-muted'}`}
-                                    onClick={() => handleFilterChange('platform', item.id)}
-                                >
-                                    {item.label}
-                                </Badge>
-                            ))}
-                        </div>
                     </div>
-
-                    {/* Asset Class */}
-                    <div>
-                        <Label className="text-xs text-muted-foreground mb-2 block">Asset Class</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {categories.asset_class.map((item) => (
-                                <Badge
-                                    key={item.id}
-                                    variant={filters.asset_class === item.id ? 'default' : 'outline'}
-                                    className={`cursor-pointer hover:opacity-80 transition-all ${filters.asset_class === item.id ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-transparent' : 'bg-background hover:bg-muted'}`}
-                                    onClick={() => handleFilterChange('asset_class', item.id)}
-                                >
-                                    {item.label}
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Strategy */}
-                    <div>
-                        <Label className="text-xs text-muted-foreground mb-2 block">Strategy</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {categories.strategy.map((item) => (
-                                <Badge
-                                    key={item.id}
-                                    variant={filters.strategy === item.id ? 'default' : 'outline'}
-                                    className={`cursor-pointer hover:opacity-80 transition-all ${filters.strategy === item.id ? 'bg-blue-500 hover:bg-blue-600 text-white border-transparent' : 'bg-background hover:bg-muted'}`}
-                                    onClick={() => handleFilterChange('strategy', item.id)}
-                                >
-                                    {item.label}
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                )}
             </div>
+
+            {/* Collapsible Filter Panel */}
+            {isOpen && (
+                <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-sm text-muted-foreground">
+                            เลือกตัวกรอง
+                        </h3>
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* Platform */}
+                        <div>
+                            <Label className="text-xs text-muted-foreground mb-2 block">Platform</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {categories.platform.map((item) => (
+                                    <Badge
+                                        key={item.id}
+                                        variant={filters.platform === item.id ? 'default' : 'outline'}
+                                        className={`cursor-pointer hover:opacity-80 transition-all ${filters.platform === item.id ? 'bg-primary' : 'bg-background hover:bg-muted'}`}
+                                        onClick={() => handleFilterChange('platform', item.id)}
+                                    >
+                                        {item.label}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Asset Class */}
+                            <div>
+                                <Label className="text-xs text-muted-foreground mb-2 block">Asset Class</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {categories.asset_class.map((item) => (
+                                        <Badge
+                                            key={item.id}
+                                            variant={filters.asset_class === item.id ? 'default' : 'outline'}
+                                            className={`cursor-pointer hover:opacity-80 transition-all ${filters.asset_class === item.id ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-transparent' : 'bg-background hover:bg-muted'}`}
+                                            onClick={() => handleFilterChange('asset_class', item.id)}
+                                        >
+                                            {item.label}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Strategy */}
+                            <div>
+                                <Label className="text-xs text-muted-foreground mb-2 block">Strategy</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {categories.strategy.map((item) => (
+                                        <Badge
+                                            key={item.id}
+                                            variant={filters.strategy === item.id ? 'default' : 'outline'}
+                                            className={`cursor-pointer hover:opacity-80 transition-all ${filters.strategy === item.id ? 'bg-blue-500 hover:bg-blue-600 text-white border-transparent' : 'bg-background hover:bg-muted'}`}
+                                            onClick={() => handleFilterChange('strategy', item.id)}
+                                        >
+                                            {item.label}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Results */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

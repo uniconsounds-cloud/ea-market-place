@@ -20,17 +20,17 @@ export default async function Home() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative py-12 md:py-24 overflow-hidden">
+      <section className="relative py-8 md:py-16 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-background to-background z-0" />
         <div className="container relative z-10 mx-auto px-4 text-center">
-          <div className="inline-block px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5 text-accent text-sm font-medium mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="inline-block px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5 text-accent text-sm font-medium mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             ✨ เครื่องมือ Forex ระดับพรีเมียมสำหรับมืออาชีพ
           </div>
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent drop-shadow-sm leading-tight">
             ทำกำไรแบบอัตโนมัติด้วย <br className="hidden sm:block" />
             <span className="text-primary text-glow">อัลกอริทึมขั้นสูง</span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
             ค้นพบ Expert Advisors (EA) ที่ผ่านการตรวจสอบแล้ว ออกแบบมาเพื่อเพิ่มศักยภาพการเทรดของคุณ
             ปลอดภัย เชื่อถือได้ และขับเคลื่อนด้วยข้อมูลจริง
           </p>
@@ -50,12 +50,12 @@ export default async function Home() {
       </section>
 
       {/* Featured Products */}
-      <section id="products" className="py-12 bg-muted/20">
+      <section id="products" className="py-6 bg-muted/20">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-end mb-12">
+          <div className="flex justify-between items-end mb-6">
             <div>
-              <h2 className="text-3xl font-bold mb-2">EA แนะนำ</h2>
-              <p className="text-muted-foreground">เครื่องมือยอดนิยมที่เราคัดสรรมาเพื่อคุณ</p>
+              <h2 className="text-2xl font-bold mb-1">EA แนะนำ</h2>
+              <p className="text-sm text-muted-foreground">เครื่องมือยอดนิยมที่เราคัดสรรมาเพื่อคุณ</p>
             </div>
             <Link href="/products" className="text-primary hover:text-primary/80 flex items-center text-sm font-medium">
               ดูทั้งหมด <ArrowRight className="ml-1 h-4 w-4" />
