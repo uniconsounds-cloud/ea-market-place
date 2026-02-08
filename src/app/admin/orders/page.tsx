@@ -307,7 +307,11 @@ export default function AdminOrdersPage() {
                                                     <h3 className="font-bold text-lg text-primary">{order.products?.name || 'Unknown Product'}</h3>
                                                     <p className="text-sm text-muted-foreground flex items-center gap-2">
                                                         <span>ลูกค้า: {order.profiles?.full_name || order.profiles?.email || 'Guest'}</span>
-                                                        <span className="text-xs px-1.5 py-0.5 bg-muted rounded">{order.plan_type === 'monthly' ? 'รายเดือน' : 'ตลอดชีพ'}</span>
+                                                        <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
+                                                            {order.plan_type === 'monthly' ? 'รายเดือน' :
+                                                                order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :
+                                                                    'ตลอดชีพ'}
+                                                        </span>
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
