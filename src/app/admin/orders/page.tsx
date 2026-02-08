@@ -154,20 +154,49 @@ export default function AdminOrdersPage() {
     };
 
     const handleReject = async (id: string) => {
-        if (!confirm('ต้องการปฏิเสธคำสั่งซื้อนี้?')) return;
+        if (!confirm('ต้องการปฏิเสธคำสั่งซื้อนี้? License ที่เกี่ยวข้องจะถูกระงับทันที')) return;
 
         setProcessingId(id);
-        const { error } = await supabase
-            .from('orders')
-            .update({ status: 'rejected' })
-            .eq('id', id);
+        try {
+            // 1. Get Order Details
+            const { data: order, error: fetchError } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('id', id)
+                .single();
 
-        if (error) {
-            alert('Error: ' + error.message);
-        } else {
+            if (fetchError) throw fetchError;
+
+            // 2. Reject Order
+            const { error: updateError } = await supabase
+                .from('orders')
+                .update({ status: 'rejected' })
+                .eq('id', id);
+
+            if (updateError) throw updateError;
+
+            // 3. Deactivate License (if exists)
+            if (order.account_number && order.product_id) {
+                const { error: licenseError } = await supabase
+                    .from('licenses')
+                    .update({ is_active: false })
+                    .eq('user_id', order.user_id)
+                    .eq('product_id', order.product_id)
+                    .eq('account_number', order.account_number);
+
+                if (licenseError) {
+                    console.error('Error deactivating license:', licenseError);
+                    // Don't throw here, as order is already rejected. Just warn.
+                    alert('Order rejected but failed to deactivate license. Please check database.');
+                }
+            }
+
             fetchOrders();
+        } catch (error: any) {
+            alert('Error: ' + error.message);
+        } finally {
+            setProcessingId(null);
         }
-        setProcessingId(null);
     };
 
     // Filter Logic
