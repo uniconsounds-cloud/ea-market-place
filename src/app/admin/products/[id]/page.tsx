@@ -271,17 +271,7 @@ export default function ProductFormPage() {
                             <p className="text-[10px] text-muted-foreground">ใช้ใส่ในโค้ด EA (ถ้าว่างไว้จะใช้ UUID)</p>
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Product Key (สำหรับ EA)</label>
-                        <Input
-                            name="product_key"
-                            value={formData.product_key}
-                            onChange={handleChange}
-                            placeholder="Ex. GOLD-EA-V1"
-                            className="font-mono"
-                        />
-                        <p className="text-[10px] text-muted-foreground">ใช้ใส่ในโค้ด EA (ถ้าว่างไว้จะใช้ UUID)</p>
-                    </div>
+
             </div>
 
             <div className="space-y-2">
