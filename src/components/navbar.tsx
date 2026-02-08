@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { Receipt, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
@@ -88,8 +88,8 @@ export function Navbar() {
 
                 <div className="flex items-center gap-4">
                     <Link href="/dashboard/billing">
-                        <Button variant="ghost" size="icon">
-                            <ShoppingCart className="h-5 w-5" />
+                        <Button variant="ghost" size="icon" title="ประวัติการสั่งซื้อ">
+                            <Receipt className="h-5 w-5" />
                         </Button>
                     </Link>
 
