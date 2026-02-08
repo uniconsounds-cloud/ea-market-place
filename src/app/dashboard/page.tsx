@@ -217,7 +217,7 @@ export default function DashboardPage() {
                                                     <div className="flex justify-end min-w-[100px]">
                                                         {!license.is_active || (license.type !== 'lifetime' && timeInfo.days <= 30) ? (
                                                             <Link href={`/products/${group.productId}?renew=${license.account_number}`}>
-                                                                <Button size="sm" variant="secondary" className="h-8 text-xs">
+                                                                <Button size="sm" variant="outline" className="h-8 text-xs">
                                                                     ต่ออายุ
                                                                 </Button>
                                                             </Link>
