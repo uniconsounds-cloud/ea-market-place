@@ -17,6 +17,7 @@ interface License {
         id: string; // added to link to product
         name: string;
         image_url: string;
+        product_key: string;
     };
     type: 'monthly' | 'lifetime';
     expiry_date: string;
@@ -29,6 +30,7 @@ interface GroupedProduct {
     productId: string;
     productName: string;
     productImage: string;
+    productKey: string;
     fileUrl: string;
     licenses: License[];
 }
@@ -58,7 +60,8 @@ export default function DashboardPage() {
                         id,
                         name,
                         image_url,
-                        file_url
+                        file_url,
+                        product_key
                     )
                 `)
                 .eq('user_id', user.id)
@@ -76,6 +79,7 @@ export default function DashboardPage() {
                             productName: l.products?.name || 'Unknown Product',
                             productImage: l.products?.image_url || '',
                             fileUrl: l.products?.file_url || '',
+                            productKey: l.products?.product_key || '',
                             licenses: []
                         };
                     }
@@ -149,7 +153,14 @@ export default function DashboardPage() {
                                             )}
                                         </div>
                                         <div>
-                                            <CardTitle className="text-lg">{group.productName}</CardTitle>
+                                            <div className="flex items-center gap-2">
+                                                <CardTitle className="text-lg">{group.productName}</CardTitle>
+                                                {group.productKey && (
+                                                    <Badge variant="secondary" className="text-xs font-mono">
+                                                        {group.productKey}
+                                                    </Badge>
+                                                )}
+                                            </div>
                                             <p className="text-sm text-muted-foreground">{group.licenses.length} License ที่ครอบครอง</p>
                                         </div>
                                     </div>
