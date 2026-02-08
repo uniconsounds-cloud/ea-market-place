@@ -1,0 +1,155 @@
+'use client';
+
+import { useState } from 'react';
+import { ProductCard } from '@/components/product-card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Filter, X } from 'lucide-react';
+
+interface ProductListProps {
+    initialProducts: any[];
+}
+
+export function ProductList({ initialProducts }: ProductListProps) {
+    const [products, setProducts] = useState(initialProducts);
+    const [filters, setFilters] = useState({
+        platform: '',
+        asset_class: '',
+        strategy: ''
+    });
+
+    const categories = {
+        platform: [
+            { id: 'mt4', label: 'MT4' },
+            { id: 'mt5', label: 'MT5' }
+        ],
+        asset_class: [
+            { id: 'gold', label: 'Gold (XAUUSD)' },
+            { id: 'silver', label: 'Silver' },
+            { id: 'currency', label: 'Forex Pairs' },
+            { id: 'crypto', label: 'Crypto' }
+        ],
+        strategy: [
+            { id: 'scalping', label: 'Scalping' },
+            { id: 'trend_following', label: 'Trend' },
+            { id: 'grid', label: 'Grid' },
+            { id: 'martingale', label: 'Martingale' }
+        ]
+    };
+
+    const handleFilterChange = (category: string, value: string) => {
+        const newFilters = { ...filters, [category]: filters[category as keyof typeof filters] === value ? '' : value };
+        setFilters(newFilters);
+        applyFilters(newFilters);
+    };
+
+    const clearFilters = () => {
+        const newFilters = { platform: '', asset_class: '', strategy: '' };
+        setFilters(newFilters);
+        applyFilters(newFilters);
+    };
+
+    const applyFilters = (currentFilters: typeof filters) => {
+        let filtered = initialProducts;
+
+        if (currentFilters.platform) {
+            filtered = filtered.filter(p => p.platform === currentFilters.platform);
+        }
+        if (currentFilters.asset_class) {
+            filtered = filtered.filter(p => p.asset_class === currentFilters.asset_class);
+        }
+        if (currentFilters.strategy) {
+            filtered = filtered.filter(p => p.strategy === currentFilters.strategy);
+        }
+
+        setProducts(filtered);
+    };
+
+    const hasFilters = filters.platform || filters.asset_class || filters.strategy;
+
+    return (
+        <div className="space-y-8">
+            {/* Filters */}
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 sticky top-20 z-20 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <Filter className="w-4 h-4" /> ตัวกรอง (Filters)
+                    </h3>
+                    {hasFilters && (
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs hover:bg-destructive/10 hover:text-destructive">
+                            <X className="w-3 h-3 mr-1" /> ล้างตัวกรอง
+                        </Button>
+                    )}
+                </div>
+
+                <div className="space-y-4">
+                    {/* Platform */}
+                    <div>
+                        <Label className="text-xs text-muted-foreground mb-2 block">Platform</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.platform.map((item) => (
+                                <Badge
+                                    key={item.id}
+                                    variant={filters.platform === item.id ? 'default' : 'outline'}
+                                    className={`cursor-pointer hover:opacity-80 transition-all ${filters.platform === item.id ? 'bg-primary' : 'bg-background hover:bg-muted'}`}
+                                    onClick={() => handleFilterChange('platform', item.id)}
+                                >
+                                    {item.label}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Asset Class */}
+                    <div>
+                        <Label className="text-xs text-muted-foreground mb-2 block">Asset Class</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.asset_class.map((item) => (
+                                <Badge
+                                    key={item.id}
+                                    variant={filters.asset_class === item.id ? 'default' : 'outline'}
+                                    className={`cursor-pointer hover:opacity-80 transition-all ${filters.asset_class === item.id ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-transparent' : 'bg-background hover:bg-muted'}`}
+                                    onClick={() => handleFilterChange('asset_class', item.id)}
+                                >
+                                    {item.label}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Strategy */}
+                    <div>
+                        <Label className="text-xs text-muted-foreground mb-2 block">Strategy</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.strategy.map((item) => (
+                                <Badge
+                                    key={item.id}
+                                    variant={filters.strategy === item.id ? 'default' : 'outline'}
+                                    className={`cursor-pointer hover:opacity-80 transition-all ${filters.strategy === item.id ? 'bg-blue-500 hover:bg-blue-600 text-white border-transparent' : 'bg-background hover:bg-muted'}`}
+                                    onClick={() => handleFilterChange('strategy', item.id)}
+                                >
+                                    {item.label}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Results */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {products.length > 0 ? (
+                    products.map((product: any) => (
+                        <ProductCard key={product.id} product={product} />
+                    ))
+                ) : (
+                    <div className="col-span-full text-center py-20 opacity-50">
+                        <p>ไม่พบสินค้าที่ตรงกับเงื่อนไข</p>
+                        <Button variant="link" onClick={clearFilters}>ล้างตัวกรอง</Button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

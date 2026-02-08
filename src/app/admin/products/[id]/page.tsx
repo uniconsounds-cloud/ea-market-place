@@ -5,6 +5,15 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ArrowLeft, Upload, Loader2, Save } from 'lucide-react';
 import Link from 'next/link';
 
@@ -26,9 +35,12 @@ export default function ProductFormPage() {
         price_quarterly: '', // Added price_quarterly
         price_lifetime: '',
         image_url: '',
-        file_url: '', // Renamed from video_url to file_url for clarity, though backend might use either
+        file_url: '',
         version: '1.0',
-        is_active: true
+        is_active: true,
+        platform: 'mt4',
+        asset_class: 'gold',
+        strategy: 'trend_following'
     });
 
     useEffect(() => {
@@ -50,7 +62,10 @@ export default function ProductFormPage() {
                 image_url: data.image_url || '',
                 file_url: data.file_url || '',
                 version: data.version || '1.0',
-                is_active: data.is_active
+                is_active: data.is_active,
+                platform: data.platform || 'mt4',
+                asset_class: data.asset_class || 'gold',
+                strategy: data.strategy || 'trend_following'
             });
         }
     };
@@ -135,7 +150,10 @@ export default function ProductFormPage() {
                 image_url: formData.image_url,
                 file_url: formData.file_url,
                 version: formData.version,
-                is_active: formData.is_active
+                is_active: formData.is_active,
+                platform: formData.platform,
+                asset_class: formData.asset_class,
+                strategy: formData.strategy,
             };
 
             let error;

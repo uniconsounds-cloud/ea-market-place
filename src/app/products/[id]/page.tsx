@@ -9,6 +9,21 @@ import { ProductPurchaseSection } from '@/components/product-purchase-section';
 
 export const revalidate = 0;
 
+const formatStrategy = (strategy: string) => {
+    switch (strategy) {
+        case 'scalping': return 'Scalping (ทำกำไรระยะสั้น)';
+        case 'trend_following': return 'Trend Following (ตามเทรนด์)';
+        case 'grid': return 'Grid System';
+        case 'martingale': return 'Martingale';
+        case 'hedging': return 'Hedging';
+        case 'swing_trading': return 'Swing Trading';
+        case 'day_trading': return 'Day Trading';
+        case 'news_trading': return 'News Trading';
+        case 'arbitrage': return 'Arbitrage';
+        default: return strategy;
+    }
+};
+
 export default async function ProductPage(props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
     const { data: product } = await supabase.from('products').select('*').eq('id', params.id).single();
@@ -55,11 +70,25 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                     {/* Right: Info & Purchase */}
                     <div>
                         <div className="mb-6">
-                            <h1 className="text-4xl font-bold mb-2">{product.name}</h1>
-                            <div className="flex items-center gap-2 text-sm">
-                                <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full">v{product.version}</span>
-                                <span className="text-muted-foreground">อัปเดตล่าสุดเร็วๆ นี้</span>
+                            <h1 className="text-4xl font-bold mb-3">{product.name}</h1>
+                            <div className="flex flex-wrap items-center gap-3 text-sm mb-4">
+                                <span className="bg-primary/20 text-primary px-2.5 py-0.5 rounded-full font-medium">v{product.version}</span>
+                                {product.platform && (
+                                    <span className="bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2.5 py-0.5 rounded-full font-medium uppercase">
+                                        {product.platform}
+                                    </span>
+                                )}
+                                {product.asset_class && (
+                                    <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2.5 py-0.5 rounded-full font-medium capitalize">
+                                        {product.asset_class}
+                                    </span>
+                                )}
                             </div>
+                            {product.strategy && (
+                                <div className="inline-block bg-muted/40 text-muted-foreground px-3 py-1 rounded-lg text-xs font-medium mb-2 border border-border/50">
+                                    Strategy: {formatStrategy(product.strategy)}
+                                </div>
+                            )}
                         </div>
 
                         <p className="text-lg text-muted-foreground mb-8 leading-relaxed">

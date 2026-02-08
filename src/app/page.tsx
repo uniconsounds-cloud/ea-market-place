@@ -1,6 +1,6 @@
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
-import { ProductCard } from '@/components/product-card';
+import { ProductList } from '@/components/product-list';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
@@ -62,10 +62,8 @@ export default async function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {products?.map((product: any) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+          <div className="min-h-[500px]">
+            <ProductList initialProducts={products || []} />
           </div>
         </div>
       </section>
