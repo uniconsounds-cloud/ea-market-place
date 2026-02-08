@@ -79,14 +79,16 @@ export default function AdminOrdersPage() {
 
             if (orderError) throw orderError;
 
-            // Check for existing license
-            const { data: existingLicense } = await supabase
+            // Check for existing license (Robust matching)
+            const { data: userLicenses } = await supabase
                 .from('licenses')
                 .select('*')
                 .eq('user_id', order.user_id)
-                .eq('product_id', order.product_id)
-                .eq('account_number', order.account_number)
-                .single();
+                .eq('product_id', order.product_id);
+
+            const existingLicense = userLicenses?.find(l =>
+                l.account_number.trim() === order.account_number.trim()
+            );
 
             let expiryDate = null;
             let startDate = new Date();
