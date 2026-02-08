@@ -15,6 +15,9 @@ interface Product {
     price_lifetime: number;
     image_url: string;
     features?: string[];
+    platform?: string;
+    asset_class?: string;
+    strategy?: string;
 }
 
 interface PortStatus {
@@ -98,7 +101,26 @@ export function ProductCard({ product }: { product: Product }) {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-                {/* Status Badges Overlay */}
+                {/* Metadata Badges (Top Left) */}
+                <div className="absolute top-2 left-2 flex flex-col gap-1 items-start z-10">
+                    {product.platform && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30 backdrop-blur-sm shadow-sm">
+                            {product.platform}
+                        </span>
+                    )}
+                    {product.asset_class && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 backdrop-blur-sm shadow-sm">
+                            {product.asset_class}
+                        </span>
+                    )}
+                    {product.strategy && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-purple-500/20 text-purple-400 border border-purple-500/30 backdrop-blur-sm shadow-sm">
+                            {product.strategy.replace('_', ' ')}
+                        </span>
+                    )}
+                </div>
+
+                {/* Status Badges Overlay (Top Right) */}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
                     {portStatuses.map((item, idx) => (
                         <div key={idx} className={`
