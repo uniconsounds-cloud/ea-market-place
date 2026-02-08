@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -25,8 +25,11 @@ interface License {
     created_at: string;
 }
 
-interface GroupedLicense {
-    account_number: string;
+interface GroupedProduct {
+    productId: string;
+    productName: string;
+    productImage: string;
+    fileUrl: string;
     licenses: License[];
 }
 
@@ -34,13 +37,7 @@ export default function DashboardPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
-    const [stats, setStats] = useState({
-        activeLicenses: 0,
-        totalInvestment: 0,
-        totalProducts: 0,
-        accountStatus: 'Inactive'
-    });
-    const [groupedLicenses, setGroupedLicenses] = useState<GroupedLicense[]>([]);
+    const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
 
     useEffect(() => {
         const initData = async () => {
@@ -52,7 +49,7 @@ export default function DashboardPage() {
             }
             setUser(user);
 
-            // 1. Fetch Licenses (with product details)
+            // Fetch Licenses (with product details)
             const { data: licensesData } = await supabase
                 .from('licenses')
                 .select(`
@@ -60,54 +57,34 @@ export default function DashboardPage() {
                     products (
                         id,
                         name,
-                        image_url
+                        image_url,
+                        file_url
                     )
                 `)
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
-            // 2. Fetch Orders (for total investment)
-            const { data: ordersData } = await supabase
-                .from('orders')
-                .select('amount, status')
-                .eq('user_id', user.id)
-                .eq('status', 'completed');
-
-            // Calculate Stats
-            const activeCount = licensesData?.filter((l: any) => l.is_active).length || 0;
-            const totalInv = ordersData?.reduce((sum: number, order: any) => sum + (order.amount || 0), 0) || 0;
-            const totalProds = licensesData?.length || 0;
-
-            setStats({
-                activeLicenses: activeCount,
-                totalInvestment: totalInv,
-                totalProducts: totalProds,
-                accountStatus: activeCount > 0 ? 'Active' : 'Standby'
-            });
-
-            // Group Licenses by Account Number
+            // Group Licenses by Product
             if (licensesData) {
-                const groups: { [key: string]: License[] } = {};
+                const groups: { [key: string]: GroupedProduct } = {};
+
                 licensesData.forEach((l: any) => {
-                    const acc = l.account_number || 'Unassigned';
-                    if (!groups[acc]) groups[acc] = [];
-                    groups[acc].push(l);
+                    const prodId = l.product_id;
+                    if (!groups[prodId]) {
+                        groups[prodId] = {
+                            productId: prodId,
+                            productName: l.products?.name || 'Unknown Product',
+                            productImage: l.products?.image_url || '',
+                            fileUrl: l.products?.file_url || '',
+                            licenses: []
+                        };
+                    }
+                    groups[prodId].licenses.push(l);
                 });
 
-                // Convert to array and sort (Active ports first, then by account number)
-                const groupedArray = Object.keys(groups).map(acc => ({
-                    account_number: acc,
-                    licenses: groups[acc]
-                })).sort((a, b) => {
-                    // Check if groups have active licenses
-                    const aActive = a.licenses.some(l => l.is_active);
-                    const bActive = b.licenses.some(l => l.is_active);
-                    if (aActive && !bActive) return -1;
-                    if (!aActive && bActive) return 1;
-                    return a.account_number.localeCompare(b.account_number);
-                });
-
-                setGroupedLicenses(groupedArray);
+                // Convert to array
+                const groupedArray = Object.values(groups);
+                setGroupedProducts(groupedArray);
             }
 
             setLoading(false);
@@ -153,146 +130,103 @@ export default function DashboardPage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold">ภาพรวมบัญชี</h1>
-                <p className="text-muted-foreground">ยินดีต้อนรับ, {user?.user_metadata?.full_name || user?.email}</p>
+                <p className="text-muted-foreground">จัดการ License และดาวน์โหลด EA ของคุณ</p>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">License ที่ใช้งาน</CardTitle>
-                        <Key className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeLicenses}</div>
-                        <p className="text-xs text-muted-foreground">License ที่ Active อยู่</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">ยอดลงทุนรวม</CardTitle>
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">฿{stats.totalInvestment.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">จากคำสั่งซื้อทั้งหมด</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">สถานะ Account</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-2xl font-bold ${stats.accountStatus === 'Active' ? 'text-green-500' : 'text-yellow-500'}`}>
-                            {stats.accountStatus}
-                        </div>
-                        <p className="text-xs text-muted-foreground">สถานะสมาชิกปัจจุบัน</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">สินค้าทั้งหมด</CardTitle>
-                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalProducts}</div>
-                        <p className="text-xs text-muted-foreground">รายการที่ซื้อแล้ว</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Grouped Licenses */}
+            {/* Product List */}
             <div className="space-y-6">
-                <h2 className="text-xl font-semibold tracking-tight">รายการ License ตามพอร์ตลงทุน</h2>
-
-                {groupedLicenses.length > 0 ? (
-                    groupedLicenses.map((group) => (
-                        <Card key={group.account_number} className="overflow-hidden border-l-4 border-l-primary">
-                            <CardHeader className="bg-muted/40 py-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-2 bg-primary/10 rounded-full">
-                                            <Activity className="h-4 w-4 text-primary" />
+                {groupedProducts.length > 0 ? (
+                    groupedProducts.map((group) => (
+                        <Card key={group.productId} className="overflow-hidden">
+                            <CardHeader className="bg-muted/30 py-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center overflow-hidden border border-border">
+                                            {group.productImage ? (
+                                                <img src={group.productImage} alt={group.productName} className="h-full w-full object-cover" />
+                                            ) : (
+                                                <Key className="h-6 w-6 text-muted-foreground" />
+                                            )}
                                         </div>
                                         <div>
-                                            <CardTitle className="text-base">Port: {group.account_number}</CardTitle>
-                                            <p className="text-xs text-muted-foreground">{group.licenses.length} รายการในพอร์ตนี้</p>
+                                            <CardTitle className="text-lg">{group.productName}</CardTitle>
+                                            <p className="text-sm text-muted-foreground">{group.licenses.length} License ที่ครอบครอง</p>
                                         </div>
                                     </div>
-                                    <Badge variant="outline" className="font-mono">
-                                        MT4/MT5
-                                    </Badge>
+
+                                    <div className="flex items-center gap-2">
+                                        {group.fileUrl && (
+                                            <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                <Button size="sm" variant="outline" className="gap-2">
+                                                    <Download className="h-4 w-4" />
+                                                    ดาวน์โหลด EA
+                                                </Button>
+                                            </a>
+                                        )}
+                                        <Link href={`/products/${group.productId}`}>
+                                            <Button size="sm">ซื้อเพิ่ม</Button>
+                                        </Link>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div className="divide-y divide-border">
-                                    {group.licenses.map((item) => {
-                                        const timeInfo = calculateTimeRemaining(item.expiry_date, item.type);
+                                    {group.licenses.map((license) => {
+                                        const timeInfo = calculateTimeRemaining(license.expiry_date, license.type);
                                         return (
-                                            <div key={item.id} className="p-4 hover:bg-muted/20 transition-colors">
+                                            <div key={license.id} className="p-4 hover:bg-muted/10 transition-colors">
                                                 <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
 
-                                                    {/* Product Info */}
-                                                    <div className="flex items-center gap-4 min-w-[200px]">
-                                                        <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
-                                                            <Key className="h-5 w-5 text-foreground/70" />
+                                                    {/* Port Info */}
+                                                    <div className="flex items-center gap-3 min-w-[200px]">
+                                                        <div className={`p-2 rounded-full ${license.is_active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                            <Activity className="h-4 w-4" />
                                                         </div>
                                                         <div>
-                                                            <h4 className="font-medium">{item.products?.name}</h4>
-                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                <span className="capitalize">{item.type} Plan</span>
-                                                                <span>•</span>
-                                                                <span className={item.is_active ? "text-green-500" : "text-red-500"}>
-                                                                    {item.is_active ? "Active" : "Inactive"}
-                                                                </span>
-                                                            </div>
+                                                            <div className="font-mono font-medium">Port: {license.account_number || 'ยังไม่ระบุ'}</div>
+                                                            <div className="text-xs text-muted-foreground capitalize">{license.type} Plan</div>
                                                         </div>
                                                     </div>
 
-                                                    {/* Expiration Progress */}
+                                                    {/* Status & Expiry */}
                                                     <div className="flex-1 max-w-md space-y-2">
                                                         <div className="flex justify-between text-xs">
                                                             <div className="flex items-center gap-1 text-muted-foreground">
                                                                 <Clock className="h-3 w-3" />
-                                                                <span>เวลาที่เหลือ</span>
+                                                                <span>สถานะ: {license.is_active ? 'Active' : 'Expired'}</span>
                                                             </div>
-                                                            <span className={`font-medium ${timeInfo.days <= 7 && item.type !== 'lifetime' ? 'text-red-500' : ''
-                                                                }`}>
+                                                            <span className={`font-medium ${timeInfo.days <= 7 && license.type !== 'lifetime' ? 'text-red-500' : ''}`}>
                                                                 {timeInfo.label}
                                                             </span>
                                                         </div>
-                                                        {item.type !== 'lifetime' && (
-                                                            <Progress value={timeInfo.percent} className="h-2" indicatorClassName={timeInfo.color} />
+                                                        {license.type !== 'lifetime' && (
+                                                            <Progress value={timeInfo.percent} className="h-1.5" indicatorClassName={timeInfo.color} />
                                                         )}
-                                                        {item.type === 'lifetime' && (
-                                                            <div className="h-2 w-full bg-green-500/20 rounded-full relative overflow-hidden">
+                                                        {license.type === 'lifetime' && (
+                                                            <div className="h-1.5 w-full bg-green-500/20 rounded-full relative overflow-hidden">
                                                                 <div className="absolute inset-0 bg-green-500 w-full" />
                                                             </div>
                                                         )}
                                                         <div className="flex justify-between text-[10px] text-muted-foreground">
-                                                            <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
-                                                            <span>หมด: {item.type === 'lifetime' ? 'ตลอดชีพ' : new Date(item.expiry_date).toLocaleDateString('th-TH')}</span>
+                                                            <span>เริ่ม: {new Date(license.created_at).toLocaleDateString('th-TH')}</span>
+                                                            <span>หมด: {license.type === 'lifetime' ? 'ตลอดชีพ' : new Date(license.expiry_date).toLocaleDateString('th-TH')}</span>
                                                         </div>
                                                     </div>
 
-                                                    {/* Actions */}
-                                                    <div className="flex items-center gap-2 md:justify-end min-w-[120px]">
-                                                        {!item.is_active || (item.type !== 'lifetime' && timeInfo.days <= 30) ? (
-                                                            <Link href={`/products/${item.products?.id}`}>
-                                                                <Button size="sm" variant={item.is_active ? "outline" : "default"} className="h-8 gap-2">
-                                                                    <CreditCard className="h-3 w-3" />
-                                                                    {item.is_active ? 'ต่ออายุ' : 'ซื้อใหม่'}
+                                                    {/* Action */}
+                                                    <div className="flex justify-end min-w-[100px]">
+                                                        {!license.is_active || (license.type !== 'lifetime' && timeInfo.days <= 30) ? (
+                                                            <Link href={`/products/${group.productId}?renew=${license.account_number}`}>
+                                                                <Button size="sm" variant="secondary" className="h-8 text-xs">
+                                                                    ต่ออายุ
                                                                 </Button>
                                                             </Link>
                                                         ) : (
-                                                            <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" disabled>
-                                                                <Activity className="h-3 w-3 mr-2" />
+                                                            <Badge variant="outline" className="h-8 px-3 text-green-500 border-green-500/30 bg-green-500/5">
                                                                 ปกติ
-                                                            </Button>
+                                                            </Badge>
                                                         )}
                                                     </div>
-
                                                 </div>
                                             </div>
                                         );
@@ -303,14 +237,14 @@ export default function DashboardPage() {
                     ))
                 ) : (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
                             <div className="p-4 bg-muted rounded-full mb-4">
-                                <Key className="h-8 w-8 text-muted-foreground/50" />
+                                <ShoppingCart className="h-8 w-8 text-muted-foreground/50" />
                             </div>
-                            <h3 className="text-lg font-medium text-foreground">ยังไม่มี License</h3>
-                            <p className="max-w-sm mt-2 mb-6">คุณยังไม่มีรายการ License ที่ใช้งานอยู่ เชื่อมต่อพอร์ตของคุณโดยการสั่งซื้อสินค้า</p>
+                            <h3 className="text-lg font-medium text-foreground">ยังไม่มีรายการสินค้า</h3>
+                            <p className="max-w-sm mt-2 mb-6 text-sm">เลือกซื้อ EA ที่เหมาะกับสไตล์การเทรดของคุณได้เลย</p>
                             <Link href="/">
-                                <Button>เลือกซื้อสินค้า</Button>
+                                <Button>ไปที่ร้านค้า</Button>
                             </Link>
                         </CardContent>
                     </Card>
