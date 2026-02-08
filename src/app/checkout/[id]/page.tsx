@@ -32,6 +32,13 @@ function CheckoutContent({ productId }: { productId: string }) {
     const [accountNumber, setAccountNumber] = useState(initialAccountNumber);
     const [slipFile, setSlipFile] = useState<File | null>(null);
     const [paymentSettings, setPaymentSettings] = useState<any>(null);
+    const [satang, setSatang] = useState(0);
+
+    useEffect(() => {
+        // Generate random satang between 0.01 and 0.99
+        const randomSatang = (Math.floor(Math.random() * 99) + 1) / 100;
+        setSatang(randomSatang);
+    }, []);
 
     useEffect(() => {
         const fetchPaymentSettings = async () => {
@@ -96,7 +103,7 @@ function CheckoutContent({ productId }: { productId: string }) {
             const { error } = await supabase.from('orders').insert({
                 user_id: user.id,
                 product_id: product.id,
-                amount: planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime),
+                amount: (planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang,
                 status: 'pending',
                 slip_url: slipUrl,
                 plan_type: planType,
@@ -219,9 +226,14 @@ function CheckoutContent({ productId }: { productId: string }) {
                                 {paymentSettings?.account_name || 'Loading...'}
                             </p>
                             <div className="mt-4 text-center">
-                                <p className="text-sm">ยอดชำระ</p>
-                                <p className="text-3xl font-bold text-primary">
-                                    ฿{planType === 'monthly' ? product.price_monthly.toLocaleString() : (planType === 'quarterly' ? product.price_quarterly.toLocaleString() : product.price_lifetime.toLocaleString())}
+                                <p className="text-sm text-muted-foreground mb-1">ยอดชำระ (รวมเศษสตางค์เพื่อยืนยันตัวตน)</p>
+                                <div className="flex items-baseline justify-center gap-1">
+                                    <span className="text-3xl font-bold text-primary">
+                                        ฿{((planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-red-400 mt-2 font-bold animate-pulse">
+                                    * กรุณาโอนยอดที่มีเศษสตางค์ตามนี้เป๊ะๆ *
                                 </p>
                             </div>
                         </div>
