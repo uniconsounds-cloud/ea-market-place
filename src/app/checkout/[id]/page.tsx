@@ -215,12 +215,12 @@ function CheckoutContent({ productId }: { productId: string }) {
                     <CardContent className="space-y-6">
                         <div className="flex flex-col items-center p-6 border rounded-lg bg-white/5">
                             {paymentSettings?.qr_image_url ? (
-                                <div className="relative group">
+                                <div className="flex flex-col items-center">
                                     <img src={paymentSettings.qr_image_url} alt="QR Code" className="w-48 h-auto mb-4 rounded-md" />
                                     <Button
                                         size="sm"
-                                        variant="default"
-                                        className="absolute bottom-6 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        variant="outline"
+                                        className="mb-4 w-full"
                                         onClick={() => {
                                             const link = document.createElement('a');
                                             link.href = paymentSettings.qr_image_url;
@@ -231,7 +231,8 @@ function CheckoutContent({ productId }: { productId: string }) {
                                             document.body.removeChild(link);
                                         }}
                                     >
-                                        <Download className="h-4 w-4" />
+                                        <Download className="mr-2 h-4 w-4" />
+                                        บันทึกรูป QR Code
                                     </Button>
                                 </div>
                             ) : (
