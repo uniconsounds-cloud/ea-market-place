@@ -31,8 +31,14 @@ function CheckoutContent({ productId }: { productId: string }) {
     const [planType, setPlanType] = useState<'monthly' | 'quarterly' | 'lifetime'>(initialPlan);
     const [accountNumber, setAccountNumber] = useState(initialAccountNumber);
     const [slipFile, setSlipFile] = useState<File | null>(null);
+    const [paymentSettings, setPaymentSettings] = useState<any>(null);
 
     useEffect(() => {
+        const fetchPaymentSettings = async () => {
+            const { data } = await supabase.from('payment_settings').select('*').single();
+            if (data) setPaymentSettings(data);
+        };
+        fetchPaymentSettings();
         fetchProduct(productId);
     }, [productId]);
 
@@ -201,9 +207,17 @@ function CheckoutContent({ productId }: { productId: string }) {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex flex-col items-center p-6 border rounded-lg bg-white/5">
-                            <QrCode className="w-32 h-32 text-white mb-4" />
-                            <p className="font-mono text-lg font-bold tracking-widest text-primary">SCB 123-4-56789-0</p>
-                            <p className="text-sm text-muted-foreground">บริษัท ยูนิคอร์น ซาวด์ จำกัด</p>
+                            {paymentSettings?.qr_image_url ? (
+                                <img src={paymentSettings.qr_image_url} alt="QR Code" className="w-48 h-auto mb-4 rounded-md" />
+                            ) : (
+                                <QrCode className="w-32 h-32 text-white mb-4" />
+                            )}
+                            <p className="font-mono text-lg font-bold tracking-widest text-primary">
+                                {paymentSettings ? `${paymentSettings.bank_name} ${paymentSettings.account_number}` : 'Loading...'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {paymentSettings?.account_name || 'Loading...'}
+                            </p>
                             <div className="mt-4 text-center">
                                 <p className="text-sm">ยอดชำระ</p>
                                 <p className="text-3xl font-bold text-primary">
