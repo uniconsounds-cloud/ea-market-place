@@ -98,8 +98,9 @@ export default function ProductFormPage() {
             setUploading(true);
             const file = e.target.files[0];
             const fileExt = file.name.split('.').pop();
-            // Keep original filename but prepend random string to avoid collisions
-            const fileName = `${Date.now()}_${file.name}`;
+            // Keep original filename but prepend 4 random digits to avoid collisions
+            const randomPrefix = Math.floor(1000 + Math.random() * 9000);
+            const fileName = `${randomPrefix}_${file.name}`;
             const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage.from('ea_files').upload(filePath, file);
