@@ -11,6 +11,7 @@ interface Product {
     name: string;
     description: string;
     price_monthly: number;
+    price_quarterly?: number;
     price_lifetime: number;
     image_url: string;
     features?: string[];
@@ -134,17 +135,34 @@ export function ProductCard({ product }: { product: Product }) {
                 </div>
 
                 <div className="mt-auto space-y-4">
-                    <div className="flex items-center justify-between border-t border-border/50 pt-4">
-                        <div className="text-center">
-                            <span className="text-xs text-muted-foreground block">รายเดือน</span>
-                            <span className="text-lg font-bold text-white">฿{product.price_monthly.toLocaleString()}</span>
+                    {product.price_quarterly ? (
+                        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-4 text-center">
+                            <div>
+                                <span className="text-[10px] text-muted-foreground block">รายเดือน</span>
+                                <span className="text-sm font-bold text-white">฿{product.price_monthly.toLocaleString()}</span>
+                            </div>
+                            <div className="border-l border-border/50 pl-2">
+                                <span className="text-[10px] text-muted-foreground block">3 เดือน</span>
+                                <span className="text-sm font-bold text-white">฿{product.price_quarterly.toLocaleString()}</span>
+                            </div>
+                            <div className="border-l border-border/50 pl-2">
+                                <span className="text-[10px] text-muted-foreground block">ถาวร</span>
+                                <span className="text-sm font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</span>
+                            </div>
                         </div>
-                        <div className="h-8 w-[1px] bg-border/50" />
-                        <div className="text-center">
-                            <span className="text-xs text-muted-foreground block">ถาวร (Lifetime)</span>
-                            <span className="text-lg font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</span>
+                    ) : (
+                        <div className="flex items-center justify-between border-t border-border/50 pt-4">
+                            <div className="text-center">
+                                <span className="text-xs text-muted-foreground block">รายเดือน</span>
+                                <span className="text-lg font-bold text-white">฿{product.price_monthly.toLocaleString()}</span>
+                            </div>
+                            <div className="h-8 w-[1px] bg-border/50" />
+                            <div className="text-center">
+                                <span className="text-xs text-muted-foreground block">ถาวร (Lifetime)</span>
+                                <span className="text-lg font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</span>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <Link href={`/products/${product.id}`} className="block">
                         <Button className="w-full group" variant="default">
