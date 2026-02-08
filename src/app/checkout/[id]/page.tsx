@@ -21,13 +21,13 @@ function CheckoutContent({ productId }: { productId: string }) {
     const searchParams = useSearchParams();
 
     // Initial state from URL params
-    const initialPlan = (searchParams.get('plan') as 'monthly' | 'lifetime') || 'lifetime';
+    const initialPlan = (searchParams.get('plan') as 'monthly' | 'quarterly' | 'lifetime') || 'lifetime';
     const initialAccountNumber = searchParams.get('accountNumber') || '';
 
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [planType, setPlanType] = useState<'monthly' | 'lifetime'>(initialPlan);
+    const [planType, setPlanType] = useState<'monthly' | 'quarterly' | 'lifetime'>(initialPlan);
     const [accountNumber, setAccountNumber] = useState(initialAccountNumber);
     const [slipFile, setSlipFile] = useState<File | null>(null);
 
@@ -89,7 +89,7 @@ function CheckoutContent({ productId }: { productId: string }) {
             const { error } = await supabase.from('orders').insert({
                 user_id: user.id,
                 product_id: product.id,
-                amount: planType === 'monthly' ? product.price_monthly : product.price_lifetime,
+                amount: planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime),
                 status: 'pending',
                 slip_url: slipUrl,
                 plan_type: planType,
@@ -151,7 +151,7 @@ function CheckoutContent({ productId }: { productId: string }) {
 
                         <div className="space-y-2">
                             <Label>แพ็กเกจที่เลือก</Label>
-                            <RadioGroup value={planType} onValueChange={(v: any) => setPlanType(v)} className="grid grid-cols-2 gap-4">
+                            <RadioGroup value={planType} onValueChange={(v: any) => setPlanType(v)} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
                                 <div>
                                     <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" />
                                     <Label
@@ -162,7 +162,19 @@ function CheckoutContent({ productId }: { productId: string }) {
                                         <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
                                     </Label>
                                 </div>
-                                <div>
+                                {product.price_quarterly && (
+                                    <div>
+                                        <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" />
+                                        <Label
+                                            htmlFor="quarterly"
+                                            className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
+                                        >
+                                            <span className="mb-2 text-sm font-semibold">3 เดือน</span>
+                                            <span className="text-xl font-bold">฿{product.price_quarterly.toLocaleString()}</span>
+                                        </Label>
+                                    </div>
+                                )}
+                                <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
                                     <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" />
                                     <Label
                                         htmlFor="lifetime"
@@ -190,7 +202,7 @@ function CheckoutContent({ productId }: { productId: string }) {
                             <div className="mt-4 text-center">
                                 <p className="text-sm">ยอดชำระ</p>
                                 <p className="text-3xl font-bold text-primary">
-                                    ฿{planType === 'monthly' ? product.price_monthly.toLocaleString() : product.price_lifetime.toLocaleString()}
+                                    ฿{planType === 'monthly' ? product.price_monthly.toLocaleString() : (planType === 'quarterly' ? product.price_quarterly.toLocaleString() : product.price_lifetime.toLocaleString())}
                                 </p>
                             </div>
                         </div>
@@ -220,6 +232,6 @@ function CheckoutContent({ productId }: { productId: string }) {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div >
     );
 }
