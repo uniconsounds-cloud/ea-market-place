@@ -3,12 +3,13 @@
 import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, BadgeCheck, QrCode } from 'lucide-react';
+import { Loader2, BadgeCheck, QrCode, ArrowLeft } from 'lucide-react';
 
 export default function CheckoutPage(props: { params: Promise<{ id: string }> }) {
     // Unwrap params using React.use()
@@ -112,6 +113,10 @@ function CheckoutContent({ productId }: { productId: string }) {
 
     return (
         <div className="container mx-auto px-4 py-12 max-w-2xl">
+            <Link href={`/products/${productId}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-6 transition-colors">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                ย้อนกลับไปหน้ารายละเอียดสินค้า
+            </Link>
             <h1 className="text-3xl font-bold mb-8 text-center">ยืนยันคำสั่งซื้อ</h1>
 
             <div className="grid gap-8">
