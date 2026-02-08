@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Zap, Check, AlertCircle } from 'lucide-react';
+import { Zap, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 
@@ -22,26 +22,38 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const [riskAccepted, setRiskAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // New State for active licenses
+    // New State for active licenses and pending orders
     const [userLicenses, setUserLicenses] = useState<any[]>([]);
+    const [userOrders, setUserOrders] = useState<any[]>([]); // New state
     const [isRenewal, setIsRenewal] = useState(false);
 
-    // Fetch user licenses on mount
+    // Fetch user licenses and orders on mount
     useEffect(() => {
-        const fetchLicenses = async () => {
+        const fetchData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data } = await supabase
+                // 1. Fetch Active Licenses
+                const { data: licenses } = await supabase
                     .from('licenses')
                     .select('*')
                     .eq('user_id', user.id)
                     .eq('product_id', product.id)
                     .eq('is_active', true);
 
-                if (data) setUserLicenses(data);
+                if (licenses) setUserLicenses(licenses);
+
+                // 2. Fetch Pending Orders
+                const { data: orders } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('product_id', product.id)
+                    .eq('status', 'pending');
+
+                if (orders) setUserOrders(orders);
             }
         };
-        fetchLicenses();
+        fetchData();
     }, [product.id]);
 
     // Check if entered account number matches an existing license
@@ -140,35 +152,64 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     return (
         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg space-y-6">
 
-            {/* Active Ports Display */}
-            {userLicenses.length > 0 && (
-                <div className="space-y-3 mb-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+            {/* Active & Pending Ports Display */}
+            {(userLicenses.length > 0 || userOrders.length > 0) && (
+                <div className="space-y-3 mb-6 p-4 bg-muted/30 rounded-lg border border-border">
                     <h4 className="text-sm font-semibold flex items-center gap-2">
                         <Check className="w-4 h-4 text-green-500" />
-                        พอร์ตที่คุณใช้งานอยู่ (คลิกเพื่อต่ออายุ)
+                        สถานะพอร์ตของคุณ
                     </h4>
                     <div className="space-y-2">
+                        {/* Active Licenses */}
                         {userLicenses.map((license) => {
                             const days = calculateDaysRemaining(license.expiry_date, license.type);
                             return (
                                 <div
-                                    key={license.id}
-                                    className={`text-sm p-2 rounded border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
+                                    key={`license-${license.id}`}
+                                    className={`text-sm p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
                                     onClick={() => setAccountNumber(license.account_number)}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold">{license.account_number}</span>
-                                        {license.type !== 'lifetime' && (
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${days <= 7 ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
-                                                เหลือ {days} วัน
-                                            </span>
-                                        )}
-                                        {license.type === 'lifetime' && <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">Lifetime</span>}
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-green-500/10 p-1.5 rounded-full">
+                                            <Check className="w-3 h-3 text-green-600" />
+                                        </div>
+                                        <div>
+                                            <div className="font-mono font-bold text-base">{license.account_number}</div>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
+                                                {license.type !== 'lifetime' && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
+                                                        เหลือ {days} วัน
+                                                    </span>
+                                                )}
+                                                {license.type === 'lifetime' && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
+                                            </div>
+                                        </div>
                                     </div>
-                                    {accountNumber === license.account_number && <Check className="w-3 h-3 text-primary" />}
+                                    {accountNumber === license.account_number && <Check className="w-4 h-4 text-primary" />}
                                 </div>
                             );
                         })}
+
+                        {/* Pending Orders */}
+                        {userOrders.map((order) => (
+                            <div
+                                key={`order-${order.id}`}
+                                className="text-sm p-3 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-900/50 dark:bg-yellow-900/10 flex justify-between items-center opacity-80"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-yellow-500/10 p-1.5 rounded-full">
+                                        <Loader2 className="w-3 h-3 text-yellow-600 animate-spin" />
+                                    </div>
+                                    <div>
+                                        <div className="font-mono font-bold text-base">{order.account_number}</div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[10px] text-yellow-700 dark:text-yellow-500 font-medium bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded">รอตรวจสอบ (Pending)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
