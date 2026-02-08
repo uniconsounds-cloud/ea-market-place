@@ -48,9 +48,7 @@ export default function ProductFormPage() {
                 price_quarterly: data.price_quarterly || '',
                 price_lifetime: data.price_lifetime,
                 image_url: data.image_url || '',
-                image_url: data.image_url || '',
                 file_url: data.file_url || '',
-                version: data.version || '1.0',
                 version: data.version || '1.0',
                 is_active: data.is_active
             });
