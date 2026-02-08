@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { CreditCard, QrCode, Loader2 } from 'lucide-react';
+import { CreditCard, QrCode, Loader2, Download } from 'lucide-react';
 
 export default function BillingPage() {
     const router = useRouter();
@@ -26,8 +26,10 @@ export default function BillingPage() {
             .from('orders')
             .select(`
                 *,
+                *,
                 products (
-                    name
+                    name,
+                    file_url
                 )
             `)
             .eq('user_id', user.id)
@@ -107,13 +109,20 @@ export default function BillingPage() {
                                     <div className="text-right">
                                         <div className="font-bold">฿{(order.amount || 0).toLocaleString()}</div>
                                         <div className={`text-xs ${order.status === 'completed' ? 'text-green-500' :
-                                                order.status === 'rejected' ? 'text-red-500' :
-                                                    'text-yellow-500'
+                                            order.status === 'rejected' ? 'text-red-500' :
+                                                'text-yellow-500'
                                             }`}>
                                             {order.status === 'completed' ? 'ชำระแล้ว' :
                                                 order.status === 'rejected' ? 'ถูกปฏิเสธ' :
                                                     'รอตรวจสอบ'}
                                         </div>
+                                        {order.status === 'completed' && order.products?.file_url && (
+                                            <a href={order.products.file_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
+                                                <Button size="sm" variant="outline" className="h-7 text-xs">
+                                                    <Download className="mr-1 h-3 w-3" /> ดาวน์โหลด EA
+                                                </Button>
+                                            </a>
+                                        )}
                                     </div>
                                 </div>
                             ))
