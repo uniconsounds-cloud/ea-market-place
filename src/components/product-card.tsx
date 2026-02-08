@@ -101,25 +101,6 @@ export function ProductCard({ product }: { product: Product }) {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-                {/* Metadata Badges (Top Left) */}
-                <div className="absolute top-2 left-2 flex flex-col gap-1 items-start z-10">
-                    {product.platform && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30 backdrop-blur-sm shadow-sm">
-                            {product.platform}
-                        </span>
-                    )}
-                    {product.asset_class && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 backdrop-blur-sm shadow-sm">
-                            {product.asset_class}
-                        </span>
-                    )}
-                    {product.strategy && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-purple-500/20 text-purple-400 border border-purple-500/30 backdrop-blur-sm shadow-sm">
-                            {product.strategy.replace('_', ' ')}
-                        </span>
-                    )}
-                </div>
-
                 {/* Status Badges Overlay (Top Right) */}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
                     {portStatuses.map((item, idx) => (
@@ -141,6 +122,24 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
 
             <div className="p-6 flex-1 flex flex-col">
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {product.platform && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            {product.platform}
+                        </span>
+                    )}
+                    {product.asset_class && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                            {product.asset_class}
+                        </span>
+                    )}
+                    {product.strategy && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                            {product.strategy.replace('_', ' ')}
+                        </span>
+                    )}
+                </div>
+
                 <p className="text-muted-foreground text-sm mb-4 line-clamp-2 h-10">
                     {product.description}
                 </p>
