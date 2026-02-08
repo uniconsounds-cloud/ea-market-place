@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, BadgeCheck, QrCode, ArrowLeft } from 'lucide-react';
+import { Loader2, BadgeCheck, QrCode, ArrowLeft, Download } from 'lucide-react';
 
 export default function CheckoutPage(props: { params: Promise<{ id: string }> }) {
     // Unwrap params using React.use()
@@ -215,17 +215,36 @@ function CheckoutContent({ productId }: { productId: string }) {
                     <CardContent className="space-y-6">
                         <div className="flex flex-col items-center p-6 border rounded-lg bg-white/5">
                             {paymentSettings?.qr_image_url ? (
-                                <img src={paymentSettings.qr_image_url} alt="QR Code" className="w-48 h-auto mb-4 rounded-md" />
+                                <div className="relative group">
+                                    <img src={paymentSettings.qr_image_url} alt="QR Code" className="w-48 h-auto mb-4 rounded-md" />
+                                    <Button
+                                        size="sm"
+                                        variant="default"
+                                        className="absolute bottom-6 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => {
+                                            const link = document.createElement('a');
+                                            link.href = paymentSettings.qr_image_url;
+                                            link.download = 'payment-qr.png';
+                                            link.target = '_blank';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                        }}
+                                    >
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             ) : (
                                 <QrCode className="w-32 h-32 text-white mb-4" />
                             )}
-                            <p className="font-mono text-lg font-bold tracking-widest text-primary">
-                                {paymentSettings ? `${paymentSettings.bank_name} ${paymentSettings.account_number}` : 'Loading...'}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {paymentSettings?.account_name || 'Loading...'}
-                            </p>
-                            <div className="mt-4 text-center">
+                            <div className="text-center space-y-1 mb-4">
+                                <p className="font-bold text-lg text-primary">{paymentSettings?.bank_name || 'Loading...'}</p>
+                                <p className="font-mono text-xl font-bold tracking-widest text-white/90">{paymentSettings?.account_number || ''}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {paymentSettings?.account_name || 'Loading...'}
+                                </p>
+                            </div>
+                            <div className="mt-2 text-center">
                                 <p className="text-sm text-muted-foreground mb-1">ยอดชำระ (รวมเศษสตางค์เพื่อยืนยันตัวตน)</p>
                                 <div className="flex items-baseline justify-center gap-1">
                                     <span className="text-3xl font-bold text-primary">
