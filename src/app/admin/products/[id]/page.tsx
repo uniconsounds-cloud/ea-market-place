@@ -131,7 +131,6 @@ export default function ProductFormPage() {
                 price_monthly: parseFloat(formData.price_monthly),
                 price_quarterly: formData.price_quarterly ? parseFloat(formData.price_quarterly) : null,
                 price_lifetime: parseFloat(formData.price_lifetime),
-                price_lifetime: parseFloat(formData.price_lifetime),
                 image_url: formData.image_url,
                 file_url: formData.file_url,
                 version: formData.version,
