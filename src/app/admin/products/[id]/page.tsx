@@ -288,7 +288,75 @@ export default function ProductFormPage() {
                         </div>
                     </div>
 
+                    <div className="space-y-6 p-6 bg-muted/20 rounded-lg border border-border/50">
+                        <h3 className="text-lg font-semibold">ข้อมูลจำเพาะ (Specifications)</h3>
 
+                        {/* Platform Radio Group */}
+                        <div className="space-y-3">
+                            <Label>Platform (แพลตฟอร์ม)</Label>
+                            <RadioGroup
+                                value={formData.platform}
+                                onValueChange={(value) => setFormData(prev => ({ ...prev, platform: value }))}
+                                className="flex space-x-4"
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="mt4" id="mt4" />
+                                    <Label htmlFor="mt4" className="cursor-pointer">MetaTrader 4 (MT4)</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="mt5" id="mt5" />
+                                    <Label htmlFor="mt5" className="cursor-pointer">MetaTrader 5 (MT5)</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Asset Class Select */}
+                            <div className="space-y-2">
+                                <Label>Asset Class (สินทรัพย์ที่เทรด)</Label>
+                                <Select
+                                    value={formData.asset_class}
+                                    onValueChange={(value) => setFormData(prev => ({ ...prev, asset_class: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="เลือกสินทรัพย์" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="gold">Gold (XAUUSD)</SelectItem>
+                                        <SelectItem value="silver">Silver (XAGUSD)</SelectItem>
+                                        <SelectItem value="currency">Forex Currency Pairs</SelectItem>
+                                        <SelectItem value="crypto">Cryptocurency</SelectItem>
+                                        <SelectItem value="indices">Indices</SelectItem>
+                                        <SelectItem value="commodities">Commodities</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Strategy Select */}
+                            <div className="space-y-2">
+                                <Label>Strategy (กลยุทธ์)</Label>
+                                <Select
+                                    value={formData.strategy}
+                                    onValueChange={(value) => setFormData(prev => ({ ...prev, strategy: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="เลือกกลยุทธ์" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="scalping">Scalping (ทำกำไรระยะสั้น)</SelectItem>
+                                        <SelectItem value="trend_following">Trend Following (ตามเทรนด์)</SelectItem>
+                                        <SelectItem value="grid">Grid System (แก้ไม้)</SelectItem>
+                                        <SelectItem value="martingale">Martingale (เบิ้ลไม้)</SelectItem>
+                                        <SelectItem value="hedging">Hedging</SelectItem>
+                                        <SelectItem value="swing_trading">Swing Trading</SelectItem>
+                                        <SelectItem value="day_trading">Day Trading</SelectItem>
+                                        <SelectItem value="news_trading">News Trading (ชนข่าว)</SelectItem>
+                                        <SelectItem value="arbitrage">Arbitrage</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium">รายละเอียด</label>
