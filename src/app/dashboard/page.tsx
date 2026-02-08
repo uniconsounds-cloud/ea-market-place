@@ -19,7 +19,7 @@ interface License {
         image_url: string;
         product_key: string;
     };
-    type: 'monthly' | 'lifetime';
+    type: 'monthly' | 'quarterly' | 'yearly' | 'lifetime';
     expiry_date: string;
     is_active: boolean;
     account_number: string;
@@ -97,7 +97,7 @@ export default function DashboardPage() {
         initData();
     }, [router]);
 
-    const calculateTimeRemaining = (expiryDate: string, type: 'monthly' | 'lifetime') => {
+    const calculateTimeRemaining = (expiryDate: string, type: 'monthly' | 'quarterly' | 'yearly' | 'lifetime') => {
         if (type === 'lifetime') return { days: 999, percent: 100, label: 'ตลอดชีพ', color: 'bg-green-500' };
 
         const now = new Date();
@@ -105,8 +105,11 @@ export default function DashboardPage() {
         const diffTime = expiry.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        // Assuming monthly is 30 days for progress bar calculation
-        let percent = (diffDays / 30) * 100;
+        let totalDays = 30;
+        if (type === 'quarterly') totalDays = 90;
+        if (type === 'yearly') totalDays = 365;
+
+        let percent = (diffDays / totalDays) * 100;
         if (percent > 100) percent = 100;
         if (percent < 0) percent = 0;
 
@@ -195,7 +198,12 @@ export default function DashboardPage() {
                                                         </div>
                                                         <div>
                                                             <div className="font-mono font-medium">Port: {license.account_number || 'ยังไม่ระบุ'}</div>
-                                                            <div className="text-xs text-muted-foreground capitalize">{license.type} Plan</div>
+                                                            <div className="text-xs text-muted-foreground capitalize">
+                                                                {license.type === 'monthly' ? 'รายเดือน' :
+                                                                    license.type === 'quarterly' ? 'ราย 3 เดือน' :
+                                                                        license.type === 'yearly' ? 'รายปี' :
+                                                                            'ตลอดชีพ'}
+                                                            </div>
                                                         </div>
                                                     </div>
 
