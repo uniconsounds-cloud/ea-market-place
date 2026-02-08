@@ -43,13 +43,13 @@ export function ProductCard({ product }: { product: Product }) {
                     .eq('product_id', product.id)
                     .eq('is_active', true);
 
-                // Fetch Pending/Rejected Orders
+                // Fetch Pending Orders
                 const { data: orders } = await supabase
                     .from('orders')
                     .select('account_number, status')
                     .eq('user_id', user.id)
                     .eq('product_id', product.id)
-                    .in('status', ['pending', 'rejected']);
+                    .eq('status', 'pending');
 
                 const statuses: PortStatus[] = [];
 
@@ -64,7 +64,7 @@ export function ProductCard({ product }: { product: Product }) {
                         // Avoid duplicates if license already exists (though duplicate-check logic prevents this mostly)
                         const exists = statuses.some(s => s.port === o.account_number && s.status === 'active');
                         if (!exists) {
-                            statuses.push({ port: o.account_number, status: o.status as 'pending' | 'rejected' });
+                            statuses.push({ port: o.account_number, status: 'pending' });
                         }
                     }
                 });
@@ -105,11 +105,9 @@ export function ProductCard({ product }: { product: Product }) {
                             flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-mono font-bold shadow-lg backdrop-blur-md border uppercase tracking-wider
                             ${item.status === 'active' ? 'bg-green-500/20 border-green-500/50 text-green-400' : ''}
                             ${item.status === 'pending' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400' : ''}
-                            ${item.status === 'rejected' ? 'bg-red-500/20 border-red-500/50 text-red-500' : ''}
                         `}>
                             {item.status === 'active' && <CheckCircle2 className="w-3 h-3" />}
                             {item.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
-                            {item.status === 'rejected' && <XCircle className="w-3 h-3" />}
                             Port: {item.port}
                         </div>
                     ))}
