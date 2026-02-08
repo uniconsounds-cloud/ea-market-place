@@ -103,19 +103,19 @@ export function ProductList({ initialProducts }: ProductListProps) {
                         {filters.platform && (
                             <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1">
                                 Platform: {getLabel('platform', filters.platform)}
-                                <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleFilterChange('platform', filters.platform)} />
+                                <X className="w-3 h-3 cursor-pointer hover:text-destructive pointer-events-auto" onClick={() => handleFilterChange('platform', filters.platform)} />
                             </Badge>
                         )}
                         {filters.asset_class && (
                             <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20">
                                 Asset: {getLabel('asset_class', filters.asset_class)}
-                                <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleFilterChange('asset_class', filters.asset_class)} />
+                                <X className="w-3 h-3 cursor-pointer hover:text-destructive pointer-events-auto" onClick={() => handleFilterChange('asset_class', filters.asset_class)} />
                             </Badge>
                         )}
                         {filters.strategy && (
                             <Badge variant="secondary" className="gap-1 pl-2 pr-1 py-1 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20">
                                 Strategy: {getLabel('strategy', filters.strategy)}
-                                <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => handleFilterChange('strategy', filters.strategy)} />
+                                <X className="w-3 h-3 cursor-pointer hover:text-destructive pointer-events-auto" onClick={() => handleFilterChange('strategy', filters.strategy)} />
                             </Badge>
                         )}
                         <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-destructive px-2">
