@@ -28,13 +28,20 @@ export function ProductList({ initialProducts }: ProductListProps) {
             { id: 'gold', label: 'Gold (XAUUSD)' },
             { id: 'silver', label: 'Silver' },
             { id: 'currency', label: 'Forex Pairs' },
-            { id: 'crypto', label: 'Crypto' }
+            { id: 'crypto', label: 'Crypto' },
+            { id: 'indices', label: 'Indices' },
+            { id: 'commodities', label: 'Commodities' }
         ],
         strategy: [
             { id: 'scalping', label: 'Scalping' },
             { id: 'trend_following', label: 'Trend' },
             { id: 'grid', label: 'Grid' },
-            { id: 'martingale', label: 'Martingale' }
+            { id: 'martingale', label: 'Martingale' },
+            { id: 'hedging', label: 'Hedging' },
+            { id: 'swing_trading', label: 'Swing' },
+            { id: 'day_trading', label: 'Day Trading' },
+            { id: 'news_trading', label: 'News' },
+            { id: 'arbitrage', label: 'Arbitrage' }
         ]
     };
 
