@@ -198,7 +198,7 @@ export default function CustomerDetailsPage() {
                                         acc[key].push(license);
                                         return acc;
                                     }, {})
-                                ).map(([groupKey, licenses]: [string, any[]]) => (
+                                ).map(([groupKey, licenses]: [string, any]) => (
                                     <div key={groupKey} className="space-y-3">
                                         <div className="flex items-center gap-2 px-1">
                                             {groupingMode === 'account' ? (
