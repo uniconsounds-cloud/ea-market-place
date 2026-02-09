@@ -24,6 +24,7 @@ import {
     Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Product {
     id: string;
@@ -61,6 +62,7 @@ export function AdminDashboardClient() {
     });
     const [productMetrics, setProductMetrics] = useState<Record<string, ProductMetric>>({});
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('sales-desc');
@@ -318,7 +320,11 @@ export function AdminDashboardClient() {
                                 {filteredProducts.length > 0 ? filteredProducts.map((product) => {
                                     const metrics = productMetrics[product.id] || { salesCount: 0, revenue: 0, activeLicenses: 0 };
                                     return (
-                                        <tr key={product.id} className="hover:bg-muted/30 transition-colors group">
+                                        <tr
+                                            key={product.id}
+                                            className="hover:bg-muted/30 transition-colors group cursor-pointer"
+                                            onClick={() => router.push(`/admin/products/${product.id}`)}
+                                        >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-4">
                                                     <div className="h-12 w-12 rounded-lg bg-gray-900 border border-border overflow-hidden shrink-0">
