@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,7 +20,8 @@ import {
     FileText,
     CheckCircle2,
     XCircle,
-    AlertCircle
+    AlertCircle,
+    Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -49,28 +51,100 @@ interface ProductMetric {
     activeLicenses: number;
 }
 
-interface Props {
-    products: Product[];
-    stats: DashboardStats;
-    productMetrics: Record<string, ProductMetric>;
-    debugInfo?: any;
-}
-
-export function AdminDashboardClient({ products, stats, productMetrics, debugInfo }: Props) {
-    if (debugInfo) {
-        console.log('--- [Admin Dashboard Debug] ---');
-        console.log('User ID:', debugInfo.userId);
-        console.log('Orders Count (Raw):', debugInfo.ordersCount);
-        console.log('Orders Error:', debugInfo.ordersError);
-        console.log('Auth Error:', debugInfo.authError);
-        console.log('-------------------------------');
-    }
+export function AdminDashboardClient() {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [stats, setStats] = useState<DashboardStats>({
+        totalProducts: 0,
+        totalOrders: 0,
+        totalRevenue: 0,
+        activeLicenses: 0
+    });
+    const [productMetrics, setProductMetrics] = useState<Record<string, ProductMetric>>({});
+    const [loading, setLoading] = useState(true);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortOrder, setSortOrder] = useState('sales-desc'); // sales-desc, sales-asc, price-desc, price-asc, name-asc
+    const [sortOrder, setSortOrder] = useState('sales-desc');
     const [filterCategory, setFilterCategory] = useState('all');
 
-    // Get unique categories/platforms (merging both concept for simplicity or just use asset_class)
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch Data Client-Side to ensure we use the active session
+                const [productsResult, ordersResult, licensesResult] = await Promise.all([
+                    supabase.from('products').select('*').order('created_at', { ascending: false }),
+                    supabase.from('orders').select('id, amount, status, product_id').order('created_at', { ascending: false }),
+                    supabase.from('licenses').select('id, product_id, is_active').eq('is_active', true)
+                ]);
+
+                const productsData = productsResult.data || [];
+                const allOrders = ordersResult.data || [];
+                const licensesData = licensesResult.data || [];
+
+                // Log for debugging
+                console.log('--- [Admin Client Debug] ---');
+                console.log('Products:', productsData.length);
+                console.log('Orders (Raw):', allOrders.length, allOrders);
+                console.log('Licenses:', licensesData.length);
+
+                // Filter completed orders (Case Insensitive)
+                const completedOrders = allOrders.filter(o => o.status?.toLowerCase() === 'completed');
+                console.log('Orders (Completed):', completedOrders.length);
+
+                // Calculate Global Stats
+                const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+                const totalOrders = completedOrders.length;
+                const activeLicenses = licensesData.length;
+
+                setStats({
+                    totalProducts: productsData.length,
+                    totalOrders,
+                    totalRevenue,
+                    activeLicenses
+                });
+
+                // Calculate Per-Product Metrics
+                const metrics: Record<string, ProductMetric> = {};
+
+                // Init metrics for all products
+                productsData.forEach(p => {
+                    metrics[p.id] = {
+                        productId: p.id,
+                        salesCount: 0,
+                        revenue: 0,
+                        activeLicenses: 0
+                    };
+                });
+
+                // Aggregate Orders
+                completedOrders.forEach(o => {
+                    if (metrics[o.product_id]) {
+                        metrics[o.product_id].salesCount++;
+                        metrics[o.product_id].revenue += (o.amount || 0);
+                    }
+                });
+
+                // Aggregate Licenses
+                licensesData.forEach(l => {
+                    if (metrics[l.product_id]) {
+                        metrics[l.product_id].activeLicenses++;
+                    }
+                });
+
+                setProducts(productsData);
+                setProductMetrics(metrics);
+
+            } catch (error) {
+                console.error("Failed to fetch admin data", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Get unique categories/platforms
     const categories = useMemo(() => {
         const cats = new Set<string>();
         products.forEach(p => {
@@ -113,6 +187,15 @@ export function AdminDashboardClient({ products, stats, productMetrics, debugInf
 
         return result;
     }, [products, searchQuery, filterCategory, sortOrder, productMetrics]);
+
+    if (loading) {
+        return (
+            <div className="flex h-[50vh] w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading dashboard data...</span>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -229,7 +312,6 @@ export function AdminDashboardClient({ products, stats, productMetrics, debugInf
                                     <th className="px-6 py-4 font-medium text-center">ยอดขาย (Sales)</th>
                                     <th className="px-6 py-4 font-medium text-right">รายได้ (Revenue)</th>
                                     <th className="px-6 py-4 font-medium text-center">Active Users</th>
-                                    {/* <th className="px-6 py-4 font-medium text-right">Actions</th> */}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/50">
@@ -294,11 +376,6 @@ export function AdminDashboardClient({ products, stats, productMetrics, debugInf
                                                     {metrics.activeLicenses}
                                                 </div>
                                             </td>
-                                            {/* <td className="px-6 py-4 text-right">
-                                                <Button variant="ghost" size="sm">
-                                                    <MoreVertical className="w-4 h-4" />
-                                                </Button>
-                                            </td> */}
                                         </tr>
                                     );
                                 }) : (
