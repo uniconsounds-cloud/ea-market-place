@@ -77,7 +77,7 @@ export function AdminDashboardClient() {
                 // Fetch Data Client-Side to ensure we use the active session
                 const [productsResult, ordersResult, licensesResult] = await Promise.all([
                     supabase.from('products').select('*').order('created_at', { ascending: false }),
-                    supabase.from('orders').select('id, amount, status, product_id, created_at, products(name, category)').order('created_at', { ascending: false }),
+                    supabase.from('orders').select('id, amount, status, product_id, created_at').order('created_at', { ascending: false }),
                     supabase.from('licenses').select('id, product_id, is_active').eq('is_active', true)
                 ]);
 
