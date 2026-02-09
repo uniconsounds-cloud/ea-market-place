@@ -6,16 +6,33 @@ export const revalidate = 0;
 export default async function AdminDashboardPage() {
     const supabase = await createSupabaseServerClient();
 
-    // Parallel Data Fetching
+    // Diagnostic: Check User
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('[AdminPage] Current User:', user?.id, 'Auth Error:', authError);
+
     const [productsResult, ordersResult, licensesResult] = await Promise.all([
         supabase.from('products').select('*').order('created_at', { ascending: false }),
         supabase.from('orders').select('id, amount, status, product_id').order('created_at', { ascending: false }),
         supabase.from('licenses').select('id, product_id, is_active').eq('is_active', true)
     ]);
 
+    if (productsResult.error) console.error('[AdminPage] Products Error:', productsResult.error);
+    if (ordersResult.error) console.error('[AdminPage] Orders Error:', ordersResult.error);
+    if (licensesResult.error) console.error('[AdminPage] Licenses Error:', licensesResult.error);
+
     const products = productsResult.data || [];
     const allOrders = ordersResult.data || [];
     const licenses = licensesResult.data || [];
+
+    // Debug output for Client Access (if needed)
+    const debugInfo = {
+        userId: user?.id,
+        productsCount: products.length,
+        ordersCount: allOrders.length,
+        licensesCount: licenses.length,
+        ordersError: ordersResult.error,
+        authError
+    };
 
     // Filter completed orders (Case Insensitive)
     const completedOrders = allOrders.filter(o => o.status?.toLowerCase() === 'completed');
@@ -65,6 +82,7 @@ export default async function AdminDashboardPage() {
             products={products}
             stats={stats}
             productMetrics={productMetrics}
+            debugInfo={debugInfo}
         />
     );
 }

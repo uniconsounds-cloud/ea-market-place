@@ -53,9 +53,19 @@ interface Props {
     products: Product[];
     stats: DashboardStats;
     productMetrics: Record<string, ProductMetric>;
+    debugInfo?: any;
 }
 
-export function AdminDashboardClient({ products, stats, productMetrics }: Props) {
+export function AdminDashboardClient({ products, stats, productMetrics, debugInfo }: Props) {
+    if (debugInfo) {
+        console.log('--- [Admin Dashboard Debug] ---');
+        console.log('User ID:', debugInfo.userId);
+        console.log('Orders Count (Raw):', debugInfo.ordersCount);
+        console.log('Orders Error:', debugInfo.ordersError);
+        console.log('Auth Error:', debugInfo.authError);
+        console.log('-------------------------------');
+    }
+
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('sales-desc'); // sales-desc, sales-asc, price-desc, price-asc, name-asc
     const [filterCategory, setFilterCategory] = useState('all');
