@@ -40,7 +40,7 @@ export default function AdminUsersPage() {
             // We need to fetch ALL profiles.
             const { data: profiles, error: profileError } = await supabase
                 .from('profiles')
-                .select('id, full_name, email, created_at, role');
+                .select('id, full_name, email, role'); // Removed created_at
 
             if (profileError) throw profileError;
 
@@ -95,7 +95,7 @@ export default function AdminUsersPage() {
         if (sortOrder === 'spent-high') return b.totalSpent - a.totalSpent;
         if (sortOrder === 'spent-low') return a.totalSpent - b.totalSpent;
         if (sortOrder === 'orders-high') return b.totalOrders - a.totalOrders;
-        if (sortOrder === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        // created_at removed
         return 0;
     });
 
