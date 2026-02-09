@@ -113,26 +113,46 @@ export default function ProductFormPage() {
             const totalSales = orders?.length || 0;
             const totalRevenue = orders?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
 
-            // 2. Get Active Licenses with User Info
-            // Note: Join syntax depends on foreign key names being correct.
-            // If explicit names fail, we can fetch profiles separately.
-            const { data: licenses, error } = await supabase
+            // 2. Get Active Licenses (Step 1: Fetch Licenses)
+            const { data: licenses, error: licenseError } = await supabase
                 .from('licenses')
-                .select(`
-                    *,
-                    profiles (email, full_name)
-                `)
+                .select('*')
                 .eq('product_id', id)
                 .eq('is_active', true)
-                .order('expiry_date', { ascending: true }); // Expiring soonest first
+                .order('expiry_date', { ascending: true });
 
-            if (error) console.error("Error fetching licenses:", error);
+            if (licenseError) throw licenseError;
 
-            const licensesData = licenses || [];
+            const licensesData: LicenseData[] = [];
+            const rawLicenses = licenses || [];
+
+            if (rawLicenses.length > 0) {
+                // Step 2: Extract User IDs
+                const userIds = Array.from(new Set(rawLicenses.map(l => l.user_id)));
+
+                // Step 3: Fetch Profiles
+                const { data: profiles, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('id, email, full_name') // Explicitly select columns, NO created_at
+                    .in('id', userIds);
+
+                if (profileError) console.error("Error fetching profiles:", profileError);
+
+                // Step 4: Map Profiles to Licenses
+                const profileMap = new Map(profiles?.map(p => [p.id, p]));
+
+                rawLicenses.forEach((l: any) => {
+                    licensesData.push({
+                        ...l,
+                        profiles: profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown' }
+                    });
+                });
+            }
+
             const activeUsers = licensesData.length;
 
             setStats({ totalRevenue, totalSales, activeUsers });
-            setActiveLicenses(licensesData as any);
+            setActiveLicenses(licensesData);
 
         } catch (error) {
             console.error("Error fetching stats:", error);
