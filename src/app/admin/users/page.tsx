@@ -225,13 +225,12 @@ export default function AdminUsersPage() {
                             ))
                         ) : (
                             <TableRow>
-                                <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                        ไม่พบรายชื่อลูกค้า
-                                    </TableCell>
-                                </TableRow>
+                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                    ไม่พบรายชื่อลูกค้า
+                                </TableCell>
+                            </TableRow>
                         )}
-                            </TableBody>
+                    </TableBody>
                 </Table>
             </div>
         </div>
