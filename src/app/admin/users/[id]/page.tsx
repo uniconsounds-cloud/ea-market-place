@@ -165,57 +165,99 @@ export default function CustomerDetailsPage() {
 
                     {/* Active Products Section */}
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold flex items-center gap-2">
-                                <CheckCircle2 className="text-green-500 w-5 h-5" /> สินค้าที่ใช้งานอยู่ (Active Products)
-                            </h2>
-                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                                {activeLicenses.length} รายการ
-                            </Badge>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <CheckCircle2 className="text-green-500 w-5 h-5" /> สินค้าที่ใช้งานอยู่ (Active Products)
+                                </h2>
+                                <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+                                    {activeLicenses.length} รายการ
+                                </Badge>
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg">
+                                <span className="text-xs text-muted-foreground px-2">Group by:</span>
+                                <Tabs value={groupingMode} onValueChange={(v) => setGroupingMode(v as 'account' | 'product')} className="w-auto">
+                                    <TabsList className="h-8">
+                                        <TabsTrigger value="account" className="text-xs px-3">Account (Port)</TabsTrigger>
+                                        <TabsTrigger value="product" className="text-xs px-3">Product Name</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            </div>
                         </div>
 
-                        <div className="grid gap-4">
-                            {activeLicenses.length > 0 ? activeLicenses.map((license) => {
-                                const daysRemaining = calculateDaysRemaining(license.expiry_date);
-                                const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
+                        <div className="grid gap-6">
+                            {activeLicenses.length > 0 ? (
+                                Object.entries(
+                                    activeLicenses.reduce((acc: any, license) => {
+                                        const key = groupingMode === 'account'
+                                            ? (license.account_number || 'No Account')
+                                            : (license.products?.name || 'Unknown Product');
 
-                                return (
-                                    <Card key={license.id} className="overflow-hidden border-l-4 border-l-green-500 hover:bg-muted/30 transition-colors">
-                                        <CardContent className="p-0 flex flex-col md:flex-row items-start md:items-center justify-between p-6 gap-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-12 w-12 rounded-lg bg-gray-900 border border-border flex items-center justify-center overflow-hidden shrink-0">
-                                                    {license.products?.image_url ? (
-                                                        <img src={license.products.image_url} alt={license.products.name} className="h-full w-full object-cover" />
-                                                    ) : (
-                                                        <Package className="text-muted-foreground w-6 h-6" />
-                                                    )}
+                                        if (!acc[key]) acc[key] = [];
+                                        acc[key].push(license);
+                                        return acc;
+                                    }, {})
+                                ).map(([groupKey, licenses]: [string, any[]]) => (
+                                    <div key={groupKey} className="space-y-3">
+                                        <div className="flex items-center gap-2 px-1">
+                                            {groupingMode === 'account' ? (
+                                                <div className="flex items-center gap-2 bg-blue-500/10 text-blue-500 px-3 py-1 rounded-full text-sm font-medium">
+                                                    <Shield className="w-4 h-4" /> Port: {groupKey}
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-bold text-lg">{license.products?.name || 'Unknown Product'}</h3>
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                        <Badge variant="secondary" className="text-[10px]">{license.products?.platform || 'MT4'}</Badge>
-                                                        <span>Account: <span className="font-mono text-foreground font-medium">{license.account_number}</span></span>
-                                                    </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2 bg-purple-500/10 text-purple-500 px-3 py-1 rounded-full text-sm font-medium">
+                                                    <Package className="w-4 h-4" /> Product: {groupKey}
                                                 </div>
-                                            </div>
+                                            )}
+                                            <div className="h-px bg-border flex-1"></div>
+                                        </div>
 
-                                            <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
-                                                <div className="text-right">
-                                                    <div className="text-xs text-muted-foreground mb-1">วันหมดอายุ (Expiry)</div>
-                                                    <div className={`font-mono flex items-center justify-end gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : ''}`}>
-                                                        <Clock className="w-3 h-3" />
-                                                        {new Date(license.expiry_date).toLocaleDateString('th-TH')}
-                                                    </div>
-                                                    <div className="text-xs text-green-500 mt-1">
-                                                        เหลือ {daysRemaining} วัน
-                                                    </div>
-                                                </div>
-                                                <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            }) : (
+                                        <div className="grid gap-4 pl-4 border-l-2 border-muted ml-4">
+                                            {licenses.map((license: any) => {
+                                                const daysRemaining = calculateDaysRemaining(license.expiry_date);
+                                                const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
+
+                                                return (
+                                                    <Card key={license.id} className="overflow-hidden hover:bg-muted/30 transition-colors">
+                                                        <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="h-10 w-10 rounded-lg bg-gray-900 border border-border flex items-center justify-center overflow-hidden shrink-0">
+                                                                    {license.products?.image_url ? (
+                                                                        <img src={license.products.image_url} alt={license.products.name} className="h-full w-full object-cover" />
+                                                                    ) : (
+                                                                        <Package className="text-muted-foreground w-5 h-5" />
+                                                                    )}
+                                                                </div>
+                                                                <div>
+                                                                    <h3 className="font-bold text-base">{license.products?.name || 'Unknown Product'}</h3>
+                                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                        <Badge variant="secondary" className="text-[10px] h-5">{license.products?.platform || 'MT4'}</Badge>
+                                                                        <span>Account: <span className="font-mono text-foreground font-medium">{license.account_number}</span></span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                                                                <div className="text-right">
+                                                                    <div className={`font-mono text-sm flex items-center justify-end gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : ''}`}>
+                                                                        <Clock className="w-3 h-3" />
+                                                                        {new Date(license.expiry_date).toLocaleDateString('th-TH')}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-green-500">
+                                                                        เหลือ {daysRemaining} วัน
+                                                                    </div>
+                                                                </div>
+                                                                <Badge className="bg-green-500 hover:bg-green-600 h-6">Active</Badge>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
                                 <div className="text-center py-12 border border-dashed rounded-xl text-muted-foreground bg-muted/20">
                                     ลูกค้ายังไม่มีสินค้าที่ใช้งานอยู่ในขณะนี้
                                 </div>
