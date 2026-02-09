@@ -9,17 +9,20 @@ export default async function AdminDashboardPage() {
     // Parallel Data Fetching
     const [productsResult, ordersResult, licensesResult] = await Promise.all([
         supabase.from('products').select('*').order('created_at', { ascending: false }),
-        supabase.from('orders').select('id, amount, status, product_id').eq('status', 'completed'),
+        supabase.from('orders').select('id, amount, status, product_id').order('created_at', { ascending: false }),
         supabase.from('licenses').select('id, product_id, is_active').eq('is_active', true)
     ]);
 
     const products = productsResult.data || [];
-    const orders = ordersResult.data || [];
+    const allOrders = ordersResult.data || [];
     const licenses = licensesResult.data || [];
 
+    // Filter completed orders (Case Insensitive)
+    const completedOrders = allOrders.filter(o => o.status?.toLowerCase() === 'completed');
+
     // Calculate Global Stats
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.amount || 0), 0);
-    const totalOrders = orders.length; // Completed orders
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+    const totalOrders = completedOrders.length;
     const activeLicenses = licenses.length;
 
     const stats = {
@@ -43,7 +46,7 @@ export default async function AdminDashboardPage() {
     });
 
     // Aggregate Orders
-    orders.forEach(o => {
+    completedOrders.forEach(o => {
         if (productMetrics[o.product_id]) {
             productMetrics[o.product_id].salesCount++;
             productMetrics[o.product_id].revenue += (o.amount || 0);
