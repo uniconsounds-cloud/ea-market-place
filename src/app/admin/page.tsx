@@ -1,66 +1,65 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { AdminDashboardClient } from '@/components/admin-dashboard-client';
 
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-    // Fetch summary stats
-    const { count: productCount } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true });
+    // Parallel Data Fetching
+    const [productsResult, ordersResult, licensesResult] = await Promise.all([
+        supabase.from('products').select('*').order('created_at', { ascending: false }),
+        supabase.from('orders').select('id, amount, status, product_id').eq('status', 'completed'),
+        supabase.from('licenses').select('id, product_id, is_active').eq('is_active', true)
+    ]);
 
-    // Fetch recent products
-    const { data: recentProducts } = await supabase
-        .from('products')
-        .select('name, price_lifetime, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
+    const products = productsResult.data || [];
+    const orders = ordersResult.data || [];
+    const licenses = licensesResult.data || [];
+
+    // Calculate Global Stats
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.amount || 0), 0);
+    const totalOrders = orders.length; // Completed orders
+    const activeLicenses = licenses.length;
+
+    const stats = {
+        totalProducts: products.length,
+        totalOrders,
+        totalRevenue,
+        activeLicenses
+    };
+
+    // Calculate Per-Product Metrics
+    const productMetrics: Record<string, { productId: string; salesCount: number; revenue: number; activeLicenses: number }> = {};
+
+    // Initialize metrics
+    products.forEach(p => {
+        productMetrics[p.id] = {
+            productId: p.id,
+            salesCount: 0,
+            revenue: 0,
+            activeLicenses: 0
+        };
+    });
+
+    // Aggregate Orders
+    orders.forEach(o => {
+        if (productMetrics[o.product_id]) {
+            productMetrics[o.product_id].salesCount++;
+            productMetrics[o.product_id].revenue += (o.amount || 0);
+        }
+    });
+
+    // Aggregate Licenses
+    licenses.forEach(l => {
+        if (productMetrics[l.product_id]) {
+            productMetrics[l.product_id].activeLicenses++;
+        }
+    });
 
     return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                <p className="text-muted-foreground">จัดการระบบหลังบ้าน</p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">สินค้าทั้งหมด</CardTitle>
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{productCount ?? 0}</div>
-                        <p className="text-xs text-muted-foreground">รายการ</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="space-y-4">
-                <h2 className="text-xl font-semibold">สินค้าล่าสุด</h2>
-                <div className="grid gap-4">
-                    {recentProducts?.map((product: any, i: number) => (
-                        <Card key={i} className="flex items-center justify-between p-4">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-primary/10 p-2 rounded-full">
-                                    <Package className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="font-medium">{product.name}</p>
-                                    <p className="text-xs text-muted-foreground flex items-center">
-                                        <Calendar className="mr-1 h-3 w-3" />
-                                        {new Date(product.created_at).toLocaleDateString('th-TH')}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="font-bold">
-                                ฿{product.price_lifetime.toLocaleString()}
-                            </div>
-                        </Card>
-                    ))}
-                </div>
-            </div>
-        </div>
+        <AdminDashboardClient
+            products={products}
+            stats={stats}
+            productMetrics={productMetrics}
+        />
     );
 }
