@@ -120,7 +120,7 @@ export default function DashboardPage() {
         return {
             days: diffDays,
             percent,
-            label: diffDays > 0 ? `${diffDays} วัน` : 'หมดอายุ',
+            label: diffDays > 0 ? `เหลือ ${diffDays} วัน` : 'หมดอายุ',
             color
         };
     };
