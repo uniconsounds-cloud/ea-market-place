@@ -30,6 +30,24 @@ interface AdminDashboardChartsProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+                <p className="text-popover-foreground font-medium mb-1">{payload[0].name}</p>
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].fill }} />
+                    <span className="text-popover-foreground">
+                        ฿{(payload[0].value || 0).toLocaleString()}
+                    </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Revenue</p>
+            </div>
+        );
+    }
+    return null;
+};
+
 export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsProps) {
     const [timeRange, setTimeRange] = useState('30d'); // 7d, 30d, all
 
@@ -230,17 +248,7 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'hsl(var(--popover))',
-                                            borderColor: 'hsl(var(--border))',
-                                            borderRadius: '8px',
-                                            color: 'hsl(var(--popover-foreground))'
-                                        }}
-                                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                                        formatter={(value: any) => [`฿${(value || 0).toLocaleString()}`, 'Revenue']}
-                                    />
+                                    <Tooltip content={<CustomTooltip />} />
                                     <Legend verticalAlign="bottom" height={36} />
                                 </PieChart>
                             </ResponsiveContainer>
