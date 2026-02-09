@@ -150,11 +150,7 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
                                     axisLine={false}
                                     tickFormatter={(value) => `฿${value}`}
                                 />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                                    itemStyle={{ color: 'hsl(var(--foreground))' }}
-                                    formatter={(value: any) => [`฿${(value || 0).toLocaleString()}`, 'Revenue']}
-                                />
+
                                 <Area
                                     type="monotone"
                                     dataKey="amount"
