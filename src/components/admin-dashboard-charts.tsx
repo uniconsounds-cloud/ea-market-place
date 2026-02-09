@@ -143,13 +143,7 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
                                     tickLine={false}
                                     axisLine={false}
                                 />
-                                <YAxis
-                                    stroke="#888888"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) => `฿${value}`}
-                                />
+
 
                                 <Area
                                     type="monotone"
