@@ -74,7 +74,8 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
 
         orders.forEach(order => {
             if (order.status !== 'completed') return;
-            const productName = order.products?.name || 'Unknown';
+            const product = products.find(p => p.id === order.product_id);
+            const productName = product?.name || 'Unknown Product';
             productSales[productName] = (productSales[productName] || 0) + (order.amount || 0);
         });
 
@@ -82,7 +83,7 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
             .map(([name, sales]) => ({ name, sales }))
             .sort((a, b) => b.sales - a.sales)
             .slice(0, 5); // Top 5
-    }, [orders]);
+    }, [orders, products]);
 
     // 3. Process Sales by Category
     const salesByCategoryData = useMemo(() => {
@@ -94,7 +95,8 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
             // Since we might not have category in orders->products join easily without strict typing,
             // we'll try to find the product in the passed 'products' array to get category.
             const product = products.find(p => p.id === order.product_id);
-            const category = product?.category || 'EA'; // Default to EA if unknown
+            // Use category or asset_class (platform is also an option but asset_class is better for grouping)
+            const category = product?.category || product?.asset_class || 'EA';
 
             categorySales[category] = (categorySales[category] || 0) + (order.amount || 0);
         });
