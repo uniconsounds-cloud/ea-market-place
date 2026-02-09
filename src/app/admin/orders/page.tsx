@@ -80,15 +80,21 @@ export default function AdminOrdersPage() {
             if (orderError) throw orderError;
 
             // Check for existing license (Robust matching)
-            const { data: userLicenses } = await supabase
+            const { data: userLicenses, error: userLicensesError } = await supabase
                 .from('licenses')
                 .select('*')
                 .eq('user_id', order.user_id)
                 .eq('product_id', order.product_id);
 
+            if (userLicensesError) console.error('Error fetching user licenses:', userLicensesError);
+            console.log('User Licenses found:', userLicenses);
+            console.log('Searching for Account:', order.account_number);
+
             const existingLicense = userLicenses?.find(l =>
                 l.account_number.trim() === order.account_number.trim()
             );
+
+            console.log('Match Found:', existingLicense);
 
             let expiryDate = null;
             let startDate = new Date();
@@ -114,8 +120,11 @@ export default function AdminOrdersPage() {
                 expiryDate = new Date(9999, 11, 31).toISOString();
             }
 
+            console.log('Calculated Expiry:', expiryDate);
+
             if (existingLicense) {
                 // Update existing license
+                console.log('Updating License ID:', existingLicense.id);
                 const { error: updateError } = await supabase
                     .from('licenses')
                     .update({
@@ -125,11 +134,15 @@ export default function AdminOrdersPage() {
                     })
                     .eq('id', existingLicense.id);
 
-                if (updateError) throw updateError;
+                if (updateError) {
+                    console.error('Update Error:', updateError);
+                    throw updateError;
+                }
                 alert('อนุมัติเรียบร้อย! License ถูกต่ออายุแล้ว');
 
             } else {
                 // Create new license
+                console.log('Creating New License');
                 const { error: licenseError } = await supabase
                     .from('licenses')
                     .insert({
@@ -141,7 +154,10 @@ export default function AdminOrdersPage() {
                         account_number: order.account_number || ''
                     });
 
-                if (licenseError) throw licenseError;
+                if (licenseError) {
+                    console.error('Insert Error:', licenseError);
+                    throw licenseError;
+                }
                 alert('อนุมัติเรียบร้อย! License ถูกสร้างแล้ว');
             }
 
