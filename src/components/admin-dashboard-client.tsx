@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { AdminDashboardCharts } from './admin-dashboard-charts';
 
 interface Product {
     id: string;
@@ -60,6 +61,7 @@ export function AdminDashboardClient() {
         totalRevenue: 0,
         activeLicenses: 0
     });
+    const [orders, setOrders] = useState<any[]>([]);
     const [productMetrics, setProductMetrics] = useState<Record<string, ProductMetric>>({});
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -75,7 +77,7 @@ export function AdminDashboardClient() {
                 // Fetch Data Client-Side to ensure we use the active session
                 const [productsResult, ordersResult, licensesResult] = await Promise.all([
                     supabase.from('products').select('*').order('created_at', { ascending: false }),
-                    supabase.from('orders').select('id, amount, status, product_id').order('created_at', { ascending: false }),
+                    supabase.from('orders').select('id, amount, status, product_id, created_at, products(name, category)').order('created_at', { ascending: false }),
                     supabase.from('licenses').select('id, product_id, is_active').eq('is_active', true)
                 ]);
 
@@ -104,6 +106,9 @@ export function AdminDashboardClient() {
                     totalRevenue,
                     activeLicenses
                 });
+
+                // Store completed orders for charts
+                setOrders(completedOrders);
 
                 // Calculate Per-Product Metrics
                 const metrics: Record<string, ProductMetric> = {};
@@ -200,7 +205,7 @@ export function AdminDashboardClient() {
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
@@ -261,6 +266,9 @@ export function AdminDashboardClient() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Charts Section */}
+            <AdminDashboardCharts orders={orders} products={products} />
 
             {/* Product Table Section */}
             <div className="space-y-4">
