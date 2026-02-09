@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
@@ -41,6 +41,12 @@ const SidebarContent = ({
                 <Button variant="ghost" className="w-full justify-start">
                     <FileText className="mr-2 h-4 w-4" />
                     รายการสั่งซื้อ
+                </Button>
+            </Link>
+            <Link href="/admin/users" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <Users className="mr-2 h-4 w-4" />
+                    ลูกค้า (Users)
                 </Button>
             </Link>
             <Link href="/admin/settings" onClick={onClose}>
