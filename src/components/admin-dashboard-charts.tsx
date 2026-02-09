@@ -143,8 +143,24 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
                                     tickLine={false}
                                     axisLine={false}
                                 />
-
-
+                                <YAxis
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `฿${value}`}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: 'hsl(var(--popover))',
+                                        borderColor: 'hsl(var(--border))',
+                                        borderRadius: '8px',
+                                        color: 'hsl(var(--popover-foreground))'
+                                    }}
+                                    itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                                    labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                                    formatter={(value: any) => [`฿${(value || 0).toLocaleString()}`, 'Revenue']}
+                                />
                                 <Area
                                     type="monotone"
                                     dataKey="amount"
@@ -174,7 +190,14 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
                                     <YAxis type="category" dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} width={100} />
                                     <Tooltip
                                         cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                                        contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                        contentStyle={{
+                                            backgroundColor: 'hsl(var(--popover))',
+                                            borderColor: 'hsl(var(--border))',
+                                            borderRadius: '8px',
+                                            color: 'hsl(var(--popover-foreground))'
+                                        }}
+                                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                                         formatter={(value: any) => [`฿${(value || 0).toLocaleString()}`, 'Sales']}
                                     />
                                     <Bar dataKey="sales" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
@@ -208,7 +231,14 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                        contentStyle={{
+                                            backgroundColor: 'hsl(var(--popover))',
+                                            borderColor: 'hsl(var(--border))',
+                                            borderRadius: '8px',
+                                            color: 'hsl(var(--popover-foreground))'
+                                        }}
+                                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                                         formatter={(value: any) => [`฿${(value || 0).toLocaleString()}`, 'Revenue']}
                                     />
                                     <Legend verticalAlign="bottom" height={36} />
