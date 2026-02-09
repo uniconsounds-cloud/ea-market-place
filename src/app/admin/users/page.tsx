@@ -182,17 +182,16 @@ export default function AdminUsersPage() {
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead className="w-[300px]">ลูกค้า (User)</TableHead>
+                            <TableHead>ลูกค้า (User)</TableHead>
                             <TableHead className="text-center">Active Products</TableHead>
                             <TableHead className="text-center">Orders (สำเร็จ)</TableHead>
                             <TableHead className="text-right">ยอดใช้จ่ายรวม</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={4} className="h-24 text-center">
                                     <Loader2 className="animate-spin h-6 w-6 mx-auto" />
                                 </TableCell>
                             </TableRow>
@@ -200,10 +199,10 @@ export default function AdminUsersPage() {
                             filteredUsers.map((user) => (
                                 <TableRow key={user.id} className="hover:bg-muted/50">
                                     <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium">{user.full_name || 'No Name'}</span>
+                                        <Link href={`/admin/users/${user.id}`} className="flex flex-col hover:bg-muted/50 p-2 -m-2 rounded transition-colors group">
+                                            <span className="font-medium group-hover:text-primary transition-colors">{user.full_name || 'No Name'}</span>
                                             <span className="text-xs text-muted-foreground">{user.email || user.id}</span>
-                                        </div>
+                                        </Link>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         {user.activeProducts > 0 ? (
@@ -222,21 +221,17 @@ export default function AdminUsersPage() {
                                             ฿{user.totalSpent.toLocaleString()}
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        <Button variant="ghost" size="icon" disabled>
-                                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                        </Button>
-                                    </TableCell>
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                    ไม่พบรายชื่อลูกค้า
-                                </TableCell>
-                            </TableRow>
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                        ไม่พบรายชื่อลูกค้า
+                                    </TableCell>
+                                </TableRow>
                         )}
-                    </TableBody>
+                            </TableBody>
                 </Table>
             </div>
         </div>
