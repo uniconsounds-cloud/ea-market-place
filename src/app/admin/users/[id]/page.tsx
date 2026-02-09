@@ -19,6 +19,7 @@ export default function CustomerDetailsPage() {
     const [expiredLicenses, setExpiredLicenses] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [groupingMode, setGroupingMode] = useState<'account' | 'product'>('account');
 
     useEffect(() => {
         if (id) fetchData();
