@@ -1,9 +1,11 @@
-import { supabase } from '@/lib/supabaseClient';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { AdminDashboardClient } from '@/components/admin-dashboard-client';
 
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
+    const supabase = await createSupabaseServerClient();
+
     // Parallel Data Fetching
     const [productsResult, ordersResult, licensesResult] = await Promise.all([
         supabase.from('products').select('*').order('created_at', { ascending: false }),
