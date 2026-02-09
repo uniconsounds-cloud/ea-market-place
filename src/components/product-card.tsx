@@ -87,7 +87,7 @@ export function ProductCard({ product }: { product: Product }) {
     return (
         <div className="glass-card rounded-xl overflow-hidden hover:shadow-2xl hover:shadow-blue-900/20 transition-all duration-300 group flex flex-col h-full border-t border-white/5 relative">
 
-            <div className="relative h-48 w-full overflow-hidden bg-gray-900">
+            <div className="relative aspect-square w-full overflow-hidden bg-gray-900">
                 {/* Placeholder for Image - in real app use Next/Image */}
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-black text-white/20 text-4xl font-bold">
                     {product.name.substring(0, 2)}

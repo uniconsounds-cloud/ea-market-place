@@ -44,7 +44,7 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                     {/* Left: Image/Visual */}
                     <div className="space-y-6">
-                        <div className="aspect-video bg-gradient-to-br from-gray-900 to-black rounded-xl border border-border/50 flex items-center justify-center relative overflow-hidden shadow-2xl">
+                        <div className="aspect-square bg-gradient-to-br from-gray-900 to-black rounded-xl border border-border/50 flex items-center justify-center relative overflow-hidden shadow-2xl">
                             <div className="text-6xl font-bold text-white/10">{product.name.substring(0, 2)}</div>
                             {product.image_url && (
                                 <img
