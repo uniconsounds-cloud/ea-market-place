@@ -75,7 +75,7 @@ export function Navbar() {
                     <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-md flex items-center justify-center font-bold text-white text-xs">
                         EZE
                     </div>
-                    <Link href="/" className="text-xl font-bold tracking-tight">
+                    <Link href="/" className="text-xl font-bold tracking-tight whitespace-nowrap">
                         EA Easy Shop
                     </Link>
                 </div>
@@ -124,7 +124,7 @@ export function Navbar() {
                                 <Button variant="outline" className="hidden sm:inline-flex">เข้าสู่ระบบ</Button>
                             </Link>
                             <Link href="/register">
-                                <Button variant="gold">สมัครสมาชิก</Button>
+                                <Button variant="gold" className="whitespace-nowrap">สมัครสมาชิก</Button>
                             </Link>
                         </>
                     )}
