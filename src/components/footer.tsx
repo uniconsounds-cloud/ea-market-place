@@ -6,7 +6,7 @@ export function Footer() {
             <div className="container mx-auto px-4 py-8 md:py-12">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                     <div className="space-y-3">
-                        <h3 className="text-lg font-bold">EA Market</h3>
+                        <h3 className="text-lg font-bold">EA Easy Shop</h3>
                         <p className="text-sm text-muted-foreground">
                             แหล่งรวม Expert Advisors ระดับพรีเมียมสำหรับนักเทรดมืออาชีพ
                             ช่วยให้การเทรดของคุณเป็นอัตโนมัติด้วยอัลกอริทึมที่ผ่านการตรวจสอบแล้ว
@@ -41,7 +41,7 @@ export function Footer() {
                     </div>
                 </div>
                 <div className="mt-8 pt-8 border-t border-border/50 text-center text-sm text-muted-foreground">
-                    © {new Date().getFullYear()} EA Market. สงวนลิขสิทธิ์
+                    © {new Date().getFullYear()} EA Easy Shop. สงวนลิขสิทธิ์
                 </div>
             </div>
         </footer>

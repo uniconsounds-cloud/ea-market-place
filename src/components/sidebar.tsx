@@ -36,10 +36,10 @@ export function SidebarContent({
         <div className="flex flex-col h-full bg-card">
             <div className="h-16 flex items-center px-6 border-b border-border">
                 <Link href="/" className="flex items-center gap-2 font-bold text-xl" onClick={onClose}>
-                    <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-md flex items-center justify-center text-white">
-                        EA
+                    <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-md flex items-center justify-center text-xs text-white">
+                        EZE
                     </div>
-                    EA Market
+                    EA Easy Shop
                 </Link>
             </div>
 
