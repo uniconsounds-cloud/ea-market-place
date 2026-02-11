@@ -78,6 +78,27 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         try {
             const { data: { user } } = await supabase.auth.getUser();
 
+            // 0. Check for duplicate License GLOBAL (Prevent hijacking active ports)
+            // Query for ANY active license with this account number and product
+            const { data: globalLicense } = await supabase
+                .from('licenses')
+                .select('user_id, expiry_date')
+                .eq('product_id', product.id)
+                .eq('account_number', accountNumber.trim())
+                .eq('is_active', true)
+                .gte('expiry_date', new Date().toISOString()) // Only check if not expired
+                .maybeSingle();
+
+            if (globalLicense) {
+                // If license exists
+                if (!user || globalLicense.user_id !== user.id) {
+                    // If not logged in OR logged in but user ID doesn't match
+                    alert('หมายเลขพอร์ตนี้ถูกใช้งานโดยบัญชีอื่นและยังไม่หมดอายุ กรุณาตรวจสอบความถูกต้อง');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             if (user) {
                 // 1. Check for duplicate License (SKIP IF RENEWAL)
                 if (!isRenewal) {
