@@ -34,6 +34,8 @@ function CheckoutContent({ productId }: { productId: string }) {
     const [paymentSettings, setPaymentSettings] = useState<any>(null);
     const [satang, setSatang] = useState(0);
 
+    const [currentLicense, setCurrentLicense] = useState<any>(null); // State for existing license
+
     useEffect(() => {
         // Generate random satang between 0.01 and 0.99
         const randomSatang = (Math.floor(Math.random() * 99) + 1) / 100;
@@ -48,6 +50,31 @@ function CheckoutContent({ productId }: { productId: string }) {
         fetchPaymentSettings();
         fetchProduct(productId);
     }, [productId]);
+
+    // Check for existing license on mount to show renewal info
+    useEffect(() => {
+        const checkLicense = async () => {
+            const key = initialAccountNumber.trim();
+            if (!key || !productId) return;
+
+            // Get User first
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: license } = await supabase
+                .from('licenses')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('product_id', productId)
+                .eq('account_number', key)
+                .single();
+
+            if (license) {
+                setCurrentLicense(license);
+            }
+        };
+        checkLicense();
+    }, [productId, initialAccountNumber]);
 
     const fetchProduct = async (id: string) => {
         const { data } = await supabase.from('products').select('*').eq('id', id).single();
@@ -139,6 +166,36 @@ function CheckoutContent({ productId }: { productId: string }) {
         }
     };
 
+    // Date Helpers
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    const calculateNewExpiry = (currentExpiry: string, type: 'monthly' | 'quarterly' | 'lifetime') => {
+        if (type === 'lifetime') return 'ตลอดชีพ';
+
+        let startDate = new Date();
+        const expiryDate = new Date(currentExpiry);
+
+        // If current expiry is in the future, start from there
+        if (expiryDate > startDate) {
+            startDate = expiryDate;
+        }
+
+        const newDate = new Date(startDate);
+        if (type === 'monthly') {
+            newDate.setMonth(newDate.getMonth() + 1);
+        } else if (type === 'quarterly') {
+            newDate.setMonth(newDate.getMonth() + 3);
+        }
+
+        return formatDate(newDate.toISOString());
+    };
+
     if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
     return (
@@ -173,22 +230,46 @@ function CheckoutContent({ productId }: { productId: string }) {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
-                            <Label htmlFor="accountNumber">หมายเลขพอร์ต (Account Number)</Label>
+                            <div className="flex justify-between items-center">
+                                <Label htmlFor="accountNumber">หมายเลขพอร์ต (Account Number)</Label>
+                                {currentLicense && (
+                                    <span className="text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                        <BadgeCheck className="w-3 h-3" /> ต่ออายุ (Renewal)
+                                    </span>
+                                )}
+                            </div>
                             <Input
                                 id="accountNumber"
                                 value={accountNumber}
-                                onChange={(e) => setAccountNumber(e.target.value)}
-                                placeholder="Ex. 12345678"
-                                className="font-mono"
+                                readOnly
+                                className="font-mono bg-muted text-muted-foreground cursor-not-allowed opacity-80"
                             />
-                            <p className="text-xs text-muted-foreground">โปรดตรวจสอบให้ถูกต้อง (ระบบจะอนุญาตให้ใช้สิทธิ์เฉพาะเลขพอร์ตนี้)</p>
+
+                            {/* Renewal Dates Display */}
+                            {currentLicense && (
+                                <div className="grid grid-cols-2 gap-2 mt-2 p-3 bg-muted/40 rounded-lg border border-dashed border-border text-xs">
+                                    <div>
+                                        <span className="text-muted-foreground block mb-0.5">วันหมดอายุปัจจุบัน:</span>
+                                        <span className="font-semibold text-foreground">
+                                            {currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-muted-foreground block mb-0.5">หมดอายุหลังต่ออายุ:</span>
+                                        <span className="font-bold text-green-600 dark:text-green-500">
+                                            {calculateNewExpiry(currentLicense.expiry_date, planType)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {!currentLicense && <p className="text-xs text-muted-foreground">ระบบล็อคหมายเลขพอร์ตเพื่อความถูกต้องของข้อมูล</p>}
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
                             <Label>แพ็กเกจที่เลือก</Label>
-                            <RadioGroup value={planType} onValueChange={(v: any) => setPlanType(v)} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
+                            <RadioGroup value={planType} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
                                 <div>
-                                    <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" />
+                                    <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" disabled />
                                     <Label
                                         htmlFor="monthly"
                                         className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
@@ -199,7 +280,7 @@ function CheckoutContent({ productId }: { productId: string }) {
                                 </div>
                                 {product.price_quarterly && (
                                     <div>
-                                        <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" />
+                                        <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" disabled />
                                         <Label
                                             htmlFor="quarterly"
                                             className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
@@ -210,7 +291,7 @@ function CheckoutContent({ productId }: { productId: string }) {
                                     </div>
                                 )}
                                 <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
-                                    <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" />
+                                    <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" disabled />
                                     <Label
                                         htmlFor="lifetime"
                                         className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}

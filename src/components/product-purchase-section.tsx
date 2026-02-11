@@ -56,6 +56,36 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         fetchData();
     }, [product.id]);
 
+    // Helper for date formatting
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    const calculateNewExpiry = (currentExpiry: string, type: 'monthly' | 'quarterly' | 'lifetime') => {
+        if (type === 'lifetime') return 'ตลอดชีพ';
+
+        let startDate = new Date();
+        const expiryDate = new Date(currentExpiry);
+
+        // If current expiry is in the future, start from there
+        if (expiryDate > startDate) {
+            startDate = expiryDate;
+        }
+
+        const newDate = new Date(startDate);
+        if (type === 'monthly') {
+            newDate.setMonth(newDate.getMonth() + 1);
+        } else if (type === 'quarterly') {
+            newDate.setMonth(newDate.getMonth() + 3);
+        }
+
+        return formatDate(newDate.toISOString());
+    };
+
     // Check if entered account number matches an existing license
     useEffect(() => {
         const existing = userLicenses.find(l => l.account_number === accountNumber.trim());
@@ -170,6 +200,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     };
 
+    // Get current license details for display
+    const currentLicense = userLicenses.find(l => l.account_number === accountNumber.trim());
+
     return (
         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg space-y-6">
 
@@ -254,6 +287,25 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         </div>
                     )}
                 </div>
+
+                {/* Renewal Info Display */}
+                {isRenewal && currentLicense && (
+                    <div className="grid grid-cols-2 gap-2 mt-2 p-3 bg-muted/40 rounded-lg border border-dashed border-border text-xs">
+                        <div>
+                            <span className="text-muted-foreground block mb-0.5">วันหมดอายุปัจจุบัน:</span>
+                            <span className="font-semibold text-foreground">
+                                {currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
+                            </span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-muted-foreground block mb-0.5">หมดอายุหลังต่ออายุ:</span>
+                            <span className="font-bold text-green-600 dark:text-green-500">
+                                {calculateNewExpiry(currentLicense.expiry_date, selectedType)}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
                 <p className="text-xs text-muted-foreground">
                     ระบุหมายเลขบัญชีเทรดที่ต้องการใช้งาน (1 หมายเลข)
                 </p>
