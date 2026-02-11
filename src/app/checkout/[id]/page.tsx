@@ -127,11 +127,10 @@ function CheckoutContent({ productId }: { productId: string }) {
             const slipUrl = await handleUpload(user.id);
 
             // 1.5 GLOBAL VALIDATION AGAIN (Security Check)
-            // Query for ANY active license with this account number and product
+            // Query for ANY active license with this account number (ANY PRODUCT)
             const { data: globalLicense } = await supabase
                 .from('licenses')
                 .select('user_id, expiry_date')
-                .eq('product_id', product.id)
                 .eq('account_number', accountNumber.trim())
                 .eq('is_active', true)
                 .gte('expiry_date', new Date().toISOString()) // Only check if not expired
