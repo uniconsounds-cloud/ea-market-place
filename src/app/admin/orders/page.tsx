@@ -79,20 +79,16 @@ export default function AdminOrdersPage() {
 
             if (orderError) throw orderError;
 
-            // Check for existing license (Robust matching)
-            const { data: userLicenses, error: userLicensesError } = await supabase
+            // Check for existing license by Account Number AND Product ID (Global check to prevent duplicates)
+            const { data: existingLicenses, error: licenseCheckError } = await supabase
                 .from('licenses')
                 .select('*')
-                .eq('user_id', order.user_id)
-                .eq('product_id', order.product_id);
+                .eq('product_id', order.product_id)
+                .eq('account_number', order.account_number); // Use exact match as per DB constraint
 
-            if (userLicensesError) console.error('Error fetching user licenses:', userLicensesError);
-            console.log('User Licenses found:', userLicenses);
-            console.log('Searching for Account:', order.account_number);
+            if (licenseCheckError) console.error('Error checking license:', licenseCheckError);
 
-            const existingLicense = userLicenses?.find(l =>
-                l.account_number.trim() === order.account_number.trim()
-            );
+            const existingLicense = existingLicenses && existingLicenses.length > 0 ? existingLicenses[0] : null;
 
             console.log('Match Found:', existingLicense);
 
