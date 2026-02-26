@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -50,6 +50,7 @@ export default function ProductFormPage() {
     });
     const [activeLicenses, setActiveLicenses] = useState<LicenseData[]>([]);
     const [loadingStats, setLoadingStats] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // --- Data for Edit Tab ---
     const [formData, setFormData] = useState({
@@ -259,6 +260,14 @@ export default function ProductFormPage() {
         return diffDays;
     };
 
+    const filteredLicenses = activeLicenses.filter(license => {
+        const query = searchQuery.toLowerCase();
+        const portMatch = license.account_number.toLowerCase().includes(query);
+        const nameMatch = (license.profiles?.full_name || '').toLowerCase().includes(query);
+        const emailMatch = (license.profiles?.email || '').toLowerCase().includes(query);
+        return portMatch || nameMatch || emailMatch;
+    });
+
     return (
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
@@ -332,9 +341,21 @@ export default function ProductFormPage() {
 
                         {/* Active Licenses Table */}
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                            <div className="p-6 flex flex-col space-y-1.5 border-b">
-                                <h3 className="font-semibold leading-none tracking-tight">Active Licenses (ลูกค้าที่ใช้งานอยู่)</h3>
-                                <p className="text-sm text-muted-foreground">รายชื่อลูกค้าและสถานะพอร์ตการลงทุน</p>
+                            <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b">
+                                <div className="space-y-1.5">
+                                    <h3 className="font-semibold leading-none tracking-tight">Active Licenses (ลูกค้าที่ใช้งานอยู่)</h3>
+                                    <p className="text-sm text-muted-foreground">รายชื่อลูกค้าและสถานะพอร์ตการลงทุน</p>
+                                </div>
+                                <div className="relative w-full md:w-72">
+                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="search"
+                                        placeholder="ค้นหา พอร์ต, ชื่อ, หรือ อีเมล..."
+                                        className="pl-8"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
                             </div>
                             <div className="p-0 overflow-x-auto">
                                 <table className="w-full text-sm text-left">
@@ -354,8 +375,8 @@ export default function ProductFormPage() {
                                                     กำลังโหลดข้อมูล...
                                                 </td>
                                             </tr>
-                                        ) : activeLicenses.length > 0 ? (
-                                            activeLicenses.map((license) => {
+                                        ) : filteredLicenses.length > 0 ? (
+                                            filteredLicenses.map((license) => {
                                                 const daysRemaining = calculateDaysRemaining(license.expiry_date);
                                                 const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
                                                 const isExpired = daysRemaining <= 0;
@@ -401,7 +422,7 @@ export default function ProductFormPage() {
                                         ) : (
                                             <tr>
                                                 <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
-                                                    ยังไม่มีลูกค้าใช้งานสินค้านี้
+                                                    {searchQuery ? 'ไม่พบข้อมูลที่ตรงกับการค้นหา' : 'ยังไม่มีลูกค้าใช้งานสินค้านี้'}
                                                 </td>
                                             </tr>
                                         )}
