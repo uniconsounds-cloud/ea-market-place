@@ -15,9 +15,20 @@ export async function POST(request: Request) {
         // Generate a 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+        // Check if we are using the dummy fallback or no key is set
+        const apiKey = process.env.RESEND_API_KEY;
+        if (!apiKey || apiKey === 're_dummy_fallback_for_build_only') {
+            console.log('\n======================================================');
+            console.log(`[⚙️ DEV MODE] รหัสยืนยันการลบ (OTP) สำหรับ ${email} คือ: ${otp}`);
+            console.log('เนื่องจากยังไม่ได้ตั้งค่า RESEND_API_KEY ระบบจะใช้รหัสนี้ให้ทดสอบไปก่อน');
+            console.log('======================================================\n');
+
+            return NextResponse.json({ success: true, otp: otp, devMode: true });
+        }
+
         // Send email using Resend
         const { data, error } = await resend.emails.send({
-            from: 'EA Market Place <noreply@ea-marketplace.com>',
+            from: 'EA Market Place <onboarding@resend.dev>', // Updated fallback sender for testing with unverified domains
             to: email,
             subject: 'รหัสยืนยันการลบสินค้า (Delete Product OTP)',
             html: `
@@ -35,7 +46,7 @@ export async function POST(request: Request) {
 
         if (error) {
             console.error('Error sending OTP email:', error);
-            return NextResponse.json({ error: 'Failed to send OTP email' }, { status: 500 });
+            return NextResponse.json({ error: error.message || 'Failed to send OTP email' }, { status: 500 });
         }
 
         // In a real production system, you'd hash this or store it in DB. 
