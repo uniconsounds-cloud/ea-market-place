@@ -14,9 +14,17 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search, Trash2, Mail } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import Link from 'next/link';
 
 // Use 'new' as a special ID for creating
@@ -51,6 +59,13 @@ export default function ProductFormPage() {
     const [activeLicenses, setActiveLicenses] = useState<LicenseData[]>([]);
     const [loadingStats, setLoadingStats] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // --- Deletion Flow State ---
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [otpCode, setOtpCode] = useState('');
+    const [generatedOtp, setGeneratedOtp] = useState('');
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // --- Data for Edit Tab ---
     const [formData, setFormData] = useState({
@@ -268,6 +283,60 @@ export default function ProductFormPage() {
         return portMatch || nameMatch || emailMatch;
     });
 
+    // --- Deletion Handlers ---
+    const handleInitiateDelete = async () => {
+        setIsSendingOtp(true);
+        try {
+            // Get current admin user email
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !user.email) {
+                alert('ไม่พบข้อมูลอีเมลของแอดมิน');
+                return;
+            }
+
+            const res = await fetch('/api/admin/send-delete-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, productId: id })
+            });
+
+            const result = await res.json();
+            if (res.ok) {
+                setGeneratedOtp(result.otp); // Store generated OTP for this session
+                setIsDeleteDialogOpen(true);
+                // Optionally start a countdown here
+            } else {
+                alert('ลบล้มเหลว: ' + result.error);
+            }
+        } catch (err: any) {
+            alert('เกิดข้อผิดพลาดในการส่งรหัส: ' + err.message);
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!otpCode || otpCode.trim() !== generatedOtp) {
+            alert('รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            const { error } = await supabase.from('products').delete().eq('id', id);
+            if (error) throw error;
+
+            alert('ลบสินค้าและข้อมูลเรียบร้อยแล้ว');
+            setIsDeleteDialogOpen(false);
+            router.push('/admin/products');
+            router.refresh();
+        } catch (error: any) {
+            alert('ลบไม่สำเร็จ: ' + error.message);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
@@ -445,10 +514,75 @@ export default function ProductFormPage() {
                                 loading={loading}
                                 uploading={uploading}
                             />
+
+                            {!isNew && (
+                                <div className="mt-12 pt-8 border-t border-red-500/20">
+                                    <div className="flex items-center justify-between p-4 bg-red-500/5 rounded-lg border border-red-500/20">
+                                        <div className="space-y-1">
+                                            <h4 className="font-semibold text-red-500 flex items-center gap-2">
+                                                <Trash2 className="h-4 w-4" /> เขตอันตราย (Danger Zone)
+                                            </h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                การลบสินค้าจะลบข้อมูลประวัติการทำรายการและใบอนุญาตทั้งหมดที่เชื่อมโยงกับสินค้านี้
+                                            </p>
+                                        </div>
+                                        <Button
+                                            variant="destructive"
+                                            onClick={handleInitiateDelete}
+                                            disabled={isSendingOtp || uploading}
+                                        >
+                                            {isSendingOtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                            {isSendingOtp ? 'กำลังส่งรหัสผ่าน...' : 'ลบสินค้านี้'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </TabsContent>
                 </Tabs>
             )}
+
+            {/* OTP Deletion Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-500">
+                            <Trash2 className="h-5 w-5" /> ยืนยันการลบสินค้า
+                        </DialogTitle>
+                        <DialogDescription className="space-y-4 pt-4">
+                            <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
+                                <Mail className="h-8 w-8 text-primary shrink-0 mt-1" />
+                                <div>
+                                    <h4 className="font-medium text-foreground">ระบบได้ส่งรหัส OTP 6 หลักไปที่อีเมลแอดมินของคุณแล้ว</h4>
+                                    <p className="text-sm mt-1">กรุณานำรหัสจากอีเมลมากรอกเพื่อยืนยันว่าคุณต้องการลบสินค้านี้จริงๆ (ป้องกันการกดผิด)</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="otp">รหัส OTP 6 หลัก</Label>
+                                <Input
+                                    id="otp"
+                                    type="text"
+                                    maxLength={6}
+                                    placeholder="XXXXXX"
+                                    className="text-center text-xl tracking-[0.5em] font-mono h-14"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                                />
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+                            ยกเลิก
+                        </Button>
+                        <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting || otpCode.length !== 6}>
+                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            ยืนยันการลบสินค้า
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

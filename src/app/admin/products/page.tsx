@@ -26,17 +26,6 @@ export default function AdminProductsPage() {
         setLoading(false);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('ยืนยันที่จะลบสินค้านี้?')) return;
-
-        const { error } = await supabase.from('products').delete().eq('id', id);
-        if (!error) {
-            fetchProducts();
-        } else {
-            alert('ลบไม่สำเร็จ: ' + error.message);
-        }
-    };
-
     // Group products by asset_class
     const groupedProducts = products.reduce((acc, product) => {
         const group = product.asset_class || 'other';
@@ -149,9 +138,6 @@ export default function AdminProductsPage() {
                                                                 <Pencil className="h-4 w-4" />
                                                             </Button>
                                                         </Link>
-                                                        <Button variant="destructive" size="icon" onClick={() => handleDelete(product.id)}>
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
                                                     </div>
                                                 </CardContent>
                                             </Card>
