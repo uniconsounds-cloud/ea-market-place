@@ -304,7 +304,11 @@ export default function ProductFormPage() {
             if (res.ok) {
                 setGeneratedOtp(result.otp); // Store generated OTP for this session
                 setIsDeleteDialogOpen(true);
-                // Optionally start a countdown here
+
+                // If in dev mode (no Resend API key), show the OTP directly to the user so they can test
+                if (result.devMode) {
+                    alert(`[DEV MODE] ⚠️ ยังไม่ได้ตั้งค่าระบบส่งอีเมล\n\nรหัส OTP จำลองสำหรับทดสอบคือ: ${result.otp}`);
+                }
             } else {
                 alert('ลบล้มเหลว: ' + result.error);
             }
