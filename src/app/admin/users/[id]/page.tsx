@@ -5,10 +5,27 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Mail, Shield, CheckCircle2, XCircle, Clock, ShoppingCart, CreditCard, Package } from 'lucide-react';
+import { ArrowLeft, Mail, Shield, CheckCircle2, XCircle, Clock, ShoppingCart, CreditCard, Package, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 export default function CustomerDetailsPage() {
     const params = useParams();
@@ -20,6 +37,18 @@ export default function CustomerDetailsPage() {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [groupingMode, setGroupingMode] = useState<'account' | 'product'>('account');
+
+    // --- OTP State & Actions ---
+    const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+    const [otpAction, setOtpAction] = useState<'edit_license' | null>(null);
+    const [otpCode, setOtpCode] = useState('');
+    const [generatedOtp, setGeneratedOtp] = useState('');
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isProcessingOtp, setIsProcessingOtp] = useState(false);
+
+    // --- License Editing State ---
+    const [isEditLicenseDialogOpen, setIsEditLicenseDialogOpen] = useState(false);
+    const [editingLicense, setEditingLicense] = useState<any | null>(null);
 
     useEffect(() => {
         if (id) fetchData();
@@ -81,6 +110,101 @@ export default function CustomerDetailsPage() {
         const diffTime = expiry.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays;
+    };
+
+    // --- OTP & License Edit Handlers ---
+    const handleInitiateOtp = async (action: 'edit_license') => {
+        if (!profile) return;
+        setIsSendingOtp(true);
+        try {
+            // Generate a 6-digit basic OTP
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            setGeneratedOtp(code);
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user?.email) throw new Error("Admin user not found");
+
+            const actionText = action === 'edit_license' ? 'แก้ไขสิทธิ์การใช้งานของลูกค้า (Edit License)' : 'ลบข้อมูล';
+            const customerName = profile.full_name || profile.email;
+
+            // Call the universal API
+            const response = await fetch('/api/admin/send-delete-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: user.email,
+                    otp: code,
+                    actionText: actionText,
+                    targetName: customerName
+                }),
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to send OTP');
+            }
+
+            setOtpAction(action);
+            setIsOtpDialogOpen(true);
+
+            // Close the edit modal so OTP takes precedence
+            if (action === 'edit_license') {
+                setIsEditLicenseDialogOpen(false);
+            }
+        } catch (error) {
+            console.error('Error initiating OTP:', error);
+            alert('เกิดข้อผิดพลาดในการส่ง OTP กรุณาลองใหม่');
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleConfirmOtp = async () => {
+        if (otpCode !== generatedOtp) {
+            alert('รหัส OTP ไม่ถูกต้อง!');
+            return;
+        }
+
+        setIsProcessingOtp(true);
+        try {
+            if (otpAction === 'edit_license' && editingLicense) {
+                await executeEditLicense();
+            }
+        } catch (error: any) {
+            alert(`เกิดข้อผิดพลาด: ${error.message}`);
+        } finally {
+            setIsProcessingOtp(false);
+        }
+    };
+
+    const executeEditLicense = async () => {
+        if (!editingLicense || !editingLicense.id) return;
+
+        try {
+            const { error } = await supabase
+                .from('licenses')
+                .update({
+                    expiry_date: editingLicense.expiry_date,
+                    is_active: editingLicense.is_active
+                })
+                .eq('id', editingLicense.id);
+
+            if (error) throw error;
+
+            alert('แก้ไขสิทธิ์การใช้งานสำเร็จแล้ว');
+
+            // Cleanup
+            setEditingLicense(null);
+            setOtpAction(null);
+            setOtpCode('');
+            setIsOtpDialogOpen(false);
+
+            // Refresh purely licenses data
+            fetchData();
+        } catch (err: any) {
+            console.error("Failed to update license:", err);
+            throw new Error(err.message || "Failed to update license data to database.");
+        }
     };
 
     if (loading) {
@@ -249,6 +373,18 @@ export default function CustomerDetailsPage() {
                                                                     </div>
                                                                 </div>
                                                                 <Badge className="bg-green-500 hover:bg-green-600 h-6">Active</Badge>
+
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="shrink-0"
+                                                                    onClick={() => {
+                                                                        setEditingLicense(license);
+                                                                        setIsEditLicenseDialogOpen(true);
+                                                                    }}
+                                                                >
+                                                                    <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                                                </Button>
                                                             </div>
                                                         </CardContent>
                                                     </Card>
@@ -283,6 +419,7 @@ export default function CustomerDetailsPage() {
                                             <th className="px-6 py-4">Account</th>
                                             <th className="px-6 py-4">หมดอายุเมื่อ</th>
                                             <th className="px-6 py-4 text-center">สถานะ</th>
+                                            <th className="px-6 py-4 text-right">จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/50">
@@ -299,8 +436,20 @@ export default function CustomerDetailsPage() {
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <Badge variant="secondary" className="bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                                                        Expired
+                                                        Inactive / Expired
                                                     </Badge>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            setEditingLicense(license);
+                                                            setIsEditLicenseDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                                    </Button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -372,6 +521,115 @@ export default function CustomerDetailsPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Edit License Dialog */}
+            <Dialog open={isEditLicenseDialogOpen} onOpenChange={setIsEditLicenseDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>แก้ไขข้อมูล License</DialogTitle>
+                        <DialogDescription>
+                            แก้ไขวันที่รับสิทธิ์ หรือระงับการใช้งานผ่านสถานะ Active
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {editingLicense && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-1">
+                                <Label>หมายเลขบัญชี Trea (Account)</Label>
+                                <Input disabled value={editingLicense.account_number} className="bg-muted font-mono" />
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label>วันเวลาหมดอายุ (Expiry Date)</Label>
+                                <Input
+                                    type="datetime-local"
+                                    value={new Date(new Date(editingLicense.expiry_date).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                    onChange={(e) => setEditingLicense({ ...editingLicense, expiry_date: new Date(e.target.value).toISOString() })}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label>สถานะการทำงาน (Status)</Label>
+                                <Select
+                                    value={editingLicense.is_active ? 'active' : 'inactive'}
+                                    onValueChange={(val) => setEditingLicense({ ...editingLicense, is_active: val === 'active' })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="เลือกสถานะ" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">Active (อนุญาตให้ใช้งาน)</SelectItem>
+                                        <SelectItem value="inactive">Inactive (ระงับการใช้งาน)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditLicenseDialogOpen(false)} disabled={isSendingOtp}>
+                            ยกเลิก
+                        </Button>
+                        <Button onClick={() => handleInitiateOtp('edit_license')} disabled={isSendingOtp}>
+                            {isSendingOtp ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> กำลังส่ง OTP...
+                                </>
+                            ) : (
+                                'บันทึกด้วย OTP'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* OTP Confirmation Dialog */}
+            <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>ยืนยันการทำรายการด้วยรหัส OTP</DialogTitle>
+                        <DialogDescription>
+                            ระบบได้ส่งรหัส OTP แบบใช้ครั้งเดียวไปที่อีเมลของแอดมินแล้ว โปรดนำรหัสมากรอกเพื่อยืนยันการตั้งค่า
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="otp">รหัส OTP 6 หลัก</Label>
+                            <Input
+                                id="otp"
+                                type="text"
+                                maxLength={6}
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value)}
+                                placeholder="123456"
+                                className="text-center font-mono text-2xl tracking-widest h-14"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setIsOtpDialogOpen(false);
+                            setOtpCode('');
+                            setOtpAction(null);
+                        }} disabled={isProcessingOtp}>
+                            ยกเลิก
+                        </Button>
+                        <Button
+                            variant="default" // always default for edit
+                            onClick={handleConfirmOtp}
+                            disabled={!otpCode || otpCode.length !== 6 || isProcessingOtp}
+                        >
+                            {isProcessingOtp ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> กำลังตรวจสอบ...
+                                </>
+                            ) : (
+                                'ยืนยัน OTP'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
