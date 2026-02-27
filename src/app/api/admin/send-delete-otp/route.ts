@@ -6,11 +6,14 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_fallback_for_b
 
 export async function POST(request: Request) {
     try {
-        const { email, productId } = await request.json();
+        const { email, productId, actionText, targetName } = await request.json();
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
+
+        const actionString = actionText || 'การลบสินค้า';
+        const targetString = targetName || `รหัสสินค้า: ${productId}`;
 
         // Generate a 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -19,7 +22,7 @@ export async function POST(request: Request) {
         const apiKey = process.env.RESEND_API_KEY;
         if (!apiKey || apiKey === 're_dummy_fallback_for_build_only') {
             console.log('\n======================================================');
-            console.log(`[⚙️ DEV MODE] รหัสยืนยันการลบ (OTP) สำหรับ ${email} คือ: ${otp}`);
+            console.log(`[⚙️ DEV MODE] รหัสยืนยัน ${actionString} (OTP) สำหรับ ${email} คือ: ${otp}`);
             console.log('เนื่องจากยังไม่ได้ตั้งค่า RESEND_API_KEY ระบบจะใช้รหัสนี้ให้ทดสอบไปก่อน');
             console.log('======================================================\n');
 
@@ -30,16 +33,16 @@ export async function POST(request: Request) {
         const { data, error } = await resend.emails.send({
             from: 'EA Market Place <onboarding@resend.dev>', // Updated fallback sender for testing with unverified domains
             to: email,
-            subject: 'รหัสยืนยันการลบสินค้า (Delete Product OTP)',
+            subject: `รหัสยืนยัน ${actionString} (Admin OTP)`,
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2>คำขออนุมัติการลบสินค้า</h2>
-                    <p>ระบบได้รับคำขอให้ลบสินค้า ID: <strong>${productId}</strong></p>
-                    <p>หากคุณเป็นผู้ดำเนินการ กรุณานำรหัส 6 หลักด้านล่างไปกรอกเพื่อยืนยันการลบ:</p>
+                    <h2>คำขออนุมัติ: ${actionString}</h2>
+                    <p>ระบบได้รับคำขออนุมัติให้ดำเนินการกับ <strong>${targetString}</strong></p>
+                    <p>หากคุณเป็นผู้ดำเนินการ กรุณานำรหัส 6 หลักด้านล่างไปกรอกเพื่อยืนยัน:</p>
                     <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #e53e3e; margin: 20px 0;">
                         ${otp}
                     </div>
-                    <p><em>รหัสนี้ใช้สำหรับยืนยันสิทธิ์เท่านั้น</em></p>
+                    <p><em>รหัสนี้ใช้สำหรับยืนยันสิทธิ์ผู้ดูแลระบบเท่านั้น</em></p>
                 </div>
             `,
         });
