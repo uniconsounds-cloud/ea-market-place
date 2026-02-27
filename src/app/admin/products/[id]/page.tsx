@@ -134,12 +134,11 @@ export default function ProductFormPage() {
             const totalSales = orders?.length || 0;
             const totalRevenue = orders?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
 
-            // 2. Get Active Licenses (Step 1: Fetch Licenses)
+            // 2. Get Licenses (Step 1: Fetch Licenses)
             const { data: licenses, error: licenseError } = await supabase
                 .from('licenses')
                 .select('*')
                 .eq('product_id', id)
-                .eq('is_active', true)
                 .order('expiry_date', { ascending: true });
 
             if (licenseError) throw licenseError;
@@ -466,12 +465,12 @@ export default function ProductFormPage() {
                             </Card>
                         </div>
 
-                        {/* Active Licenses Table */}
+                        {/* Licenses Table */}
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b">
                                 <div className="space-y-1.5">
-                                    <h3 className="font-semibold leading-none tracking-tight">Active Licenses (ลูกค้าที่ใช้งานอยู่)</h3>
-                                    <p className="text-sm text-muted-foreground">รายชื่อลูกค้าและสถานะพอร์ตการลงทุน</p>
+                                    <h3 className="font-semibold leading-none tracking-tight">Product Licenses (รายการสิทธิ์การใช้งาน)</h3>
+                                    <p className="text-sm text-muted-foreground">รายชื่อลูกค้าและสถานะพอร์ตการลงทุนทั้งหมด</p>
                                 </div>
                                 <div className="relative w-full md:w-72">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
