@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_fallback_for_b
 
 export async function POST(request: Request) {
     try {
-        const { email, productId, actionText, targetName } = await request.json();
+        const { email, productId, actionText, targetName, otp: requestedOtp } = await request.json();
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -15,8 +15,8 @@ export async function POST(request: Request) {
         const actionString = actionText || 'การลบสินค้า';
         const targetString = targetName || `รหัสสินค้า: ${productId}`;
 
-        // Generate a 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // Generate a 6-digit OTP, or use the one provided by the client
+        const otp = requestedOtp || Math.floor(100000 + Math.random() * 900000).toString();
 
         // Check if we are using the dummy fallback or no key is set
         const apiKey = process.env.RESEND_API_KEY;
