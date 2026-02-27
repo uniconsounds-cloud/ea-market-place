@@ -398,7 +398,7 @@ export default function ProductFormPage() {
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href="/admin">
+                <Link href="/admin/products">
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
