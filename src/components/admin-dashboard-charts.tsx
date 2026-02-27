@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface AdminDashboardChartsProps {
     orders: any[];
     products: any[];
+    timeRange: string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -48,14 +49,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsProps) {
-    const [timeRange, setTimeRange] = useState('30d'); // 7d, 30d, all
-
+export function AdminDashboardCharts({ orders, products, timeRange }: AdminDashboardChartsProps) {
     // 1. Process Sales Trend Data
     const salesTrendData = useMemo(() => {
         const data: Record<string, number> = {};
         const now = new Date();
-        const daysToSubtract = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 365;
+        const daysToSubtract = timeRange === '1d' ? 0 : timeRange === '3d' ? 3 : timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 365;
 
         // Initialize dates with 0
         for (let i = daysToSubtract; i >= 0; i--) {
@@ -128,20 +127,6 @@ export function AdminDashboardCharts({ orders, products }: AdminDashboardChartsP
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-lg font-medium">ยอดขายรวม (Sales Trend)</CardTitle>
-                    <div className="flex bg-muted rounded-lg p-1">
-                        {['7d', '30d', 'all'].map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setTimeRange(range)}
-                                className={`px-3 py-1 text-xs rounded-md transition-all ${timeRange === range
-                                    ? 'bg-background shadow-sm text-foreground font-medium'
-                                    : 'text-muted-foreground hover:text-foreground'
-                                    }`}
-                            >
-                                {range === '7d' ? '7 วันล่าสุด' : range === '30d' ? '30 วันล่าสุด' : 'ทั้งหมด'}
-                            </button>
-                        ))}
-                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[300px] w-full">
