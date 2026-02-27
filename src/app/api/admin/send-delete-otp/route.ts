@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
         // Send email using Resend
         const { data, error } = await resend.emails.send({
-            from: 'EA Market Place <onboarding@resend.dev>', // Updated fallback sender for testing with unverified domains
+            from: 'EA Market Place <admin@eaeze.com>', // The system's sending address
             to: email,
             subject: `รหัสยืนยัน ${actionString} (Admin OTP)`,
             html: `
