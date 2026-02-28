@@ -132,7 +132,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             // Query for ANY active license with this account number (ANY PRODUCT)
             const { data: globalLicense } = await supabase
                 .from('licenses')
-                .select('user_id, expiry_date')
+                .select('user_id, product_id, expiry_date')
                 .eq('account_number', accountNumber.trim())
                 .eq('is_active', true)
                 .gte('expiry_date', new Date().toISOString()) // Only check if not expired
@@ -140,9 +140,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             if (globalLicense) {
                 // If license exists
-                if (!user || globalLicense.user_id !== user.id) {
-                    // If not logged in OR logged in but user ID doesn't match
-                    alert('หมายเลขพอร์ตนี้ถูกใช้งานโดยบัญชีอื่นและยังไม่หมดอายุ กรุณาตรวจสอบความถูกต้อง');
+                if (!user || (globalLicense.user_id !== user.id) || (globalLicense.product_id !== product.id)) {
+                    // Block if: not logged in OR logged in but user ID doesn't match OR product doesn't match
+                    // This means you cannot use the same port for a DIFFERENT product, or by a DIFFERENT user.
+                    alert('หมายเลขพอร์ตนี้ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้');
                     setLoading(false);
                     return;
                 }
