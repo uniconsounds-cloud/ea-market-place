@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
@@ -47,6 +47,24 @@ const SidebarContent = ({
                 <Button variant="ghost" className="w-full justify-start">
                     <Users className="mr-2 h-4 w-4" />
                     ลูกค้า (Users)
+                </Button>
+            </Link>
+            <Link href="/admin/brokers" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <Briefcase className="mr-2 h-4 w-4" />
+                    ระบบจัดการ Brokers
+                </Button>
+            </Link>
+            <Link href="/admin/ib-requests" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <FileCheck className="mr-2 h-4 w-4" />
+                    คำขออนุมัติ IB
+                </Button>
+            </Link>
+            <Link href="/admin/affiliates" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start">
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    ระบบแนะนำ (Affiliates)
                 </Button>
             </Link>
             <Link href="/admin/settings" onClick={onClose}>

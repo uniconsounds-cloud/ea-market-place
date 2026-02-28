@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Check, ShieldCheck, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { ProductPurchaseSection } from '@/components/product-purchase-section';
+import { ProductIbBanner } from '@/components/product-ib-banner';
 
 export const revalidate = 0;
 
@@ -69,6 +70,8 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
 
                     {/* Right: Info & Purchase */}
                     <div>
+                        <ProductIbBanner productId={product.id} />
+
                         <div className="mb-6">
                             <h1 className="text-4xl font-bold mb-3">{product.name}</h1>
                             <div className="flex flex-wrap items-center gap-3 text-sm mb-4">

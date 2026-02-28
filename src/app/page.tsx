@@ -40,9 +40,9 @@ export default async function Home() {
                 ดูสินค้าทั้งหมด
               </Button>
             </Link>
-            <Link href="/register">
+            <Link href="/products">
               <Button variant="outline" size="lg" className="px-8 text-base">
-                ทดลองใช้ฟรี
+                รับสิทธิ์ใช้งาน EA ฟรี (สมัครเป็น IB)
               </Button>
             </Link>
           </div>

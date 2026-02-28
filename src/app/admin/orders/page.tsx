@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Check, X, Search, FileText, Loader2, Filter } from 'lucide-react';
+import { Check, X, Search, FileText, Loader2, Filter, Zap } from 'lucide-react';
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
@@ -59,7 +59,7 @@ export default function AdminOrdersPage() {
                 const mappedData = rawData.map(o => ({
                     ...o,
                     products: { name: 'Raw Product (' + o.product_id + ')', price_monthly: 0, price_lifetime: 0 },
-                    profiles: { full_name: 'Raw User', email: o.user_id }
+                    profiles: { full_name: 'Raw User', email: o.user_id, ib_status: 'none', ib_expiry_date: null }
                 }));
                 setOrders(mappedData);
             }
@@ -78,6 +78,68 @@ export default function AdminOrdersPage() {
                 .eq('id', order.id);
 
             if (orderError) throw orderError;
+
+            // ==========================================
+            // AFFILIATE COMMISSION LOGIC
+            // ==========================================
+            if (!order.is_ib_request && order.amount > 0) {
+                // 1. Get the buyer's referred_by ID
+                const { data: buyerProfile } = await supabase
+                    .from('profiles')
+                    .select('referred_by')
+                    .eq('id', order.user_id)
+                    .single();
+
+                if (buyerProfile && buyerProfile.referred_by) {
+                    const affiliateId = buyerProfile.referred_by;
+
+                    // 2. Get the Affiliate's current commission rate
+                    const { data: affiliateProfile } = await supabase
+                        .from('profiles')
+                        .select('commission_rate, accumulated_commission')
+                        .eq('id', affiliateId)
+                        .single();
+
+                    if (affiliateProfile) {
+                        const commissionRate = affiliateProfile.commission_rate || 2.0;
+
+                        // 3. Calculate Commission amount
+                        // e.g. 1000 * (2 / 100) = 20
+                        const commissionAmount = order.amount * (commissionRate / 100);
+
+                        // 4. Insert into commission_history
+                        const { error: historyError } = await supabase
+                            .from('commission_history')
+                            .insert({
+                                affiliate_id: affiliateId,
+                                buyer_id: order.user_id,
+                                order_id: order.id,
+                                amount: commissionAmount
+                            });
+
+                        if (historyError) {
+                            console.error('Error inserting commission history:', historyError);
+                            // Not throwing to avoid blocking the user's license generation,
+                            // but ideally this should be a transaction.
+                        } else {
+                            // 5. Update accumulated_commission
+                            const newAccumulated = (Number(affiliateProfile.accumulated_commission) || 0) + commissionAmount;
+
+                            const { error: updateProfileError } = await supabase
+                                .from('profiles')
+                                .update({ accumulated_commission: newAccumulated })
+                                .eq('id', affiliateId);
+
+                            if (updateProfileError) {
+                                console.error('Error updating accumulated_commission:', updateProfileError);
+                            }
+                        }
+                    }
+                }
+            }
+            // ==========================================
+            // END AFFILIATE COMMISSION LOGIC
+            // ==========================================
 
             // Check for existing license by Account Number AND Product ID (Global check to prevent duplicates)
             const { data: existingLicenses, error: licenseCheckError } = await supabase
@@ -104,7 +166,23 @@ export default function AdminOrdersPage() {
                 }
             }
 
-            if (order.plan_type === 'monthly') {
+            if (order.is_ib_request) {
+                // If it's an IB request, license expires on their IB Expiry Date
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('ib_expiry_date')
+                    .eq('id', order.user_id)
+                    .single();
+
+                if (profileData && profileData.ib_expiry_date) {
+                    expiryDate = new Date(profileData.ib_expiry_date).toISOString();
+                } else {
+                    // Fallback to 1 year if expiry date is somehow missing 
+                    const date = new Date(startDate);
+                    date.setFullYear(date.getFullYear() + 1);
+                    expiryDate = date.toISOString();
+                }
+            } else if (order.plan_type === 'monthly') {
                 const date = new Date(startDate);
                 date.setMonth(date.getMonth() + 1);
                 expiryDate = date.toISOString();
@@ -300,7 +378,13 @@ export default function AdminOrdersPage() {
                                     <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
                                         {/* Slip Preview */}
                                         <div className="w-full md:w-32 h-48 md:h-32 bg-black/20 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border relative group cursor-pointer">
-                                            {order.slip_url ? (
+                                            {order.is_ib_request ? (
+                                                <div className="text-xs text-blue-400 flex flex-col items-center justify-center p-2 text-center h-full bg-blue-500/10">
+                                                    <Zap className="w-8 h-8 mb-2" />
+                                                    <span className="font-bold">IB Request</span>
+                                                    <span>(Free License)</span>
+                                                </div>
+                                            ) : order.slip_url ? (
                                                 <a href={order.slip_url} target="_blank" rel="noreferrer" className="w-full h-full">
                                                     <img src={order.slip_url} alt="Slip" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -318,7 +402,14 @@ export default function AdminOrdersPage() {
                                         <div className="flex-1 space-y-1.5 w-full">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h3 className="font-bold text-lg text-primary">{order.products?.name || 'Unknown Product'}</h3>
+                                                    <h3 className="font-bold text-lg text-primary">
+                                                        {order.products?.name || 'Unknown Product'}
+                                                        {order.is_ib_request && (
+                                                            <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                                                                สิทธิ์ใช้งาน IB ฟรี
+                                                            </span>
+                                                        )}
+                                                    </h3>
                                                     <p className="text-sm text-muted-foreground flex items-center gap-2">
                                                         <span>ลูกค้า: {order.profiles?.full_name || order.profiles?.email || 'Guest'}</span>
                                                         <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
@@ -329,7 +420,9 @@ export default function AdminOrdersPage() {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="text-xl font-bold font-mono">฿{order.amount?.toLocaleString()}</div>
+                                                    <div className="text-xl font-bold font-mono">
+                                                        {order.is_ib_request ? '฿0' : `฿${order.amount?.toLocaleString()}`}
+                                                    </div>
                                                     <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${order.status === 'completed' ? 'bg-green-500/20 text-green-500' :
                                                         order.status === 'rejected' ? 'bg-red-500/20 text-red-500' :
                                                             'bg-yellow-500/20 text-yellow-500'

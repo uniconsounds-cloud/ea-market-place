@@ -30,6 +30,19 @@ export async function middleware(request: NextRequest) {
     // https://supabase.com/docs/guides/auth/server-side/nextjs
     await supabase.auth.getUser()
 
+    // Referral Tracking Logic
+    // If the URL has ?ref=abc123, save it as a cookie for 30 days
+    const refCode = request.nextUrl.searchParams.get('ref');
+    if (refCode) {
+        response.cookies.set('affiliate_ref', refCode, {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30, // 30 days
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+        });
+    }
+
     return response
 }
 

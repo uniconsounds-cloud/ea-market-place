@@ -22,12 +22,23 @@ export default function RegisterPage() {
         setError(null);
 
         try {
+            // Extract referral code from cookie if it exists
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+                return null;
+            };
+
+            const refCode = getCookie('affiliate_ref');
+
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
                     data: {
                         full_name: fullName,
+                        ...(refCode ? { referred_by_code: refCode } : {}),
                     },
                 },
             });
@@ -48,6 +59,24 @@ export default function RegisterPage() {
 
     const handleGoogleLogin = async () => {
         try {
+            // Extract referral code from cookie if it exists
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+                return null;
+            };
+
+            const refCode = getCookie('affiliate_ref');
+
+            // To pass metadata with OAuth, we have to store it locally before redirect
+            // or pass it via queryParams (though Supabase strips some custom params).
+            // A more reliable way is to let the callback process the cookie, OR pass it here:
+            if (refCode) {
+                // We'll set a local storage item just in case the cookie is lost
+                localStorage.setItem('pending_affiliate_ref', refCode);
+            }
+
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {

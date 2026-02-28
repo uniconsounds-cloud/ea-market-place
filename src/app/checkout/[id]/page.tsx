@@ -24,6 +24,7 @@ function CheckoutContent({ productId }: { productId: string }) {
     // Initial state from URL params
     const initialPlan = (searchParams.get('plan') as 'monthly' | 'quarterly' | 'lifetime') || 'lifetime';
     const initialAccountNumber = searchParams.get('accountNumber') || '';
+    const isIbRequest = searchParams.get('isIbRequest') === 'true';
 
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -106,7 +107,7 @@ function CheckoutContent({ productId }: { productId: string }) {
     };
 
     const handleSubmit = async () => {
-        if (!slipFile) {
+        if (!isIbRequest && !slipFile) {
             alert('กรุณาแนบสลิปโอนเงิน');
             return;
         }
@@ -123,8 +124,11 @@ function CheckoutContent({ productId }: { productId: string }) {
                 return;
             }
 
-            // 1. Upload Slip
-            const slipUrl = await handleUpload(user.id);
+            // 1. Upload Slip (Skip for IB Requests)
+            let slipUrl = null;
+            if (!isIbRequest) {
+                slipUrl = await handleUpload(user.id);
+            }
 
             // 1.5 GLOBAL VALIDATION AGAIN (Security Check)
             // Query for ANY active license with this account number (ANY PRODUCT)
@@ -146,8 +150,9 @@ function CheckoutContent({ productId }: { productId: string }) {
             const { error } = await supabase.from('orders').insert({
                 user_id: user.id,
                 product_id: product.id,
-                amount: (planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang,
-                status: 'pending',
+                amount: isIbRequest ? 0 : (planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang,
+                status: 'pending', // Both go to pending
+                is_ib_request: isIbRequest ? true : false,
                 slip_url: slipUrl,
                 plan_type: planType,
                 account_number: accountNumber.trim() // Save account number
@@ -155,7 +160,11 @@ function CheckoutContent({ productId }: { productId: string }) {
 
             if (error) throw error;
 
-            alert('แจ้งชำระเงินเรียบร้อย! กรุณารอแอดมินตรวจสอบ');
+            if (isIbRequest) {
+                alert('ส่งคำขอรับสิทธิ์ใช้งาน IB เรียบร้อยแล้ว! แอดมินกำลังดำเนินการตรวจสอบ');
+            } else {
+                alert('แจ้งชำระเงินเรียบร้อย! กรุณารอแอดมินตรวจสอบ');
+            }
             router.push('/dashboard/billing');
 
         } catch (error: any) {
@@ -262,6 +271,12 @@ function CheckoutContent({ productId }: { productId: string }) {
                                 </div>
                             )}
                             {!currentLicense && <p className="text-xs text-muted-foreground">ระบบล็อคหมายเลขพอร์ตเพื่อความถูกต้องของข้อมูล</p>}
+                            {isIbRequest && (
+                                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 rounded-md text-sm border border-blue-200 dark:border-blue-800 flex items-start gap-2">
+                                    <BadgeCheck className="w-5 h-5 shrink-0 mt-0.5 text-blue-500" />
+                                    <p>รายการนี้เป็นการ <strong>ขอสิทธิ์ใช้งานฟรีในฐานะ IB</strong> โดยไม่ต้องชำระเงิน แอดมินจะทำการตรวจสอบบัญชีของท่านและอนุมัติสิทธิ์ให้โดยเร็วที่สุด</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
@@ -305,80 +320,83 @@ function CheckoutContent({ productId }: { productId: string }) {
                 </Card>
 
                 {/* Payment */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>ชำระเงิน</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="flex flex-col items-center p-6 border rounded-lg bg-white/5">
-                            {paymentSettings?.qr_image_url ? (
-                                <div className="flex flex-col items-center">
-                                    <img src={paymentSettings.qr_image_url} alt="QR Code" className="w-48 h-auto mb-4 rounded-md" />
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="mb-4 w-full"
-                                        onClick={() => {
-                                            const link = document.createElement('a');
-                                            link.href = paymentSettings.qr_image_url;
-                                            link.download = 'payment-qr.png';
-                                            link.target = '_blank';
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                        }}
-                                    >
-                                        <Download className="mr-2 h-4 w-4" />
-                                        บันทึกรูป QR Code
-                                    </Button>
+                {!isIbRequest && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>ชำระเงิน</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex flex-col items-center p-6 border rounded-lg bg-white/5">
+                                {paymentSettings?.qr_image_url ? (
+                                    <div className="flex flex-col items-center">
+                                        <img src={paymentSettings.qr_image_url} alt="QR Code" className="w-48 h-auto mb-4 rounded-md" />
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="mb-4 w-full"
+                                            onClick={() => {
+                                                const link = document.createElement('a');
+                                                link.href = paymentSettings.qr_image_url;
+                                                link.download = 'payment-qr.png';
+                                                link.target = '_blank';
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                            }}
+                                        >
+                                            <Download className="mr-2 h-4 w-4" />
+                                            บันทึกรูป QR Code
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <QrCode className="w-32 h-32 text-white mb-4" />
+                                )}
+                                <div className="text-center space-y-1 mb-4">
+                                    <p className="font-bold text-lg text-primary">{paymentSettings?.bank_name || 'Loading...'}</p>
+                                    <p className="font-mono text-xl font-bold tracking-widest text-white/90">{paymentSettings?.account_number || ''}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {paymentSettings?.account_name || 'Loading...'}
+                                    </p>
                                 </div>
-                            ) : (
-                                <QrCode className="w-32 h-32 text-white mb-4" />
-                            )}
-                            <div className="text-center space-y-1 mb-4">
-                                <p className="font-bold text-lg text-primary">{paymentSettings?.bank_name || 'Loading...'}</p>
-                                <p className="font-mono text-xl font-bold tracking-widest text-white/90">{paymentSettings?.account_number || ''}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {paymentSettings?.account_name || 'Loading...'}
-                                </p>
-                            </div>
-                            <div className="mt-2 text-center">
-                                <p className="text-sm text-muted-foreground mb-1">ยอดชำระ (รวมเศษสตางค์เพื่อยืนยันตัวตน)</p>
-                                <div className="flex items-baseline justify-center gap-1">
-                                    <span className="text-3xl font-bold text-primary">
-                                        ฿{((planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
+                                <div className="mt-2 text-center">
+                                    <p className="text-sm text-muted-foreground mb-1">ยอดชำระ (รวมเศษสตางค์เพื่อยืนยันตัวตน)</p>
+                                    <div className="flex items-baseline justify-center gap-1">
+                                        <span className="text-3xl font-bold text-primary">
+                                            ฿{((planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-red-400 mt-2 font-bold animate-pulse">
+                                        * กรุณาโอนยอดที่มีเศษสตางค์ตามนี้เป๊ะๆ *
+                                    </p>
                                 </div>
-                                <p className="text-xs text-red-400 mt-2 font-bold animate-pulse">
-                                    * กรุณาโอนยอดที่มีเศษสตางค์ตามนี้เป๊ะๆ *
-                                </p>
                             </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <Label>แนบหลักฐานการโอนเงิน</Label>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
-                                />
+                            <div className="space-y-2">
+                                <Label>แนบหลักฐานการโอนเงิน</Label>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        <Button className="w-full" size="lg" onClick={handleSubmit} disabled={submitting}>
-                            {submitting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังบันทึก...
-                                </>
-                            ) : (
-                                <>
-                                    <BadgeCheck className="mr-2 h-4 w-4" /> ยืนยันการแจ้งชำระเงิน
-                                </>
-                            )}
-                        </Button>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                )}
+
+                <Button className="w-full" size="lg" onClick={handleSubmit} disabled={submitting}>
+                    {submitting ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังบันทึก...
+                        </>
+                    ) : (
+                        <>
+                            <BadgeCheck className="mr-2 h-4 w-4" /> {isIbRequest ? 'ยืนยันขอสิทธิ์ใช้งานฟรี (บัญชี IB)' : 'ยืนยันการแจ้งชำระเงิน'}
+                        </>
+                    )}
+                </Button>
             </div>
         </div >
     );
