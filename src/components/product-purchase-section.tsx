@@ -130,13 +130,15 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             // 0. Check for duplicate License GLOBAL (Prevent hijacking active ports)
             // Query for ANY active license with this account number (ANY PRODUCT)
-            const { data: globalLicense } = await supabase
+            const { data: globalLicenses } = await supabase
                 .from('licenses')
                 .select('user_id, product_id, expiry_date')
                 .eq('account_number', accountNumber.trim())
                 .eq('is_active', true)
                 .gte('expiry_date', new Date().toISOString()) // Only check if not expired
-                .maybeSingle();
+                .limit(1);
+
+            const globalLicense = globalLicenses?.[0];
 
             if (globalLicense) {
                 // If license exists

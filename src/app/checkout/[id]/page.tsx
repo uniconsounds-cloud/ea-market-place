@@ -132,13 +132,15 @@ function CheckoutContent({ productId }: { productId: string }) {
 
             // 1.5 GLOBAL VALIDATION AGAIN (Security Check)
             // Query for ANY active license with this account number (ANY PRODUCT)
-            const { data: globalLicense } = await supabase
+            const { data: globalLicenses } = await supabase
                 .from('licenses')
                 .select('user_id, product_id, expiry_date')
                 .eq('account_number', accountNumber.trim())
                 .eq('is_active', true)
                 .gte('expiry_date', new Date().toISOString()) // Only check if not expired
-                .maybeSingle();
+                .limit(1);
+
+            const globalLicense = globalLicenses?.[0];
 
             if (globalLicense && (!user || (globalLicense.user_id !== user.id) || (globalLicense.product_id !== product.id))) {
                 alert('หมายเลขพอร์ตนี้ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้');
