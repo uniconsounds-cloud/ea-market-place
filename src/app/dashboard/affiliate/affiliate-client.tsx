@@ -23,7 +23,7 @@ export default function AffiliateClient({ user }: { user: AffiliateUser }) {
 
     useEffect(() => {
         if (typeof window !== 'undefined' && user.referral_code) {
-            setReferralLink(`${window.location.origin}/?ref=${user.referral_code}`);
+            setReferralLink(`${window.location.origin}/register?ref=${user.referral_code}`);
         }
     }, [user.referral_code]);
 
