@@ -73,7 +73,8 @@ export default async function AdminLicensesPage() {
     const licenses = (rawLicenses || []).map(l => {
         // Check if this specific license port number is an approved IB port
         const userIbRecords = l.user_id ? ibMembershipsMap[l.user_id] || [] : [];
-        const isIbLicense = userIbRecords.some(r => r.account_number === l.account_number);
+        const isIbLicense = userIbRecords.some(r => r.account_number === l.account_number) ||
+            (profilesMap[l.user_id]?.ib_account_number === l.account_number);
 
         return {
             ...l,
