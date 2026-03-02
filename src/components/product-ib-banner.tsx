@@ -145,16 +145,20 @@ export function ProductIbBanner({ productId }: { productId: string }) {
                 return;
             }
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
                 .update({
                     ib_status: 'pending',
                     ib_broker_id: selectedBroker,
                     ib_account_number: accountNumber
                 })
-                .eq('id', user.id);
+                .eq('id', user.id)
+                .select();
 
             if (error) throw error;
+            if (!data || data.length === 0) {
+                throw new Error("คำสั่งถูกปฏิเสธโดยฐานข้อมูล: โปรดแน่ใจว่าคุณได้รันคำสั่ง SQL แก้ไขเรื่อง Policy (RLS) บน Supabase แล้วตามที่ได้แจ้งไว้ก่อนหน้านี้");
+            }
 
             setIbStatus('pending');
             setIsOpen(false);
