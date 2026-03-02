@@ -33,6 +33,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     // IB Status
     const [ibStatus, setIbStatus] = useState<'none' | 'pending' | 'approved'>('none');
     const [useIbQuota, setUseIbQuota] = useState(true);
+    const [ibAccounts, setIbAccounts] = useState<string[]>([]);
 
     // Fetch user licenses and orders on mount
     useEffect(() => {
@@ -62,10 +63,13 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 // 3. Fetch IB Memberships
                 const { data: memberships } = await supabase
                     .from('ib_memberships')
-                    .select('status, broker_id')
+                    .select('status, broker_id, account_number')
                     .eq('user_id', user.id);
 
+                let fetchedIbAccounts: string[] = [];
+
                 if (memberships && memberships.length > 0) {
+                    fetchedIbAccounts = memberships.map(m => m.account_number).filter(Boolean);
                     const hasApproved = memberships.some(m => m.status === 'approved');
                     if (hasApproved) {
                         setIbStatus('approved');
@@ -75,6 +79,19 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         setIbStatus('none');
                     }
                 }
+
+                // 4. Fetch Legacy Fallback explicitly just in case they haven't been mapped
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('ib_account_number')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile?.ib_account_number && !fetchedIbAccounts.includes(profile.ib_account_number)) {
+                    fetchedIbAccounts.push(profile.ib_account_number);
+                }
+
+                setIbAccounts(fetchedIbAccounts);
             }
         };
         fetchData();
@@ -242,55 +259,77 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                     </h4>
                     <div className="space-y-2">
                         {/* Active Licenses */}
-                        {userLicenses.map((license) => {
-                            const days = calculateDaysRemaining(license.expiry_date, license.type);
-                            return (
-                                <div
-                                    key={`license-${license.id}`}
-                                    className={`text-sm p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
-                                    onClick={() => setAccountNumber(license.account_number)}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-green-500/10 p-1.5 rounded-full">
-                                            <Check className="w-3 h-3 text-green-600" />
+                        {userLicenses
+                            .filter(license => (ibStatus === 'approved' && useIbQuota) ? ibAccounts.includes(license.account_number) : !ibAccounts.includes(license.account_number))
+                            .map((license) => {
+                                const days = calculateDaysRemaining(license.expiry_date, license.type);
+                                const isIbPort = ibAccounts.includes(license.account_number);
+
+                                return (
+                                    <div
+                                        key={`license-${license.id}`}
+                                        className={`text-sm p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
+                                        onClick={() => setAccountNumber(license.account_number)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-green-500/10 p-1.5 rounded-full">
+                                                <Check className="w-3 h-3 text-green-600" />
+                                            </div>
+                                            <div>
+                                                <div className="font-mono font-bold text-base">{license.account_number}</div>
+                                                <div className="flex items-center gap-2 mt-0.5 mt-1 relative w-full overflow-hidden">
+                                                    <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
+
+                                                    {isIbPort && (
+                                                        <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                            IB Customer
+                                                        </span>
+                                                    )}
+
+                                                    {(!isIbPort && license.type !== 'lifetime') && (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
+                                                            เหลือ {days} วัน
+                                                        </span>
+                                                    )}
+                                                    {(!isIbPort && license.type === 'lifetime') && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="font-mono font-bold text-base">{license.account_number}</div>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
-                                                {license.type !== 'lifetime' && (
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
-                                                        เหลือ {days} วัน
-                                                    </span>
-                                                )}
-                                                {license.type === 'lifetime' && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
+                                        {accountNumber === license.account_number && <Check className="w-4 h-4 text-primary" />}
+                                    </div>
+                                );
+                            })}
+
+                        {/* Pending Orders */}
+                        {userOrders
+                            .filter(order => (ibStatus === 'approved' && useIbQuota) ? ibAccounts.includes(order.account_number) : !ibAccounts.includes(order.account_number))
+                            .map((order) => {
+                                const isIbPort = ibAccounts.includes(order.account_number);
+                                return (
+                                    <div
+                                        key={`order-${order.id}`}
+                                        className="text-sm p-3 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-900/50 dark:bg-yellow-900/10 flex justify-between items-center opacity-80"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-yellow-500/10 p-1.5 rounded-full">
+                                                <Loader2 className="w-3 h-3 text-yellow-600 animate-spin" />
+                                            </div>
+                                            <div>
+                                                <div className="font-mono font-bold text-base">{order.account_number}</div>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-[10px] text-yellow-700 dark:text-yellow-500 font-medium bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded">รอตรวจสอบ (Pending)</span>
+
+                                                    {isIbPort && (
+                                                        <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                            IB Request
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    {accountNumber === license.account_number && <Check className="w-4 h-4 text-primary" />}
-                                </div>
-                            );
-                        })}
-
-                        {/* Pending Orders */}
-                        {userOrders.map((order) => (
-                            <div
-                                key={`order-${order.id}`}
-                                className="text-sm p-3 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-900/50 dark:bg-yellow-900/10 flex justify-between items-center opacity-80"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-yellow-500/10 p-1.5 rounded-full">
-                                        <Loader2 className="w-3 h-3 text-yellow-600 animate-spin" />
-                                    </div>
-                                    <div>
-                                        <div className="font-mono font-bold text-base">{order.account_number}</div>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-[10px] text-yellow-700 dark:text-yellow-500 font-medium bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded">รอตรวจสอบ (Pending)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                                );
+                            })}
                     </div>
                 </div>
             )}
@@ -364,13 +403,13 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         <div>
                             <span className="text-muted-foreground block mb-0.5">วันหมดอายุปัจจุบัน:</span>
                             <span className="font-semibold text-foreground">
-                                {currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
+                                {ibAccounts.includes(currentLicense.account_number) ? (currentLicense.expiry_date ? formatDate(currentLicense.expiry_date) : 'ไม่มีข้อมูลวันหมดอายุ') : (currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date))}
                             </span>
                         </div>
                         <div className="text-right">
                             <span className="text-muted-foreground block mb-0.5">หมดอายุหลังต่ออายุ:</span>
                             <span className="font-bold text-green-600 dark:text-green-500">
-                                {calculateNewExpiry(currentLicense.expiry_date, selectedType)}
+                                {ibStatus === 'approved' && useIbQuota ? 'ประเมินสิทธิ์ฟรีโดย Admin' : calculateNewExpiry(currentLicense.expiry_date, selectedType)}
                             </span>
                         </div>
                     </div>
