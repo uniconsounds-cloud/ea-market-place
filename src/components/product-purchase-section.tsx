@@ -260,8 +260,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     };
 
     // Helper for progress bar
-    const calculateDaysRemaining = (expiryDate: string, type: string) => {
-        if (type === 'lifetime') return 999;
+    const calculateDaysRemaining = (expiryDate: string, type: string, isIbPort: boolean = false) => {
+        // If it's a normal lifetime port, or an IB port missing an explicit date, return 999
+        if ((!isIbPort && type === 'lifetime') || (isIbPort && !expiryDate)) return 999;
         const now = new Date();
         const expiry = new Date(expiryDate);
         const diffTime = expiry.getTime() - now.getTime();
@@ -286,8 +287,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         {userLicenses
                             .filter(license => (ibStatus === 'approved' && useIbQuota) ? ibAccounts.includes(license.account_number) : !ibAccounts.includes(license.account_number))
                             .map((license) => {
-                                const days = calculateDaysRemaining(license.expiry_date, license.type);
                                 const isIbPort = ibAccounts.includes(license.account_number);
+                                const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
 
                                 return (
                                     <div
@@ -427,7 +428,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         <div>
                             <span className="text-muted-foreground block mb-0.5">วันหมดอายุปัจจุบัน:</span>
                             <span className="font-semibold text-foreground">
-                                {currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
+                                {(!ibAccounts.includes(currentLicense.account_number) && currentLicense.type === 'lifetime') ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
                             </span>
                         </div>
                         <div className="text-right">
