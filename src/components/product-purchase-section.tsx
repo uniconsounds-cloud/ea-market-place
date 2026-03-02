@@ -22,6 +22,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const [riskAccepted, setRiskAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Validation State
+    const [portValidationMsg, setPortValidationMsg] = useState<{ text: string, type: 'error' | 'success' | 'checking' } | null>(null);
+
     // New State for active licenses and pending orders
     const [userLicenses, setUserLicenses] = useState<any[]>([]);
     const [userOrders, setUserOrders] = useState<any[]>([]);
@@ -107,11 +110,62 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         return formatDate(newDate.toISOString());
     };
 
-    // Check if entered account number matches an existing license
+    // Check if entered account number matches an existing license / Validations
     useEffect(() => {
-        const existing = userLicenses.find(l => l.account_number === accountNumber.trim());
-        setIsRenewal(!!existing);
-    }, [accountNumber, userLicenses]);
+        const timeoutId = setTimeout(async () => {
+            const port = accountNumber.trim();
+            if (!port) {
+                setPortValidationMsg(null);
+                setIsRenewal(false);
+                return;
+            }
+
+            setPortValidationMsg({ text: 'กำลังตรวจสอบพอร์ต...', type: 'checking' });
+
+            // 1. Quick check against loaded user active licenses for this product
+            const existingUserLicense = userLicenses.find(l => l.account_number === port);
+            if (existingUserLicense) {
+                if (ibStatus === 'approved' && useIbQuota) {
+                    setPortValidationMsg({ text: 'คุณมีสิทธิ์ใช้งานสำหรับพอร์ตนี้อยู่แล้ว ไม่สามารถขอสิทธิ์ฟรีซ้ำได้', type: 'error' });
+                    setIsRenewal(false); // Don't show renewal UI for IB
+                } else {
+                    setIsRenewal(true);
+                    setPortValidationMsg({ text: 'ต่ออายุ License เดิม', type: 'success' });
+                }
+                return;
+            }
+
+            // 2. Quick check against pending orders for this product
+            const pendingOrder = userOrders.find(o => o.account_number === port);
+            if (pendingOrder) {
+                setPortValidationMsg({ text: 'คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว', type: 'error' });
+                setIsRenewal(false);
+                return;
+            }
+
+            // 3. Global check: is this port used by someone else or for another product?
+            const { data: globalLicenses } = await supabase
+                .from('licenses')
+                .select('id')
+                .eq('account_number', port)
+                .eq('is_active', true)
+                .gte('expiry_date', new Date().toISOString())
+                .limit(1);
+
+            if (globalLicenses && globalLicenses.length > 0) {
+                setPortValidationMsg({ text: 'หมายเลขพอร์ตนี้มีการใช้งานในระบบแล้ว ไม่สามารถใช้ซ้ำได้', type: 'error' });
+                setIsRenewal(false);
+                return;
+            }
+
+            // All good
+            setIsRenewal(false);
+            setPortValidationMsg({ text: 'สามารถใช้พอร์ตนี้ได้', type: 'success' });
+
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [accountNumber, userLicenses, userOrders, ibStatus, useIbQuota]);
 
 
     const handlePurchase = async () => {
@@ -130,64 +184,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             const { data: { user } } = await supabase.auth.getUser();
 
             // 0. Check for duplicate License GLOBAL (Prevent hijacking active ports)
-            // Query for ANY active license with this account number (ANY PRODUCT)
-            const { data: globalLicenses } = await supabase
-                .from('licenses')
-                .select('user_id, product_id, expiry_date')
-                .eq('account_number', accountNumber.trim())
-                .eq('is_active', true)
-                .gte('expiry_date', new Date().toISOString()) // Only check if not expired
-                .limit(1);
-
-            const globalLicense = globalLicenses?.[0];
-
-            if (globalLicense) {
-                // If license exists
-                if (!user || (globalLicense.user_id !== user.id) || (globalLicense.product_id !== product.id)) {
-                    // Block if: not logged in OR logged in but user ID doesn't match OR product doesn't match
-                    // This means you cannot use the same port for a DIFFERENT product, or by a DIFFERENT user.
-                    alert('หมายเลขพอร์ตนี้ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้');
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            if (user) {
-                // 1. Check for duplicate License (SKIP IF RENEWAL)
-                if (!isRenewal) {
-                    const { data: existingLicenses } = await supabase
-                        .from('licenses')
-                        .select('id')
-                        .eq('user_id', user.id)
-                        .eq('product_id', product.id)
-                        .eq('account_number', accountNumber.trim())
-                        .limit(1);
-
-                    if (existingLicenses && existingLicenses.length > 0) {
-                        alert('คุณมี License สำหรับหมายเลขพอร์ตนี้แล้ว (สามารถเลือกต่ออายุได้)');
-                        setIsRenewal(true);
-                        setLoading(false);
-                        return;
-                    }
-                }
-
-                // 2. Check for pending/completed Order (Duplicate request in short time)
-                // We might want to allow multiple pending orders if they are for renewals, 
-                // but generally safer to block duplicates unless status is rejected.
-                const { data: existingOrders } = await supabase
-                    .from('orders')
-                    .select('id, status')
-                    .eq('user_id', user.id)
-                    .eq('product_id', product.id)
-                    .eq('account_number', accountNumber.trim())
-                    .eq('status', 'pending') // Only block pending
-                    .limit(1);
-
-                if (existingOrders && existingOrders.length > 0) {
-                    alert('คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว');
-                    setLoading(false);
-                    return;
-                }
+            if (portValidationMsg?.type === 'error') {
+                alert(portValidationMsg.text);
+                setLoading(false);
+                return;
             }
 
             const queryParams = new URLSearchParams({
@@ -349,6 +349,14 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         </div>
                     )}
                 </div>
+                {portValidationMsg && (
+                    <div className={`text-xs mt-1.5 flex items-center gap-1 ${portValidationMsg.type === 'error' ? 'text-red-500' : portValidationMsg.type === 'success' ? 'text-green-500' : 'text-blue-500'}`}>
+                        {portValidationMsg.type === 'checking' && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {portValidationMsg.type === 'success' && <Check className="w-3 h-3" />}
+                        {portValidationMsg.type === 'error' && <AlertCircle className="w-3 h-3" />}
+                        {portValidationMsg.text}
+                    </div>
+                )}
 
                 {/* Renewal Info Display */}
                 {isRenewal && currentLicense && (
@@ -367,83 +375,81 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         </div>
                     </div>
                 )}
-
-                <p className="text-xs text-muted-foreground">
-                    ระบุหมายเลขบัญชีเทรดที่ต้องการใช้งาน (1 หมายเลข)
-                </p>
             </div>
 
-            {/* License Type Selection */}
-            <div>
-                <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
-                <div className="grid grid-cols-1 gap-3 mb-6">
-                    {/* Monthly Option */}
-                    <div
-                        className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'monthly' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-background/50 hover:border-primary/50'}`}
-                        onClick={() => setSelectedType('monthly')}
-                    >
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'monthly' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
-                                    {selectedType === 'monthly' && <div className="w-2 h-2 bg-black rounded-full" />}
+            {/* License Type Selection (Hidden if using IB Quota) */}
+            {!(ibStatus === 'approved' && useIbQuota) && (
+                <div>
+                    <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
+                    <div className="grid grid-cols-1 gap-3 mb-6">
+                        {/* Monthly Option */}
+                        <div
+                            className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'monthly' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-background/50 hover:border-primary/50'}`}
+                            onClick={() => setSelectedType('monthly')}
+                        >
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'monthly' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                                        {selectedType === 'monthly' && <div className="w-2 h-2 bg-black rounded-full" />}
+                                    </div>
+                                    <div>
+                                        <span className={`font-semibold block ${selectedType === 'monthly' ? 'text-primary' : ''}`}>รายเดือน (1 Month)</span>
+                                        <span className="text-xs text-muted-foreground">เหมาะสำหรับทดลองใช้</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className={`font-semibold block ${selectedType === 'monthly' ? 'text-primary' : ''}`}>รายเดือน (1 Month)</span>
-                                    <span className="text-xs text-muted-foreground">เหมาะสำหรับทดลองใช้</span>
+                                <div className="text-xl font-bold">฿{product.price_monthly?.toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        {/* Quarterly Option */}
+                        {product.price_quarterly && (
+                            <div
+                                className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'quarterly' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-background/50 hover:border-primary/50'}`}
+                                onClick={() => setSelectedType('quarterly')}
+                            >
+                                {/* Best Value Tag for Quarterly if needed */}
+                                <div className="absolute -top-2 right-4 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                    แนะนำ
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'quarterly' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                                            {selectedType === 'quarterly' && <div className="w-2 h-2 bg-black rounded-full" />}
+                                        </div>
+                                        <div>
+                                            <span className={`font-semibold block ${selectedType === 'quarterly' ? 'text-primary' : ''}`}>ราย 3 เดือน (Quarterly)</span>
+                                            <span className="text-xs text-muted-foreground">ประหยัดกว่ารายเดือน</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-xl font-bold">฿{product.price_quarterly?.toLocaleString()}</div>
                                 </div>
                             </div>
-                            <div className="text-xl font-bold">฿{product.price_monthly?.toLocaleString()}</div>
-                        </div>
-                    </div>
+                        )}
 
-                    {/* Quarterly Option */}
-                    {product.price_quarterly && (
+                        {/* Lifetime Option */}
                         <div
-                            className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'quarterly' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-background/50 hover:border-primary/50'}`}
-                            onClick={() => setSelectedType('quarterly')}
+                            className={`relative border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'lifetime' ? 'border-accent bg-accent/10 ring-1 ring-accent' : 'border-accent/30 bg-accent/5 hover:bg-accent/10'}`}
+                            onClick={() => setSelectedType('lifetime')}
                         >
-                            {/* Best Value Tag for Quarterly if needed */}
-                            <div className="absolute -top-2 right-4 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                แนะนำ
+                            <div className="absolute -top-3 right-4 bg-accent text-black text-xs font-bold px-2 py-0.5 rounded-full shadow-lg shadow-yellow-500/20">
+                                คุ้มค่าที่สุด
                             </div>
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'quarterly' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
-                                        {selectedType === 'quarterly' && <div className="w-2 h-2 bg-black rounded-full" />}
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'lifetime' ? 'border-accent bg-accent' : 'border-muted-foreground'}`}>
+                                        {selectedType === 'lifetime' && <div className="w-2 h-2 bg-black rounded-full" />}
                                     </div>
                                     <div>
-                                        <span className={`font-semibold block ${selectedType === 'quarterly' ? 'text-primary' : ''}`}>ราย 3 เดือน (Quarterly)</span>
-                                        <span className="text-xs text-muted-foreground">ประหยัดกว่ารายเดือน</span>
+                                        <span className={`font-semibold block ${selectedType === 'lifetime' ? 'text-accent' : 'text-accent/80'}`}>ถาวร (Lifetime)</span>
+                                        <span className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</span>
                                     </div>
                                 </div>
-                                <div className="text-xl font-bold">฿{product.price_quarterly?.toLocaleString()}</div>
+                                <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime?.toLocaleString()}</div>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Lifetime Option */}
-                    <div
-                        className={`relative border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedType === 'lifetime' ? 'border-accent bg-accent/10 ring-1 ring-accent' : 'border-accent/30 bg-accent/5 hover:bg-accent/10'}`}
-                        onClick={() => setSelectedType('lifetime')}
-                    >
-                        <div className="absolute -top-3 right-4 bg-accent text-black text-xs font-bold px-2 py-0.5 rounded-full shadow-lg shadow-yellow-500/20">
-                            คุ้มค่าที่สุด
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedType === 'lifetime' ? 'border-accent bg-accent' : 'border-muted-foreground'}`}>
-                                    {selectedType === 'lifetime' && <div className="w-2 h-2 bg-black rounded-full" />}
-                                </div>
-                                <div>
-                                    <span className={`font-semibold block ${selectedType === 'lifetime' ? 'text-accent' : 'text-accent/80'}`}>ถาวร (Lifetime)</span>
-                                    <span className="text-xs text-muted-foreground">จ่ายครั้งเดียว ใช้ได้ตลอดชีพ</span>
-                                </div>
-                            </div>
-                            <div className="text-2xl font-bold text-accent gold-glow">฿{product.price_lifetime?.toLocaleString()}</div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Risk Disclosure Section */}
             <div className="space-y-4 pt-4 border-t border-border">
