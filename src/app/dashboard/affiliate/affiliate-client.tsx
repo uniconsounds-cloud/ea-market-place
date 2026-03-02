@@ -17,7 +17,7 @@ interface AffiliateUser {
     ib_status: string;
 }
 
-export default function AffiliateClient({ user }: { user: AffiliateUser }) {
+export default function AffiliateClient({ user, upline }: { user: AffiliateUser, upline?: { full_name: string; email: string } | null }) {
     const [referralLink, setReferralLink] = useState('');
     const [copied, setCopied] = useState(false);
 
