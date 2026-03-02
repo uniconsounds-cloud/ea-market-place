@@ -148,6 +148,22 @@ function CheckoutContent({ productId }: { productId: string }) {
                 return;
             }
 
+            // 1.8 PENDING ORDERS VALIDATION (Duplicate Check)
+            const { data: existingOrders } = await supabase
+                .from('orders')
+                .select('id, status')
+                .eq('user_id', user.id)
+                .eq('product_id', product.id)
+                .eq('account_number', accountNumber.trim())
+                .eq('status', 'pending')
+                .limit(1);
+
+            if (existingOrders && existingOrders.length > 0) {
+                alert('คุณมีคำขอสิทธิ์สำหรับพอร์ตนี้ที่กำลังรอตรวจสอบอยู่แล้ว ไม่สามารถส่งซ้ำได้');
+                setSubmitting(false);
+                return;
+            }
+
             // 2. Create Order
             const { error } = await supabase.from('orders').insert({
                 user_id: user.id,

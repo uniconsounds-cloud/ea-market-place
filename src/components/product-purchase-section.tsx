@@ -173,16 +173,16 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 // 2. Check for pending/completed Order (Duplicate request in short time)
                 // We might want to allow multiple pending orders if they are for renewals, 
                 // but generally safer to block duplicates unless status is rejected.
-                const { data: existingOrder } = await supabase
+                const { data: existingOrders } = await supabase
                     .from('orders')
                     .select('id, status')
                     .eq('user_id', user.id)
                     .eq('product_id', product.id)
                     .eq('account_number', accountNumber.trim())
                     .eq('status', 'pending') // Only block pending
-                    .maybeSingle();
+                    .limit(1);
 
-                if (existingOrder) {
+                if (existingOrders && existingOrders.length > 0) {
                     alert('คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว');
                     setLoading(false);
                     return;
