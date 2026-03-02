@@ -10,20 +10,22 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
-interface License {
-    id: string;
+interface ProductItem {
+    id: string; // license id or order id
     product_id: string;
+    type: 'monthly' | 'quarterly' | 'yearly' | 'lifetime' | string;
+    expiry_date?: string; // only for licenses
+    is_active?: boolean; // only for licenses
+    status?: string; // mostly for orders (pending, rejected)
+    account_number: string;
+    created_at: string;
     products: {
-        id: string; // added to link to product
+        id: string;
         name: string;
         image_url: string;
         product_key: string;
     };
-    type: 'monthly' | 'quarterly' | 'yearly' | 'lifetime';
-    expiry_date: string;
-    is_active: boolean;
-    account_number: string;
-    created_at: string;
+    source: 'license' | 'order';
 }
 
 interface GroupedProduct {
@@ -32,7 +34,7 @@ interface GroupedProduct {
     productImage: string;
     productKey: string;
     fileUrl: string;
-    licenses: License[];
+    items: ProductItem[];
 }
 
 export default function DashboardPage() {
@@ -41,6 +43,7 @@ export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
     const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
     const [ibBrokers, setIbBrokers] = useState<string[]>([]);
+    const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
 
     useEffect(() => {
         const initData = async () => {
@@ -68,49 +71,76 @@ export default function DashboardPage() {
             const { data: licensesData } = await supabase
                 .from('licenses')
                 .select(`
-                    *,
-                    products (
-                        id,
-                        name,
-                        image_url,
-                        file_url,
-                        product_key
-                    )
+                    id, product_id, type, expiry_date, is_active, account_number, created_at,
+                    products ( id, name, image_url, file_url, product_key )
+                `)
+                .eq('user_id', user.id);
+
+            // Fetch Orders that are pending or rejected
+            const { data: ordersData } = await supabase
+                .from('orders')
+                .select(`
+                    id, product_id, plan_type, status, account_number, created_at,
+                    products ( id, name, image_url, file_url, product_key )
                 `)
                 .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+                .in('status', ['pending', 'rejected']);
 
-            // Group Licenses by Product
+            // Process Data
+            const allItems: ProductItem[] = [];
+
             if (licensesData) {
-                const groups: { [key: string]: GroupedProduct } = {};
-
                 licensesData.forEach((l: any) => {
-                    const prodId = l.product_id;
-                    if (!groups[prodId]) {
-                        groups[prodId] = {
-                            productId: prodId,
-                            productName: l.products?.name || 'Unknown Product',
-                            productImage: l.products?.image_url || '',
-                            fileUrl: l.products?.file_url || '',
-                            productKey: l.products?.product_key || '',
-                            licenses: []
-                        };
-                    }
-                    groups[prodId].licenses.push(l);
+                    allItems.push({
+                        ...l,
+                        source: 'license'
+                    });
                 });
-
-                // Convert to array
-                const groupedArray = Object.values(groups);
-                setGroupedProducts(groupedArray);
             }
 
+            if (ordersData) {
+                ordersData.forEach((o: any) => {
+                    allItems.push({
+                        id: o.id,
+                        product_id: o.product_id,
+                        type: o.plan_type,
+                        status: o.status,
+                        account_number: o.account_number,
+                        created_at: o.created_at,
+                        products: o.products,
+                        source: 'order'
+                    });
+                });
+            }
+
+            // Sort all by created_at desc
+            allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            // Group by Product
+            const groups: { [key: string]: GroupedProduct } = {};
+            allItems.forEach((item) => {
+                const prodId = item.product_id;
+                if (!groups[prodId]) {
+                    groups[prodId] = {
+                        productId: prodId,
+                        productName: item.products?.name || 'Unknown Product',
+                        productImage: item.products?.image_url || '',
+                        fileUrl: (item.products as any)?.file_url || '',
+                        productKey: item.products?.product_key || '',
+                        items: []
+                    };
+                }
+                groups[prodId].items.push(item);
+            });
+
+            setGroupedProducts(Object.values(groups));
             setLoading(false);
         };
 
         initData();
     }, [router]);
 
-    const calculateTimeRemaining = (expiryDate: string, type: 'monthly' | 'quarterly' | 'yearly' | 'lifetime') => {
+    const calculateTimeRemaining = (expiryDate: string, type: string) => {
         if (type === 'lifetime') return { days: 999, percent: 100, label: 'ตลอดชีพ', color: 'bg-green-500' };
 
         const now = new Date();
@@ -138,6 +168,27 @@ export default function DashboardPage() {
         };
     };
 
+    const isItemVisible = (item: ProductItem, currentFilter: string) => {
+        if (currentFilter === 'all') return true;
+
+        if (item.source === 'order') {
+            if (currentFilter === 'pending' && item.status === 'pending') return true;
+            if (currentFilter === 'rejected' && item.status === 'rejected') return true;
+            return false;
+        }
+
+        if (item.source === 'license') {
+            const timeInfo = calculateTimeRemaining(item.expiry_date!, item.type);
+
+            if (currentFilter === 'active' && item.is_active && timeInfo.days > 7) return true;
+            if (currentFilter === 'expiring' && item.is_active && timeInfo.days > 0 && timeInfo.days <= 7) return true;
+            if (currentFilter === 'expired' && (!item.is_active || timeInfo.days <= 0)) return true;
+            return false;
+        }
+
+        return false;
+    };
+
     if (loading) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
@@ -163,135 +214,197 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
-                    <p className="text-muted-foreground mt-1">จัดการ License และดาวน์โหลด EA ของคุณ</p>
+                    <p className="text-muted-foreground mt-1">จัดการ License, ติดตามสถานะออเดอร์ และดาวน์โหลด EA</p>
                 </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2">
+                <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
+                    ทั้งหมด
+                </Button>
+                <Button variant={filter === 'active' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('active')} className={filter === 'active' ? 'bg-green-600 hover:bg-green-700' : ''}>
+                    ใช้งานอยู่ (Active)
+                </Button>
+                <Button variant={filter === 'pending' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('pending')} className={filter === 'pending' ? 'bg-orange-500 hover:bg-orange-600' : ''}>
+                    รออนุมัติ (Pending)
+                </Button>
+                <Button variant={filter === 'expiring' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('expiring')} className={filter === 'expiring' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}>
+                    ใกล้หมดอายุ
+                </Button>
+                <Button variant={filter === 'expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('expired')}>
+                    หมดอายุ
+                </Button>
+                <Button variant={filter === 'rejected' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('rejected')} className={filter === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}>
+                    ถูกปฏิเสธ
+                </Button>
             </div>
 
             {/* Product List */}
             <div className="space-y-6">
-                {groupedProducts.length > 0 ? (
-                    groupedProducts.map((group) => (
-                        <Card key={group.productId} className="overflow-hidden">
-                            <CardHeader className="bg-muted/30 py-4">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center overflow-hidden border border-border">
-                                            {group.productImage ? (
-                                                <img src={group.productImage} alt={group.productName} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <Key className="h-6 w-6 text-muted-foreground" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <CardTitle className="text-lg">{group.productName}</CardTitle>
-                                                {group.productKey && (
-                                                    <Badge variant="secondary" className="text-xs font-mono">
-                                                        {group.productKey}
-                                                    </Badge>
+                {groupedProducts.filter(group => group.items.some(item => isItemVisible(item, filter))).length > 0 ? (
+                    groupedProducts.map((group) => {
+                        // Filter items based on selected tab
+                        const visibleItems = group.items.filter(item => isItemVisible(item, filter));
+                        if (visibleItems.length === 0) return null;
+
+                        return (
+                            <Card key={group.productId} className="overflow-hidden border-border/50">
+                                <CardHeader className="bg-muted/30 py-4 border-b border-border/30">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center overflow-hidden border border-border/50 shadow-sm">
+                                                {group.productImage ? (
+                                                    <img src={group.productImage} alt={group.productName} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <Key className="h-6 w-6 text-muted-foreground" />
                                                 )}
                                             </div>
-                                            <p className="text-sm text-muted-foreground">{group.licenses.length} License ที่ครอบครอง</p>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <CardTitle className="text-lg">{group.productName}</CardTitle>
+                                                    {group.productKey && (
+                                                        <Badge variant="secondary" className="text-xs font-mono bg-background/50 border-border/50">
+                                                            {group.productKey}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">{visibleItems.length} รายการ (พอร์ต/ไอดี)</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            {group.fileUrl && (
+                                                <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                    <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-muted">
+                                                        <Download className="h-4 w-4" />
+                                                        ดาวน์โหลดไฟล์
+                                                    </Button>
+                                                </a>
+                                            )}
+                                            <Link href={`/products/${group.productId}`}>
+                                                <Button size="sm">เพิ่มพอร์ตรับ EA</Button>
+                                            </Link>
                                         </div>
                                     </div>
+                                </CardHeader>
+                                <CardContent className="p-0 bg-card">
+                                    <div className="divide-y divide-border/40">
+                                        {visibleItems.map((item) => {
+                                            const isOrder = item.source === 'order';
+                                            let timeInfo = null;
+                                            if (!isOrder && item.expiry_date) {
+                                                timeInfo = calculateTimeRemaining(item.expiry_date, item.type);
+                                            }
 
-                                    <div className="flex items-center gap-2">
-                                        {group.fileUrl && (
-                                            <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
-                                                <Button size="sm" variant="outline" className="gap-2">
-                                                    <Download className="h-4 w-4" />
-                                                    ดาวน์โหลด EA
-                                                </Button>
-                                            </a>
-                                        )}
-                                        <Link href={`/products/${group.productId}`}>
-                                            <Button size="sm">ซื้อเพิ่ม</Button>
-                                        </Link>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="divide-y divide-border">
-                                    {group.licenses.map((license) => {
-                                        const timeInfo = calculateTimeRemaining(license.expiry_date, license.type);
-                                        return (
-                                            <div key={license.id} className="p-4 hover:bg-muted/10 transition-colors">
-                                                <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
+                                            return (
+                                                <div key={item.id} className="p-4 hover:bg-muted/10 transition-colors">
+                                                    <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
 
-                                                    {/* Port Info */}
-                                                    <div className="flex items-center gap-3 min-w-[200px]">
-                                                        <div className={`p-2 rounded-full ${license.is_active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                            <Activity className="h-4 w-4" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-mono font-medium">Port: {license.account_number || 'ยังไม่ระบุ'}</div>
-                                                            <div className="text-xs text-muted-foreground capitalize">
-                                                                {license.type === 'monthly' ? 'รายเดือน' :
-                                                                    license.type === 'quarterly' ? 'ราย 3 เดือน' :
-                                                                        license.type === 'yearly' ? 'รายปี' :
-                                                                            'ตลอดชีพ'}
+                                                        {/* Port Info & Badge */}
+                                                        <div className="flex items-start md:items-center gap-3 min-w-[200px]">
+                                                            {isOrder ? (
+                                                                <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.status === 'pending' ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                                    <Clock className="h-4 w-4" />
+                                                                </div>
+                                                            ) : (
+                                                                <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.is_active && timeInfo?.days! > 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                                    <Activity className="h-4 w-4" />
+                                                                </div>
+                                                            )}
+
+                                                            <div>
+                                                                <div className="font-mono font-medium flex items-center gap-2 placeholder-transparent">
+                                                                    Port: {item.account_number || <span className="text-muted-foreground italic text-xs">รอการระบุ</span>}
+
+                                                                    {/* Status Badges */}
+                                                                    {isOrder && item.status === 'pending' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 border-orange-500/20">รออนุมัติ</Badge>}
+                                                                    {isOrder && item.status === 'rejected' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">ถูกปฏิเสธ</Badge>}
+                                                                    {!isOrder && item.is_active && timeInfo?.days! > 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">ใช้งานอยู่</Badge>}
+                                                                    {!isOrder && item.is_active && timeInfo?.days! > 0 && timeInfo?.days! <= 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-500/30">ใกล้หมดอายุ</Badge>}
+                                                                    {!isOrder && (!item.is_active || timeInfo?.days! <= 0) && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">หมดอายุ</Badge>}
+                                                                </div>
+                                                                <div className="text-xs text-muted-foreground capitalize mt-0.5">
+                                                                    {item.type === 'monthly' ? 'เช่ารายเดือน' :
+                                                                        item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
+                                                                            item.type === 'yearly' ? 'เช่ารายปี' :
+                                                                                'สิทธิ์ใช้งานตลอดชีพ (Lifetime)'}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                    {/* Status & Expiry */}
-                                                    <div className="flex-1 max-w-md space-y-2">
-                                                        <div className="flex justify-between text-xs">
-                                                            <div className="flex items-center gap-1 text-muted-foreground">
-                                                                <Clock className="h-3 w-3" />
-                                                                <span>สถานะ: {license.is_active ? 'Active' : 'Expired'}</span>
-                                                            </div>
-                                                            <span className={`font-medium ${timeInfo.days <= 7 && license.type !== 'lifetime' ? 'text-red-500' : ''}`}>
-                                                                {timeInfo.label}
-                                                            </span>
+                                                        {/* Central Status Area (Progress or Reject Reason) */}
+                                                        <div className="flex-1 max-w-md space-y-2">
+                                                            {isOrder ? (
+                                                                // For Orders
+                                                                <div className="text-sm bg-muted/30 p-2.5 rounded-md border border-border/40">
+                                                                    {item.status === 'pending' && "ระบบกำลังดำเนินการตรวจสอบออเดอร์ หากคุณชำระเงิน/ใช้ IB Quota แล้ว โปรดรอแอดมินอนุมัติ 1-12 ชม."}
+                                                                    {item.status === 'rejected' && "คำสั่งซื้อถูกปฏิเสธ: รูปสลิปอาจไม่ชัดเจน หรือ ข้อมูล IB ไม่ถูกต้อง หากมีข้อสงสัยโปรดติดต่อแอดมิน"}
+                                                                </div>
+                                                            ) : (
+                                                                // For Licenses
+                                                                <>
+                                                                    <div className="flex justify-between text-xs">
+                                                                        <div className="flex items-center gap-1 text-muted-foreground">
+                                                                            <Clock className="h-3 w-3" />
+                                                                            <span>เวลาที่เหลือ</span>
+                                                                        </div>
+                                                                        <span className={`font-medium ${timeInfo?.days! <= 7 && item.type !== 'lifetime' ? 'text-red-500' : ''}`}>
+                                                                            {timeInfo?.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    {item.type !== 'lifetime' && (
+                                                                        <Progress value={timeInfo?.percent} className="h-1.5 bg-muted/50" indicatorClassName={timeInfo?.color} />
+                                                                    )}
+                                                                    {item.type === 'lifetime' && (
+                                                                        <div className="h-1.5 w-full bg-green-500/10 rounded-full relative overflow-hidden">
+                                                                            <div className="absolute inset-0 bg-green-500 w-full" />
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                                        <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
+                                                                        <span>หมดอายุ: {item.type === 'lifetime' ? 'ตลอดชีพ' : new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
-                                                        {license.type !== 'lifetime' && (
-                                                            <Progress value={timeInfo.percent} className="h-1.5" indicatorClassName={timeInfo.color} />
-                                                        )}
-                                                        {license.type === 'lifetime' && (
-                                                            <div className="h-1.5 w-full bg-green-500/20 rounded-full relative overflow-hidden">
-                                                                <div className="absolute inset-0 bg-green-500 w-full" />
-                                                            </div>
-                                                        )}
-                                                        <div className="flex justify-between text-[10px] text-muted-foreground">
-                                                            <span>เริ่ม: {new Date(license.created_at).toLocaleDateString('th-TH')}</span>
-                                                            <span>หมด: {license.type === 'lifetime' ? 'ตลอดชีพ' : new Date(license.expiry_date).toLocaleDateString('th-TH')}</span>
-                                                        </div>
-                                                    </div>
 
-                                                    {/* Action */}
-                                                    <div className="flex justify-end min-w-[100px]">
-                                                        {!license.is_active || (license.type !== 'lifetime' && timeInfo.days <= 30) ? (
-                                                            <Link href={`/products/${group.productId}?renew=${license.account_number}`}>
-                                                                <Button size="sm" variant="outline" className="h-8 text-xs">
-                                                                    ต่ออายุ
-                                                                </Button>
-                                                            </Link>
-                                                        ) : (
-                                                            <Badge variant="outline" className="h-8 px-3 text-green-500 border-green-500/30 bg-green-500/5">
-                                                                ปกติ
-                                                            </Badge>
-                                                        )}
+                                                        {/* Right Action Menu */}
+                                                        <div className="flex justify-end min-w-[100px]">
+                                                            {!isOrder && (!item.is_active || (item.type !== 'lifetime' && timeInfo?.days! <= 30)) ? (
+                                                                <Link href={`/products/${group.productId}?renew=${item.account_number}`}>
+                                                                    <Button size="sm" variant="outline" className="h-8 text-xs bg-background">
+                                                                        ต่ออายุ
+                                                                    </Button>
+                                                                </Link>
+                                                            ) : (
+                                                                <div className="w-[70px]"></div> // Spacing placeholder
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))
+                                            );
+                                        })}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })
                 ) : (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-                            <div className="p-4 bg-muted rounded-full mb-4">
-                                <ShoppingCart className="h-8 w-8 text-muted-foreground/50" />
+                    <Card className="border-border/50 bg-card/50">
+                        <CardContent className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                            <div className="p-5 bg-muted rounded-full mb-4 ring-8 ring-background">
+                                <ShoppingCart className="h-10 w-10 text-muted-foreground/40" />
                             </div>
-                            <h3 className="text-lg font-medium text-foreground">ยังไม่มีรายการสินค้า</h3>
-                            <p className="max-w-sm mt-2 mb-6 text-sm">เลือกซื้อ EA ที่เหมาะกับสไตล์การเทรดของคุณได้เลย</p>
-                            <Link href="/">
-                                <Button>ไปที่ร้านค้า</Button>
-                            </Link>
+                            <h3 className="text-xl font-medium text-foreground">ไม่พบรายการสินค้าในสถานะออเดอร์นี้</h3>
+                            <p className="max-w-sm mt-2 mb-6 text-sm">หากคุณสั่งซื้อเรียบร้อยแล้ว แต่ออเดอร์หายไป โปรดติดต่อเราเพื่อตรวจสอบ</p>
+                            {filter !== 'all' ? (
+                                <Button variant="outline" onClick={() => setFilter('all')}>ดูรายการทั้งหมด</Button>
+                            ) : (
+                                <Link href="/">
+                                    <Button>เข้าสู่หน้าร้านค้า EA</Button>
+                                </Link>
+                            )}
                         </CardContent>
                     </Card>
                 )}
