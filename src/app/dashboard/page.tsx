@@ -26,6 +26,7 @@ interface ProductItem {
         product_key: string;
     };
     source: 'license' | 'order';
+    is_ib?: boolean;
 }
 
 interface GroupedProduct {
@@ -55,10 +56,18 @@ export default function DashboardPage() {
             }
             setUser(user);
 
+            // Fetch Profile for legacy fallback IB account
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('ib_account_number')
+                .eq('id', user.id)
+                .single();
+            const legacyIbAccount = profileData?.ib_account_number;
+
             // Fetch Approved IB Memberships
             const { data: ibData } = await supabase
                 .from('ib_memberships')
-                .select('brokers(name)')
+                .select('account_number, brokers(name)')
                 .eq('user_id', user.id)
                 .eq('status', 'approved');
 
@@ -91,9 +100,13 @@ export default function DashboardPage() {
 
             if (licensesData) {
                 licensesData.forEach((l: any) => {
+                    const isIbLicense = (ibData || []).some((ib: any) => String(ib.account_number).trim() === String(l.account_number).trim()) ||
+                        (legacyIbAccount && String(legacyIbAccount).trim() === String(l.account_number).trim());
+
                     allItems.push({
                         ...l,
-                        source: 'license'
+                        source: 'license',
+                        is_ib: isIbLicense
                     });
                 });
             }
@@ -108,7 +121,8 @@ export default function DashboardPage() {
                         account_number: o.account_number,
                         created_at: o.created_at,
                         products: o.products,
-                        source: 'order'
+                        source: 'order',
+                        is_ib: o.is_ib_request // if we want orders to know too, though less relevant here
                     });
                 });
             }
@@ -140,17 +154,32 @@ export default function DashboardPage() {
         initData();
     }, [router]);
 
-    const calculateTimeRemaining = (expiryDate: string, type: string) => {
-        if (type === 'lifetime') return { days: 999, percent: 100, label: 'ตลอดชีพ', color: 'bg-green-500' };
+    const calculateTimeRemaining = (item: ProductItem) => {
+        // Pure lifetime non-IB licenses
+        if (item.type === 'lifetime' && !item.is_ib) {
+            return { days: 999, percent: 100, label: 'ตลอดชีพ', color: 'bg-green-500', isLifetime: true };
+        }
+
+        if (!item.expiry_date) {
+            return { days: 0, percent: 0, label: 'ไม่มีข้อมูลวันหมดอายุ', color: 'bg-gray-500', isLifetime: false };
+        }
 
         const now = new Date();
-        const expiry = new Date(expiryDate);
+        const expiry = new Date(item.expiry_date);
         const diffTime = expiry.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        let totalDays = 30;
-        if (type === 'quarterly') totalDays = 90;
-        if (type === 'yearly') totalDays = 365;
+        let totalDays = 30; // default for monthly
+        if (item.type === 'quarterly') totalDays = 90;
+        if (item.type === 'yearly') totalDays = 365;
+
+        // If it's an IB license or anything else with a dynamic creation/expiry delta
+        if (item.is_ib && item.created_at) {
+            const created = new Date(item.created_at);
+            const totalDiffTime = expiry.getTime() - created.getTime();
+            const calculatedTotalDays = Math.ceil(totalDiffTime / (1000 * 60 * 60 * 24));
+            totalDays = calculatedTotalDays > 0 ? calculatedTotalDays : 90; // Fallback to 90
+        }
 
         let percent = (diffDays / totalDays) * 100;
         if (percent > 100) percent = 100;
@@ -164,7 +193,8 @@ export default function DashboardPage() {
             days: diffDays,
             percent,
             label: diffDays > 0 ? `เหลือ ${diffDays} วัน` : 'หมดอายุ',
-            color
+            color,
+            isLifetime: false
         };
     };
 
@@ -178,7 +208,7 @@ export default function DashboardPage() {
         }
 
         if (item.source === 'license') {
-            const timeInfo = calculateTimeRemaining(item.expiry_date!, item.type);
+            const timeInfo = calculateTimeRemaining(item);
 
             if (currentFilter === 'active' && item.is_active && timeInfo.days > 7) return true;
             if (currentFilter === 'expiring' && item.is_active && timeInfo.days > 0 && timeInfo.days <= 7) return true;
@@ -294,7 +324,7 @@ export default function DashboardPage() {
                                             const isOrder = item.source === 'order';
                                             let timeInfo = null;
                                             if (!isOrder && item.expiry_date) {
-                                                timeInfo = calculateTimeRemaining(item.expiry_date, item.type);
+                                                timeInfo = calculateTimeRemaining(item);
                                             }
 
                                             return (
@@ -324,11 +354,16 @@ export default function DashboardPage() {
                                                                     {!isOrder && item.is_active && timeInfo?.days! > 0 && timeInfo?.days! <= 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-500/30">ใกล้หมดอายุ</Badge>}
                                                                     {!isOrder && (!item.is_active || timeInfo?.days! <= 0) && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">หมดอายุ</Badge>}
                                                                 </div>
-                                                                <div className="text-xs text-muted-foreground capitalize mt-0.5">
-                                                                    {item.type === 'monthly' ? 'เช่ารายเดือน' :
-                                                                        item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
-                                                                            item.type === 'yearly' ? 'เช่ารายปี' :
-                                                                                'สิทธิ์ใช้งานตลอดชีพ (Lifetime)'}
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    {item.is_ib && (
+                                                                        <Badge variant="outline" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20 uppercase tracking-wider">IB Customer</Badge>
+                                                                    )}
+                                                                    <div className="text-xs text-muted-foreground capitalize">
+                                                                        {item.type === 'monthly' ? 'เช่ารายเดือน' :
+                                                                            item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
+                                                                                item.type === 'yearly' ? 'เช่ารายปี' :
+                                                                                    'สิทธิ์ใช้งานตลอดชีพ (Lifetime)'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -349,21 +384,21 @@ export default function DashboardPage() {
                                                                             <Clock className="h-3 w-3" />
                                                                             <span>เวลาที่เหลือ</span>
                                                                         </div>
-                                                                        <span className={`font-medium ${timeInfo?.days! <= 7 && item.type !== 'lifetime' ? 'text-red-500' : ''}`}>
+                                                                        <span className={`font-medium ${timeInfo?.days! <= 7 && !timeInfo?.isLifetime ? 'text-red-500' : ''}`}>
                                                                             {timeInfo?.label}
                                                                         </span>
                                                                     </div>
-                                                                    {item.type !== 'lifetime' && (
+                                                                    {!timeInfo?.isLifetime && (
                                                                         <Progress value={timeInfo?.percent} className="h-1.5 bg-muted/50" indicatorClassName={timeInfo?.color} />
                                                                     )}
-                                                                    {item.type === 'lifetime' && (
+                                                                    {timeInfo?.isLifetime && (
                                                                         <div className="h-1.5 w-full bg-green-500/10 rounded-full relative overflow-hidden">
                                                                             <div className="absolute inset-0 bg-green-500 w-full" />
                                                                         </div>
                                                                     )}
                                                                     <div className="flex justify-between text-[10px] text-muted-foreground">
                                                                         <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
-                                                                        <span>หมดอายุ: {item.type === 'lifetime' ? 'ตลอดชีพ' : new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
+                                                                        <span>หมดอายุ: {timeInfo?.isLifetime ? 'ตลอดชีพ' : new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
                                                                     </div>
                                                                 </>
                                                             )}
@@ -371,7 +406,7 @@ export default function DashboardPage() {
 
                                                         {/* Right Action Menu */}
                                                         <div className="flex justify-end min-w-[100px]">
-                                                            {!isOrder && (!item.is_active || (item.type !== 'lifetime' && timeInfo?.days! <= 30)) ? (
+                                                            {!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 30)) ? (
                                                                 <Link href={`/products/${group.productId}?renew=${item.account_number}`}>
                                                                     <Button size="sm" variant="outline" className="h-8 text-xs bg-background">
                                                                         ต่ออายุ
