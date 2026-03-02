@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
     const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
+    const [ibBrokers, setIbBrokers] = useState<string[]>([]);
 
     useEffect(() => {
         const initData = async () => {
@@ -50,6 +51,18 @@ export default function DashboardPage() {
                 return;
             }
             setUser(user);
+
+            // Fetch Approved IB Memberships
+            const { data: ibData } = await supabase
+                .from('ib_memberships')
+                .select('brokers(name)')
+                .eq('user_id', user.id)
+                .eq('status', 'approved');
+
+            if (ibData && ibData.length > 0) {
+                const brokers = ibData.map((b: any) => b.brokers?.name).filter(Boolean);
+                setIbBrokers(brokers);
+            }
 
             // Fetch Licenses (with product details)
             const { data: licensesData } = await supabase
@@ -135,9 +148,23 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold">ภาพรวมบัญชี</h1>
-                <p className="text-muted-foreground">จัดการ License และดาวน์โหลด EA ของคุณ</p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl font-bold">ภาพรวมบัญชี</h1>
+                        {ibBrokers.length > 0 && (
+                            <div className="flex gap-1.5 flex-wrap">
+                                {ibBrokers.map(brokerName => (
+                                    <Badge key={brokerName} variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 py-1 border border-green-500/20">
+                                        <ShieldCheck className="w-3 h-3 mr-1" />
+                                        IB {brokerName}
+                                    </Badge>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-muted-foreground mt-1">จัดการ License และดาวน์โหลด EA ของคุณ</p>
+                </div>
             </div>
 
             {/* Product List */}

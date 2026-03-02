@@ -45,7 +45,8 @@ export default async function AdminIbRequestsPage() {
                 ib_link
             )
         `)
-        .eq("status", "pending")
+        .in("status", ["pending", "approved"])
+        .order("status", { ascending: false }) // Sort pending first
         .order("updated_at", { ascending: false });
 
     return <AdminIbRequestsClient initialRequests={ibRequests || []} />;

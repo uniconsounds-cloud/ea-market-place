@@ -106,7 +106,7 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {profile.ib_status === 'approved' ? (
+                                            {profile.ib_memberships && profile.ib_memberships.some((m: any) => m.status === 'approved') ? (
                                                 <Badge className="bg-green-500/20 text-green-500 hover:bg-green-500/30">
                                                     ใช้งาน EA ฟรี
                                                 </Badge>

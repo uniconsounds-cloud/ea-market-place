@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type IBRequest = {
     id: string; // ib_memberships ID
@@ -43,6 +44,10 @@ type IBRequest = {
 export default function AdminIbRequestsClient({ initialRequests }: { initialRequests: IBRequest[] }) {
     const [requests, setRequests] = useState<IBRequest[]>(initialRequests);
     const [isLoading, setIsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState("pending");
+
+    const pendingRequests = requests.filter(r => r.status === "pending");
+    const approvedRequests = requests.filter(r => r.status === "approved");
 
     // Approval Modal State
     const [isApproveOpen, setIsApproveOpen] = useState(false);
@@ -63,8 +68,8 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
 
             if (error) throw new Error(error.message);
 
-            // Remove from the pending list
-            setRequests(requests.filter(r => r.id !== id));
+            // Update status in local state instead of removing, so it moves to the other tab
+            setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r));
 
             if (action === "approve") {
                 toast.success("อนุมัติสำเร็จ", { description: "ผู้ใช้นี้ได้รับสิทธิ์ IB ของโบรกเกอร์นี้แล้ว" });
@@ -130,94 +135,184 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
             <Card className="border-border/40 shadow-sm">
                 <CardHeader className="bg-muted/20 border-b border-border/40 pb-4">
                     <CardTitle className="text-lg flex items-center justify-between">
-                        <span>รายการรออนุมัติ</span>
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400">
-                            รอตรวจสอบ {requests.length} รายการ
-                        </Badge>
+                        <span>รายการคำขอสิทธิ์ IB</span>
+                        <div className="flex gap-2">
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400">
+                                รอตรวจสอบ {pendingRequests.length}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-400">
+                                อนุมัติแล้ว {approvedRequests.length}
+                            </Badge>
+                        </div>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/10">
-                                <TableRow>
-                                    <TableHead className="w-[200px]">ลูกค้า</TableHead>
-                                    <TableHead>โบรกเกอร์ (Broker)</TableHead>
-                                    <TableHead>ข้อมูลรอยืนยัน</TableHead>
-                                    <TableHead className="w-[180px]">วันที่ขอสิทธิ์</TableHead>
-                                    <TableHead className="text-right w-[180px]">การจัดการ</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {requests.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground flex-col gap-2">
-                                            <div className="flex justify-center mb-2">
-                                                <CheckCircle2 className="w-10 h-10 text-muted-foreground/30" />
-                                            </div>
-                                            ไม่มีคำขอ IB ที่รอการอนุมัติ
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    requests.map((request) => (
-                                        <TableRow key={request.id} className="hover:bg-muted/5">
-                                            <TableCell className="font-medium">
-                                                {getName(request)}
-                                                <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {request.id.substring(0, 8)}...</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="font-semibold text-primary/80">
-                                                    {getBrokerName(request)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                {request.verification_data ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-sm">{request.verification_data}</span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 shrink-0 hover:bg-muted/50"
-                                                            onClick={() => copyToClipboard(request.verification_data as string)}
-                                                        >
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic text-sm">-</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {format(new Date(request.updated_at), 'd MMM yyyy HH:mm', { locale: th })} น.
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10"
-                                                        onClick={() => handleRejectClick(request.id, getName(request))}
-                                                        disabled={isLoading}
-                                                    >
-                                                        <XCircle className="w-3.5 h-3.5 mr-1" /> ปฏิเสธ
-                                                    </Button>
-                                                    <Button
-                                                        variant="default"
-                                                        size="sm"
-                                                        className="h-8 bg-green-500 hover:bg-green-600 text-white"
-                                                        onClick={() => openApproveModal(request)}
-                                                        disabled={isLoading}
-                                                    >
-                                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> อนุมัติ
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <div className="border-b px-4 py-3 bg-muted/5 flex items-center justify-between">
+                            <TabsList>
+                                <TabsTrigger value="pending" className="flex gap-2">
+                                    รอพิจารณา
+                                    {pendingRequests.length > 0 && (
+                                        <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700">
+                                            {pendingRequests.length}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger value="approved">
+                                    อนุมัติแล้ว
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
+
+                        <TabsContent value="pending" className="m-0 border-none p-0 outline-none">
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader className="bg-muted/10">
+                                        <TableRow>
+                                            <TableHead className="w-[200px]">ลูกค้า</TableHead>
+                                            <TableHead>โบรกเกอร์ (Broker)</TableHead>
+                                            <TableHead>ข้อมูลรอยืนยัน</TableHead>
+                                            <TableHead className="w-[180px]">วันที่ขอสิทธิ์</TableHead>
+                                            <TableHead className="text-right w-[180px]">การจัดการ</TableHead>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pendingRequests.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground flex-col gap-2">
+                                                    <div className="flex justify-center mb-2">
+                                                        <CheckCircle2 className="w-10 h-10 text-muted-foreground/30" />
+                                                    </div>
+                                                    ไม่มีคำขอ IB ที่รอการอนุมัติ
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            pendingRequests.map((request) => (
+                                                <TableRow key={request.id} className="hover:bg-muted/5">
+                                                    <TableCell className="font-medium">
+                                                        {getName(request)}
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {request.id.substring(0, 8)}...</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="font-semibold text-primary/80">
+                                                            {getBrokerName(request)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {request.verification_data ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-sm">{request.verification_data}</span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-5 w-5 shrink-0 hover:bg-muted/50"
+                                                                    onClick={() => copyToClipboard(request.verification_data as string)}
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic text-sm">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-muted-foreground">
+                                                        {format(new Date(request.updated_at), 'd MMM yyyy HH:mm', { locale: th })} น.
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10"
+                                                                onClick={() => handleRejectClick(request.id, getName(request))}
+                                                                disabled={isLoading}
+                                                            >
+                                                                <XCircle className="w-3.5 h-3.5 mr-1" /> ปฏิเสธ
+                                                            </Button>
+                                                            <Button
+                                                                variant="default"
+                                                                size="sm"
+                                                                className="h-8 bg-green-500 hover:bg-green-600 text-white"
+                                                                onClick={() => openApproveModal(request)}
+                                                                disabled={isLoading}
+                                                            >
+                                                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> อนุมัติ
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="approved" className="m-0 border-none p-0 outline-none">
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader className="bg-muted/10">
+                                        <TableRow>
+                                            <TableHead className="w-[200px]">ลูกค้า</TableHead>
+                                            <TableHead>โบรกเกอร์ (Broker)</TableHead>
+                                            <TableHead>ข้อมูลรอยืนยัน</TableHead>
+                                            <TableHead className="w-[180px]">วันที่อนุมัติ</TableHead>
+                                            <TableHead className="text-right w-[180px]">สถานะ</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {approvedRequests.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground flex-col gap-2">
+                                                    ไม่มีลูกค้าระบบ IB ที่ได้รับอนุมัติแล้ว
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            approvedRequests.map((request) => (
+                                                <TableRow key={request.id} className="hover:bg-muted/5">
+                                                    <TableCell className="font-medium">
+                                                        {getName(request)}
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {request.id.substring(0, 8)}...</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="font-semibold text-primary/80">
+                                                            {getBrokerName(request)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {request.verification_data ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-sm">{request.verification_data}</span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-5 w-5 shrink-0 hover:bg-muted/50"
+                                                                    onClick={() => copyToClipboard(request.verification_data as string)}
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic text-sm">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-muted-foreground">
+                                                        {format(new Date(request.updated_at), 'd MMM yyyy HH:mm', { locale: th })} น.
+                                                    </TableCell>
+                                                    <TableCell className="text-right flex justify-end">
+                                                        <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-400 mt-2">
+                                                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                            อนุมัติแล้ว
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
 

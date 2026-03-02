@@ -24,9 +24,9 @@ export default async function AdminAffiliatesPage() {
             referral_code,
             commission_rate,
             accumulated_commission,
-            ib_status,
+            ib_memberships(status),
             referred_by,
-            upline:profiles!referred_by(full_name, email)
+            upline:referred_by(full_name, email)
         `);
 
     if (error) {

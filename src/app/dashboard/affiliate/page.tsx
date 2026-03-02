@@ -21,6 +21,7 @@ export default async function AffiliateDashboardPage() {
             full_name,
             email,
             referral_code,
+            referred_by,
             commission_rate,
             accumulated_commission,
             ib_status
@@ -33,7 +34,21 @@ export default async function AffiliateDashboardPage() {
         return <div>Error loading profile data.</div>;
     }
 
-    // 3. (Optional Server Fetch) Get recent referrals/history here if needed
+    // 3. Fetch Upline (Referrer) Data if exists
+    let upline = null;
+    if (profile.referred_by) {
+        const { data: uplineData } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', profile.referred_by)
+            .single();
+
+        if (uplineData) {
+            upline = uplineData;
+        }
+    }
+
+    // 4. (Optional Server Fetch) Get recent referrals/history here if needed
     // But passing it to client cleanly is usually easier for tables
 
     return (
@@ -42,6 +57,7 @@ export default async function AffiliateDashboardPage() {
                 id: session.user.id,
                 ...profile
             }}
+            upline={upline}
         />
     );
 }
