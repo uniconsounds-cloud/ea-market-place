@@ -39,7 +39,7 @@ export default async function AdminIbRequestsPage() {
             ib_account_number,
             ib_broker_id,
             updated_at,
-            brokers (
+            brokers!profiles_ib_broker_id_fkey (
                 name,
                 ib_link
             )
