@@ -115,6 +115,36 @@ export function ProductIbBanner({ productId }: { productId: string }) {
 
         setIsSubmitting(true);
         try {
+            // 1. Check if port is already active in global licenses
+            const { data: globalLicenses } = await supabase
+                .from('licenses')
+                .select('id')
+                .eq('account_number', accountNumber.trim())
+                .eq('is_active', true)
+                .gte('expiry_date', new Date().toISOString())
+                .limit(1);
+
+            if (globalLicenses && globalLicenses.length > 0) {
+                toast.error("ไม่สามารถทำรายการได้", { description: "หมายเลขพอร์ตนี้ถูกใช้งานไปแล้วและยังมีอายุการใช้งานอยู่" });
+                setIsSubmitting(false);
+                return;
+            }
+
+            // 2. Check if port is already attached to another profile (approved or pending)
+            const { data: duplicateProfiles } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('ib_account_number', accountNumber.trim())
+                .in('ib_status', ['pending', 'approved'])
+                .neq('id', user.id)
+                .limit(1);
+
+            if (duplicateProfiles && duplicateProfiles.length > 0) {
+                toast.error("ไม่สามารถทำรายการได้", { description: "หมายเลขพอร์ตนี้ถูกลงทะเบียนขอสิทธิ์ไปแล้วโดยผู้ใช้อื่น" });
+                setIsSubmitting(false);
+                return;
+            }
+
             const { error } = await supabase
                 .from('profiles')
                 .update({
