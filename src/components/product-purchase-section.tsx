@@ -159,8 +159,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         setPortValidationMsg({ text: 'พอร์ตนี้เป็นพอร์ตเช่าซื้อปกติ ไม่สามารถขอใช้สิทธิ์ IB ได้', type: 'error' });
                         setIsRenewal(false);
                     } else {
-                        setPortValidationMsg({ text: 'คุณมีสิทธิ์ใช้งานสำหรับพอร์ตนี้อยู่แล้ว ไม่สามารถขอสิทธิ์ฟรีซ้ำได้', type: 'error' });
-                        setIsRenewal(false); // Can't renew IB from client
+                        // Allow IB Renewal Requests 
+                        setIsRenewal(true);
+                        setPortValidationMsg({ text: 'ขอต่ออายุสิทธิ์ IB (รอแอดมินอนุมัติ)', type: 'success' });
                     }
                 } else {
                     // Try to renew as Normal
@@ -309,9 +310,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                                         </span>
                                                     )}
 
-                                                    {(!isIbPort && license.type !== 'lifetime') && (
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
-                                                            เหลือ {days} วัน
+                                                    {((!isIbPort && license.type !== 'lifetime') || (isIbPort && license.expiry_date)) && (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 font-bold' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
+                                                            เหลือ {days > 0 ? days : 0} วัน
                                                         </span>
                                                     )}
                                                     {(!isIbPort && license.type === 'lifetime') && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
@@ -430,9 +431,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                             </span>
                         </div>
                         <div className="text-right">
-                            <span className="text-muted-foreground block mb-0.5">หมดอายุหลังต่ออายุ:</span>
+                            <span className="text-muted-foreground block mb-0.5">ส่วนขยายอายุการใช้งาน:</span>
                             <span className="font-bold text-green-600 dark:text-green-500">
-                                {calculateNewExpiry(currentLicense.expiry_date, selectedType)}
+                                {ibStatus === 'approved' && useIbQuota ? 'รอแอดมินอนุมัติวันเพิ่มให้' : calculateNewExpiry(currentLicense.expiry_date, selectedType)}
                             </span>
                         </div>
                     </div>
@@ -553,11 +554,11 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             <Button
                 size="lg"
-                className={`w-full text-base font-semibold shadow-xl transition-all duration-300 ${isRenewal ? 'bg-green-600 hover:bg-green-700 shadow-green-900/20' : ibStatus === 'approved' && useIbQuota ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-900/20' : 'shadow-blue-900/20'}`}
+                className={`w-full text-base font-semibold shadow-xl transition-all duration-300 ${isRenewal && !useIbQuota ? 'bg-green-600 hover:bg-green-700 shadow-green-900/20' : isRenewal && useIbQuota ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-900/20' : ibStatus === 'approved' && useIbQuota ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-900/20' : 'shadow-blue-900/20'}`}
                 onClick={handlePurchase}
                 disabled={loading}
             >
-                {loading ? 'กำลังดำเนินการ...' : isRenewal ? 'ต่ออายุ License (Renew)' : ibStatus === 'approved' && useIbQuota ? 'ขอรับสิทธิ์ใช้งานฟรี (0 ฿)' : 'ดำเนินการต่อ'}
+                {loading ? 'กำลังดำเนินการ...' : isRenewal ? (useIbQuota ? 'ยื่นคำร้องต่ออายุโควต้า IB' : 'ต่ออายุ License (Renew)') : ibStatus === 'approved' && useIbQuota ? 'ขอรับสิทธิ์ใช้งานฟรี (0 ฿)' : 'ดำเนินการต่อ'}
             </Button>
             <p className="text-center text-xs text-muted-foreground mt-3 flex items-center justify-center gap-1">
                 <AlertCircle className="w-3 h-3" />
