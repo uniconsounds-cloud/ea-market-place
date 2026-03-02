@@ -104,7 +104,10 @@ export default function CustomerDetailsPage() {
         }
     };
 
-    const calculateDaysRemaining = (expiryDate: string) => {
+    const calculateDaysRemaining = (expiryDate: string | null, type: string, isIbPort: boolean) => {
+        if (!isIbPort && type === 'lifetime') return 999;
+        if (!expiryDate) return 0;
+
         const expiry = new Date(expiryDate);
         const now = new Date();
         const diffTime = expiry.getTime() - now.getTime();
@@ -339,7 +342,7 @@ export default function CustomerDetailsPage() {
 
                                         <div className="grid gap-4 pl-4 border-l-2 border-muted ml-4">
                                             {licenses.map((license: any) => {
-                                                const daysRemaining = calculateDaysRemaining(license.expiry_date);
+                                                const daysRemaining = calculateDaysRemaining(license.expiry_date, license.type, license.is_ib);
                                                 const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
 
                                                 return (
@@ -357,6 +360,11 @@ export default function CustomerDetailsPage() {
                                                                     <h3 className="font-bold text-base">{license.products?.name || 'Unknown Product'}</h3>
                                                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                         <Badge variant="secondary" className="text-[10px] h-5">{license.products?.platform || 'MT4'}</Badge>
+                                                                        {license.is_ib && (
+                                                                            <Badge variant="outline" className="text-[10px] h-5 bg-blue-500/10 text-blue-500 border-blue-500/20">
+                                                                                IB Port
+                                                                            </Badge>
+                                                                        )}
                                                                         <span>Account: <span className="font-mono text-foreground font-medium">{license.account_number}</span></span>
                                                                     </div>
                                                                 </div>
@@ -366,10 +374,10 @@ export default function CustomerDetailsPage() {
                                                                 <div className="text-right">
                                                                     <div className={`font-mono text-sm flex items-center justify-end gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : ''}`}>
                                                                         <Clock className="w-3 h-3" />
-                                                                        {new Date(license.expiry_date).toLocaleDateString('th-TH')}
+                                                                        {(!license.is_ib && license.type === 'lifetime') ? 'ตลอดชีพ' : (license.expiry_date ? new Date(license.expiry_date).toLocaleDateString('th-TH') : '-')}
                                                                     </div>
                                                                     <div className="text-[10px] text-green-500">
-                                                                        เหลือ {daysRemaining} วัน
+                                                                        {(!license.is_ib && license.type === 'lifetime') ? '' : `เหลือ ${daysRemaining} วัน`}
                                                                     </div>
                                                                 </div>
                                                                 <Badge className="bg-green-500 hover:bg-green-600 h-6">Active</Badge>

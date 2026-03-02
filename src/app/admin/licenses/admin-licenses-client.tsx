@@ -314,7 +314,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                             ) : (
                                 filteredLicenses.map((license) => {
                                     const isIB = license.is_ib;
-                                    const isExpired = license.type !== 'lifetime' && license.expiry_date && new Date(license.expiry_date) < new Date();
+                                    const isExpired = (!isIB && license.type === 'lifetime') ? false : (license.expiry_date && new Date(license.expiry_date) < new Date());
 
                                     return (
                                         <tr key={license.id} className="border-b hover:bg-muted/20 transition-colors">
@@ -347,7 +347,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                                                 {license.is_active ? 'Active' : 'Inactive'}
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                {license.type === 'lifetime' ? (
+                                                {(!isIB && license.type === 'lifetime') ? (
                                                     <span className="text-muted-foreground">ตลอดชีพ</span>
                                                 ) : (
                                                     <span className={`${isExpired ? 'text-red-500 font-bold' : ''}`}>
