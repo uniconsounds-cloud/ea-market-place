@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key } from 'lucide-react';
+import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap } from 'lucide-react';
 
 export default function AdminLicensesClient({ initialLicenses }: { initialLicenses: any[] }) {
     const [licenses, setLicenses] = useState(initialLicenses);
@@ -32,6 +32,8 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
     const [editingLicense, setEditingLicense] = useState<any>(null);
     const [editExpiryDate, setEditExpiryDate] = useState('');
     const [editIsActive, setEditIsActive] = useState(true);
+    const [expiryOption, setExpiryOption] = useState("6months");
+    const [customDate, setCustomDate] = useState("");
     const [saving, setSaving] = useState(false);
 
     // Extract unique options for dropdowns
@@ -78,9 +80,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
             });
         }
         if (showIbCustomers) {
-            filtered = filtered.filter(l =>
-                l.profiles?.ib_account_number && l.profiles?.ib_account_number === l.account_number
-            );
+            filtered = filtered.filter(l => l.is_ib);
         }
 
         // 4. Sorting
@@ -132,6 +132,11 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
             setEditExpiryDate('');
         }
         setEditIsActive(license.is_active);
+        setExpiryOption("6months");
+
+        const date = new Date();
+        date.setMonth(date.getMonth() + 6);
+        setCustomDate(date.toISOString().split('T')[0]);
     };
 
     const handleSaveLicense = async () => {
@@ -142,7 +147,27 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                 is_active: editIsActive,
             };
 
-            if (editingLicense.type !== 'lifetime') {
+            if (editingLicense.is_ib) {
+                // IB Expiry Logic via Buttons
+                let finalExpiryDate: Date;
+                const now = new Date();
+
+                if (expiryOption === "1month") {
+                    now.setMonth(now.getMonth() + 1);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "6months") {
+                    now.setMonth(now.getMonth() + 6);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "1year") {
+                    now.setFullYear(now.getFullYear() + 1);
+                    finalExpiryDate = now;
+                } else {
+                    finalExpiryDate = new Date(customDate);
+                }
+                updates.expiry_date = finalExpiryDate.toISOString();
+
+            } else if (editingLicense.type !== 'lifetime') {
+                // Standard License Expiry Logic (Input field)
                 if (!editExpiryDate) {
                     alert('กรุณาระบุวันหมดอายุ');
                     setSaving(false);
@@ -288,8 +313,8 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                                 </tr>
                             ) : (
                                 filteredLicenses.map((license) => {
-                                    const isIB = license.profiles?.ib_account_number && license.profiles?.ib_account_number === license.account_number;
-                                    const isExpired = license.type !== 'lifetime' && new Date(license.expiry_date) < new Date();
+                                    const isIB = license.is_ib;
+                                    const isExpired = license.type !== 'lifetime' && license.expiry_date && new Date(license.expiry_date) < new Date();
 
                                     return (
                                         <tr key={license.id} className="border-b hover:bg-muted/20 transition-colors">
@@ -306,8 +331,10 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                                                 <div className="text-xs text-muted-foreground capitalize">{license.products?.asset_class || license.products?.platform}</div>
                                             </td>
                                             <td className="px-4 py-3 capitalize">
-                                                {license.type === 'lifetime' ? (
-                                                    <span className="text-orange-600 bg-orange-100 px-2 py-0.5 rounded text-xs font-bold">Lifetime</span>
+                                                {isIB ? (
+                                                    <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded text-xs font-bold border border-blue-200">IB Customer</span>
+                                                ) : license.type === 'lifetime' ? (
+                                                    <span className="text-orange-600 bg-orange-100 px-2 py-0.5 rounded text-xs font-bold border border-orange-200">Lifetime</span>
                                                 ) : license.type}
                                             </td>
                                             <td className="px-4 py-3 font-mono font-medium">{license.account_number}</td>
@@ -387,7 +414,70 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                                     <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
                                 </div>
 
-                                {editingLicense.type !== 'lifetime' && (
+                                {editingLicense.is_ib ? (
+                                    <div className="space-y-3 pt-2 border-t border-border">
+                                        <Label className="flex items-center gap-2 text-blue-600 font-bold">
+                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB Customer)
+                                        </Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "1month" ? "default" : "outline"}
+                                                className={expiryOption === "1month" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("1month")}
+                                            >
+                                                1 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "6months" ? "default" : "outline"}
+                                                className={expiryOption === "6months" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("6months")}
+                                            >
+                                                6 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "1year" ? "default" : "outline"}
+                                                className={expiryOption === "1year" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("1year")}
+                                            >
+                                                1 ปี
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "custom" ? "default" : "outline"}
+                                                className={expiryOption === "custom" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("custom")}
+                                            >
+                                                กำหนดเอง
+                                            </Button>
+                                        </div>
+
+                                        {expiryOption === "custom" && (
+                                            <div className="pt-2">
+                                                <Label htmlFor="customDate" className="text-muted-foreground text-xs mb-1.5 block">เลือกวันที่หมดอายุ</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="customDate"
+                                                        type="date"
+                                                        value={customDate}
+                                                        onChange={(e) => setCustomDate(e.target.value)}
+                                                        className="pl-9"
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                        required={expiryOption === "custom"}
+                                                    />
+                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                </div>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">วันหมดอายุเดิม: {editingLicense.expiry_date ? formatDate(editingLicense.expiry_date) : '-'}</p>
+                                    </div>
+                                ) : editingLicense.type !== 'lifetime' ? (
                                     <div className="space-y-2">
                                         <Label className="flex items-center gap-2">
                                             <Calendar className="w-4 h-4" /> วันหมดอายุ (Expiry Date)
@@ -398,8 +488,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                                             onChange={(e) => setEditExpiryDate(e.target.value)}
                                         />
                                     </div>
-                                )}
-                                {editingLicense.type === 'lifetime' && (
+                                ) : (
                                     <div className="text-center p-3 border border-orange-200 bg-orange-50 text-orange-800 rounded-lg text-sm">
                                         สิทธิ์การใช้งานแบบตลอดชีพ ไม่ต้องตั้งวันหมดอายุ
                                     </div>

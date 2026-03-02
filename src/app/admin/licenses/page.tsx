@@ -36,6 +36,8 @@ export default async function AdminLicensesPage() {
     // Manual Join: Fetch Profiles
     const userIds = Array.from(new Set((rawLicenses || []).map(l => l.user_id).filter(Boolean)));
     let profilesMap: Record<string, any> = {};
+    let ibMembershipsMap: Record<string, any[]> = {};
+
     if (userIds.length > 0) {
         const { data: profiles } = await supabase
             .from('profiles')
@@ -48,13 +50,37 @@ export default async function AdminLicensesPage() {
                 return acc;
             }, {});
         }
+
+        // Fetch IB Memberships for these users
+        const { data: ibMemberships } = await supabase
+            .from('ib_memberships')
+            .select('user_id, account_number, status')
+            .in('user_id', userIds)
+            .eq('status', 'approved');
+
+        if (ibMemberships) {
+            // Group by user_id
+            ibMemberships.forEach(ib => {
+                if (!ibMembershipsMap[ib.user_id]) {
+                    ibMembershipsMap[ib.user_id] = [];
+                }
+                ibMembershipsMap[ib.user_id].push(ib);
+            });
+        }
     }
 
     // Merge Data
-    const licenses = (rawLicenses || []).map(l => ({
-        ...l,
-        profiles: l.user_id ? profilesMap[l.user_id] : null
-    }));
+    const licenses = (rawLicenses || []).map(l => {
+        // Check if this specific license port number is an approved IB port
+        const userIbRecords = l.user_id ? ibMembershipsMap[l.user_id] || [] : [];
+        const isIbLicense = userIbRecords.some(r => r.account_number === l.account_number);
+
+        return {
+            ...l,
+            profiles: l.user_id ? profilesMap[l.user_id] : null,
+            is_ib: isIbLicense
+        };
+    });
 
     return (
         <AdminLicensesClient initialLicenses={licenses} />
