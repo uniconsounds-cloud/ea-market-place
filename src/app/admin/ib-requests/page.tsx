@@ -28,23 +28,24 @@ export default async function AdminIbRequestsPage() {
         redirect("/");
     }
 
-    // Fetch all profiles with IB status = 'pending', joined with their broker info
-    // We use inner join to get only profiles that have a broker
+    // Fetch all pending ib_memberships, joined with profiles and brokers
     const { data: ibRequests, error } = await supabase
-        .from("profiles")
+        .from("ib_memberships")
         .select(`
             id,
-            full_name,
-            ib_status,
-            ib_account_number,
-            ib_broker_id,
+            verification_data,
+            status,
             updated_at,
-            brokers!profiles_ib_broker_id_fkey (
+            profiles (
+                full_name,
+                email
+            ),
+            brokers (
                 name,
                 ib_link
             )
         `)
-        .eq("ib_status", "pending")
+        .eq("status", "pending")
         .order("updated_at", { ascending: false });
 
     return <AdminIbRequestsClient initialRequests={ibRequests || []} />;

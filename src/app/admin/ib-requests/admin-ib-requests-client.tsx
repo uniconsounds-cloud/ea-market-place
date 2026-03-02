@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { format, addMonths, addYears } from "date-fns";
+import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import {
     Table,
@@ -13,21 +13,24 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, Link as LinkIcon, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 type IBRequest = {
-    id: string; // Profile ID
-    full_name: string | null;
-    ib_status: string;
-    ib_account_number: string | null;
-    ib_broker_id: string | null;
+    id: string; // ib_memberships ID
+    verification_data: string | null;
+    status: string;
     updated_at: string;
+    profiles: {
+        full_name: string | null;
+        email: string | null;
+    } | {
+        full_name: string | null;
+        email: string | null;
+    }[] | null;
     brokers: {
         name: string;
         ib_link: string;
@@ -44,26 +47,18 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
     // Approval Modal State
     const [isApproveOpen, setIsApproveOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<IBRequest | null>(null);
-    const [expiryOption, setExpiryOption] = useState("1month");
-    const [customDate, setCustomDate] = useState("");
 
-    const handleAction = async (id: string, action: "approve" | "reject", eParams?: any) => {
+    const handleAction = async (id: string, action: "approve" | "reject") => {
         setIsLoading(true);
         try {
             const { data: sessionData } = await supabase.auth.getSession();
             if (!sessionData?.session) throw new Error("Unauthorized");
 
             const newStatus = action === "approve" ? "approved" : "rejected";
-            const updates: any = { ib_status: newStatus };
-
-            if (action === "approve") {
-                if (!eParams?.expiryDate) throw new Error("Expiry date is required");
-                updates.ib_expiry_date = eParams.expiryDate;
-            }
 
             const { error } = await supabase
-                .from("profiles")
-                .update(updates)
+                .from("ib_memberships")
+                .update({ status: newStatus })
                 .eq("id", id);
 
             if (error) throw new Error(error.message);
@@ -72,7 +67,7 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
             setRequests(requests.filter(r => r.id !== id));
 
             if (action === "approve") {
-                toast.success("อนุมัติสำเร็จ", { description: "ผู้ใช้นี้ได้รับสิทธิ์ IB แล้ว" });
+                toast.success("อนุมัติสำเร็จ", { description: "ผู้ใช้นี้ได้รับสิทธิ์ IB ของโบรกเกอร์นี้แล้ว" });
                 setIsApproveOpen(false);
             } else {
                 toast.success("ปฏิเสธสำเร็จ", { description: "คำขอ IB ถูกปฏิเสธแล้ว" });
@@ -93,37 +88,35 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
 
     const openApproveModal = (request: IBRequest) => {
         setSelectedRequest(request);
-        // Default to +1 month setup
-        setCustomDate(format(addMonths(new Date(), 1), "yyyy-MM-dd"));
-        setExpiryOption("1month");
         setIsApproveOpen(true);
     };
 
     const submitApproval = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRequest) return;
-
-        let finalExpiryDate: Date;
-        const now = new Date();
-
-        if (expiryOption === "1month") {
-            finalExpiryDate = addMonths(now, 1);
-        } else if (expiryOption === "6months") {
-            finalExpiryDate = addMonths(now, 6);
-        } else if (expiryOption === "1year") {
-            finalExpiryDate = addYears(now, 1);
-        } else {
-            // custom
-            finalExpiryDate = new Date(customDate);
-        }
-
-        handleAction(selectedRequest.id, "approve", { expiryDate: finalExpiryDate.toISOString() });
+        handleAction(selectedRequest.id, "approve");
     };
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast.success("คัดลอกเลขบัญชีสำเร็จ");
+        toast.success("คัดลอกข้อมูลสำเร็จ");
     };
+
+    const getName = (req: IBRequest) => {
+        if (!req.profiles) return 'ไม่ได้ระบุชื่อ';
+        if (Array.isArray(req.profiles)) {
+            return req.profiles[0]?.full_name || req.profiles[0]?.email || 'ไม่ได้ระบุชื่อ';
+        }
+        return req.profiles.full_name || req.profiles.email || 'ไม่ได้ระบุชื่อ';
+    };
+
+    const getBrokerName = (req: IBRequest) => {
+        if (!req.brokers) return 'ไม่พบข้อมูลโบรกเกอร์';
+        if (Array.isArray(req.brokers)) {
+            return req.brokers[0]?.name || 'ไม่พบข้อมูลโบรกเกอร์';
+        }
+        return req.brokers.name || 'ไม่พบข้อมูลโบรกเกอร์';
+    }
 
     return (
         <div className="space-y-6">
@@ -150,7 +143,7 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                 <TableRow>
                                     <TableHead className="w-[200px]">ลูกค้า</TableHead>
                                     <TableHead>โบรกเกอร์ (Broker)</TableHead>
-                                    <TableHead>เลขบัญชีเทรด (Account)</TableHead>
+                                    <TableHead>ข้อมูลรอยืนยัน</TableHead>
                                     <TableHead className="w-[180px]">วันที่ขอสิทธิ์</TableHead>
                                     <TableHead className="text-right w-[180px]">การจัดการ</TableHead>
                                 </TableRow>
@@ -169,27 +162,23 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                     requests.map((request) => (
                                         <TableRow key={request.id} className="hover:bg-muted/5">
                                             <TableCell className="font-medium">
-                                                {request.full_name || 'ไม่ได้ระบุชื่อ'}
-                                                <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">{request.id}</div>
+                                                {getName(request)}
+                                                <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {request.id.substring(0, 8)}...</div>
                                             </TableCell>
                                             <TableCell>
-                                                {request.brokers ? (
-                                                    <span className="font-semibold text-primary/80">
-                                                        {Array.isArray(request.brokers) ? request.brokers[0]?.name : request.brokers.name}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic text-sm">ไม่พบข้อมูลโบรกเกอร์</span>
-                                                )}
+                                                <span className="font-semibold text-primary/80">
+                                                    {getBrokerName(request)}
+                                                </span>
                                             </TableCell>
                                             <TableCell>
-                                                {request.ib_account_number ? (
+                                                {request.verification_data ? (
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-sm">{request.ib_account_number}</span>
+                                                        <span className="font-mono text-sm">{request.verification_data}</span>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-5 w-5 shrink-0 hover:bg-muted/50"
-                                                            onClick={() => copyToClipboard(request.ib_account_number as string)}
+                                                            onClick={() => copyToClipboard(request.verification_data as string)}
                                                         >
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                                                         </Button>
@@ -207,7 +196,7 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                                         variant="outline"
                                                         size="sm"
                                                         className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10"
-                                                        onClick={() => handleRejectClick(request.id, request.full_name || "")}
+                                                        onClick={() => handleRejectClick(request.id, getName(request))}
                                                         disabled={isLoading}
                                                     >
                                                         <XCircle className="w-3.5 h-3.5 mr-1" /> ปฏิเสธ
@@ -236,71 +225,19 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
             <Dialog open={isApproveOpen} onOpenChange={setIsApproveOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>อนุมัติคำขอสิทธิ์ IB</DialogTitle>
+                        <DialogTitle>ยืนยันการอนุมัติสิทธิ์ IB</DialogTitle>
                     </DialogHeader>
                     {selectedRequest && (
                         <form onSubmit={submitApproval} className="space-y-6 pt-2">
-                            <div className="bg-muted/50 p-3 rounded-md border border-border/50 text-sm space-y-1.5">
-                                <p><span className="text-muted-foreground mr-2">ลูกค้า:</span> <strong>{selectedRequest.full_name || 'ไม่มีชื่อ'}</strong></p>
-                                <p><span className="text-muted-foreground mr-2">โบรกเกอร์:</span> <strong>{selectedRequest.brokers ? (Array.isArray(selectedRequest.brokers) ? selectedRequest.brokers[0]?.name : selectedRequest.brokers.name) : '-'}</strong></p>
-                                <p><span className="text-muted-foreground mr-2">เลขบัญชีเทรด:</span> <strong className="font-mono">{selectedRequest.ib_account_number || '-'}</strong></p>
+                            <div className="bg-muted/50 p-4 rounded-md border border-border/50 text-sm space-y-2">
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ลูกค้า:</span> <strong>{getName(selectedRequest)}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">โบรกเกอร์:</span> <strong>{getBrokerName(selectedRequest)}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ข้อมูลยืนยัน:</span> <strong className="font-mono text-primary">{selectedRequest.verification_data || '-'}</strong></p>
                             </div>
 
-                            <div className="space-y-3">
-                                <Label>ระยะเวลาอนุมัติ (วันหมดอายุสิทธิ์ IB)</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        type="button"
-                                        variant={expiryOption === "1month" ? "default" : "outline"}
-                                        className={expiryOption === "1month" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                        onClick={() => setExpiryOption("1month")}
-                                    >
-                                        1 เดือน
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant={expiryOption === "6months" ? "default" : "outline"}
-                                        className={expiryOption === "6months" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                        onClick={() => setExpiryOption("6months")}
-                                    >
-                                        6 เดือน
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant={expiryOption === "1year" ? "default" : "outline"}
-                                        className={expiryOption === "1year" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                        onClick={() => setExpiryOption("1year")}
-                                    >
-                                        1 ปี
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant={expiryOption === "custom" ? "default" : "outline"}
-                                        className={expiryOption === "custom" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                        onClick={() => setExpiryOption("custom")}
-                                    >
-                                        กำหนดเอง
-                                    </Button>
-                                </div>
-
-                                {expiryOption === "custom" && (
-                                    <div className="pt-2">
-                                        <Label htmlFor="customDate" className="text-muted-foreground text-xs mb-1.5 block">เลือกวันที่หมดอายุ</Label>
-                                        <div className="relative">
-                                            <Input
-                                                id="customDate"
-                                                type="date"
-                                                value={customDate}
-                                                onChange={(e) => setCustomDate(e.target.value)}
-                                                className="pl-9"
-                                                min={format(new Date(), "yyyy-MM-dd")}
-                                                required={expiryOption === "custom"}
-                                            />
-                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                การกดอนุมัติจะเป็นการให้สิทธิ์ผู้ใช้รายนี้สำหรับโบรกเกอร์ที่ระบุไว้ เพื่อนำไปใช้เป็นส่วนลด 100% ในช่องทางการสั่งซื้อ
+                            </p>
 
                             <Button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white" disabled={isLoading}>
                                 {isLoading ? "กำลังดำเนินการ..." : "ยืนยันการอนุมัติสิทธิ์ IB"}

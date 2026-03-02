@@ -13,12 +13,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Check, X, Search, FileText, Loader2, Filter, Zap } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar } from 'lucide-react';
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+
+    // IB Approval Modal State
+    const [approveModalOpen, setApproveModalOpen] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const [expiryOption, setExpiryOption] = useState("6months");
+    const [customDate, setCustomDate] = useState("");
 
     // Filter & Sort State
     const [statusFilter, setStatusFilter] = useState('all');
@@ -67,9 +75,46 @@ export default function AdminOrdersPage() {
         setLoading(false);
     };
 
-    const handleApprove = async (order: any) => {
-        if (!confirm('ยืนยันอนุมัติคำสั่งซื้อนี้? License จะถูกสร้าง/ต่ออายุทันที')) return;
+    const handleApproveClick = (order: any) => {
+        if (order.is_ib_request) {
+            setSelectedOrder(order);
+            const date = new Date();
+            date.setMonth(date.getMonth() + 6);
+            setCustomDate(date.toISOString().split('T')[0]);
+            setExpiryOption("6months");
+            setApproveModalOpen(true);
+        } else {
+            handleApprove(order);
+        }
+    };
 
+    const submitIbApproval = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedOrder) return;
+
+        let finalExpiryDate: Date;
+        const now = new Date();
+
+        if (expiryOption === "1month") {
+            now.setMonth(now.getMonth() + 1);
+            finalExpiryDate = now;
+        } else if (expiryOption === "6months") {
+            now.setMonth(now.getMonth() + 6);
+            finalExpiryDate = now;
+        } else if (expiryOption === "1year") {
+            now.setFullYear(now.getFullYear() + 1);
+            finalExpiryDate = now;
+        } else {
+            finalExpiryDate = new Date(customDate);
+        }
+
+        handleApprove(selectedOrder, finalExpiryDate);
+    };
+
+    const handleApprove = async (order: any, customExpiryDate?: Date) => {
+        if (!customExpiryDate && !confirm('ยืนยันอนุมัติคำสั่งซื้อนี้? License จะถูกสร้าง/ต่ออายุทันที')) return;
+
+        setApproveModalOpen(false);
         setProcessingId(order.id);
         try {
             const { error: orderError } = await supabase
@@ -167,17 +212,11 @@ export default function AdminOrdersPage() {
             }
 
             if (order.is_ib_request) {
-                // If it's an IB request, license expires on their IB Expiry Date
-                const { data: profileData } = await supabase
-                    .from('profiles')
-                    .select('ib_expiry_date')
-                    .eq('id', order.user_id)
-                    .single();
-
-                if (profileData && profileData.ib_expiry_date) {
-                    expiryDate = new Date(profileData.ib_expiry_date).toISOString();
+                // IB Request gets the admin-specified expiry date
+                if (customExpiryDate) {
+                    expiryDate = customExpiryDate.toISOString();
                 } else {
-                    // Fallback to 1 year if expiry date is somehow missing 
+                    // Fallback to 1 year if somehow custom date is missing
                     const date = new Date(startDate);
                     date.setFullYear(date.getFullYear() + 1);
                     expiryDate = date.toISOString();
@@ -449,7 +488,7 @@ export default function AdminOrdersPage() {
                                             <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0 shrink-0">
                                                 <Button
                                                     className="w-full md:w-32 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20"
-                                                    onClick={() => handleApprove(order)}
+                                                    onClick={() => handleApproveClick(order)}
                                                     disabled={!!processingId}
                                                     size="sm"
                                                 >
@@ -479,6 +518,84 @@ export default function AdminOrdersPage() {
                     )}
                 </TabsContent>
             </Tabs>
+
+            {/* IB Approve Modal */}
+            <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>ยืนยันอนุมัติคำสั่งซื้อ (สิทธิ์ IB)</DialogTitle>
+                    </DialogHeader>
+                    {selectedOrder && (
+                        <form onSubmit={submitIbApproval} className="space-y-6 pt-2">
+                            <div className="bg-muted/50 p-4 rounded-md border border-border/50 text-sm space-y-2">
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ลูกค้า:</span> <strong>{selectedOrder.profiles?.full_name || selectedOrder.profiles?.email || 'Guest'}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">สินค้า:</span> <strong>{selectedOrder.products?.name}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">Account Port:</span> <strong className="font-mono text-primary">{selectedOrder.account_number || '-'}</strong></p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Label>ระยะเวลาอนุมัติ License (วันหมดอายุสิทธิ์)</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        type="button"
+                                        variant={expiryOption === "1month" ? "default" : "outline"}
+                                        className={expiryOption === "1month" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                        onClick={() => setExpiryOption("1month")}
+                                    >
+                                        1 เดือน
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={expiryOption === "6months" ? "default" : "outline"}
+                                        className={expiryOption === "6months" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                        onClick={() => setExpiryOption("6months")}
+                                    >
+                                        6 เดือน
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={expiryOption === "1year" ? "default" : "outline"}
+                                        className={expiryOption === "1year" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                        onClick={() => setExpiryOption("1year")}
+                                    >
+                                        1 ปี
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={expiryOption === "custom" ? "default" : "outline"}
+                                        className={expiryOption === "custom" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                        onClick={() => setExpiryOption("custom")}
+                                    >
+                                        กำหนดเอง
+                                    </Button>
+                                </div>
+
+                                {expiryOption === "custom" && (
+                                    <div className="pt-2">
+                                        <Label htmlFor="customDate" className="text-muted-foreground text-xs mb-1.5 block">เลือกวันที่หมดอายุ</Label>
+                                        <div className="relative">
+                                            <Input
+                                                id="customDate"
+                                                type="date"
+                                                value={customDate}
+                                                onChange={(e) => setCustomDate(e.target.value)}
+                                                className="pl-9"
+                                                min={new Date().toISOString().split('T')[0]}
+                                                required={expiryOption === "custom"}
+                                            />
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <Button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white" disabled={!!processingId}>
+                                {!!processingId ? "กำลังดำเนินการ..." : "ยืนยันการสร้าง/ต่ออายุ License"}
+                            </Button>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

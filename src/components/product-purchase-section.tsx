@@ -28,8 +28,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const [isRenewal, setIsRenewal] = useState(false);
 
     // IB Status
-    const [ibStatus, setIbStatus] = useState<'none' | 'pending' | 'approved' | 'rejected' | 'expired'>('none');
-    const [ibAccountNumber, setIbAccountNumber] = useState<string | null>(null);
+    const [ibStatus, setIbStatus] = useState<'none' | 'pending' | 'approved'>('none');
     const [useIbQuota, setUseIbQuota] = useState(true);
 
     // Fetch user licenses and orders on mount
@@ -57,18 +56,20 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
                 if (orders) setUserOrders(orders);
 
-                // 3. Fetch IB Status
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('ib_status, ib_account_number')
-                    .eq('id', user.id)
-                    .single();
+                // 3. Fetch IB Memberships
+                const { data: memberships } = await supabase
+                    .from('ib_memberships')
+                    .select('status, broker_id')
+                    .eq('user_id', user.id);
 
-                if (profile) {
-                    setIbStatus(profile.ib_status as any);
-                    setIbAccountNumber(profile.ib_account_number);
-                    if (profile.ib_status === 'approved' && profile.ib_account_number) {
-                        setAccountNumber(profile.ib_account_number);
+                if (memberships && memberships.length > 0) {
+                    const hasApproved = memberships.some(m => m.status === 'approved');
+                    if (hasApproved) {
+                        setIbStatus('approved');
+                    } else if (memberships.some(m => m.status === 'pending')) {
+                        setIbStatus('pending');
+                    } else {
+                        setIbStatus('none');
                     }
                 }
             }
@@ -154,15 +155,15 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             if (user) {
                 // 1. Check for duplicate License (SKIP IF RENEWAL)
                 if (!isRenewal) {
-                    const { data: existingLicense } = await supabase
+                    const { data: existingLicenses } = await supabase
                         .from('licenses')
                         .select('id')
                         .eq('user_id', user.id)
                         .eq('product_id', product.id)
                         .eq('account_number', accountNumber.trim())
-                        .single();
+                        .limit(1);
 
-                    if (existingLicense) {
+                    if (existingLicenses && existingLicenses.length > 0) {
                         alert('คุณมี License สำหรับหมายเลขพอร์ตนี้แล้ว (สามารถเลือกต่ออายุได้)');
                         setIsRenewal(true);
                         setLoading(false);
@@ -194,7 +195,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 accountNumber: accountNumber.trim()
             });
 
-            if (ibStatus === 'approved' && useIbQuota && accountNumber.trim() === ibAccountNumber) {
+            if (ibStatus === 'approved' && useIbQuota) {
                 queryParams.append('isIbRequest', 'true');
             }
 
@@ -308,11 +309,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                 checked={useIbQuota}
                                 onChange={() => {
                                     setUseIbQuota(true);
-                                    if (ibAccountNumber) setAccountNumber(ibAccountNumber);
                                 }}
                                 className="accent-primary"
                             />
-                            <span>ขอสิทธิ์ใช้งานฟรี (บัญชี IB: {ibAccountNumber})</span>
+                            <span>ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
                             <input
@@ -321,11 +321,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                 checked={!useIbQuota}
                                 onChange={() => {
                                     setUseIbQuota(false);
-                                    if (accountNumber === ibAccountNumber) setAccountNumber('');
                                 }}
                                 className="accent-primary"
                             />
-                            <span>เช่า/ซื้อ ปกติ (สำหรับบัญชีอื่น)</span>
+                            <span>เช่า/ซื้อ ปกติ</span>
                         </label>
                     </div>
                 </div>
@@ -342,7 +341,6 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         placeholder="Ex. 12345678"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
-                        disabled={ibStatus === 'approved' && useIbQuota}
                         className={`bg-background/50 border-input font-mono text-lg ${isRenewal ? 'border-green-500 ring-1 ring-green-500/50' : ''}`}
                     />
                     {isRenewal && (

@@ -62,16 +62,16 @@ function CheckoutContent({ productId }: { productId: string }) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data: license } = await supabase
+            const { data: licenses } = await supabase
                 .from('licenses')
                 .select('*')
                 .eq('user_id', user.id)
                 .eq('product_id', productId)
                 .eq('account_number', key)
-                .single();
+                .limit(1);
 
-            if (license) {
-                setCurrentLicense(license);
+            if (licenses && licenses.length > 0) {
+                setCurrentLicense(licenses[0]);
             }
         };
         checkLicense();
@@ -128,6 +128,20 @@ function CheckoutContent({ productId }: { productId: string }) {
             let slipUrl = null;
             if (!isIbRequest) {
                 slipUrl = await handleUpload(user.id);
+            } else {
+                // Verify user actually has an approved IB membership
+                const { data: memberships } = await supabase
+                    .from('ib_memberships')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('status', 'approved')
+                    .limit(1);
+
+                if (!memberships || memberships.length === 0) {
+                    alert('คุณไม่ได้รับสิทธิ์ IB กรุณายกเลิกและทำรายการใหม่');
+                    setSubmitting(false);
+                    return;
+                }
             }
 
             // 1.5 GLOBAL VALIDATION AGAIN (Security Check)
