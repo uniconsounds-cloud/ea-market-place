@@ -83,12 +83,21 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 // 4. Fetch Legacy Fallback explicitly just in case they haven't been mapped
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('ib_account_number')
+                    .select('ib_account_number, ib_status')
                     .eq('id', user.id)
                     .single();
 
                 if (profile?.ib_account_number && !fetchedIbAccounts.includes(profile.ib_account_number)) {
                     fetchedIbAccounts.push(profile.ib_account_number);
+                }
+
+                // If there were no approved new memberships, fallback to legacy profile status
+                if (!memberships || memberships.length === 0 || !memberships.some(m => m.status === 'approved')) {
+                    if (profile?.ib_status === 'approved') {
+                        setIbStatus('approved');
+                    } else if (profile?.ib_status === 'pending') {
+                        setIbStatus('pending');
+                    }
                 }
 
                 setIbAccounts(fetchedIbAccounts);
