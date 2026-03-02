@@ -151,12 +151,26 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             // 1. Quick check against loaded user active licenses for this product
             const existingUserLicense = userLicenses.find(l => l.account_number === port);
             if (existingUserLicense) {
+                const isIbPort = ibAccounts.includes(port);
+
                 if (ibStatus === 'approved' && useIbQuota) {
-                    setPortValidationMsg({ text: 'คุณมีสิทธิ์ใช้งานสำหรับพอร์ตนี้อยู่แล้ว ไม่สามารถขอสิทธิ์ฟรีซ้ำได้', type: 'error' });
-                    setIsRenewal(false); // Don't show renewal UI for IB
+                    // Try to renew as IB
+                    if (!isIbPort) {
+                        setPortValidationMsg({ text: 'พอร์ตนี้เป็นพอร์ตเช่าซื้อปกติ ไม่สามารถขอใช้สิทธิ์ IB ได้', type: 'error' });
+                        setIsRenewal(false);
+                    } else {
+                        setPortValidationMsg({ text: 'คุณมีสิทธิ์ใช้งานสำหรับพอร์ตนี้อยู่แล้ว ไม่สามารถขอสิทธิ์ฟรีซ้ำได้', type: 'error' });
+                        setIsRenewal(false); // Can't renew IB from client
+                    }
                 } else {
-                    setIsRenewal(true);
-                    setPortValidationMsg({ text: 'ต่ออายุ License เดิม', type: 'success' });
+                    // Try to renew as Normal
+                    if (isIbPort) {
+                        setPortValidationMsg({ text: 'พอร์ตนี้เป็นพอร์ตสำหรับโควต้า IB ไม่สามารถต่ออายุแบบปกติได้', type: 'error' });
+                        setIsRenewal(false);
+                    } else {
+                        setIsRenewal(true);
+                        setPortValidationMsg({ text: 'ต่ออายุ License เดิม', type: 'success' });
+                    }
                 }
                 return;
             }
@@ -412,13 +426,13 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         <div>
                             <span className="text-muted-foreground block mb-0.5">วันหมดอายุปัจจุบัน:</span>
                             <span className="font-semibold text-foreground">
-                                {ibAccounts.includes(currentLicense.account_number) ? (currentLicense.expiry_date ? formatDate(currentLicense.expiry_date) : 'ไม่มีข้อมูลวันหมดอายุ') : (currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date))}
+                                {currentLicense.type === 'lifetime' ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
                             </span>
                         </div>
                         <div className="text-right">
                             <span className="text-muted-foreground block mb-0.5">หมดอายุหลังต่ออายุ:</span>
                             <span className="font-bold text-green-600 dark:text-green-500">
-                                {ibStatus === 'approved' && useIbQuota ? 'ประเมินสิทธิ์ฟรีโดย Admin' : calculateNewExpiry(currentLicense.expiry_date, selectedType)}
+                                {calculateNewExpiry(currentLicense.expiry_date, selectedType)}
                             </span>
                         </div>
                     </div>
