@@ -172,8 +172,29 @@ export function ProductIbBanner({ productId }: { productId: string }) {
 
     if (isLoading) return null;
 
-    // Do not show banner if they are already approved or pending
-    if (ibStatus === 'approved' || ibStatus === 'pending') return null;
+    // Do not show banner if they are already approved
+    if (ibStatus === 'approved') return null;
+
+    if (ibStatus === 'pending') {
+        return (
+            <Card className="mb-8 border-orange-500/50 bg-gradient-to-r from-orange-500/10 via-background to-background shadow-sm overflow-hidden relative">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
+                <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                    <div className="bg-orange-500/20 p-3 rounded-full shrink-0">
+                        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left">
+                        <h3 className="text-lg font-bold text-foreground mb-1">
+                            คำขอสิทธิ์ IB ของท่านกำลังรอการตรวจสอบ
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            ทีมงานกำลังตรวจสอบข้อมูลหมายเลขพอร์ตของคุณ โปรดรอการอนุมัติภายใน 24 ชั่วโมง
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card className="mb-8 border-primary/50 bg-gradient-to-r from-primary/10 via-background to-background shadow-sm overflow-hidden relative">
