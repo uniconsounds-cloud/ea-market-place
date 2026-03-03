@@ -439,7 +439,7 @@ export default function CustomerDetailsPage() {
                                                                         <Badge variant="secondary" className="text-[10px] h-5">{license.products?.platform || 'MT4'}</Badge>
                                                                         {license.is_ib && (
                                                                             <Badge variant="outline" className="text-[10px] h-5 bg-blue-500/10 text-blue-500 border-blue-500/20">
-                                                                                IB Port
+                                                                                IB {license.ib_broker_name || 'Port'}
                                                                             </Badge>
                                                                         )}
                                                                         <span>Account: <span className="font-mono text-foreground font-medium">{license.account_number}</span></span>
