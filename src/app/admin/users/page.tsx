@@ -57,20 +57,33 @@ export default function AdminUsersPage() {
                 .select('user_id')
                 .eq('is_active', true);
 
+            // Fetch IB Memberships to display broker names
+            const { data: ibMemberships } = await supabase
+                .from('ib_memberships')
+                .select('user_id, brokers(name)')
+                .eq('status', 'approved');
+
             // 3. Process & Merge Data
             const processedUsers = profiles?.map(profile => {
                 const userOrders = orders?.filter(o => o.user_id === profile.id) || [];
                 const userLicenses = licenses?.filter(l => l.user_id === profile.id) || [];
+                const userIbs = ibMemberships?.filter(ib => ib.user_id === profile.id) || [];
 
                 const totalSpent = userOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
                 const totalOrders = userOrders.length;
                 const activeProducts = userLicenses.length;
 
+                const ibBrokerNames = Array.from(new Set(userIbs.map(ib => {
+                    return Array.isArray((ib as any).brokers) ? (ib as any).brokers[0]?.name : (ib as any).brokers?.name;
+                }).filter(Boolean)));
+
                 return {
                     ...profile,
                     totalSpent,
                     totalOrders,
-                    activeProducts
+                    activeProducts,
+                    is_ib: ibBrokerNames.length > 0,
+                    ib_broker_names: ibBrokerNames
                 };
             }) || [];
 
@@ -200,7 +213,14 @@ export default function AdminUsersPage() {
                                 <TableRow key={user.id} className="hover:bg-muted/50">
                                     <TableCell>
                                         <Link href={`/admin/users/${user.id}`} className="flex flex-col hover:bg-muted/50 p-2 -m-2 rounded transition-colors group">
-                                            <span className="font-medium group-hover:text-primary transition-colors">{user.full_name || 'No Name'}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium group-hover:text-primary transition-colors">{user.full_name || 'No Name'}</span>
+                                                {user.is_ib && (
+                                                    <span className="inline-block px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded font-bold border border-blue-200 uppercase tracking-wide">
+                                                        IB {user.ib_broker_names.join(' / ')}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <span className="text-xs text-muted-foreground">{user.email || user.id}</span>
                                         </Link>
                                     </TableCell>
