@@ -63,13 +63,13 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 // 3. Fetch IB Memberships
                 const { data: memberships } = await supabase
                     .from('ib_memberships')
-                    .select('status, broker_id, account_number')
+                    .select('status, broker_id, verification_data')
                     .eq('user_id', user.id);
 
                 let fetchedIbAccounts: string[] = [];
 
                 if (memberships && memberships.length > 0) {
-                    fetchedIbAccounts = memberships.map(m => m.account_number).filter(Boolean);
+                    fetchedIbAccounts = memberships.map(m => m.verification_data).filter(Boolean);
                     const hasApproved = memberships.some(m => m.status === 'approved');
                     if (hasApproved) {
                         setIbStatus('approved');
