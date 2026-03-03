@@ -55,7 +55,23 @@ export default function AdminOrdersPage() {
         }
 
         if (data && data.length > 0) {
-            setOrders(data);
+            // Fetch IB Memberships to get the broker details for these orders
+            const userIds = Array.from(new Set(data.map(o => o.user_id).filter(Boolean)));
+            const { data: ibMemberships } = await supabase
+                .from('ib_memberships')
+                .select('user_id, verification_data, brokers(name)')
+                .in('user_id', userIds)
+                .eq('status', 'approved');
+
+            const mappedData = data.map(o => {
+                const matchedIb = ibMemberships?.find(ib => ib.user_id === o.user_id && ib.verification_data === o.account_number);
+                return {
+                    ...o,
+                    ib_broker_name: matchedIb ? (Array.isArray((matchedIb as any).brokers) ? (matchedIb as any).brokers[0]?.name : (matchedIb as any).brokers?.name) : undefined
+                };
+            });
+
+            setOrders(mappedData);
         } else {
             console.log('Main fetch returned empty. Trying raw fetch...');
             const { data: rawData } = await supabase
@@ -420,7 +436,7 @@ export default function AdminOrdersPage() {
                                             {order.is_ib_request ? (
                                                 <div className="text-xs text-blue-400 flex flex-col items-center justify-center p-2 text-center h-full bg-blue-500/10">
                                                     <Zap className="w-8 h-8 mb-2" />
-                                                    <span className="font-bold">IB Request</span>
+                                                    <span className="font-bold">IB {order.ib_broker_name || 'Request'}</span>
                                                     <span>(Free License)</span>
                                                 </div>
                                             ) : order.slip_url ? (
@@ -445,7 +461,7 @@ export default function AdminOrdersPage() {
                                                         {order.products?.name || 'Unknown Product'}
                                                         {order.is_ib_request && (
                                                             <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                                                                สิทธิ์ใช้งาน IB ฟรี
+                                                                คำขอสิทธิ์ IB {order.ib_broker_name || 'Customer'}
                                                             </span>
                                                         )}
                                                     </h3>

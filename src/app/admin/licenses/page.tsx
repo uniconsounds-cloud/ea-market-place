@@ -54,7 +54,7 @@ export default async function AdminLicensesPage() {
         // Fetch IB Memberships for these users
         const { data: ibMemberships } = await supabase
             .from('ib_memberships')
-            .select('user_id, account_number, status')
+            .select('user_id, verification_data, status, brokers(name)')
             .in('user_id', userIds)
             .eq('status', 'approved');
 
@@ -64,7 +64,10 @@ export default async function AdminLicensesPage() {
                 if (!ibMembershipsMap[ib.user_id]) {
                     ibMembershipsMap[ib.user_id] = [];
                 }
-                ibMembershipsMap[ib.user_id].push(ib);
+                ibMembershipsMap[ib.user_id].push({
+                    account_number: ib.verification_data,
+                    broker_name: Array.isArray((ib as any).brokers) ? (ib as any).brokers[0]?.name : (ib as any).brokers?.name || 'Customer'
+                });
             });
         }
     }
@@ -73,13 +76,15 @@ export default async function AdminLicensesPage() {
     const licenses = (rawLicenses || []).map(l => {
         // Check if this specific license port number is an approved IB port
         const userIbRecords = l.user_id ? ibMembershipsMap[l.user_id] || [] : [];
-        const isIbLicense = userIbRecords.some(r => r.account_number === l.account_number) ||
-            (profilesMap[l.user_id]?.ib_account_number === l.account_number);
+        const matchedIb = userIbRecords.find(r => r.account_number === l.account_number);
+
+        const isIbLicense = Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number === l.account_number);
 
         return {
             ...l,
             profiles: l.user_id ? profilesMap[l.user_id] : null,
-            is_ib: isIbLicense
+            is_ib: isIbLicense,
+            ib_broker_name: matchedIb ? matchedIb.broker_name : (profilesMap[l.user_id]?.ib_account_number === l.account_number ? 'Customer' : undefined)
         };
     });
 

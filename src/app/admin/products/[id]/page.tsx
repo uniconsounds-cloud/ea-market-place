@@ -51,6 +51,7 @@ export default function ProductFormPage() {
         created_at: string;
         type?: string;
         is_ib?: boolean;
+        ib_broker_name?: string;
         profiles?: {
             email: string;
             full_name: string;
@@ -171,7 +172,7 @@ export default function ProductFormPage() {
                 // Step 3.5: Fetch IB Memberships
                 const { data: ibMemberships } = await supabase
                     .from('ib_memberships')
-                    .select('user_id, account_number')
+                    .select('user_id, verification_data, brokers(name)')
                     .in('user_id', userIds)
                     .eq('status', 'approved');
 
@@ -179,7 +180,10 @@ export default function ProductFormPage() {
                 if (ibMemberships) {
                     ibMemberships.forEach(ib => {
                         if (!ibMap.has(ib.user_id)) ibMap.set(ib.user_id, []);
-                        ibMap.get(ib.user_id).push(ib.account_number);
+                        ibMap.get(ib.user_id).push({
+                            account_number: ib.verification_data,
+                            broker_name: Array.isArray((ib as any).brokers) ? (ib as any).brokers[0]?.name : (ib as any).brokers?.name || 'Customer'
+                        });
                     });
                 }
 
@@ -189,11 +193,14 @@ export default function ProductFormPage() {
                 rawLicenses.forEach((l: any) => {
                     const profileData = profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown', ib_account_number: null };
                     const userIbAccounts = ibMap.get(l.user_id) || [];
-                    const isIbPort = userIbAccounts.includes(l.account_number) || (profileData.ib_account_number === l.account_number);
+                    const matchedIb = userIbAccounts.find((a: any) => a.account_number === l.account_number);
+
+                    const isIbPort = Boolean(matchedIb) || (profileData.ib_account_number === l.account_number);
 
                     licensesData.push({
                         ...l,
                         is_ib: isIbPort,
+                        ib_broker_name: matchedIb ? matchedIb.broker_name : (profileData.ib_account_number === l.account_number ? 'Customer' : undefined),
                         profiles: profileData
                     });
                 });
@@ -611,7 +618,7 @@ export default function ProductFormPage() {
                                                             </div>
                                                             {license.is_ib && (
                                                                 <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded font-bold border border-blue-200 uppercase tracking-wide">
-                                                                    IB Customer
+                                                                    IB {license.ib_broker_name || 'Customer'}
                                                                 </span>
                                                             )}
                                                         </td>
@@ -801,7 +808,7 @@ export default function ProductFormPage() {
                                 {editingLicense.is_ib ? (
                                     <div className="space-y-3 pt-2 border-t border-border">
                                         <Label className="flex items-center gap-2 text-blue-600 font-bold">
-                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB Customer)
+                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB {editingLicense.ib_broker_name || 'Customer'})
                                         </Label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <Button

@@ -27,6 +27,7 @@ interface ProductItem {
     };
     source: 'license' | 'order';
     is_ib?: boolean;
+    ib_broker_name?: string;
 }
 
 interface GroupedProduct {
@@ -105,13 +106,16 @@ export default function DashboardPage() {
 
             if (licensesData) {
                 licensesData.forEach((l: any) => {
-                    const isIbLicense = (ibData || []).some((ib: any) => String(ib.verification_data).trim() === String(l.account_number).trim()) ||
-                        (legacyIbAccount && String(legacyIbAccount).trim() === String(l.account_number).trim());
+                    const matchedIb = (ibData || []).find((ib: any) => String(ib.verification_data).trim() === String(l.account_number).trim());
+                    const isIbLicense = Boolean(matchedIb) || (legacyIbAccount && String(legacyIbAccount).trim() === String(l.account_number).trim());
+
+                    const brokerName = Array.isArray((matchedIb as any)?.brokers) ? (matchedIb as any)?.brokers[0]?.name : (matchedIb as any)?.brokers?.name;
 
                     allItems.push({
                         ...l,
                         source: 'license',
-                        is_ib: isIbLicense
+                        is_ib: isIbLicense,
+                        ib_broker_name: brokerName
                     });
                 });
             }
@@ -378,7 +382,9 @@ export default function DashboardPage() {
                                                                 </div>
                                                                 <div className="flex items-center gap-2 mt-0.5">
                                                                     {item.is_ib && (
-                                                                        <Badge variant="outline" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20 uppercase tracking-wider">IB Customer</Badge>
+                                                                        <Badge variant="outline" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20 uppercase tracking-wider">
+                                                                            IB {item.ib_broker_name || 'Customer'}
+                                                                        </Badge>
                                                                     )}
                                                                     <div className="text-xs text-muted-foreground capitalize">
                                                                         {item.type === 'monthly' ? 'เช่ารายเดือน' :

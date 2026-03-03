@@ -33,7 +33,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     // IB Status
     const [ibStatus, setIbStatus] = useState<'none' | 'pending' | 'approved'>('none');
     const [useIbQuota, setUseIbQuota] = useState(true);
-    const [ibAccounts, setIbAccounts] = useState<string[]>([]);
+    const [ibAccounts, setIbAccounts] = useState<Record<string, string>>({});
 
     // Fetch user licenses and orders on mount
     useEffect(() => {
@@ -63,13 +63,18 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 // 3. Fetch IB Memberships
                 const { data: memberships } = await supabase
                     .from('ib_memberships')
-                    .select('status, broker_id, verification_data')
+                    .select('status, broker_id, verification_data, brokers(name)')
                     .eq('user_id', user.id);
 
-                let fetchedIbAccounts: string[] = [];
+                let fetchedIbAccounts: Record<string, string> = {};
 
                 if (memberships && memberships.length > 0) {
-                    fetchedIbAccounts = memberships.map(m => m.verification_data).filter(Boolean);
+                    memberships.forEach(m => {
+                        if (m.verification_data) {
+                            fetchedIbAccounts[m.verification_data] = Array.isArray((m as any).brokers) ? (m as any).brokers[0]?.name : (m as any).brokers?.name || 'Customer';
+                        }
+                    });
+
                     const hasApproved = memberships.some(m => m.status === 'approved');
                     if (hasApproved) {
                         setIbStatus('approved');
@@ -87,8 +92,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                     .eq('id', user.id)
                     .single();
 
-                if (profile?.ib_account_number && !fetchedIbAccounts.includes(profile.ib_account_number)) {
-                    fetchedIbAccounts.push(profile.ib_account_number);
+                if (profile?.ib_account_number && !fetchedIbAccounts[profile.ib_account_number]) {
+                    fetchedIbAccounts[profile.ib_account_number] = 'Customer';
                 }
 
                 // If there were no approved new memberships, fallback to legacy profile status
@@ -151,7 +156,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             // 1. Quick check against loaded user active licenses for this product
             const existingUserLicense = userLicenses.find(l => l.account_number === port);
             if (existingUserLicense) {
-                const isIbPort = ibAccounts.includes(port);
+                const isIbPort = !!ibAccounts[port];
 
                 if (ibStatus === 'approved' && useIbQuota) {
                     // Try to renew as IB
@@ -285,9 +290,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                     <div className="space-y-2">
                         {/* Active Licenses */}
                         {userLicenses
-                            .filter(license => (ibStatus === 'approved' && useIbQuota) ? ibAccounts.includes(license.account_number) : !ibAccounts.includes(license.account_number))
+                            .filter(license => (ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[license.account_number] : !ibAccounts[license.account_number])
                             .map((license) => {
-                                const isIbPort = ibAccounts.includes(license.account_number);
+                                const isIbPort = !!ibAccounts[license.account_number];
+                                const brokerName = ibAccounts[license.account_number];
                                 const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
 
                                 return (
@@ -307,7 +313,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
                                                     {isIbPort && (
                                                         <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                                            IB Customer
+                                                            IB {brokerName}
                                                         </span>
                                                     )}
 
@@ -327,9 +333,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
                         {/* Pending Orders */}
                         {userOrders
-                            .filter(order => (ibStatus === 'approved' && useIbQuota) ? ibAccounts.includes(order.account_number) : !ibAccounts.includes(order.account_number))
+                            .filter(order => (ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[order.account_number] : !ibAccounts[order.account_number])
                             .map((order) => {
-                                const isIbPort = ibAccounts.includes(order.account_number);
+                                const isIbPort = !!ibAccounts[order.account_number];
                                 return (
                                     <div
                                         key={`order-${order.id}`}
@@ -428,7 +434,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         <div>
                             <span className="text-muted-foreground block mb-0.5">วันหมดอายุปัจจุบัน:</span>
                             <span className="font-semibold text-foreground">
-                                {(!ibAccounts.includes(currentLicense.account_number) && currentLicense.type === 'lifetime') ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
+                                {(!ibAccounts[currentLicense.account_number] && currentLicense.type === 'lifetime') ? 'ตลอดชีพ' : formatDate(currentLicense.expiry_date)}
                             </span>
                         </div>
                         <div className="text-right">

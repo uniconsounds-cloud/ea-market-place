@@ -76,11 +76,18 @@ export default function CustomerDetailsPage() {
             // 1.5 Fetch IB Memberships
             const { data: ibData } = await supabase
                 .from('ib_memberships')
-                .select('account_number')
+                .select('verification_data, brokers(name)')
                 .eq('user_id', id)
                 .eq('status', 'approved');
 
-            const approvedIbAccounts = ibData?.map(ib => ib.account_number) || [];
+            let approvedIbAccounts: Record<string, string> = {};
+            if (ibData) {
+                ibData.forEach(ib => {
+                    if (ib.verification_data) {
+                        approvedIbAccounts[ib.verification_data] = Array.isArray((ib as any).brokers) ? (ib as any).brokers[0]?.name : (ib as any).brokers?.name || 'Customer';
+                    }
+                });
+            }
 
             // 2. Fetch Licenses (Active & Expired)
             // Note: We need product details for display
@@ -96,7 +103,8 @@ export default function CustomerDetailsPage() {
             // Map IB ports
             const mappedLicenses = (rawLicenses || []).map((l: any) => ({
                 ...l,
-                is_ib: approvedIbAccounts.includes(l.account_number) || (profileData?.ib_account_number === l.account_number)
+                is_ib: !!approvedIbAccounts[l.account_number] || (profileData?.ib_account_number === l.account_number),
+                ib_broker_name: approvedIbAccounts[l.account_number] || (profileData?.ib_account_number === l.account_number ? 'Customer' : undefined)
             }));
 
             mappedLicenses.forEach((l: any) => {
@@ -645,7 +653,7 @@ export default function CustomerDetailsPage() {
                                 {editingLicense.is_ib ? (
                                     <div className="space-y-3 pt-2 border-t border-border">
                                         <Label className="flex items-center gap-2 text-blue-600 font-bold">
-                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB Customer)
+                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB {editingLicense.ib_broker_name || 'Customer'})
                                         </Label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <Button
