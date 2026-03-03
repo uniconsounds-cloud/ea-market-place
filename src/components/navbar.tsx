@@ -19,6 +19,7 @@ export function Navbar() {
     const router = useRouter();
     const [user, setUser] = useState<any>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isIbRole, setIsIbRole] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -26,11 +27,23 @@ export function Navbar() {
         const fetchUserData = async (sessionUser: any) => {
             if (sessionUser) {
                 setUser(sessionUser);
-                const { data: profile } = await supabase.from('profiles').select('role').eq('id', sessionUser.id).single();
+                const { data: profile } = await supabase.from('profiles').select('role, ib_account_number').eq('id', sessionUser.id).single();
                 setIsAdmin(profile?.role === 'admin');
+
+                // Check if they are an active IB (either legacy property or active membership)
+                let ibStatus = !!profile?.ib_account_number;
+                if (!ibStatus) {
+                    const { count } = await supabase.from('ib_memberships')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('user_id', sessionUser.id)
+                        .eq('status', 'approved');
+                    ibStatus = (count ?? 0) > 0;
+                }
+                setIsIbRole(ibStatus);
             } else {
                 setUser(null);
                 setIsAdmin(false);
+                setIsIbRole(false);
             }
             setLoading(false);
         };
@@ -59,6 +72,7 @@ export function Navbar() {
         // 1. Immediate UI update
         setUser(null);
         setIsAdmin(false);
+        setIsIbRole(false);
 
         // 2. Perform actua logout
         await supabase.auth.signOut();
@@ -98,8 +112,13 @@ export function Navbar() {
                     ) : user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="rounded-full bg-secondary/50">
+                                <Button variant="ghost" size="icon" className="rounded-full bg-secondary/50 relative">
                                     <User className="h-5 w-5" />
+                                    {isIbRole && (
+                                        <span className="absolute -top-1 -right-1 bg-gradient-to-br from-blue-500 to-indigo-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-md border border-background">
+                                            IB
+                                        </span>
+                                    )}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">

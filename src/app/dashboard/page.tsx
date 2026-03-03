@@ -44,6 +44,7 @@ export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
     const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
     const [ibBrokers, setIbBrokers] = useState<string[]>([]);
+    const [pendingIbRequests, setPendingIbRequests] = useState<any[]>([]);
     const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
 
     useEffect(() => {
@@ -64,14 +65,18 @@ export default function DashboardPage() {
                 .single();
             const legacyIbAccount = profileData?.ib_account_number;
 
-            // Fetch Approved IB Memberships
-            const { data: ibData } = await supabase
+            // Fetch All IB Memberships (Pending and Approved)
+            const { data: allIbData } = await supabase
                 .from('ib_memberships')
-                .select('account_number, brokers(name)')
-                .eq('user_id', user.id)
-                .eq('status', 'approved');
+                .select('account_number, status, brokers(name)')
+                .eq('user_id', user.id);
 
-            if (ibData && ibData.length > 0) {
+            const ibData = allIbData?.filter(ib => ib.status === 'approved') || [];
+            const pendingIb = allIbData?.filter(ib => ib.status === 'pending') || [];
+
+            setPendingIbRequests(pendingIb);
+
+            if (ibData.length > 0) {
                 const brokers = ibData.map((b: any) => b.brokers?.name).filter(Boolean);
                 setIbBrokers(brokers);
             }
@@ -247,6 +252,23 @@ export default function DashboardPage() {
                     <p className="text-muted-foreground mt-1">จัดการ License, ติดตามสถานะออเดอร์ และดาวน์โหลด EA</p>
                 </div>
             </div>
+
+            {/* Pending IB Requests Alerts */}
+            {pendingIbRequests.length > 0 && (
+                <div className="grid gap-3">
+                    {pendingIbRequests.map((req, idx) => (
+                        <div key={idx} className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                            <div>
+                                <h4 className="font-semibold text-orange-600 dark:text-orange-400">คำขอสิทธิ์ IB: {req.brokers?.name || 'ไม่ระบุโบรคเกอร์'} (รอการอนุมัติ)</h4>
+                                <p className="text-sm text-orange-600/80 dark:text-orange-400/80 mt-1">
+                                    พอร์ต {req.account_number} กำลังอยู่ในขั้นตอนการตรวจสอบจากแอดมิน โปรดรอประมาณ 1-12 ชั่วโมง
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Filters */}
             <div className="flex flex-wrap gap-2">
