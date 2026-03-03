@@ -277,11 +277,19 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     // Get current license details for display
     const currentLicense = userLicenses.find(l => l.account_number === accountNumber.trim());
 
+    // Compute unique brokers and filtered ports
+    const uniqueBrokers = Array.from(new Set(Object.values(ibAccounts))).filter(Boolean);
+    const ibQuotaLabel = uniqueBrokers.length > 0 ? `ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB ${uniqueBrokers.join(' / ')}` : 'ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB';
+
+    // Filter ports for display to avoid rendering empty sections and drop empty port strings
+    const displayLicenses = userLicenses.filter(license => license.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[license.account_number] : !ibAccounts[license.account_number]));
+    const displayOrders = userOrders.filter(order => order.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[order.account_number] : !ibAccounts[order.account_number]));
+
     return (
         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg space-y-6">
 
             {/* Active & Pending Ports Display */}
-            {(userLicenses.length > 0 || userOrders.length > 0) && (
+            {(displayLicenses.length > 0 || displayOrders.length > 0) && (
                 <div className="space-y-3 mb-6 p-4 bg-muted/30 rounded-lg border border-border">
                     <h4 className="text-sm font-semibold flex items-center gap-2">
                         <Check className="w-4 h-4 text-green-500" />
@@ -289,78 +297,74 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                     </h4>
                     <div className="space-y-2">
                         {/* Active Licenses */}
-                        {userLicenses
-                            .filter(license => (ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[license.account_number] : !ibAccounts[license.account_number])
-                            .map((license) => {
-                                const isIbPort = !!ibAccounts[license.account_number];
-                                const brokerName = ibAccounts[license.account_number];
-                                const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
+                        {displayLicenses.map((license) => {
+                            const isIbPort = !!ibAccounts[license.account_number];
+                            const brokerName = ibAccounts[license.account_number];
+                            const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
 
-                                return (
-                                    <div
-                                        key={`license-${license.id}`}
-                                        className={`text-sm p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
-                                        onClick={() => setAccountNumber(license.account_number)}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-green-500/10 p-1.5 rounded-full">
-                                                <Check className="w-3 h-3 text-green-600" />
-                                            </div>
-                                            <div>
-                                                <div className="font-mono font-bold text-base">{license.account_number}</div>
-                                                <div className="flex items-center gap-2 mt-0.5 mt-1 relative w-full overflow-hidden">
-                                                    <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
+                            return (
+                                <div
+                                    key={`license-${license.id}`}
+                                    className={`text-sm p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
+                                    onClick={() => setAccountNumber(license.account_number)}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-green-500/10 p-1.5 rounded-full">
+                                            <Check className="w-3 h-3 text-green-600" />
+                                        </div>
+                                        <div>
+                                            <div className="font-mono font-bold text-base">{license.account_number}</div>
+                                            <div className="flex items-center gap-2 mt-0.5 mt-1 relative w-full overflow-hidden">
+                                                <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
 
-                                                    {isIbPort && (
-                                                        <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                                            IB {brokerName}
-                                                        </span>
-                                                    )}
+                                                {isIbPort && (
+                                                    <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                        IB {brokerName}
+                                                    </span>
+                                                )}
 
-                                                    {((!isIbPort && license.type !== 'lifetime') || (isIbPort && license.expiry_date)) && (
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 font-bold' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
-                                                            เหลือ {days > 0 ? days : 0} วัน
-                                                        </span>
-                                                    )}
-                                                    {(!isIbPort && license.type === 'lifetime') && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
-                                                </div>
+                                                {((!isIbPort && license.type !== 'lifetime') || (isIbPort && license.expiry_date)) && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 font-bold' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
+                                                        เหลือ {days > 0 ? days : 0} วัน
+                                                    </span>
+                                                )}
+                                                {(!isIbPort && license.type === 'lifetime') && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
                                             </div>
                                         </div>
-                                        {accountNumber === license.account_number && <Check className="w-4 h-4 text-primary" />}
                                     </div>
-                                );
-                            })}
+                                    {accountNumber === license.account_number && <Check className="w-4 h-4 text-primary" />}
+                                </div>
+                            );
+                        })}
 
                         {/* Pending Orders */}
-                        {userOrders
-                            .filter(order => (ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[order.account_number] : !ibAccounts[order.account_number])
-                            .map((order) => {
-                                const isIbPort = !!ibAccounts[order.account_number];
-                                return (
-                                    <div
-                                        key={`order-${order.id}`}
-                                        className="text-sm p-3 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-900/50 dark:bg-yellow-900/10 flex justify-between items-center opacity-80"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-yellow-500/10 p-1.5 rounded-full">
-                                                <Loader2 className="w-3 h-3 text-yellow-600 animate-spin" />
-                                            </div>
-                                            <div>
-                                                <div className="font-mono font-bold text-base">{order.account_number}</div>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className="text-[10px] text-yellow-700 dark:text-yellow-500 font-medium bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded">รอตรวจสอบ (Pending)</span>
+                        {displayOrders.map((order) => {
+                            const isIbPort = !!ibAccounts[order.account_number];
+                            return (
+                                <div
+                                    key={`order-${order.id}`}
+                                    className="text-sm p-3 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-900/50 dark:bg-yellow-900/10 flex justify-between items-center opacity-80"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-yellow-500/10 p-1.5 rounded-full">
+                                            <Loader2 className="w-3 h-3 text-yellow-600 animate-spin" />
+                                        </div>
+                                        <div>
+                                            <div className="font-mono font-bold text-base">{order.account_number}</div>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="text-[10px] text-yellow-700 dark:text-yellow-500 font-medium bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded">รอตรวจสอบ (Pending)</span>
 
-                                                    {isIbPort && (
-                                                        <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                                            IB Request
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                {isIbPort && (
+                                                    <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                        IB {ibAccounts[order.account_number]}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -382,7 +386,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                 }}
                                 className="accent-primary"
                             />
-                            <span>ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB</span>
+                            <span>{ibQuotaLabel}</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
                             <input
