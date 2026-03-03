@@ -609,7 +609,7 @@ export default function ProductFormPage() {
                                                             )}
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <div className={`flex items - center gap - 2 ${isExpiringSoon ? 'text-orange-500 font-bold' : isExpired ? 'text-red-500' : ''} `}>
+                                                            <div className={`flex items-center gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : isExpired ? 'text-red-500' : ''}`}>
                                                                 <Clock className="w-3 h-3" />
                                                                 {(!license.is_ib && license.type === 'lifetime') ? (
                                                                     'ตลอดชีพ'
@@ -700,7 +700,7 @@ export default function ProductFormPage() {
             <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className={`flex items - center gap - 2 ${otpAction === 'delete_product' ? 'text-red-500' : 'text-primary'} `}>
+                        <DialogTitle className={`flex items-center gap-2 ${otpAction === 'delete_product' ? 'text-red-500' : 'text-primary'}`}>
                             {otpAction === 'delete_product' ? <Trash2 className="h-5 w-5" /> : <Save className="h-5 w-5" />}
                             {otpAction === 'delete_product' ? 'ยืนยันการลบสินค้า' : 'ยืนยันการอัพเดท License'}
                         </DialogTitle>
