@@ -37,7 +37,8 @@ export default function ProductFormPage() {
 
     const [activeTab, setActiveTab] = useState('overview');
     const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [uploadingFile, setUploadingFile] = useState(false);
 
     // --- Data for Overview Tab ---
     interface LicenseData {
@@ -219,11 +220,11 @@ export default function ProductFormPage() {
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {
             if (!e.target.files || e.target.files.length === 0) return;
-            setUploading(true);
+            setUploadingImage(true);
             const file = e.target.files[0];
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt} `;
-            const filePath = `products / ${fileName} `;
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `products/${fileName}`;
 
             const { error: uploadError } = await supabase.storage.from('products').upload(filePath, file);
             if (uploadError) throw uploadError;
@@ -234,18 +235,18 @@ export default function ProductFormPage() {
         } catch (error: any) {
             alert('Error uploading image: ' + error.message);
         } finally {
-            setUploading(false);
+            setUploadingImage(false);
         }
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {
             if (!e.target.files || e.target.files.length === 0) return;
-            setUploading(true);
+            setUploadingFile(true);
             const file = e.target.files[0];
             const randomPrefix = Math.floor(1000 + Math.random() * 9000);
-            const fileName = `${randomPrefix}_${file.name} `;
-            const filePath = `${fileName} `;
+            const fileName = `${randomPrefix}_${file.name}`;
+            const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage.from('ea_files').upload(filePath, file);
             if (uploadError) throw uploadError;
@@ -256,7 +257,7 @@ export default function ProductFormPage() {
         } catch (error: any) {
             alert('Error uploading file: ' + error.message);
         } finally {
-            setUploading(false);
+            setUploadingFile(false);
         }
     };
 
@@ -502,7 +503,8 @@ export default function ProductFormPage() {
                         handleFileUpload={handleFileUpload}
                         handleSubmit={handleSubmit}
                         loading={loading}
-                        uploading={uploading}
+                        uploadingImage={uploadingImage}
+                        uploadingFile={uploadingFile}
                     />
                 </div>
             ) : (
@@ -666,7 +668,8 @@ export default function ProductFormPage() {
                                 handleFileUpload={handleFileUpload}
                                 handleSubmit={handleSubmit}
                                 loading={loading}
-                                uploading={uploading}
+                                uploadingImage={uploadingImage}
+                                uploadingFile={uploadingFile}
                             />
 
                             {!isNew && (
@@ -683,7 +686,7 @@ export default function ProductFormPage() {
                                         <Button
                                             variant="destructive"
                                             onClick={() => handleInitiateOtp('delete_product')}
-                                            disabled={isSendingOtp || uploading}
+                                            disabled={isSendingOtp || uploadingImage || uploadingFile}
                                         >
                                             {isSendingOtp && otpAction === 'delete_product' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                                             {isSendingOtp && otpAction === 'delete_product' ? 'กำลังส่งรหัสผ่าน...' : 'ลบสินค้านี้'}
@@ -886,7 +889,7 @@ export default function ProductFormPage() {
 }
 
 // Extracted Form Component for cleanliness
-function EditForm({ formData, setFormData, handleChange, handleImageUpload, handleFileUpload, handleSubmit, loading, uploading }: any) {
+function EditForm({ formData, setFormData, handleChange, handleImageUpload, handleFileUpload, handleSubmit, loading, uploadingImage, uploadingFile }: any) {
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -908,12 +911,12 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                             id="image-upload"
                             className="hidden"
                             onChange={handleImageUpload}
-                            disabled={uploading}
+                            disabled={uploadingImage}
                         />
                         <label htmlFor="image-upload">
                             <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 cursor-pointer">
-                                {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                                {uploading ? 'กำลังอัพโหลด...' : 'อัพโหลดรูปภาพ'}
+                                {uploadingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                {uploadingImage ? 'กำลังอัพโหลด...' : 'อัพโหลดรูปภาพ'}
                             </div>
                         </label>
                         <p className="text-xs text-muted-foreground mt-2">
@@ -942,12 +945,12 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                             id="file-upload"
                             className="hidden"
                             onChange={handleFileUpload}
-                            disabled={uploading}
+                            disabled={uploadingFile}
                         />
                         <label htmlFor="file-upload">
                             <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 cursor-pointer w-full">
-                                {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                                {uploading ? 'กำลังอัพโหลด...' : 'อัพโหลดไฟล์ EA'}
+                                {uploadingFile ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                {uploadingFile ? 'กำลังอัพโหลด...' : 'อัพโหลดไฟล์ EA'}
                             </div>
                         </label>
                         <p className="text-xs text-muted-foreground mt-2">
@@ -1118,7 +1121,7 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                 </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || uploading}>
+            <Button type="submit" className="w-full" disabled={loading || uploadingImage || uploadingFile}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 บันทึกข้อมูล
             </Button>
