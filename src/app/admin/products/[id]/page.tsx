@@ -333,8 +333,13 @@ export default function ProductFormPage() {
             let targetName = '';
 
             if (action === 'delete_product') {
+                if (stats.activeUsers > 0) {
+                    alert(`ไม่สามารถลบสินค้าได้!\\n\\nยังมีลูกค้าที่กำลังใช้งานสินค้านี้อยู่ (${stats.activeUsers} พอร์ต)\\nกรุณาปิดสถานะ Active ของทุกลูกค้าให้ครบก่อนทำการลบสินค้าครับ`);
+                    setIsSendingOtp(false);
+                    return;
+                }
                 actionText = 'การลบสินค้า';
-                targetName = `สินค้า: ${formData.name || id} `;
+                targetName = `สินค้า: ${formData.name || id}`;
             } else if (action === 'edit_license') {
                 actionText = 'การแก้ไขข้อมูล License';
                 targetName = `License พอร์ต ${editingLicense?.account_number} ของคุณ ${editingLicense?.profiles?.full_name || 'ไม่ระบุชื่อ'} `;
@@ -674,19 +679,21 @@ export default function ProductFormPage() {
 
                             {!isNew && (
                                 <div className="mt-12 pt-8 border-t border-red-500/20">
-                                    <div className="flex items-center justify-between p-4 bg-red-500/5 rounded-lg border border-red-500/20">
+                                    <div className={`flex items-center justify-between p-4 rounded-lg border ${stats.activeUsers > 0 ? 'bg-muted/50 border-border opacity-70' : 'bg-red-500/5 border-red-500/20'}`}>
                                         <div className="space-y-1">
-                                            <h4 className="font-semibold text-red-500 flex items-center gap-2">
+                                            <h4 className={`font-semibold flex items-center gap-2 ${stats.activeUsers > 0 ? 'text-muted-foreground' : 'text-red-500'}`}>
                                                 <Trash2 className="h-4 w-4" /> เขตอันตราย (Danger Zone)
                                             </h4>
                                             <p className="text-sm text-muted-foreground">
-                                                การลบสินค้าจะลบข้อมูลประวัติการทำรายการและใบอนุญาตทั้งหมดที่เชื่อมโยงกับสินค้านี้
+                                                {stats.activeUsers > 0
+                                                    ? `ไม่สามารถลบสินค้าได้ เนื่องจากยังมีลูกค้าเปิดใช้งานอยู่ ${stats.activeUsers} พอร์ต (ต้องปิดทั้งหมดก่อน)`
+                                                    : 'การลบสินค้าจะลบข้อมูลประวัติการทำรายการและใบอนุญาตทั้งหมดที่เชื่อมโยงกับสินค้านี้'}
                                             </p>
                                         </div>
                                         <Button
-                                            variant="destructive"
+                                            variant={stats.activeUsers > 0 ? "outline" : "destructive"}
                                             onClick={() => handleInitiateOtp('delete_product')}
-                                            disabled={isSendingOtp || uploadingImage || uploadingFile}
+                                            disabled={isSendingOtp || uploadingImage || uploadingFile || stats.activeUsers > 0}
                                         >
                                             {isSendingOtp && otpAction === 'delete_product' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                                             {isSendingOtp && otpAction === 'delete_product' ? 'กำลังส่งรหัสผ่าน...' : 'ลบสินค้านี้'}
