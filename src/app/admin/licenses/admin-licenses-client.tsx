@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap } from 'lucide-react';
+import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap, Loader2, Save, Mail } from 'lucide-react';
 
 export default function AdminLicensesClient({ initialLicenses }: { initialLicenses: any[] }) {
     const [licenses, setLicenses] = useState(initialLicenses);
@@ -32,8 +32,17 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
     const [editingLicense, setEditingLicense] = useState<any>(null);
     const [editExpiryDate, setEditExpiryDate] = useState('');
     const [editIsActive, setEditIsActive] = useState(true);
-    const [expiryOption, setExpiryOption] = useState("6months");
-    const [customDate, setCustomDate] = useState("");
+
+    // License specific UI logic
+    const [expiryOption, setExpiryOption] = useState<string>("custom");
+    const [customDate, setCustomDate] = useState<string>("");
+
+    // OTP verification hooks
+    const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+    const [otpCode, setOtpCode] = useState('');
+    const [generatedOtp, setGeneratedOtp] = useState('');
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isProcessingOtp, setIsProcessingOtp] = useState(false);
     const [saving, setSaving] = useState(false);
 
     // Extract unique options for dropdowns
@@ -132,14 +141,62 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
             setEditExpiryDate('');
         }
         setEditIsActive(license.is_active);
-        setExpiryOption("6months");
+        setExpiryOption("custom"); // Changed default to custom
 
         const date = new Date();
         date.setMonth(date.getMonth() + 6);
         setCustomDate(date.toISOString().split('T')[0]);
     };
 
-    const handleSaveLicense = async () => {
+    const handleInitiateOtp = async () => {
+        setIsSendingOtp(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !user.email) {
+                alert('ไม่พบข้อมูลอีเมลของแอดมิน');
+                return;
+            }
+
+            const actionText = 'การแก้ไขข้อมูล License (สิทธิ์การใช้งาน)';
+            const targetName = `พอร์ต ${editingLicense?.account_number} ของคุณ ${editingLicense?.profiles?.full_name || 'ไม่ระบุชื่อ'}`;
+
+            const res = await fetch('/api/admin/send-delete-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, title: actionText, targetName })
+            });
+
+            const result = await res.json();
+            if (res.ok) {
+                setGeneratedOtp(result.otp);
+                setIsOtpDialogOpen(true);
+                // Intentionally keeping the Edit panel open in background unless explicitly closed
+
+                if (result.devMode) {
+                    alert(`[DEV MODE] ⚠️ ยังไม่ได้ตั้งค่าระบบส่งอีเมล\n\nรหัส OTP จำลองสำหรับทดสอบคือ: ${result.otp}`);
+                }
+            } else {
+                alert('ส่งขอ OTP ล้มเหลว: ' + result.error);
+            }
+        } catch (err: any) {
+            alert('เกิดข้อผิดพลาดในการส่งรหัส: ' + err.message);
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleConfirmOtp = async () => {
+        if (!otpCode || otpCode.trim() !== generatedOtp) {
+            alert('รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+            return;
+        }
+
+        setIsProcessingOtp(true);
+        await executeEditLicense();
+        setIsProcessingOtp(false);
+    };
+
+    const executeEditLicense = async () => {
         if (!editingLicense) return;
         setSaving(true);
         try {
@@ -161,7 +218,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                 } else if (expiryOption === "1year") {
                     now.setFullYear(now.getFullYear() + 1);
                     finalExpiryDate = now;
-                } else {
+                } else { // custom
                     finalExpiryDate = new Date(customDate);
                 }
                 updates.expiry_date = finalExpiryDate.toISOString();
@@ -191,6 +248,8 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
             ));
 
             setEditingLicense(null);
+            setIsOtpDialogOpen(false); // Close OTP dialog
+            setOtpCode(''); // Clear OTP code
             alert('บันทึกข้อมูลสำเร็จ');
         } catch (error: any) {
             alert('เกิดข้อผิดพลาด: ' + error.message);
@@ -498,9 +557,64 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                     )}
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditingLicense(null)}>ยกเลิก</Button>
-                        <Button onClick={handleSaveLicense} disabled={saving}>
-                            {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                        <Button variant="outline" onClick={() => setEditingLicense(null)} disabled={isSendingOtp}>
+                            ยกเลิก
+                        </Button>
+                        <Button onClick={handleInitiateOtp} disabled={isSendingOtp}>
+                            {isSendingOtp ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> กำลังส่ง OTP...
+                                </>
+                            ) : (
+                                'บันทึกด้วย OTP'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* General OTP Confirmation Dialog */}
+            <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-primary">
+                            <Save className="h-5 w-5" />
+                            ยืนยันการตั้งค่า License
+                        </DialogTitle>
+                        <DialogDescription className="space-y-4 pt-4">
+                            <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
+                                <Mail className="h-8 w-8 text-primary shrink-0 mt-1" />
+                                <div>
+                                    <h4 className="font-medium text-foreground">ระบบได้ส่งรหัส OTP 6 หลักไปที่อีเมลแอดมินของคุณแล้ว</h4>
+                                    <p className="text-sm mt-1">กรุณานำรหัสจากอีเมลมากรอกเพื่อยืนยันรายการ (ป้องกันความผิดพลาด)</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="otp">รหัส OTP 6 หลัก</Label>
+                                <Input
+                                    id="otp"
+                                    type="text"
+                                    maxLength={6}
+                                    placeholder="XXXXXX"
+                                    className="text-center text-xl tracking-[0.5em] font-mono h-14"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                                />
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setIsOtpDialogOpen(false)} disabled={isProcessingOtp}>
+                            ยกเลิก
+                        </Button>
+                        <Button
+                            variant="default"
+                            onClick={handleConfirmOtp}
+                            disabled={isProcessingOtp || otpCode.length !== 6}
+                        >
+                            {isProcessingOtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            ยืนยันและบันทึกข้อมูล
                         </Button>
                     </DialogFooter>
                 </DialogContent>

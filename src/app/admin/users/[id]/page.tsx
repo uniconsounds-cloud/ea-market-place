@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Mail, Shield, CheckCircle2, XCircle, Clock, ShoppingCart, CreditCard, Package, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Mail, Shield, CheckCircle2, XCircle, Clock, ShoppingCart, CreditCard, Package, Loader2, Pencil, Trash2, Zap, User, Key, Calendar, ArrowUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch";
 
 export default function CustomerDetailsPage() {
     const params = useParams();
@@ -49,6 +50,12 @@ export default function CustomerDetailsPage() {
     // --- License Editing State ---
     const [isEditLicenseDialogOpen, setIsEditLicenseDialogOpen] = useState(false);
     const [editingLicense, setEditingLicense] = useState<any | null>(null);
+    const [editExpiryDate, setEditExpiryDate] = useState('');
+    const [editIsActive, setEditIsActive] = useState(true);
+
+    // License UI Math
+    const [expiryOption, setExpiryOption] = useState<string>("custom");
+    const [customDate, setCustomDate] = useState<string>("");
 
     useEffect(() => {
         if (id) fetchData();
@@ -130,6 +137,32 @@ export default function CustomerDetailsPage() {
         return diffDays;
     };
 
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const handleEditLicenseClick = (license: any) => {
+        setEditingLicense(license);
+        setEditIsActive(license.is_active);
+        if (license.expiry_date) {
+            const date = new Date(license.expiry_date);
+            setEditExpiryDate(date.toISOString().split('T')[0]); // YYYY-MM-DD
+            setCustomDate(date.toISOString().split('T')[0]); // For custom option
+            setExpiryOption('custom'); // Default to custom if there's an existing date
+        } else {
+            setEditExpiryDate('');
+            setCustomDate('');
+            setExpiryOption('custom'); // Default to custom if no existing date
+        }
+        setIsEditLicenseDialogOpen(true);
+    };
+
     // --- OTP & License Edit Handlers ---
     const handleInitiateOtp = async (action: 'edit_license') => {
         if (!profile) return;
@@ -196,14 +229,34 @@ export default function CustomerDetailsPage() {
     };
 
     const executeEditLicense = async () => {
-        if (!editingLicense || !editingLicense.id) return;
+        if (!editingLicense) return;
 
         try {
+            let finalExpiryDate: Date | null = null;
+            const now = new Date();
+
+            if (editingLicense.is_ib) {
+                if (expiryOption === "1month") {
+                    now.setMonth(now.getMonth() + 1);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "6months") {
+                    now.setMonth(now.getMonth() + 6);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "1year") {
+                    now.setFullYear(now.getFullYear() + 1);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "custom" && customDate) { // custom
+                    finalExpiryDate = new Date(customDate);
+                }
+            } else if (editingLicense.type !== 'lifetime' && editExpiryDate) {
+                finalExpiryDate = new Date(editExpiryDate);
+            }
+
             const { error } = await supabase
                 .from('licenses')
                 .update({
-                    expiry_date: editingLicense.expiry_date,
-                    is_active: editingLicense.is_active
+                    expiry_date: finalExpiryDate ? finalExpiryDate.toISOString() : null,
+                    is_active: editIsActive
                 })
                 .eq('id', editingLicense.id);
 
@@ -216,6 +269,7 @@ export default function CustomerDetailsPage() {
             setOtpAction(null);
             setOtpCode('');
             setIsOtpDialogOpen(false);
+            setIsEditLicenseDialogOpen(false); // Close edit dialog as well
 
             // Refresh purely licenses data
             fetchData();
@@ -465,13 +519,11 @@ export default function CustomerDetailsPage() {
                                                 <td className="px-6 py-4 text-right">
                                                     <Button
                                                         variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => {
-                                                            setEditingLicense(license);
-                                                            setIsEditLicenseDialogOpen(true);
-                                                        }}
+                                                        size="sm"
+                                                        onClick={() => handleEditLicenseClick(license)}
+                                                        className="text-primary hover:text-primary hover:bg-primary/10"
                                                     >
-                                                        <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                                        <Pencil className="w-4 h-4" />
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -547,44 +599,128 @@ export default function CustomerDetailsPage() {
 
             {/* Edit License Dialog */}
             <Dialog open={isEditLicenseDialogOpen} onOpenChange={setIsEditLicenseDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>แก้ไขข้อมูล License</DialogTitle>
-                        <DialogDescription>
-                            แก้ไขวันที่รับสิทธิ์ หรือระงับการใช้งานผ่านสถานะ Active
-                        </DialogDescription>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Key className="w-5 h-5 text-primary" /> จัดการสิทธิ์การใช้งาน
+                        </DialogTitle>
                     </DialogHeader>
 
                     {editingLicense && (
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-1">
-                                <Label>หมายเลขบัญชี Trea (Account)</Label>
-                                <Input disabled value={editingLicense.account_number} className="bg-muted font-mono" />
+                        <div className="space-y-6 my-4">
+                            {/* Read-only Data */}
+                            <div className="bg-muted p-4 rounded-lg space-y-3 text-sm">
+                                <div className="flex gap-2 items-start">
+                                    <User className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                                    <div>
+                                        <div className="font-bold">{profile?.full_name || 'ผู้ใช้งาน'}</div>
+                                        <div className="text-muted-foreground">{profile?.email}</div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div>
+                                        <strong>{editingLicense.products?.name}</strong>
+                                        <span className="text-muted-foreground ml-2">({editingLicense.type})</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <Key className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div>
+                                        พอร์ตหมายเลข: <strong className="font-mono">{editingLicense.account_number}</strong>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <Label>วันเวลาหมดอายุ (Expiry Date)</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={new Date(new Date(editingLicense.expiry_date).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
-                                    onChange={(e) => setEditingLicense({ ...editingLicense, expiry_date: new Date(e.target.value).toISOString() })}
-                                />
-                            </div>
+                            {/* Editable Fields */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between border rounded-lg p-3">
+                                    <div className="space-y-0.5">
+                                        <Label>สถานะการใช้งาน (Active Target)</Label>
+                                        <p className="text-xs text-muted-foreground">เปิด/ปิด สิทธิ์การใช้ EA พอร์ตนี้</p>
+                                    </div>
+                                    <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
+                                </div>
 
-                            <div className="space-y-1">
-                                <Label>สถานะการทำงาน (Status)</Label>
-                                <Select
-                                    value={editingLicense.is_active ? 'active' : 'inactive'}
-                                    onValueChange={(val) => setEditingLicense({ ...editingLicense, is_active: val === 'active' })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="เลือกสถานะ" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="active">Active (อนุญาตให้ใช้งาน)</SelectItem>
-                                        <SelectItem value="inactive">Inactive (ระงับการใช้งาน)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                {editingLicense.is_ib ? (
+                                    <div className="space-y-3 pt-2 border-t border-border">
+                                        <Label className="flex items-center gap-2 text-blue-600 font-bold">
+                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB Customer)
+                                        </Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "1month" ? "default" : "outline"}
+                                                className={expiryOption === "1month" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("1month")}
+                                            >
+                                                1 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "6months" ? "default" : "outline"}
+                                                className={expiryOption === "6months" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("6months")}
+                                            >
+                                                6 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "1year" ? "default" : "outline"}
+                                                className={expiryOption === "1year" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("1year")}
+                                            >
+                                                1 ปี
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "custom" ? "default" : "outline"}
+                                                className={expiryOption === "custom" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("custom")}
+                                            >
+                                                กำหนดเอง
+                                            </Button>
+                                        </div>
+
+                                        {expiryOption === "custom" && (
+                                            <div className="pt-2">
+                                                <Label htmlFor="customDate" className="text-muted-foreground text-xs mb-1.5 block">เลือกวันที่หมดอายุ</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="customDate"
+                                                        type="date"
+                                                        value={customDate}
+                                                        onChange={(e) => setCustomDate(e.target.value)}
+                                                        className="pl-9"
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                        required={expiryOption === "custom"}
+                                                    />
+                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                </div>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">วันหมดอายุเดิม: {editingLicense.expiry_date ? formatDate(editingLicense.expiry_date) : '-'}</p>
+                                    </div>
+                                ) : (!editingLicense.is_ib && editingLicense.type !== 'lifetime') ? (
+                                    <div className="space-y-2">
+                                        <Label className="flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" /> วันหมดอายุ (Expiry Date)
+                                        </Label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={editExpiryDate}
+                                            onChange={(e) => setEditExpiryDate(e.target.value)}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-3 border border-orange-200 bg-orange-50 text-orange-800 rounded-lg text-sm">
+                                        สิทธิ์การใช้งานแบบตลอดชีพ ไม่ต้องตั้งวันหมดอายุ
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search, Trash2, Mail, Pencil } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search, Trash2, Mail, Pencil, User, Key, Calendar, Zap, Package } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -26,6 +26,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
 
 // Use 'new' as a special ID for creating
 export default function ProductFormPage() {
@@ -75,6 +76,12 @@ export default function ProductFormPage() {
     // --- License Edit State ---
     const [isEditLicenseDialogOpen, setIsEditLicenseDialogOpen] = useState(false);
     const [editingLicense, setEditingLicense] = useState<LicenseData | null>(null);
+    const [editExpiryDate, setEditExpiryDate] = useState('');
+    const [editIsActive, setEditIsActive] = useState(true);
+
+    // License UI Math
+    const [expiryOption, setExpiryOption] = useState<string>("custom");
+    const [customDate, setCustomDate] = useState<string>("");
 
     // --- Data for Edit Tab ---
     const [formData, setFormData] = useState({
@@ -215,8 +222,8 @@ export default function ProductFormPage() {
             setUploading(true);
             const file = e.target.files[0];
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `products/${fileName}`;
+            const fileName = `${Math.random()}.${fileExt} `;
+            const filePath = `products / ${fileName} `;
 
             const { error: uploadError } = await supabase.storage.from('products').upload(filePath, file);
             if (uploadError) throw uploadError;
@@ -237,8 +244,8 @@ export default function ProductFormPage() {
             setUploading(true);
             const file = e.target.files[0];
             const randomPrefix = Math.floor(1000 + Math.random() * 9000);
-            const fileName = `${randomPrefix}_${file.name}`;
-            const filePath = `${fileName}`;
+            const fileName = `${randomPrefix}_${file.name} `;
+            const filePath = `${fileName} `;
 
             const { error: uploadError } = await supabase.storage.from('ea_files').upload(filePath, file);
             if (uploadError) throw uploadError;
@@ -326,10 +333,10 @@ export default function ProductFormPage() {
 
             if (action === 'delete_product') {
                 actionText = 'การลบสินค้า';
-                targetName = `สินค้า: ${formData.name || id}`;
+                targetName = `สินค้า: ${formData.name || id} `;
             } else if (action === 'edit_license') {
                 actionText = 'การแก้ไขข้อมูล License';
-                targetName = `License พอร์ต ${editingLicense?.account_number} ของคุณ ${editingLicense?.profiles?.full_name || 'ไม่ระบุชื่อ'}`;
+                targetName = `License พอร์ต ${editingLicense?.account_number} ของคุณ ${editingLicense?.profiles?.full_name || 'ไม่ระบุชื่อ'} `;
             }
 
             const res = await fetch('/api/admin/send-delete-otp', {
@@ -350,7 +357,7 @@ export default function ProductFormPage() {
                 }
 
                 if (result.devMode) {
-                    alert(`[DEV MODE] ⚠️ ยังไม่ได้ตั้งค่าระบบส่งอีเมล\n\nรหัส OTP จำลองสำหรับทดสอบคือ: ${result.otp}`);
+                    alert(`[DEV MODE] ⚠️ ยังไม่ได้ตั้งค่าระบบส่งอีเมล\n\nรหัส OTP จำลองสำหรับทดสอบคือ: ${result.otp} `);
                 }
             } else {
                 alert('ส่งขอ OTP ล้มเหลว: ' + result.error);
@@ -393,29 +400,78 @@ export default function ProductFormPage() {
 
     const executeEditLicense = async () => {
         if (!editingLicense) return;
+
         try {
+            let finalExpiryDate: Date | null = null;
+            const now = new Date();
+
+            if (editingLicense.is_ib) {
+                if (expiryOption === "1month") {
+                    now.setMonth(now.getMonth() + 1);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "6months") {
+                    now.setMonth(now.getMonth() + 6);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "1year") {
+                    now.setFullYear(now.getFullYear() + 1);
+                    finalExpiryDate = now;
+                } else if (expiryOption === "custom" && customDate) {
+                    finalExpiryDate = new Date(customDate);
+                }
+            } else if (editingLicense.type !== 'lifetime' && editExpiryDate) {
+                finalExpiryDate = new Date(editExpiryDate);
+            }
+
             const { error } = await supabase
                 .from('licenses')
                 .update({
-                    expiry_date: editingLicense.expiry_date,
-                    is_active: editingLicense.is_active
+                    expiry_date: finalExpiryDate ? finalExpiryDate.toISOString() : null,
+                    is_active: editIsActive
                 })
                 .eq('id', editingLicense.id);
 
             if (error) throw error;
 
-            alert('อัพเดท License สำเร็จ!');
+            alert('อัพเดทสิทธิ์การใช้งานพอร์ตเรียบร้อยแล้ว');
+
+            // Clean up States
             setIsOtpDialogOpen(false);
+            setOtpCode('');
+            setOtpAction(null);
+            setIsEditLicenseDialogOpen(false);
             setEditingLicense(null);
-            fetchStats(); // Refresh table
+
+            // Resync specific user stats (soft refresh)
+            fetchStats();
         } catch (error: any) {
-            alert('อัพเดท License ไม่สำเร็จ: ' + error.message);
+            alert('เกิดข้อผิดพลาดในการอัพเดท: ' + error.message);
         }
     };
 
-    const openEditLicense = (license: LicenseData) => {
-        setEditingLicense({ ...license }); // Copy to avoid mutating display data immediately
+    const handleEditLicense = (license: LicenseData) => {
+        setEditingLicense(license);
+        setEditIsActive(license.is_active);
+        if (license.expiry_date) {
+            const date = new Date(license.expiry_date);
+            setEditExpiryDate(date.toISOString().split('T')[0]);
+            setCustomDate(date.toISOString().split('T')[0]);
+            setExpiryOption('custom');
+        } else {
+            setEditExpiryDate('');
+            setCustomDate('');
+            setExpiryOption('custom');
+        }
         setIsEditLicenseDialogOpen(true);
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     };
 
     return (
@@ -553,7 +609,7 @@ export default function ProductFormPage() {
                                                             )}
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <div className={`flex items-center gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : isExpired ? 'text-red-500' : ''}`}>
+                                                            <div className={`flex items - center gap - 2 ${isExpiringSoon ? 'text-orange-500 font-bold' : isExpired ? 'text-red-500' : ''} `}>
                                                                 <Clock className="w-3 h-3" />
                                                                 {(!license.is_ib && license.type === 'lifetime') ? (
                                                                     'ตลอดชีพ'
@@ -579,7 +635,7 @@ export default function ProductFormPage() {
                                                             )}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
-                                                            <Button variant="ghost" size="icon" onClick={() => openEditLicense(license)} title="แก้ไข License">
+                                                            <Button variant="ghost" size="icon" onClick={() => handleEditLicense(license)} title="แก้ไข License">
                                                                 <Pencil className="w-4 h-4" />
                                                             </Button>
                                                         </td>
@@ -644,7 +700,7 @@ export default function ProductFormPage() {
             <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className={`flex items-center gap-2 ${otpAction === 'delete_product' ? 'text-red-500' : 'text-primary'}`}>
+                        <DialogTitle className={`flex items - center gap - 2 ${otpAction === 'delete_product' ? 'text-red-500' : 'text-primary'} `}>
                             {otpAction === 'delete_product' ? <Trash2 className="h-5 w-5" /> : <Save className="h-5 w-5" />}
                             {otpAction === 'delete_product' ? 'ยืนยันการลบสินค้า' : 'ยืนยันการอัพเดท License'}
                         </DialogTitle>
@@ -689,60 +745,128 @@ export default function ProductFormPage() {
 
             {/* License Edit Dialog */}
             <Dialog open={isEditLicenseDialogOpen} onOpenChange={setIsEditLicenseDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>แก้ไข License</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Key className="w-5 h-5 text-primary" /> จัดการสิทธิ์การใช้งาน
+                        </DialogTitle>
                     </DialogHeader>
+
                     {editingLicense && (
-                        <div className="space-y-4 py-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
-                                    <Label className="text-xs text-muted-foreground">ลูกค้า</Label>
-                                    <p className="font-medium text-sm">{editingLicense.profiles?.full_name}</p>
-                                    <p className="text-xs text-muted-foreground">{editingLicense.profiles?.email}</p>
+                        <div className="space-y-6 my-4">
+                            {/* Read-only Data */}
+                            <div className="bg-muted p-4 rounded-lg space-y-3 text-sm">
+                                <div className="flex gap-2 items-start">
+                                    <User className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                                    <div>
+                                        <div className="font-bold">{editingLicense.profiles?.full_name || 'ผู้ใช้งาน'}</div>
+                                        <div className="text-muted-foreground">{editingLicense.profiles?.email}</div>
+                                    </div>
                                 </div>
-                                <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
-                                    <Label className="text-xs text-muted-foreground">หมายเลขพอร์ต</Label>
-                                    <p className="font-mono font-medium text-sm">{editingLicense.account_number}</p>
+                                <div className="flex gap-2 items-center">
+                                    <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div>
+                                        <strong>{formData.name}</strong>
+                                        <span className="text-muted-foreground ml-2">({editingLicense.type})</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <Key className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div>
+                                        พอร์ตหมายเลข: <strong className="font-mono">{editingLicense.account_number}</strong>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label>วันหมดอายุ (Expiry Date)</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={new Date(new Date(editingLicense.expiry_date || new Date().toISOString()).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
-                                    onChange={(e) => {
-                                        setEditingLicense({
-                                            ...editingLicense,
-                                            expiry_date: new Date(e.target.value).toISOString()
-                                        });
-                                    }}
-                                />
-                            </div>
+                            {/* Editable Fields */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between border rounded-lg p-3">
+                                    <div className="space-y-0.5">
+                                        <Label>สถานะการใช้งาน (Active Target)</Label>
+                                        <p className="text-xs text-muted-foreground">เปิด/ปิด สิทธิ์การใช้ EA พอร์ตนี้</p>
+                                    </div>
+                                    <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
+                                </div>
 
-                            <div className="space-y-2">
-                                <Label>สถานะการใช้งาน (Active Status)</Label>
-                                <Select
-                                    value={editingLicense.is_active ? 'active' : 'inactive'}
-                                    onValueChange={(v) => setEditingLicense({ ...editingLicense, is_active: v === 'active' })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="เลือกสถานะ" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="active">
-                                            <div className="flex items-center text-green-500 font-medium">
-                                                <CheckCircle2 className="w-4 h-4 mr-2" /> ใช้งานได้ (Active)
+                                {editingLicense.is_ib ? (
+                                    <div className="space-y-3 pt-2 border-t border-border">
+                                        <Label className="flex items-center gap-2 text-blue-600 font-bold">
+                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB Customer)
+                                        </Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "1month" ? "default" : "outline"}
+                                                className={expiryOption === "1month" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("1month")}
+                                            >
+                                                1 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "6months" ? "default" : "outline"}
+                                                className={expiryOption === "6months" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("6months")}
+                                            >
+                                                6 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "1year" ? "default" : "outline"}
+                                                className={expiryOption === "1year" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("1year")}
+                                            >
+                                                1 ปี
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "custom" ? "default" : "outline"}
+                                                className={expiryOption === "custom" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => setExpiryOption("custom")}
+                                            >
+                                                กำหนดเอง
+                                            </Button>
+                                        </div>
+
+                                        {expiryOption === "custom" && (
+                                            <div className="pt-2">
+                                                <Label htmlFor="customDate" className="text-muted-foreground text-xs mb-1.5 block">เลือกวันที่หมดอายุ</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        id="customDate"
+                                                        type="date"
+                                                        value={customDate}
+                                                        onChange={(e) => setCustomDate(e.target.value)}
+                                                        className="pl-9"
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                        required={expiryOption === "custom"}
+                                                    />
+                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                </div>
                                             </div>
-                                        </SelectItem>
-                                        <SelectItem value="inactive">
-                                            <div className="flex items-center text-red-500 font-medium">
-                                                ระงับการใช้งาน (Inactive)
-                                            </div>
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">วันหมดอายุเดิม: {editingLicense.expiry_date ? formatDate(editingLicense.expiry_date) : '-'}</p>
+                                    </div>
+                                ) : (!editingLicense.is_ib && editingLicense.type !== 'lifetime') ? (
+                                    <div className="space-y-2">
+                                        <Label className="flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" /> วันหมดอายุ (Expiry Date)
+                                        </Label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={editExpiryDate}
+                                            onChange={(e) => setEditExpiryDate(e.target.value)}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-3 border border-orange-200 bg-orange-50 text-orange-800 rounded-lg text-sm">
+                                        สิทธิ์การใช้งานแบบตลอดชีพ ไม่ต้องตั้งวันหมดอายุ
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -751,8 +875,8 @@ export default function ProductFormPage() {
                             ยกเลิก
                         </Button>
                         <Button onClick={() => handleInitiateOtp('edit_license')} disabled={isSendingOtp}>
-                            {isSendingOtp && otpAction === 'edit_license' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            {isSendingOtp && otpAction === 'edit_license' ? 'กำลังขอรหัส OTP...' : 'บันทึกและขอ OTP'}
+                            {isSendingOtp && otpAction === 'edit_license' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {isSendingOtp && otpAction === 'edit_license' ? 'กำลังส่ง OTP...' : 'บันทึกด้วย OTP'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
