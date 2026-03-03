@@ -68,7 +68,7 @@ export default function DashboardPage() {
             // Fetch All IB Memberships (Pending and Approved)
             const { data: allIbData } = await supabase
                 .from('ib_memberships')
-                .select('account_number, status, brokers(name)')
+                .select('verification_data, status, brokers(name)')
                 .eq('user_id', user.id);
 
             const ibData = allIbData?.filter(ib => ib.status === 'approved') || [];
@@ -105,7 +105,7 @@ export default function DashboardPage() {
 
             if (licensesData) {
                 licensesData.forEach((l: any) => {
-                    const isIbLicense = (ibData || []).some((ib: any) => String(ib.account_number).trim() === String(l.account_number).trim()) ||
+                    const isIbLicense = (ibData || []).some((ib: any) => String(ib.verification_data).trim() === String(l.account_number).trim()) ||
                         (legacyIbAccount && String(legacyIbAccount).trim() === String(l.account_number).trim());
 
                     allItems.push({
@@ -262,7 +262,7 @@ export default function DashboardPage() {
                             <div>
                                 <h4 className="font-semibold text-orange-600 dark:text-orange-400">คำขอสิทธิ์ IB: {req.brokers?.name || 'ไม่ระบุโบรคเกอร์'} (รอการอนุมัติ)</h4>
                                 <p className="text-sm text-orange-600/80 dark:text-orange-400/80 mt-1">
-                                    พอร์ต {req.account_number} กำลังอยู่ในขั้นตอนการตรวจสอบจากแอดมิน โปรดรอประมาณ 1-12 ชั่วโมง
+                                    พอร์ต {req.verification_data} กำลังอยู่ในขั้นตอนการตรวจสอบจากแอดมิน โปรดรอประมาณ 1-12 ชั่วโมง
                                 </p>
                             </div>
                         </div>
