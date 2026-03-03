@@ -173,11 +173,6 @@ export function ProductIbBanner({ productId }: { productId: string }) {
         }
     };
 
-    if (isLoading) return null;
-
-    // Do not show banner if they are already approved for at least 1 broker
-    if (hasApproved) return null;
-
     // If they applied to all possible brokers and they are all pending/rejected
     if (availableBrokers.length === 0) {
         if (hasPending) {
@@ -212,10 +207,12 @@ export function ProductIbBanner({ productId }: { productId: string }) {
                 </div>
                 <div className="flex-1 text-center sm:text-left">
                     <h3 className="text-lg font-bold text-foreground mb-1">
-                        สิทธิพิเศษสำหรับ IB (รับสิทธิ์ใช้ EA ฟรี!)
+                        {hasApproved ? "สมัครโควต้า IB เพิ่มเติม" : "สิทธิพิเศษสำหรับ IB (รับสิทธิ์ใช้ EA ฟรี!)"}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                        เพียงเปิดบัญชีเทรดภายใต้ลิงก์ตัวแทน (IB) ของเรา คุณจะได้รับสิทธิ์ใช้งาน Expert Advisor แบบฟรีทันทีเมื่อผ่านการอนุมัติ (สามารถสมัครได้หลายโบรกเกอร์)
+                        {hasApproved
+                            ? "คุณสามารถเปิดพอร์ตกับโบรกเกอร์อื่นๆ ภายใต้ลิงก์ตัวแทนของเราเพื่อรับโควต้าเพิ่มเติมได้ (สามารถสมัครได้หลายโบรกเกอร์)"
+                            : "เพียงเปิดบัญชีเทรดภายใต้ลิงก์ตัวแทน (IB) ของเรา คุณจะได้รับสิทธิ์ใช้งาน Expert Advisor แบบฟรีทันทีเมื่อผ่านการอนุมัติ (สามารถสมัครได้หลายโบรกเกอร์)"}
                     </p>
                     {hasPending && (
                         <p className="text-xs text-orange-500 mt-1">
