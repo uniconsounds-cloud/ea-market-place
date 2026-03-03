@@ -66,9 +66,18 @@ export default function CustomerDetailsPage() {
 
             if (profileData) setProfile(profileData);
 
+            // 1.5 Fetch IB Memberships
+            const { data: ibData } = await supabase
+                .from('ib_memberships')
+                .select('account_number')
+                .eq('user_id', id)
+                .eq('status', 'approved');
+
+            const approvedIbAccounts = ibData?.map(ib => ib.account_number) || [];
+
             // 2. Fetch Licenses (Active & Expired)
             // Note: We need product details for display
-            const { data: licenses } = await supabase
+            const { data: rawLicenses } = await supabase
                 .from('licenses')
                 .select('*, products(name, image_url, platform)')
                 .eq('user_id', id)
@@ -77,7 +86,13 @@ export default function CustomerDetailsPage() {
             const active: any[] = [];
             const expired: any[] = [];
 
-            (licenses || []).forEach((l: any) => {
+            // Map IB ports
+            const mappedLicenses = (rawLicenses || []).map((l: any) => ({
+                ...l,
+                is_ib: approvedIbAccounts.includes(l.account_number) || (profileData?.ib_account_number === l.account_number)
+            }));
+
+            mappedLicenses.forEach((l: any) => {
                 if (l.is_active) {
                     active.push(l);
                 } else {

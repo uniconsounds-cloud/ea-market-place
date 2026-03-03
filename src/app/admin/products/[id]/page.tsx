@@ -42,9 +42,13 @@ export default function ProductFormPage() {
     interface LicenseData {
         id: string;
         user_id: string;
+        product_id: string;
         account_number: string;
-        expiry_date: string;
+        expiry_date: string | null;
         is_active: boolean;
+        created_at: string;
+        type?: string;
+        is_ib?: boolean;
         profiles?: {
             email: string;
             full_name: string;
@@ -153,18 +157,36 @@ export default function ProductFormPage() {
                 // Step 3: Fetch Profiles
                 const { data: profiles, error: profileError } = await supabase
                     .from('profiles')
-                    .select('id, email, full_name') // Explicitly select columns, NO created_at
+                    .select('id, email, full_name, ib_account_number')
                     .in('id', userIds);
 
-                if (profileError) console.error("Error fetching profiles:", profileError);
+                // Step 3.5: Fetch IB Memberships
+                const { data: ibMemberships } = await supabase
+                    .from('ib_memberships')
+                    .select('user_id, account_number')
+                    .in('user_id', userIds)
+                    .eq('status', 'approved');
+
+                const ibMap = new Map();
+                if (ibMemberships) {
+                    ibMemberships.forEach(ib => {
+                        if (!ibMap.has(ib.user_id)) ibMap.set(ib.user_id, []);
+                        ibMap.get(ib.user_id).push(ib.account_number);
+                    });
+                }
 
                 // Step 4: Map Profiles to Licenses
                 const profileMap = new Map(profiles?.map(p => [p.id, p]));
 
                 rawLicenses.forEach((l: any) => {
+                    const profileData = profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown', ib_account_number: null };
+                    const userIbAccounts = ibMap.get(l.user_id) || [];
+                    const isIbPort = userIbAccounts.includes(l.account_number) || (profileData.ib_account_number === l.account_number);
+
                     licensesData.push({
                         ...l,
-                        profiles: profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown' }
+                        is_ib: isIbPort,
+                        profiles: profileData
                     });
                 });
             }
@@ -271,7 +293,9 @@ export default function ProductFormPage() {
         }
     };
 
-    const calculateDaysRemaining = (expiryDate: string) => {
+    const calculateDaysRemaining = (expiryDate: string | null, type: string, isIbPort: boolean) => {
+        if (!isIbPort && type === 'lifetime') return 999;
+        if (!expiryDate) return 0;
         const expiry = new Date(expiryDate);
         const now = new Date();
         const diffTime = expiry.getTime() - now.getTime();
@@ -504,9 +528,9 @@ export default function ProductFormPage() {
                                             </tr>
                                         ) : filteredLicenses.length > 0 ? (
                                             filteredLicenses.map((license) => {
-                                                const daysRemaining = calculateDaysRemaining(license.expiry_date);
+                                                const daysRemaining = calculateDaysRemaining(license.expiry_date, license.type || '', license.is_ib || false);
                                                 const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
-                                                const isExpired = daysRemaining <= 0;
+                                                const isExpired = (!license.is_ib && license.type === 'lifetime') ? false : daysRemaining <= 0;
 
                                                 return (
                                                     <tr key={license.id} className="hover:bg-muted/30 transition-colors">
@@ -522,14 +546,25 @@ export default function ProductFormPage() {
                                                             <div className="font-mono bg-muted/50 px-2 py-1 rounded w-fit text-xs">
                                                                 {license.account_number}
                                                             </div>
+                                                            {license.is_ib && (
+                                                                <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded font-bold border border-blue-200 uppercase tracking-wide">
+                                                                    IB Customer
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className={`flex items-center gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : isExpired ? 'text-red-500' : ''}`}>
                                                                 <Clock className="w-3 h-3" />
-                                                                {new Date(license.expiry_date).toLocaleDateString('th-TH')}
-                                                                <span className="text-xs opacity-70">
-                                                                    ({isExpired ? 'หมดอายุ' : `เหลือ ${daysRemaining} วัน`})
-                                                                </span>
+                                                                {(!license.is_ib && license.type === 'lifetime') ? (
+                                                                    'ตลอดชีพ'
+                                                                ) : license.expiry_date ? (
+                                                                    <>
+                                                                        {new Date(license.expiry_date).toLocaleDateString('th-TH')}
+                                                                        <span className="text-xs opacity-70">
+                                                                            ({isExpired ? 'หมดอายุ' : `เหลือ ${daysRemaining} วัน`})
+                                                                        </span>
+                                                                    </>
+                                                                ) : '-'}
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
@@ -676,7 +711,7 @@ export default function ProductFormPage() {
                                 <Label>วันหมดอายุ (Expiry Date)</Label>
                                 <Input
                                     type="datetime-local"
-                                    value={new Date(new Date(editingLicense.expiry_date).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                    value={new Date(new Date(editingLicense.expiry_date || new Date().toISOString()).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                                     onChange={(e) => {
                                         setEditingLicense({
                                             ...editingLicense,
