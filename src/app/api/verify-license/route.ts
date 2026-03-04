@@ -12,7 +12,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', message: 'Invalid API Key' }, { status: 401 });
         }
 
-        const { account_number, product_id } = await req.json();
+        const { account_number, product_id, balance } = await req.json();
 
         if (!account_number || !product_id) {
             return NextResponse.json({ status: 'error', message: 'Missing parameters' }, { status: 400 });
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
         // We look for a license that matches product (by UUID OR Key) + account_number
 
         let targetProductUUID = product_id;
+        let productMinBalance = 0;
 
         // If product_id is NOT a UUID (simple check), try to resolve it from product_key
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product_id);
@@ -29,15 +30,25 @@ export async function POST(req: Request) {
         if (!isUUID) {
             const { data: product } = await supabase
                 .from('products')
-                .select('id')
+                .select('id, min_balance')
                 .eq('product_key', product_id)
                 .single();
 
             if (product) {
                 targetProductUUID = product.id;
+                productMinBalance = product.min_balance || 0;
             } else {
                 // Product Key not found
                 return NextResponse.json({ status: 'invalid', message: 'Invalid Product ID/Key' }, { status: 200 });
+            }
+        } else {
+            const { data: product } = await supabase
+                .from('products')
+                .select('min_balance')
+                .eq('id', targetProductUUID)
+                .single();
+            if (product) {
+                productMinBalance = product.min_balance || 0;
             }
         }
 
@@ -55,7 +66,12 @@ export async function POST(req: Request) {
             // Requirement says: Return JSON { status: "expired" ... }
         }
 
-        // 3. Check Expiry
+        // 3. Check Minimum Balance requirement
+        if (balance !== undefined && productMinBalance > 0 && Number(balance) < productMinBalance) {
+            return NextResponse.json({ status: 'insufficient_balance', message: `Insufficient Balance. Minimum required: $${productMinBalance}` }, { status: 200 });
+        }
+
+        // 4. Check Expiry
         if (license.expiry_date) {
             const expiry = new Date(license.expiry_date);
             const now = new Date();

@@ -99,7 +99,8 @@ export default function ProductFormPage() {
         is_active: true,
         platform: 'mt4',
         asset_class: 'gold',
-        strategy: 'trend_following'
+        strategy: 'trend_following',
+        min_balance: 0
     });
 
     useEffect(() => {
@@ -129,7 +130,8 @@ export default function ProductFormPage() {
                 is_active: data.is_active,
                 platform: data.platform || 'mt4',
                 asset_class: data.asset_class || 'gold',
-                strategy: data.strategy || 'trend_following'
+                strategy: data.strategy || 'trend_following',
+                min_balance: data.min_balance || 0
             });
         }
     };
@@ -1119,6 +1121,16 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         name="version"
                         value={formData.version}
                         onChange={handleChange}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">ขั้นต่ำพอร์ต (Min Balance) $</label>
+                    <Input
+                        type="number"
+                        name="min_balance"
+                        value={formData.min_balance}
+                        onChange={handleChange}
+                        placeholder="Ex. 100"
                     />
                 </div>
                 <div className="space-y-2">
