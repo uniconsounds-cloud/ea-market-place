@@ -274,6 +274,13 @@ export default function ProductFormPage() {
         e.preventDefault();
         setLoading(true);
         try {
+            const parsedMinBalance = parseFloat(formData.min_balance as unknown as string) || 0;
+            if (parsedMinBalance <= 0) {
+                alert('กรุณาระบุทุนขั้นต่ำ (Min Balance) ให้มากกว่า 0 หรือตั้งค่าให้ถูกต้อง');
+                setLoading(false);
+                return;
+            }
+
             const payload = {
                 name: formData.name,
                 product_key: formData.product_key || null,
@@ -288,7 +295,7 @@ export default function ProductFormPage() {
                 platform: formData.platform,
                 asset_class: formData.asset_class,
                 strategy: formData.strategy,
-                min_balance: parseFloat(formData.min_balance as unknown as string) || 0
+                min_balance: parsedMinBalance
             };
 
             let error;
