@@ -57,7 +57,73 @@ export default function AdminProductsPage() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (data) setProducts(data);
+        if (data) {
+            // Compute stats for each product
+            const { data: licenses } = await supabase
+                .from('licenses')
+                .select('product_id, account_number, is_active, user_id')
+                .eq('is_active', true);
+
+            const userIds = Array.from(new Set(licenses?.map(l => l.user_id).filter(Boolean)));
+            let ibMembershipsMap: Record<string, string[]> = {};
+
+            if (userIds.length > 0) {
+                const { data: ibMemberships } = await supabase
+                    .from('ib_memberships')
+                    .select('user_id, verification_data')
+                    .in('user_id', userIds)
+                    .eq('status', 'approved');
+
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, ib_account_number')
+                    .in('id', userIds);
+
+                if (ibMemberships) {
+                    ibMemberships.forEach(ib => {
+                        if (!ibMembershipsMap[ib.user_id]) ibMembershipsMap[ib.user_id] = [];
+                        ibMembershipsMap[ib.user_id].push(ib.verification_data);
+                    });
+                }
+
+                if (profiles) {
+                    profiles.forEach(p => {
+                        if (p.ib_account_number) {
+                            if (!ibMembershipsMap[p.id]) ibMembershipsMap[p.id] = [];
+                            if (!ibMembershipsMap[p.id].includes(p.ib_account_number)) {
+                                ibMembershipsMap[p.id].push(p.ib_account_number);
+                            }
+                        }
+                    });
+                }
+            }
+
+            const productsWithStats = data.map(product => {
+                const productLicenses = licenses?.filter(l => l.product_id === product.id) || [];
+                let regularCount = 0;
+                let ibCount = 0;
+
+                productLicenses.forEach(l => {
+                    const isIb = l.user_id && l.account_number && ibMembershipsMap[l.user_id]?.includes(l.account_number);
+                    if (isIb) {
+                        ibCount++;
+                    } else {
+                        regularCount++;
+                    }
+                });
+
+                return {
+                    ...product,
+                    stats: {
+                        regular: regularCount,
+                        ib: ibCount,
+                        total: regularCount + ibCount
+                    }
+                };
+            });
+
+            setProducts(productsWithStats);
+        }
         setLoading(false);
     };
 
@@ -280,10 +346,28 @@ export default function AdminProductsPage() {
                                                         {product.is_active ? 'Active' : 'Inactive'}
                                                     </Badge>
                                                 </div>
-                                                <div className="text-sm text-muted-foreground flex flex-wrap gap-4">
+                                                <div className="text-sm text-muted-foreground flex flex-wrap gap-4 mt-2">
                                                     <span>รายเดือน: ฿{product.price_monthly?.toLocaleString()}</span>
                                                     {product.price_quarterly && <span>3 เดือน: ฿{product.price_quarterly?.toLocaleString()}</span>}
                                                     <span>ถาวร: ฿{product.price_lifetime?.toLocaleString()}</span>
+                                                </div>
+                                                <div className="text-sm flex flex-wrap gap-4 mt-2 p-2 bg-muted/30 rounded-md border border-border/50 text-foreground w-max">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-muted-foreground font-medium">Min Balance:</span>
+                                                        <span className="font-bold text-yellow-600 dark:text-yellow-500">${product.min_balance || 0}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 ml-2">
+                                                        <span className="text-muted-foreground font-medium">เช่าซื้อ:</span>
+                                                        <span className="font-bold">{product.stats?.regular || 0}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-muted-foreground font-medium">โควต้า IB:</span>
+                                                        <span className="font-bold text-blue-600 dark:text-blue-500">{product.stats?.ib || 0}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 ml-2">
+                                                        <span className="text-muted-foreground font-medium">ใช้งานรวม:</span>
+                                                        <span className="font-bold text-primary">{product.stats?.total || 0} พอร์ต</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
