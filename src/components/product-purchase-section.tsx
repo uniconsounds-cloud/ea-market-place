@@ -406,6 +406,20 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             {/* Account Number Input */}
             <div className="space-y-2">
+                {product.min_balance > 0 && (
+                    <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-500 p-3 rounded-lg flex items-start gap-2 text-sm max-w-lg">
+                        <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                        <div>
+                            {(ibStatus === 'approved' && useIbQuota) ? 'บังคับทุนขั้นต่ำ' : 'ทุนแนะนำขั้นต่ำ'}:
+                            <span className="font-bold ml-1">${product.min_balance.toLocaleString()}</span>
+                            <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80 mt-1">
+                                {ibStatus === 'approved' && useIbQuota
+                                    ? 'หากทุนไม่ถึงเกณฑ์ที่กำหนด ระบบจะไม่อนุญาตให้รัน EA เพื่อความปลอดภัยครับ'
+                                    : 'ระบบขอแนะนำให้มีทุนตามเกณฑ์นี้ เพื่อประสิทธิภาพสูงสุดในการเทรดครับ'}
+                            </p>
+                        </div>
+                    </div>
+                )}
                 <Label htmlFor="accountNumber" className="text-base font-semibold">
                     หมายเลขพอร์ต (Account Number) <span className="text-red-500">*</span>
                 </Label>
