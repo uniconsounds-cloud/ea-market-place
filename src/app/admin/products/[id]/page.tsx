@@ -278,9 +278,9 @@ export default function ProductFormPage() {
                 name: formData.name,
                 product_key: formData.product_key || null,
                 description: formData.description,
-                price_monthly: parseFloat(formData.price_monthly),
-                price_quarterly: formData.price_quarterly ? parseFloat(formData.price_quarterly) : null,
-                price_lifetime: parseFloat(formData.price_lifetime),
+                price_monthly: parseFloat(formData.price_monthly as unknown as string),
+                price_quarterly: formData.price_quarterly ? parseFloat(formData.price_quarterly as unknown as string) : null,
+                price_lifetime: parseFloat(formData.price_lifetime as unknown as string),
                 image_url: formData.image_url,
                 file_url: formData.file_url,
                 version: formData.version,
@@ -288,6 +288,7 @@ export default function ProductFormPage() {
                 platform: formData.platform,
                 asset_class: formData.asset_class,
                 strategy: formData.strategy,
+                min_balance: parseFloat(formData.min_balance as unknown as string) || 0
             };
 
             let error;
