@@ -288,22 +288,20 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     return (
         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg space-y-6">
 
-            {product.min_balance > 0 && (
-                <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-500 p-4 rounded-lg flex items-start gap-3 text-sm">
-                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                    <div>
-                        <div className="font-semibold text-base mb-1">
-                            {(ibStatus === 'approved' && useIbQuota) ? 'บังคับทุนขั้นต่ำ' : 'ทุนแนะนำขั้นต่ำ'}:
-                            <span className="font-bold ml-1">${Number(product.min_balance).toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80">
-                            {ibStatus === 'approved' && useIbQuota
-                                ? 'หากทุนไม่ถึงเกณฑ์ที่กำหนด ระบบจะไม่อนุญาตให้รัน EA เพื่อความปลอดภัยครับ'
-                                : 'ระบบขอแนะนำให้มีทุนตามเกณฑ์นี้ เพื่อประสิทธิภาพสูงสุดในการเทรดครับ'}
-                        </p>
+            <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-500 p-4 rounded-lg flex items-start gap-3 text-sm">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                    <div className="font-semibold text-base mb-1">
+                        {(ibStatus === 'approved' && useIbQuota) ? 'บังคับทุนขั้นต่ำ' : 'ทุนแนะนำขั้นต่ำ'}:
+                        <span className="font-bold ml-1">${Number(product.min_balance).toLocaleString()}</span>
                     </div>
+                    <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80">
+                        {ibStatus === 'approved' && useIbQuota
+                            ? 'หากทุนไม่ถึงเกณฑ์ที่กำหนด ระบบจะไม่อนุญาตให้รัน EA เพื่อความปลอดภัยครับ'
+                            : 'ระบบขอแนะนำให้มีทุนตามเกณฑ์นี้ เพื่อประสิทธิภาพสูงสุดในการเทรดครับ'}
+                    </p>
                 </div>
-            )}
+            </div>
 
             {/* Active & Pending Ports Display */}
             {(displayLicenses.length > 0 || displayOrders.length > 0) && (
