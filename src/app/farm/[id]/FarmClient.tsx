@@ -118,12 +118,12 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                     <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:10%_10%]" />
 
                     {/* Base Environment Trees (Planted uniformly) */}
-                    <div className="absolute inset-10 sm:inset-16 grid grid-cols-6 grid-rows-6 sm:grid-cols-8 sm:grid-rows-8 gap-2 opacity-90">
+                    <div className="absolute inset-2 sm:inset-6 grid grid-cols-8 grid-rows-8 gap-0 sm:gap-1 opacity-85 pointer-events-none">
                         {Array.from({ length: 64 }).map((_, i) => (
                             <div key={`base_tree_${i}`} className="w-full h-full flex items-center justify-center">
-                                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-tr from-green-700 to-green-500 border-[3px] border-green-800 shadow-[0_10px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
-                                    <span className="text-xs sm:text-base drop-shadow-md">🌳</span>
-                                </div>
+                                <span className="text-[1.75rem] sm:text-4xl md:text-5xl lg:text-[4.5rem] drop-shadow-[0_8px_10px_rgba(0,0,0,0.5)]">
+                                    🌳
+                                </span>
                             </div>
                         ))}
                     </div>
