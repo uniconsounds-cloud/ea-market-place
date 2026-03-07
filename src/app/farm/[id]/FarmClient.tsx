@@ -117,6 +117,17 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                     {/* Grid Pattern Background */}
                     <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:10%_10%]" />
 
+                    {/* Base Environment Trees (Planted uniformly) */}
+                    <div className="absolute inset-10 sm:inset-16 grid grid-cols-6 grid-rows-6 sm:grid-cols-8 sm:grid-rows-8 gap-2 opacity-90">
+                        {Array.from({ length: 64 }).map((_, i) => (
+                            <div key={`base_tree_${i}`} className="w-full h-full flex items-center justify-center">
+                                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-tr from-green-700 to-green-500 border-[3px] border-green-800 shadow-[0_10px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
+                                    <span className="text-xs sm:text-base drop-shadow-md">🌳</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
                     {/* Plot Label */}
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-gradient-to-b from-[#8d6e63] to-[#5d4037] border-2 border-[#3e2723] px-8 py-2.5 rounded-xl shadow-2xl z-20 flex flex-col items-center">
                         <h2 className="text-amber-50 font-bold text-base sm:text-lg tracking-widest uppercase shadow-black drop-shadow-md">
