@@ -73,7 +73,7 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
     const totalStandardLots = totalRawLots / 100;
 
     return (
-        <div className="flex flex-col h-screen w-full bg-gradient-to-b from-[#1a120b] to-[#3e2723] overflow-hidden font-sans">
+        <div className="flex flex-col min-h-screen w-full bg-gradient-to-b from-[#1a120b] to-[#3e2723] overflow-y-auto font-sans pb-12">
             {/* Top Frame: Luxury HUD */}
             <div className="w-full h-24 bg-black/60 backdrop-blur-md border-b border-amber-500/30 flex items-center justify-between px-4 sm:px-8 shadow-2xl shrink-0 z-10 relative">
                 <div className="flex flex-col">
@@ -106,10 +106,18 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
             </div>
 
             {/* Main Canvas / Gameplay Area */}
-            <div className="flex-1 w-full flex items-center justify-center p-4 sm:p-8 relative">
+            <div className="flex-1 w-full flex flex-col items-center justify-start p-4 sm:p-8 pt-8 relative">
+
+                {/* Plot Label (Moved outside canvas) */}
+                <div className="mb-6 bg-gradient-to-b from-[#8d6e63] to-[#5d4037] border-2 border-[#3e2723] px-8 py-2.5 rounded-xl shadow-lg flex flex-col items-center">
+                    <h2 className="text-amber-50 font-bold text-base sm:text-lg tracking-widest uppercase shadow-black drop-shadow-md">
+                        {isDemo ? 'DEMO FARM' : time.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h2>
+                    {isDemo && <span className="text-[10px] text-amber-200/80 tracking-wider">Simulated Data</span>}
+                </div>
 
                 {/* 1:1 Aspect Ratio Farm Plot */}
-                <div className="relative w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl aspect-square bg-[#2d1b11] rounded-3xl border-[6px] border-[#4e342e] shadow-[inset_0_20px_60px_rgba(0,0,0,0.6),0_15px_40px_rgba(0,0,0,0.8)] overflow-hidden">
+                <div className="relative w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl aspect-square bg-[#2d1b11] rounded-3xl border-[6px] border-[#4e342e] shadow-[inset_0_20px_60px_rgba(0,0,0,0.6),0_15px_40px_rgba(0,0,0,0.8)] overflow-hidden shrink-0">
 
                     {/* Dirt texture & Lighting */}
                     <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-900/40 via-[#3e2723] to-black" />
@@ -117,23 +125,20 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                     {/* Grid Pattern Background */}
                     <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:10%_10%]" />
 
-                    {/* Base Environment Trees (Planted uniformly) */}
-                    <div className="absolute inset-2 sm:inset-6 grid grid-cols-8 grid-rows-8 gap-0 sm:gap-1 opacity-85 pointer-events-none">
+                    {/* Base Environment Trees (Organic Overlapping Plantation) */}
+                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 gap-0 opacity-90 pointer-events-none">
                         {Array.from({ length: 64 }).map((_, i) => (
                             <div key={`base_tree_${i}`} className="w-full h-full flex items-center justify-center">
-                                <span className="text-[1.75rem] sm:text-4xl md:text-5xl lg:text-[4.5rem] drop-shadow-[0_8px_10px_rgba(0,0,0,0.5)]">
+                                <span
+                                    className="text-[2.25rem] sm:text-5xl md:text-6xl lg:text-[7rem] drop-shadow-[0_15px_20px_rgba(0,0,0,0.7)]"
+                                    style={{
+                                        transform: `scale(${1.2 + (seededRandom(i) * 0.4)}) rotate(${-15 + (seededRandom(i + 100) * 30)}deg) translate(${-15 + (seededRandom(i + 200) * 30)}%, ${-15 + (seededRandom(i + 300) * 30)}%)`
+                                    }}
+                                >
                                     🌳
                                 </span>
                             </div>
                         ))}
-                    </div>
-
-                    {/* Plot Label */}
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-gradient-to-b from-[#8d6e63] to-[#5d4037] border-2 border-[#3e2723] px-8 py-2.5 rounded-xl shadow-2xl z-20 flex flex-col items-center">
-                        <h2 className="text-amber-50 font-bold text-base sm:text-lg tracking-widest uppercase shadow-black drop-shadow-md">
-                            {isDemo ? 'DEMO FARM' : time.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                        </h2>
-                        {isDemo && <span className="text-[10px] text-amber-200/80 tracking-wider">Simulated Data</span>}
                     </div>
 
                     {/* Render Order "Flowers" dynamically */}
@@ -173,18 +178,18 @@ function FlowerNode({ order }: { order: any }) {
         // Morph state: Profit (Golden Fruit)
         if (status === 'CLOSED_TP') {
             return {
-                baseClass: 'bg-gradient-to-tr from-yellow-300 via-yellow-100 to-white shadow-[0_0_25px_rgba(253,224,71,0.9)] border-yellow-200 z-20',
+                baseClass: 'drop-shadow-[0_0_25px_rgba(253,224,71,1)] z-30',
                 innerElement: '✨',
-                animation: 'animate-bounce'
+                animation: 'animate-bounce text-[2.5rem] sm:text-[3.5rem]'
             };
         }
 
         // Morph state: Loss (Dead/Burned)
         if (status === 'CLOSED_SL') {
             return {
-                baseClass: 'bg-gradient-to-br from-[#4e342e] to-[#212121] shadow-none border-[#3e2723] opacity-60 z-0',
+                baseClass: 'drop-shadow-[0_5px_8px_rgba(0,0,0,0.8)] opacity-80 z-0',
                 innerElement: '🥀',
-                animation: 'grayscale'
+                animation: 'grayscale text-[2.5rem] sm:text-[3rem]'
             };
         }
 
@@ -192,16 +197,16 @@ function FlowerNode({ order }: { order: any }) {
         const risk = order.sl_risk_percent || 0;
         if (risk < 10) {
             // Very Safe (Near TP / Floating Positive)
-            return { baseClass: 'bg-gradient-to-tr from-yellow-400 to-yellow-100 shadow-[0_0_20px_rgba(250,204,21,0.6)] border-yellow-300', innerElement: '🏵️', animation: 'animate-pulse' };
+            return { baseClass: 'drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] z-20', innerElement: '🏵️', animation: 'animate-pulse text-[2.5rem] sm:text-[3.5rem]' };
         } else if (risk < 40) {
             // Moderate Risk
-            return { baseClass: 'bg-gradient-to-tr from-orange-400 to-yellow-400 shadow-[0_0_10px_rgba(251,146,60,0.5)] border-orange-300', innerElement: '🌸', animation: '' };
+            return { baseClass: 'drop-shadow-[0_0_15px_rgba(251,146,60,0.8)] z-20', innerElement: '🌸', animation: 'text-[2.5rem] sm:text-[3.5rem]' };
         } else if (risk < 75) {
             // High Risk
-            return { baseClass: 'bg-gradient-to-tr from-orange-600 to-orange-400 border-orange-500', innerElement: '🌺', animation: '' };
+            return { baseClass: 'drop-shadow-[0_0_10px_rgba(234,88,12,0.8)] z-10', innerElement: '🌺', animation: 'text-[2.5rem] sm:text-[3.5rem]' };
         } else {
             // Danger Limits (Near SL)
-            return { baseClass: 'bg-gradient-to-tr from-[#795548] to-[#ffb74d] border-[#5d4037]', innerElement: '🍂', animation: '' };
+            return { baseClass: 'drop-shadow-[0_5px_10px_rgba(0,0,0,0.9)] z-10', innerElement: '🍂', animation: 'text-[2.5rem] sm:text-[3.5rem]' };
         }
     };
 
@@ -218,9 +223,9 @@ function FlowerNode({ order }: { order: any }) {
                 rotate: `${-15 + (seededRandom(order.ticket_id) * 30)}deg`
             }}
         >
-            {/* The Plant Shape */}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-colors duration-1000 ${baseClass}`}>
-                <span className="drop-shadow-sm">{innerElement}</span>
+            {/* The Plant Shape (Frameless Emoji) */}
+            <div className={`flex items-center justify-center transition-[filter,transform] duration-1000 ${baseClass}`}>
+                <span className="drop-shadow-2xl">{innerElement}</span>
             </div>
 
             {/* Hover Tooltip (Interactive Reveal) */}
