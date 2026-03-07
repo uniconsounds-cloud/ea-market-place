@@ -48,14 +48,27 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
         };
     }, [portNumber]);
 
+    const mockOrders = useMemo(() => [
+        { ticket_id: 1001, type: 'BUY', status: 'OPEN', current_pnl: 15.50, sl_risk_percent: 5, raw_lot_size: 15 },
+        { ticket_id: 1002, type: 'SELL', status: 'OPEN', current_pnl: -45.20, sl_risk_percent: 35, raw_lot_size: 30 },
+        { ticket_id: 1003, type: 'BUY', status: 'OPEN', current_pnl: -120.00, sl_risk_percent: 85, raw_lot_size: 60 },
+        { ticket_id: 1004, type: 'SELL', status: 'CLOSED_TP', current_pnl: 85.00, sl_risk_percent: 0, raw_lot_size: 20 },
+        { ticket_id: 1005, type: 'BUY', status: 'CLOSED_SL', current_pnl: -200.00, sl_risk_percent: 100, raw_lot_size: 50 },
+        { ticket_id: 1006, type: 'BUY', status: 'OPEN', current_pnl: 5.00, sl_risk_percent: 15, raw_lot_size: 150 },
+        { ticket_id: 1007, type: 'SELL', status: 'OPEN', current_pnl: -80.00, sl_risk_percent: 60, raw_lot_size: 15 },
+    ], []);
+
+    const isDemo = orders.length === 0;
+    const displayOrders = isDemo ? mockOrders : orders;
+
     // Derived stats from Open states only
     const floatingPnl = useMemo(() => {
-        return orders.filter(o => o.status === 'OPEN').reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
-    }, [orders]);
+        return displayOrders.filter(o => o.status === 'OPEN').reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
+    }, [displayOrders]);
 
     const totalRawLots = useMemo(() => {
-        return orders.filter(o => o.status === 'OPEN').reduce((sum, o) => sum + (Number(o.raw_lot_size) || 0), 0);
-    }, [orders]);
+        return displayOrders.filter(o => o.status === 'OPEN').reduce((sum, o) => sum + (Number(o.raw_lot_size) || 0), 0);
+    }, [displayOrders]);
 
     const totalStandardLots = totalRawLots / 100;
 
@@ -105,14 +118,15 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                     <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:10%_10%]" />
 
                     {/* Plot Label */}
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-gradient-to-b from-[#8d6e63] to-[#5d4037] border-2 border-[#3e2723] px-8 py-2.5 rounded-xl shadow-2xl z-20">
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-gradient-to-b from-[#8d6e63] to-[#5d4037] border-2 border-[#3e2723] px-8 py-2.5 rounded-xl shadow-2xl z-20 flex flex-col items-center">
                         <h2 className="text-amber-50 font-bold text-base sm:text-lg tracking-widest uppercase shadow-black drop-shadow-md">
-                            {time.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            {isDemo ? 'DEMO FARM' : time.toLocaleString('default', { month: 'long', year: 'numeric' })}
                         </h2>
+                        {isDemo && <span className="text-[10px] text-amber-200/80 tracking-wider">Simulated Data</span>}
                     </div>
 
                     {/* Render Order "Flowers" dynamically */}
-                    {orders.map(order => (
+                    {displayOrders.map(order => (
                         <FlowerNode
                             key={`${order.ticket_id}_${order.status}`}
                             order={order}
