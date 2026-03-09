@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Home, Key, CreditCard, Settings, LogOut, LayoutDashboard, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -37,9 +38,14 @@ export function SidebarContent({
         <div className="flex flex-col h-full bg-card">
             <div className="h-16 flex items-center px-6 border-b border-border">
                 <Link href="/" className="flex items-center gap-2 font-bold text-xl" onClick={onClose}>
-                    <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-md flex items-center justify-center text-xs text-white">
-                        EZE
-                    </div>
+                    <Image
+                        src="/logo.png"
+                        alt="EAEZE Logo"
+                        width={120}
+                        height={120}
+                        className="h-8 w-auto object-contain"
+                        priority
+                    />
                     EA Easy Shop
                 </Link>
             </div>

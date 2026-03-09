@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Receipt, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -86,9 +87,14 @@ export function Navbar() {
         <nav className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="container mx-auto flex h-16 items-center justify-between px-4">
                 <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-md flex items-center justify-center font-bold text-white text-xs">
-                        EZE
-                    </div>
+                    <Image
+                        src="/logo.png"
+                        alt="EAEZE Logo"
+                        width={120}
+                        height={120}
+                        className="h-10 w-auto object-contain"
+                        priority
+                    />
                     <Link href="/" className="text-xl font-bold tracking-tight whitespace-nowrap">
                         EA Easy Shop
                     </Link>
