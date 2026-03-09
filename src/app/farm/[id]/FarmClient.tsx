@@ -19,9 +19,10 @@ const GRID_ROWS = 12;
 type ZoomLevel = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 // 15 predefined invisible slots on the tree bush for organic placement
+// Adjusted coordinates based on the larger 280px tree rendering
 const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
-    x: 20 + seededRandom(i * 10) * 60, // 20% to 80%
-    y: 10 + seededRandom(i * 20) * 45, // 10% to 55%
+    x: 25 + seededRandom(i * 10) * 50, // 25% to 75%
+    y: 40 + seededRandom(i * 20) * 45, // 40% to 85% to stay on the green foliage part of tree
     z: i
 }));
 
@@ -200,10 +201,10 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                     style={{ transform: `scale(${mapScale})` }}
                 >
                     {/* The 10x12 Isometric Farm Plot */}
-                    <div className="relative w-0 h-0 flex items-center justify-center">
+                    <div className="relative w-[1000px] h-[800px] flex items-center justify-center">
 
                         {/* Wooden Signpost Header */}
-                        <div className="absolute -top-[350px] left-1/2 -translate-x-1/2 z-0 flex flex-col items-center pointer-events-none drop-shadow-xl blur-[0px]">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-0 flex flex-col items-center pointer-events-none drop-shadow-xl blur-[0px]">
                             <div className="bg-[#6d4c41] border-4 border-[#3e2723] rounded-sm px-10 py-3 shadow-[inset_0_4px_6px_rgba(255,255,255,0.1)] relative">
                                 {/* Nails */}
                                 <div className="absolute top-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
@@ -220,65 +221,67 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                         </div>
 
                         {/* Rendering 120 Isometric Trees */}
-                        {treeDataMap.map((tree, i) => {
-                            const col = i % GRID_COLS;
-                            const row = Math.floor(i / GRID_COLS);
+                        <div className="absolute top-[200px] left-[500px]">
+                            {treeDataMap.map((tree, i) => {
+                                const col = i % GRID_COLS;
+                                const row = Math.floor(i / GRID_COLS);
 
-                            // Cartesian to Isometric Projection
-                            const posX = (col - row) * TILE_W;
-                            const posY = (col + row) * TILE_H;
-                            const zIndex = col + row; // Front items overlap back items
+                                // Cartesian to Isometric Projection
+                                const posX = (col - row) * TILE_W;
+                                const posY = (col + row) * TILE_H;
+                                const zIndex = col + row; // Front items overlap back items
 
-                            return (
-                                <div
-                                    key={`iso_tree_${i}`}
-                                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                                    style={{
-                                        left: `${posX}px`,
-                                        top: `${posY}px`,
-                                        zIndex: zIndex,
-                                        width: '160px',  // Size of the base image rendering
-                                        height: '160px'
-                                    }}
-                                >
-                                    {/* Base Isometric Bush & Dirt */}
-                                    <Image
-                                        src="/farm/base_tree.png"
-                                        alt="Base Tree"
-                                        fill
-                                        className="object-contain"
-                                        priority={i < 40}
-                                        unoptimized
-                                    />
+                                return (
+                                    <div
+                                        key={`iso_tree_${i}`}
+                                        className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                                        style={{
+                                            left: `${posX}px`,
+                                            top: `${posY}px`,
+                                            zIndex: zIndex,
+                                            width: '280px',  // Size of the base image rendering (increased to prevent clipping)
+                                            height: '280px'
+                                        }}
+                                    >
+                                        {/* Base Isometric Bush & Dirt */}
+                                        <Image
+                                            src="/farm/base_tree.png"
+                                            alt="Base Tree"
+                                            fill
+                                            className="object-contain object-bottom"
+                                            priority={i < 40}
+                                            unoptimized
+                                        />
 
-                                    {/* Render Slots on this Tree */}
-                                    {tree.assets.map((asset, aIdx) => {
-                                        const slot = TREE_SLOTS[asset.slotId];
-                                        return (
-                                            <div
-                                                key={`slot_${i}_${aIdx}`}
-                                                className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none drop-shadow-xl"
-                                                style={{
-                                                    left: `${slot.x}%`,
-                                                    top: `${slot.y}%`,
-                                                    zIndex: zIndex + 1
-                                                }}
-                                            >
-                                                {asset.type === 'A' && (
-                                                    <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse" unoptimized />
-                                                )}
-                                                {asset.type === 'B' && (
-                                                    <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain" unoptimized />
-                                                )}
-                                                {asset.type === 'C' && (
-                                                    <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain opacity-90" unoptimized />
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            );
-                        })}
+                                        {/* Render Slots on this Tree */}
+                                        {tree.assets.map((asset, aIdx) => {
+                                            const slot = TREE_SLOTS[asset.slotId];
+                                            return (
+                                                <div
+                                                    key={`slot_${i}_${aIdx}`}
+                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none drop-shadow-xl"
+                                                    style={{
+                                                        left: `${slot.x}%`,
+                                                        top: `${slot.y}%`,
+                                                        zIndex: zIndex + 1
+                                                    }}
+                                                >
+                                                    {asset.type === 'A' && (
+                                                        <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse" unoptimized />
+                                                    )}
+                                                    {asset.type === 'B' && (
+                                                        <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain" unoptimized />
+                                                    )}
+                                                    {asset.type === 'C' && (
+                                                        <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain opacity-90" unoptimized />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
