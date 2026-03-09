@@ -11,7 +11,7 @@ function seededRandom(seed: number) {
     return x - Math.floor(x);
 }
 
-const TILE_W = 110; // Isometric pixel base width (doubled for wider spread)
+const TILE_W = 105; // Isometric pixel base width (tightly fitted)
 const TILE_H = TILE_W / 2; // Isometric pixel half-height
 const GRID_COLS = 10;
 const GRID_ROWS = 12;
@@ -21,8 +21,8 @@ type ZoomLevel = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 // 15 predefined invisible slots on the tree bush for organic placement
 // Adjusted coordinates based on the larger 280px tree rendering
 const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
-    x: 25 + seededRandom(i * 10) * 50, // 25% to 75%
-    y: 40 + seededRandom(i * 20) * 45, // 40% to 85% to stay on the green foliage part of tree
+    x: 25 + seededRandom(i * 10) * 50, // 25% to 75% wide
+    y: 15 + seededRandom(i * 20) * 40, // 15% to 55% high to stay purely on the green leaves
     z: i
 }));
 
@@ -201,7 +201,7 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                     style={{ transform: `scale(${mapScale})` }}
                 >
                     {/* The 10x12 Isometric Farm Plot */}
-                    <div className="relative w-[1000px] h-[800px] flex items-center justify-center">
+                    <div className="relative w-[2400px] h-[1600px] flex items-center justify-center">
 
                         {/* Wooden Signpost Header */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 z-0 flex flex-col items-center pointer-events-none drop-shadow-xl blur-[0px]">
@@ -221,7 +221,7 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                         </div>
 
                         {/* Rendering 120 Isometric Trees */}
-                        <div className="absolute top-[200px] left-[500px]">
+                        <div className="absolute top-[200px] left-[1200px]">
                             {treeDataMap.map((tree, i) => {
                                 const col = i % GRID_COLS;
                                 const row = Math.floor(i / GRID_COLS);
