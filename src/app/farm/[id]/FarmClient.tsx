@@ -16,10 +16,10 @@ function seededRandom(seed: number) {
 // ==========================================
 
 // 1. ระยะห่างความกว้าง ซ้าย-ขวา (ยิ่งน้อย ต้นไม้จะยิ่งเบียดกันแนวนอน)
-const TILE_W = 105;
+const TILE_W = 100;
 
 // 2. ระยะความลึก บน-ล่าง (ยิ่งน้อย แถวบนจะยิ่งขยับเลื่อนลงมาซ้อนทับแถวล่างมากขึ้น)
-const TILE_H_OFFSET = 45; // แนะนำ: 40-52 (เดิมปกติตามสูตรคือ TILE_W / 2)
+const TILE_H_OFFSET = 55; // แนะนำ: 40-52 (เดิมปกติตามสูตรคือ TILE_W / 2)
 
 // 3. พื้นที่เกิดของผลไม้/ดอกไม้บนต้น (0% คือยอดขอบบนสุด, 100% คือขอบล่างสุดของรูปต้นไม้)
 const FRUIT_SPAWN_Y_MIN = 10; // ขอบเขตด้านบนสุด (เลขยิ่งน้อย ยิ่งอยู่สูง)
@@ -116,6 +116,18 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
         let globalTreeIndex = 0;
         let globalSlotIndex = 0;
 
+        // Helper to check if a tile is a 'Tree' (checkerboard pattern)
+        const isTreeTile = (index: number) => {
+            const col = index % GRID_COLS;
+            const row = Math.floor(index / GRID_COLS);
+            return (col + row) % 2 === 0;
+        };
+
+        // Initialize to first valid tree
+        while (globalTreeIndex < trees.length && !isTreeTile(globalTreeIndex)) {
+            globalTreeIndex++;
+        }
+
         const placeAsset = (type: 'A' | 'B' | 'C') => {
             if (globalTreeIndex >= trees.length) return; // Full farm
             trees[globalTreeIndex].assets.push({ type, slotId: globalSlotIndex });
@@ -124,6 +136,11 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
             if (globalSlotIndex >= 15) {
                 globalSlotIndex = 0;
                 globalTreeIndex++;
+
+                // Advance to the next valid tree tile
+                while (globalTreeIndex < trees.length && !isTreeTile(globalTreeIndex)) {
+                    globalTreeIndex++;
+                }
             }
         };
 
@@ -250,29 +267,31 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                                     const posY = (col + row) * TILE_H_OFFSET;
                                     const zIndex = col + row; // Front items overlap back items
 
+                                    const isTree = (col + row) % 2 === 0; // Checkerboard logic
+
                                     return (
                                         <div
-                                            key={`iso_tree_${i}`}
-                                            className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                                            key={`tree_${i}`}
+                                            className="absolute pointer-events-none"
                                             style={{
                                                 left: `${posX}px`,
                                                 top: `${posY}px`,
-                                                zIndex: zIndex,
-                                                width: '280px',  // Size of the base image rendering (increased to prevent clipping)
+                                                zIndex,
+                                                width: '280px',
                                                 height: '280px'
                                             }}
                                         >
                                             <Image
-                                                src="/farm/base_tree.png"
-                                                alt="Base Tree"
+                                                src={isTree ? "/farm/base_tree.png" : "/farm/base_ground.png"}
+                                                alt={isTree ? "Base Tree" : "Base Ground"}
                                                 fill
                                                 className="object-contain object-bottom"
                                                 priority={i < 40}
                                                 unoptimized
                                             />
 
-                                            {/* Render Slots on this Tree */}
-                                            {tree.assets.map((asset, aIdx) => {
+                                            {/* Render Slots only if it's a tree */}
+                                            {isTree && tree.assets.map((asset, aIdx) => {
                                                 const slot = TREE_SLOTS[asset.slotId];
                                                 return (
                                                     <div
