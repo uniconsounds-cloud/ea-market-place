@@ -11,18 +11,31 @@ function seededRandom(seed: number) {
     return x - Math.floor(x);
 }
 
-const TILE_W = 105; // Isometric pixel base width (tightly fitted)
-const TILE_H = TILE_W / 2; // Isometric pixel half-height
+// ==========================================
+// 🛠️ CONFIGURABLE VARIABLES (สำหรับปรับจูนระยะ)
+// ==========================================
+
+// 1. ระยะห่างความกว้าง ซ้าย-ขวา (ยิ่งน้อย ต้นไม้จะยิ่งเบียดกันแนวนอน)
+const TILE_W = 105;
+
+// 2. ระยะความลึก บน-ล่าง (ยิ่งน้อย แถวบนจะยิ่งขยับเลื่อนลงมาซ้อนทับแถวล่างมากขึ้น)
+const TILE_H_OFFSET = 45; // แนะนำ: 40-52 (เดิมปกติตามสูตรคือ TILE_W / 2)
+
+// 3. พื้นที่เกิดของผลไม้/ดอกไม้บนต้น (0% คือยอดขอบบนสุด, 100% คือขอบล่างสุดของรูปต้นไม้)
+const FRUIT_SPAWN_Y_MIN = 10; // ขอบเขตด้านบนสุด (เลขยิ่งน้อย ยิ่งอยู่สูง)
+const FRUIT_SPAWN_Y_MAX = 42; // ขอบเขตด้านล่างสุด (เลขยิ่งมาก ยิ่งย้อยลงมาที่โคน)
+const FRUIT_SPAWN_X_MIN = 25; // ขอบเขตซ้ายสุด
+const FRUIT_SPAWN_X_MAX = 75; // ขอบเขตขวาสุด
+
 const GRID_COLS = 10;
 const GRID_ROWS = 12;
 
 type ZoomLevel = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 // 15 predefined invisible slots on the tree bush for organic placement
-// Adjusted coordinates based on the larger 280px tree rendering
 const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
-    x: 25 + seededRandom(i * 10) * 50, // 25% to 75% wide
-    y: 15 + seededRandom(i * 20) * 40, // 15% to 55% high to stay purely on the green leaves
+    x: FRUIT_SPAWN_X_MIN + seededRandom(i * 10) * (FRUIT_SPAWN_X_MAX - FRUIT_SPAWN_X_MIN),
+    y: FRUIT_SPAWN_Y_MIN + seededRandom(i * 20) * (FRUIT_SPAWN_Y_MAX - FRUIT_SPAWN_Y_MIN),
     z: i
 }));
 
@@ -193,97 +206,104 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
             </div>
 
             {/* Main Infinite Canvas (Horizontal Scroll Area) */}
-            <div className="flex-1 w-full min-w-[200vw] sm:min-w-[150vw] flex items-center justify-center relative mt-24">
+            <div className="flex-1 w-full relative mt-24 overflow-auto">
+                {/* 
+                  To prevent the `scale()` transform from pushing the left edge of the grid 
+                  into un-scrollable negative space (a known CSS issue with flex + scale + overflow), 
+                  we wrapper the scaled content inside a massively oversized block frame.
+                */}
+                <div className="min-w-[4000px] min-h-[3000px] flex items-center justify-center pointer-events-auto">
 
-                {/* 2.5D Camera Wrapper */}
-                <div
-                    className="relative transition-transform duration-1000 ease-out flex items-center justify-center origin-center"
-                    style={{ transform: `scale(${mapScale})` }}
-                >
-                    {/* The 10x12 Isometric Farm Plot */}
-                    <div className="relative w-[2400px] h-[1600px] flex items-center justify-center">
+                    {/* 2.5D Camera Wrapper */}
+                    <div
+                        className="relative transition-transform duration-1000 ease-out origin-center"
+                        style={{ transform: `scale(${mapScale})` }}
+                    >
+                        {/* The 10x12 Isometric Farm Plot */}
+                        <div className="relative w-[2400px] h-[1600px] pointer-events-none">
 
-                        {/* Wooden Signpost Header */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-0 flex flex-col items-center pointer-events-none drop-shadow-xl blur-[0px]">
-                            <div className="bg-[#6d4c41] border-4 border-[#3e2723] rounded-sm px-10 py-3 shadow-[inset_0_4px_6px_rgba(255,255,255,0.1)] relative">
-                                {/* Nails */}
-                                <div className="absolute top-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
-                                <div className="absolute top-1 right-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
-                                <div className="absolute bottom-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
-                                <div className="absolute bottom-1 right-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                            {/* Wooden Signpost Header */}
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-0 flex flex-col items-center pointer-events-auto drop-shadow-xl blur-[0px] mt-20">
+                                <div className="bg-[#6d4c41] border-4 border-[#3e2723] rounded-sm px-10 py-3 shadow-[inset_0_4px_6px_rgba(255,255,255,0.1)] relative">
+                                    {/* Nails */}
+                                    <div className="absolute top-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                                    <div className="absolute top-1 right-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                                    <div className="absolute bottom-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                                    <div className="absolute bottom-1 right-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
 
-                                <h2 className="text-[#f5deb3] font-black text-2xl tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                                    {isDemo ? 'DEMO TIMELINE' : signpostLabel}
-                                </h2>
-                                {isDemo && <span className="block text-center text-[10px] text-[#ffcccb] tracking-wider mt-1">Simulated Aggregate Data</span>}
+                                    <h2 className="text-[#f5deb3] font-black text-2xl tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                                        {isDemo ? 'DEMO TIMELINE' : signpostLabel}
+                                    </h2>
+                                    {isDemo && <span className="block text-center text-[10px] text-[#ffcccb] tracking-wider mt-1">Simulated Aggregate Data</span>}
+                                </div>
+                                <div className="w-4 h-16 bg-[#3e2723] shadow-xl"></div>
                             </div>
-                            <div className="w-4 h-16 bg-[#3e2723] shadow-xl"></div>
-                        </div>
 
-                        {/* Rendering 120 Isometric Trees */}
-                        <div className="absolute top-[200px] left-[1200px]">
-                            {treeDataMap.map((tree, i) => {
-                                const col = i % GRID_COLS;
-                                const row = Math.floor(i / GRID_COLS);
+                            {/* Rendering 120 Isometric Trees */}
+                            <div className="absolute top-[200px] left-[1200px]">
+                                {treeDataMap.map((tree, i) => {
+                                    const col = i % GRID_COLS;
+                                    const row = Math.floor(i / GRID_COLS);
 
-                                // Cartesian to Isometric Projection
-                                const posX = (col - row) * TILE_W;
-                                const posY = (col + row) * TILE_H;
-                                const zIndex = col + row; // Front items overlap back items
+                                    // Cartesian to Isometric Projection
+                                    const posX = (col - row) * TILE_W;
+                                    const posY = (col + row) * TILE_H_OFFSET;
+                                    const zIndex = col + row; // Front items overlap back items
 
-                                return (
-                                    <div
-                                        key={`iso_tree_${i}`}
-                                        className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                                        style={{
-                                            left: `${posX}px`,
-                                            top: `${posY}px`,
-                                            zIndex: zIndex,
-                                            width: '280px',  // Size of the base image rendering (increased to prevent clipping)
-                                            height: '280px'
-                                        }}
-                                    >
-                                        <Image
-                                            src="/farm/base_tree.png"
-                                            alt="Base Tree"
-                                            fill
-                                            className="object-contain object-bottom"
-                                            priority={i < 40}
-                                            unoptimized
-                                        />
+                                    return (
+                                        <div
+                                            key={`iso_tree_${i}`}
+                                            className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                                            style={{
+                                                left: `${posX}px`,
+                                                top: `${posY}px`,
+                                                zIndex: zIndex,
+                                                width: '280px',  // Size of the base image rendering (increased to prevent clipping)
+                                                height: '280px'
+                                            }}
+                                        >
+                                            <Image
+                                                src="/farm/base_tree.png"
+                                                alt="Base Tree"
+                                                fill
+                                                className="object-contain object-bottom"
+                                                priority={i < 40}
+                                                unoptimized
+                                            />
 
-                                        {/* Render Slots on this Tree */}
-                                        {tree.assets.map((asset, aIdx) => {
-                                            const slot = TREE_SLOTS[asset.slotId];
-                                            return (
-                                                <div
-                                                    key={`slot_${i}_${aIdx}`}
-                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none drop-shadow-xl"
-                                                    style={{
-                                                        left: `${slot.x}%`,
-                                                        top: `${slot.y}%`,
-                                                        zIndex: zIndex + 1
-                                                    }}
-                                                >
-                                                    {asset.type === 'A' && (
-                                                        <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse" unoptimized />
-                                                    )}
-                                                    {asset.type === 'B' && (
-                                                        <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain" unoptimized />
-                                                    )}
-                                                    {asset.type === 'C' && (
-                                                        <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain opacity-90" unoptimized />
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
+                                            {/* Render Slots on this Tree */}
+                                            {tree.assets.map((asset, aIdx) => {
+                                                const slot = TREE_SLOTS[asset.slotId];
+                                                return (
+                                                    <div
+                                                        key={`slot_${i}_${aIdx}`}
+                                                        className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none drop-shadow-xl"
+                                                        style={{
+                                                            left: `${slot.x}%`,
+                                                            top: `${slot.y}%`,
+                                                            zIndex: zIndex + 1
+                                                        }}
+                                                    >
+                                                        {asset.type === 'A' && (
+                                                            <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse" unoptimized />
+                                                        )}
+                                                        {asset.type === 'B' && (
+                                                            <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain" unoptimized />
+                                                        )}
+                                                        {asset.type === 'C' && (
+                                                            <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain opacity-90" unoptimized />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                </div>
 
+                </div>
             </div>
         </div>
     );
