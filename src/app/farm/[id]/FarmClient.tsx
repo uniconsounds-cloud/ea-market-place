@@ -116,10 +116,11 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
         let globalTreeIndex = 0;
         let globalSlotIndex = 0;
 
-        // Helper to check if a tile is a 'Tree' (alternating rows)
+        // Helper to check if a tile is a 'Tree' (alternating rows AND columns)
         const isTreeTile = (index: number) => {
+            const col = index % GRID_COLS;
             const row = Math.floor(index / GRID_COLS);
-            return row % 2 !== 0; // Odd rows will be trees, Even rows will be empty ground
+            return row % 2 !== 0 && col % 2 !== 0; // Odd rows AND Odd cols will be trees, everything else empty ground
         };
 
         // Initialize to first valid tree
@@ -266,7 +267,7 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                                     const posY = (col + row) * TILE_H_OFFSET;
                                     const zIndex = col + row; // Front items overlap back items
 
-                                    const isTree = row % 2 !== 0; // Alternating rows logic
+                                    const isTree = row % 2 !== 0 && col % 2 !== 0; // Alternating rows AND columns logic
 
                                     return (
                                         <div
