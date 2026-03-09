@@ -11,7 +11,7 @@ function seededRandom(seed: number) {
     return x - Math.floor(x);
 }
 
-const TILE_W = 60; // Isometric pixel base width
+const TILE_W = 120; // Isometric pixel base width (doubled for wider spread)
 const TILE_H = TILE_W / 2; // Isometric pixel half-height
 const GRID_COLS = 10;
 const GRID_ROWS = 12;
@@ -243,7 +243,6 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                                             height: '280px'
                                         }}
                                     >
-                                        {/* Base Isometric Bush & Dirt */}
                                         <Image
                                             src="/farm/base_tree.png"
                                             alt="Base Tree"
