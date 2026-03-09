@@ -11,7 +11,7 @@ function seededRandom(seed: number) {
     return x - Math.floor(x);
 }
 
-const TILE_W = 120; // Isometric pixel base width (doubled for wider spread)
+const TILE_W = 110; // Isometric pixel base width (doubled for wider spread)
 const TILE_H = TILE_W / 2; // Isometric pixel half-height
 const GRID_COLS = 10;
 const GRID_ROWS = 12;
@@ -144,7 +144,7 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
     const mapScale = zoom === 'DAILY' ? 1.4 : zoom === 'WEEKLY' ? 0.9 : 0.6;
 
     return (
-        <div className="flex flex-col min-h-screen w-full bg-[#fdfaf6] overflow-x-auto overflow-y-hidden font-sans relative">
+        <div className="flex flex-col min-h-screen w-full bg-[#fdfaf6] overflow-x-auto overflow-y-auto font-sans relative">
 
             {/* Top Frame: Luxury HUD */}
             <div className="fixed top-0 left-0 w-full h-24 bg-white/90 backdrop-blur-md border-b-2 border-amber-200/50 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0 z-50">
