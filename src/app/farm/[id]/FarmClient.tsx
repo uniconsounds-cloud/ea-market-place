@@ -2,17 +2,33 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Clock } from 'lucide-react';
+import { Clock, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import Image from 'next/image';
 
-// Seeded random number generator for consistent static positioning on Canvas
+// --- Utilities ---
 function seededRandom(seed: number) {
     let x = Math.sin(seed) * 10000;
     return x - Math.floor(x);
 }
 
+const TILE_W = 60; // Isometric pixel base width
+const TILE_H = TILE_W / 2; // Isometric pixel half-height
+const GRID_COLS = 10;
+const GRID_ROWS = 12;
+
+type ZoomLevel = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+// 15 predefined invisible slots on the tree bush for organic placement
+const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
+    x: 20 + seededRandom(i * 10) * 60, // 20% to 80%
+    y: 10 + seededRandom(i * 20) * 45, // 10% to 55%
+    z: i
+}));
+
 export default function FarmClient({ portNumber, initialOrders }: { portNumber: string, initialOrders: any[] }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [time, setTime] = useState(new Date());
+    const [zoom, setZoom] = useState<ZoomLevel>('DAILY');
 
     useEffect(() => {
         const timer = setInterval(() => setTime(new Date()), 1000);
@@ -20,17 +36,11 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
     }, []);
 
     useEffect(() => {
-        // Subscribe to real-time changes using Postgres Changes
         const channel = supabase
             .channel(`farm_updates_${portNumber}`)
             .on(
                 'postgres_changes',
-                {
-                    event: '*', // Listen to all inserts, updates, deletes
-                    schema: 'public',
-                    table: 'farm_active_orders',
-                    filter: `port_number=eq.${portNumber}`
-                },
+                { event: '*', schema: 'public', table: 'farm_active_orders', filter: `port_number=eq.${portNumber}` },
                 (payload) => {
                     if (payload.eventType === 'INSERT') {
                         setOrders(prev => [...prev.filter(o => o.ticket_id !== payload.new.ticket_id), payload.new]);
@@ -42,202 +52,239 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                 }
             )
             .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(channel); };
     }, [portNumber]);
 
-    const mockOrders = useMemo(() => [
+    // Mock initial demo state if empty
+    const isDemo = orders.length === 0;
+    const displayOrders = useMemo(() => isDemo ? [
         { ticket_id: 1001, type: 'BUY', status: 'OPEN', current_pnl: 15.50, sl_risk_percent: 5, raw_lot_size: 15 },
         { ticket_id: 1002, type: 'SELL', status: 'OPEN', current_pnl: -45.20, sl_risk_percent: 35, raw_lot_size: 30 },
-        { ticket_id: 1003, type: 'BUY', status: 'OPEN', current_pnl: -120.00, sl_risk_percent: 85, raw_lot_size: 60 },
-        { ticket_id: 1004, type: 'SELL', status: 'CLOSED_TP', current_pnl: 85.00, sl_risk_percent: 0, raw_lot_size: 20 },
-        { ticket_id: 1005, type: 'BUY', status: 'CLOSED_SL', current_pnl: -200.00, sl_risk_percent: 100, raw_lot_size: 50 },
-        { ticket_id: 1006, type: 'BUY', status: 'OPEN', current_pnl: 5.00, sl_risk_percent: 15, raw_lot_size: 150 },
-        { ticket_id: 1007, type: 'SELL', status: 'OPEN', current_pnl: -80.00, sl_risk_percent: 60, raw_lot_size: 15 },
-    ], []);
+        { ticket_id: 1004, type: 'SELL', status: 'CLOSED_TP', current_pnl: 10.00, sl_risk_percent: 0, raw_lot_size: 20 },
+        { ticket_id: 1005, type: 'BUY', status: 'CLOSED_SL', current_pnl: -5.00, sl_risk_percent: 100, raw_lot_size: 50 },
+    ] : orders, [isDemo, orders]);
 
-    const isDemo = orders.length === 0;
-    const displayOrders = isDemo ? mockOrders : orders;
+    // Derived Variables based on Zoom Level
+    const derivedStats = useMemo(() => {
+        const openOrders = displayOrders.filter(o => o.status === 'OPEN');
+        const floatingPnl = openOrders.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
+        const totalStandardLots = openOrders.reduce((sum, o) => sum + (Number(o.raw_lot_size) || 0), 0) / 100;
 
-    // Derived stats from Open states only
-    const floatingPnl = useMemo(() => {
-        return displayOrders.filter(o => o.status === 'OPEN').reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
-    }, [displayOrders]);
+        let totalProfit = 0;
+        let totalLoss = 0;
 
-    const totalRawLots = useMemo(() => {
-        return displayOrders.filter(o => o.status === 'OPEN').reduce((sum, o) => sum + (Number(o.raw_lot_size) || 0), 0);
-    }, [displayOrders]);
+        // Cumulative past data (In a real app, Weekly/Monthly would hit DB aggregates instead of map)
+        const closedTp = displayOrders.filter(o => o.status === 'CLOSED_TP');
+        const closedSl = displayOrders.filter(o => o.status === 'CLOSED_SL');
 
-    const totalStandardLots = totalRawLots / 100;
+        // Simulating data scaling based on zoom choice for effect
+        let multiplier = zoom === 'DAILY' ? 1 : zoom === 'WEEKLY' ? 5 : 20;
+
+        totalProfit = closedTp.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0) * multiplier;
+        totalLoss = Math.abs(closedSl.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0)) * multiplier;
+
+        return {
+            openOrdersCount: openOrders.length,
+            floatingPnl,
+            totalStandardLots,
+            fruitCount: Math.min(Math.floor(totalProfit * 10), 1000),   // 1 Fruit = 10 cents ($0.10)
+            deadCount: Math.min(Math.floor(totalLoss * 10), 1000),      // 1 Dead = 10 cents ($0.10)
+        };
+    }, [displayOrders, zoom]);
+
+    // Distribute active orders, fruits, and dead flowers across the 120 trees
+    const treeDataMap = useMemo(() => {
+        // Init 120 trees with 15 empty slots each
+        const trees = Array.from({ length: GRID_COLS * GRID_ROWS }).map(() => ({
+            assets: [] as any[], // Array of { type: 'A'|'B'|'C', slotId: number }
+        }));
+
+        let globalTreeIndex = 0;
+        let globalSlotIndex = 0;
+
+        const placeAsset = (type: 'A' | 'B' | 'C') => {
+            if (globalTreeIndex >= trees.length) return; // Full farm
+            trees[globalTreeIndex].assets.push({ type, slotId: globalSlotIndex });
+
+            globalSlotIndex++;
+            if (globalSlotIndex >= 15) {
+                globalSlotIndex = 0;
+                globalTreeIndex++;
+            }
+        };
+
+        // 1. Place 'A' (Pulsing Lotus) for every Open Order
+        for (let i = 0; i < derivedStats.openOrdersCount; i++) {
+            placeAsset('A');
+        }
+
+        // 2. Place 'B' (Apple) for every 10 cents Profit
+        for (let i = 0; i < derivedStats.fruitCount; i++) {
+            placeAsset('B');
+        }
+
+        // 3. Place 'C' (Dead Lotus) for every 10 cents Loss
+        for (let i = 0; i < derivedStats.deadCount; i++) {
+            placeAsset('C');
+        }
+
+        // We shuffle the tree array purely for organic randomness so fruits aren't just stacked on Tree 0
+        return trees.sort((a, b) => seededRandom(a.assets.length) - 0.5);
+    }, [derivedStats]);
+
+    // Signpost Labels
+    const signpostLabel = zoom === 'DAILY'
+        ? time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()
+        : zoom === 'WEEKLY'
+            ? `WEEK 3, ${time.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }).toUpperCase()}`
+            : `${time.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase()}`;
+
+    // Isometric Map Scale
+    const mapScale = zoom === 'DAILY' ? 1.4 : zoom === 'WEEKLY' ? 0.9 : 0.6;
 
     return (
-        <div className="flex flex-col min-h-screen w-full bg-gradient-to-b from-[#1a120b] to-[#3e2723] overflow-y-auto font-sans pb-12">
+        <div className="flex flex-col min-h-screen w-full bg-[#fdfaf6] overflow-x-auto overflow-y-hidden font-sans relative">
+
             {/* Top Frame: Luxury HUD */}
-            <div className="w-full h-24 bg-black/60 backdrop-blur-md border-b border-amber-500/30 flex items-center justify-between px-4 sm:px-8 shadow-2xl shrink-0 z-10 relative">
+            <div className="fixed top-0 left-0 w-full h-24 bg-white/90 backdrop-blur-md border-b-2 border-amber-200/50 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0 z-50">
                 <div className="flex flex-col">
-                    <h1 className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 tracking-wider">
+                    <h1 className="text-xl sm:text-2xl font-extrabold text-[#d4af37] tracking-wider drop-shadow-sm flex items-center gap-2">
+                        <Image src="/logo.png" alt="EAEZE" width={40} height={40} className="h-8 w-auto" />
                         EasyGold Farm
                     </h1>
-                    <span className="text-sm text-amber-200/60 font-mono tracking-widest mt-1">PORT: {portNumber}</span>
+                    <span className="text-xs text-amber-900/40 font-mono tracking-widest mt-1">PORT: {portNumber}</span>
                 </div>
 
-                <div className="flex items-center gap-6 sm:gap-12">
+                {/* Center: Zoom Controls */}
+                <div className="hidden lg:flex bg-[#fbf8f1] rounded-full p-1 border border-[#e3d5b8] shadow-inner gap-1">
+                    <button onClick={() => setZoom('DAILY')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${zoom === 'DAILY' ? 'bg-[#d4af37] text-white shadow-md' : 'text-[#8b7355] hover:bg-white'} uppercase tracking-wide`}>Daily</button>
+                    <button onClick={() => setZoom('WEEKLY')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${zoom === 'WEEKLY' ? 'bg-[#d4af37] text-white shadow-md' : 'text-[#8b7355] hover:bg-white'} uppercase tracking-wide`}>Weekly</button>
+                    <button onClick={() => setZoom('MONTHLY')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${zoom === 'MONTHLY' ? 'bg-[#d4af37] text-white shadow-md' : 'text-[#8b7355] hover:bg-white'} uppercase tracking-wide`}>Monthly</button>
+                </div>
+
+                <div className="flex items-center gap-6 sm:gap-12 text-[#5c4a3d]">
                     <div className="flex flex-col items-center">
-                        <span className="text-[10px] sm:text-xs text-amber-500/70 uppercase tracking-widest font-semibold mb-1">Floating PnL</span>
-                        <span className={`text-xl sm:text-3xl font-bold font-mono transition-colors duration-300 ${floatingPnl >= 0 ? 'text-green-400 drop-shadow-[0_0_12px_rgba(74,222,128,0.4)]' : 'text-red-400 drop-shadow-[0_0_12px_rgba(248,113,113,0.4)]'}`}>
-                            {floatingPnl >= 0 ? '+' : ''}{floatingPnl.toFixed(2)}
+                        <span className="text-[10px] sm:text-xs text-[#a68a61] uppercase tracking-widest font-semibold mb-1">Floating PnL</span>
+                        <span className={`text-xl sm:text-3xl font-bold font-mono transition-colors duration-300 ${derivedStats.floatingPnl >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            {derivedStats.floatingPnl >= 0 ? '+' : ''}{derivedStats.floatingPnl.toFixed(2)}
                         </span>
                     </div>
 
                     <div className="hidden sm:flex flex-col items-center">
-                        <span className="text-[10px] sm:text-xs text-amber-500/70 uppercase tracking-widest font-semibold mb-1">Standard Lots</span>
-                        <span className="text-lg sm:text-xl font-bold text-amber-100 font-mono">{totalStandardLots.toFixed(2)}</span>
+                        <span className="text-[10px] sm:text-xs text-[#a68a61] uppercase tracking-widest font-semibold mb-1">Standard Lots</span>
+                        <span className="text-lg sm:text-xl font-bold font-mono">{derivedStats.totalStandardLots.toFixed(2)}</span>
                     </div>
 
                     <div className="flex flex-col items-end min-w-[100px]">
-                        <span className="text-[10px] sm:text-xs text-amber-500/70 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1.5">
-                            <Clock className="w-3 h-3 text-amber-400" /> Time
+                        <span className="text-[10px] sm:text-xs text-[#a68a61] uppercase tracking-widest font-semibold mb-1 flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-[#d4af37]" /> Time
                         </span>
-                        <span className="text-base sm:text-lg font-mono text-amber-200">{time.toLocaleTimeString()}</span>
+                        <span className="text-base sm:text-lg font-mono">{time.toLocaleTimeString()}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Main Canvas / Gameplay Area */}
-            <div className="flex-1 w-full flex flex-col items-center justify-start p-4 sm:p-8 pt-8 relative">
+            {/* Mobile Zoom Controls */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 lg:hidden bg-white/90 backdrop-blur-md rounded-full p-1.5 border border-[#e3d5b8] shadow-2xl flex gap-2 z-50">
+                <button onClick={() => setZoom('DAILY')} className={`p-3 rounded-full transition-all ${zoom === 'DAILY' ? 'bg-[#d4af37] text-white' : 'text-[#8b7355]'}`}><ZoomIn className="w-5 h-5" /></button>
+                <button onClick={() => setZoom('WEEKLY')} className={`p-3 rounded-full transition-all ${zoom === 'WEEKLY' ? 'bg-[#d4af37] text-white' : 'text-[#8b7355]'}`}><Maximize className="w-5 h-5" /></button>
+                <button onClick={() => setZoom('MONTHLY')} className={`p-3 rounded-full transition-all ${zoom === 'MONTHLY' ? 'bg-[#d4af37] text-white' : 'text-[#8b7355]'}`}><ZoomOut className="w-5 h-5" /></button>
+            </div>
 
-                {/* Plot Label (Moved outside canvas) */}
-                <div className="mb-6 bg-gradient-to-b from-[#8d6e63] to-[#5d4037] border-2 border-[#3e2723] px-8 py-2.5 rounded-xl shadow-lg flex flex-col items-center">
-                    <h2 className="text-amber-50 font-bold text-base sm:text-lg tracking-widest uppercase shadow-black drop-shadow-md">
-                        {isDemo ? 'DEMO FARM' : time.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                    </h2>
-                    {isDemo && <span className="text-[10px] text-amber-200/80 tracking-wider">Simulated Data</span>}
-                </div>
+            {/* Main Infinite Canvas (Horizontal Scroll Area) */}
+            <div className="flex-1 w-full min-w-[200vw] sm:min-w-[150vw] flex items-center justify-center relative mt-24">
 
-                {/* 1:1 Aspect Ratio Farm Plot */}
-                <div className="relative w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl aspect-square bg-[#2d1b11] rounded-3xl border-[6px] border-[#4e342e] shadow-[inset_0_20px_60px_rgba(0,0,0,0.6),0_15px_40px_rgba(0,0,0,0.8)] overflow-hidden shrink-0">
+                {/* 2.5D Camera Wrapper */}
+                <div
+                    className="relative transition-transform duration-1000 ease-out flex items-center justify-center origin-center"
+                    style={{ transform: `scale(${mapScale})` }}
+                >
+                    {/* The 10x12 Isometric Farm Plot */}
+                    <div className="relative w-0 h-0 flex items-center justify-center">
 
-                    {/* Dirt texture & Lighting */}
-                    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-900/40 via-[#3e2723] to-black" />
+                        {/* Wooden Signpost Header */}
+                        <div className="absolute -top-[350px] left-1/2 -translate-x-1/2 z-0 flex flex-col items-center pointer-events-none drop-shadow-xl blur-[0px]">
+                            <div className="bg-[#6d4c41] border-4 border-[#3e2723] rounded-sm px-10 py-3 shadow-[inset_0_4px_6px_rgba(255,255,255,0.1)] relative">
+                                {/* Nails */}
+                                <div className="absolute top-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                                <div className="absolute top-1 right-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                                <div className="absolute bottom-1 left-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
+                                <div className="absolute bottom-1 right-2 w-2 h-2 rounded-full bg-black/60 shadow-inner"></div>
 
-                    {/* Grid Pattern Background */}
-                    <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:10%_10%]" />
+                                <h2 className="text-[#f5deb3] font-black text-2xl tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                                    {isDemo ? 'DEMO TIMELINE' : signpostLabel}
+                                </h2>
+                                {isDemo && <span className="block text-center text-[10px] text-[#ffcccb] tracking-wider mt-1">Simulated Aggregate Data</span>}
+                            </div>
+                            <div className="w-4 h-16 bg-[#3e2723] shadow-xl"></div>
+                        </div>
 
-                    {/* Base Environment Trees (Organic Overlapping Plantation) */}
-                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 gap-0 opacity-90 pointer-events-none">
-                        {Array.from({ length: 64 }).map((_, i) => (
-                            <div key={`base_tree_${i}`} className="w-full h-full flex items-center justify-center">
-                                <span
-                                    className="text-[2.25rem] sm:text-5xl md:text-6xl lg:text-[7rem] drop-shadow-[0_15px_20px_rgba(0,0,0,0.7)]"
+                        {/* Rendering 120 Isometric Trees */}
+                        {treeDataMap.map((tree, i) => {
+                            const col = i % GRID_COLS;
+                            const row = Math.floor(i / GRID_COLS);
+
+                            // Cartesian to Isometric Projection
+                            const posX = (col - row) * TILE_W;
+                            const posY = (col + row) * TILE_H;
+                            const zIndex = col + row; // Front items overlap back items
+
+                            return (
+                                <div
+                                    key={`iso_tree_${i}`}
+                                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
                                     style={{
-                                        transform: `scale(${1.2 + (seededRandom(i) * 0.4)}) rotate(${-15 + (seededRandom(i + 100) * 30)}deg) translate(${-15 + (seededRandom(i + 200) * 30)}%, ${-15 + (seededRandom(i + 300) * 30)}%)`
+                                        left: `${posX}px`,
+                                        top: `${posY}px`,
+                                        zIndex: zIndex,
+                                        width: '160px',  // Size of the base image rendering
+                                        height: '160px'
                                     }}
                                 >
-                                    🌳
-                                </span>
-                            </div>
-                        ))}
+                                    {/* Base Isometric Bush & Dirt */}
+                                    <Image
+                                        src="/farm/base_tree.jpg"
+                                        alt="Base Tree"
+                                        fill
+                                        className="object-contain"
+                                        style={{ mixBlendMode: 'multiply' }} // Clears the white JPEG background beautifully
+                                        priority={i < 40}
+                                        unoptimized
+                                    />
+
+                                    {/* Render Slots on this Tree */}
+                                    {tree.assets.map((asset, aIdx) => {
+                                        const slot = TREE_SLOTS[asset.slotId];
+                                        return (
+                                            <div
+                                                key={`slot_${i}_${aIdx}`}
+                                                className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 pointer-events-none drop-shadow-xl"
+                                                style={{
+                                                    left: `${slot.x}%`,
+                                                    top: `${slot.y}%`,
+                                                    zIndex: zIndex + 1
+                                                }}
+                                            >
+                                                {asset.type === 'A' && (
+                                                    <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse mix-blend-multiply" unoptimized />
+                                                )}
+                                                {asset.type === 'B' && (
+                                                    <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain mix-blend-multiply" unoptimized />
+                                                )}
+                                                {asset.type === 'C' && (
+                                                    <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain mix-blend-multiply opacity-90" unoptimized />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
                     </div>
-
-                    {/* Render Order "Flowers" dynamically */}
-                    {displayOrders.map(order => (
-                        <FlowerNode
-                            key={`${order.ticket_id}_${order.status}`}
-                            order={order}
-                        />
-                    ))}
-
                 </div>
+
             </div>
         </div>
     );
 }
 
-// Sub-component rendering the physics UI of a flower
-function FlowerNode({ order }: { order: any }) {
-    // 1. Calculate deterministic X, Y position inside 15% - 85% safe zone.
-    const posX = useMemo(() => 15 + (seededRandom(order.ticket_id * 1.5) * 70), [order.ticket_id]);
-    const posY = useMemo(() => 20 + (seededRandom(order.ticket_id * 2.5) * 65), [order.ticket_id]);
-
-    // 2. Variable Sizing Rules (Mapping lot sizes to 5 scales)
-    const sizeMap = () => {
-        const s = order.raw_lot_size || 0;
-        if (s < 10) return 'scale-75 text-sm';     // Size 1: Micro
-        if (s < 50) return 'scale-90 text-base';   // Size 2: Small
-        if (s < 100) return 'scale-100 text-lg';   // Size 3: Normal
-        if (s < 500) return 'scale-125 text-xl';   // Size 4: Large
-        return 'scale-150 text-2xl drop-shadow-xl z-10'; // Size 5: Jumbo
-    };
-
-    // 3. Status and color mapping
-    const appearance = () => {
-        const status = order.status;
-
-        // Morph state: Profit (Golden Fruit)
-        if (status === 'CLOSED_TP') {
-            return {
-                baseClass: 'drop-shadow-[0_0_25px_rgba(253,224,71,1)] z-30',
-                innerElement: '✨',
-                animation: 'animate-bounce text-[2.5rem] sm:text-[3.5rem]'
-            };
-        }
-
-        // Morph state: Loss (Dead/Burned)
-        if (status === 'CLOSED_SL') {
-            return {
-                baseClass: 'drop-shadow-[0_5px_8px_rgba(0,0,0,0.8)] opacity-80 z-0',
-                innerElement: '🥀',
-                animation: 'grayscale text-[2.5rem] sm:text-[3rem]'
-            };
-        }
-
-        // OPEN State: Risk Gradient 0 -> 100
-        const risk = order.sl_risk_percent || 0;
-        if (risk < 10) {
-            // Very Safe (Near TP / Floating Positive)
-            return { baseClass: 'drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] z-20', innerElement: '🏵️', animation: 'animate-pulse text-[2.5rem] sm:text-[3.5rem]' };
-        } else if (risk < 40) {
-            // Moderate Risk
-            return { baseClass: 'drop-shadow-[0_0_15px_rgba(251,146,60,0.8)] z-20', innerElement: '🌸', animation: 'text-[2.5rem] sm:text-[3.5rem]' };
-        } else if (risk < 75) {
-            // High Risk
-            return { baseClass: 'drop-shadow-[0_0_10px_rgba(234,88,12,0.8)] z-10', innerElement: '🌺', animation: 'text-[2.5rem] sm:text-[3.5rem]' };
-        } else {
-            // Danger Limits (Near SL)
-            return { baseClass: 'drop-shadow-[0_5px_10px_rgba(0,0,0,0.9)] z-10', innerElement: '🍂', animation: 'text-[2.5rem] sm:text-[3.5rem]' };
-        }
-    };
-
-    const { baseClass, innerElement, animation } = appearance();
-
-    return (
-        <div
-            className={`absolute flex flex-col items-center justify-center transition-all duration-[2000ms] ease-out group cursor-default ${sizeMap()} ${animation}`}
-            style={{
-                left: `${posX}%`,
-                top: `${posY}%`,
-                transform: 'translate(-50%, -50%)',
-                // Add a small randomized rotation for natural asymmetry
-                rotate: `${-15 + (seededRandom(order.ticket_id) * 30)}deg`
-            }}
-        >
-            {/* The Plant Shape (Frameless Emoji) */}
-            <div className={`flex items-center justify-center transition-[filter,transform] duration-1000 ${baseClass}`}>
-                <span className="drop-shadow-2xl">{innerElement}</span>
-            </div>
-
-            {/* Hover Tooltip (Interactive Reveal) */}
-            <div className="absolute top-full mt-2 w-max opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[10px] px-3 py-1.5 rounded-lg pointer-events-none z-50 shadow-2xl border border-white/10 flex flex-col items-center">
-                <span className="font-mono text-amber-500 mb-0.5">#{order.ticket_id} | {order.type}</span>
-                <span className={`font-bold ${Number(order.current_pnl) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${Number(order.current_pnl || 0).toFixed(2)}
-                </span>
-                {order.status === 'OPEN' && (
-                    <span className="text-gray-400 mt-0.5 text-[9px]">Risk: {Number(order.sl_risk_percent || 0).toFixed(0)}%</span>
-                )}
-            </div>
-        </div>
-    );
-}
