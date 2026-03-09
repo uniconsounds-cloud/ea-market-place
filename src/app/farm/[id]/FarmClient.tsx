@@ -243,11 +243,10 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                                 >
                                     {/* Base Isometric Bush & Dirt */}
                                     <Image
-                                        src="/farm/base_tree.jpg"
+                                        src="/farm/base_tree.png"
                                         alt="Base Tree"
                                         fill
                                         className="object-contain"
-                                        style={{ mixBlendMode: 'multiply' }} // Clears the white JPEG background beautifully
                                         priority={i < 40}
                                         unoptimized
                                     />
@@ -266,13 +265,13 @@ export default function FarmClient({ portNumber, initialOrders }: { portNumber: 
                                                 }}
                                             >
                                                 {asset.type === 'A' && (
-                                                    <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse mix-blend-multiply" unoptimized />
+                                                    <Image src="/farm/asset_a_lotus.png" alt="Open Order" fill className="object-contain animate-pulse" unoptimized />
                                                 )}
                                                 {asset.type === 'B' && (
-                                                    <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain mix-blend-multiply" unoptimized />
+                                                    <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain" unoptimized />
                                                 )}
                                                 {asset.type === 'C' && (
-                                                    <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain mix-blend-multiply opacity-90" unoptimized />
+                                                    <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain opacity-90" unoptimized />
                                                 )}
                                             </div>
                                         );
