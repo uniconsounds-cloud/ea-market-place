@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
         response.cookies.set('affiliate_ref', refCode, {
             path: '/',
             maxAge: 60 * 60 * 24 * 30, // 30 days
-            httpOnly: true,
+            httpOnly: false, // Must be false so client-side register form can read it
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
         });
