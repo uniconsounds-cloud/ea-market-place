@@ -40,13 +40,12 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         const fetchData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                // 1. Fetch Active Licenses
+                // 1. Fetch All Licenses (Active & Expired) to allow easy renewal
                 const { data: licenses } = await supabase
                     .from('licenses')
                     .select('*')
                     .eq('user_id', user.id)
-                    .eq('product_id', product.id)
-                    .eq('is_active', true);
+                    .eq('product_id', product.id);
 
                 if (licenses) setUserLicenses(licenses);
 
@@ -318,21 +317,26 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                             const isIbPort = !!ibAccounts[license.account_number];
                             const brokerName = ibAccounts[license.account_number];
                             const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
+                            const isExpired = (!isIbPort && license.type !== 'lifetime') && (days <= 0 || !license.is_active);
 
                             return (
                                 <div
                                     key={`license-${license.id}`}
-                                    className={`text-sm p-3 rounded-md border cursor-pointer hover:bg-muted transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
+                                    className={`text-sm p-3 rounded-md border cursor-pointer transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : isExpired ? 'border-border bg-muted/30 opacity-70 hover:opacity-100 hover:bg-muted/50' : 'border-border bg-background hover:bg-muted'}`}
                                     onClick={() => setAccountNumber(license.account_number)}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-green-500/10 p-1.5 rounded-full">
-                                            <Check className="w-3 h-3 text-green-600" />
+                                        <div className={`p-1.5 rounded-full ${isExpired ? 'bg-gray-500/10' : 'bg-green-500/10'}`}>
+                                            <Check className={`w-3 h-3 ${isExpired ? 'text-gray-500' : 'text-green-600'}`} />
                                         </div>
                                         <div>
                                             <div className="font-mono font-bold text-base">{license.account_number}</div>
-                                            <div className="flex items-center gap-2 mt-0.5 mt-1 relative w-full overflow-hidden">
-                                                <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
+                                            <div className="flex items-center gap-2 mt-0.5 relative w-full overflow-hidden flex-wrap">
+                                                {isExpired ? (
+                                                    <span className="text-[10px] text-gray-500 font-medium bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">หมดอายุ / ไม่พร้อมใช้งาน</span>
+                                                ) : (
+                                                    <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">ใช้งานได้ (Active)</span>
+                                                )}
 
                                                 {isIbPort && (
                                                     <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
@@ -341,8 +345,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                                 )}
 
                                                 {((!isIbPort && license.type !== 'lifetime') || (isIbPort && license.expiry_date)) && (
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${days <= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 font-bold' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
-                                                        เหลือ {days > 0 ? days : 0} วัน
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${isExpired ? 'bg-red-100 text-red-600 dark:bg-red-900/30 font-bold' : days <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 font-bold' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
+                                                        {isExpired ? 'Expired' : `เหลือ ${days} วัน`}
                                                     </span>
                                                 )}
                                                 {(!isIbPort && license.type === 'lifetime') && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
