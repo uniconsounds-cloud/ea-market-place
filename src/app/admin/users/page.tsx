@@ -42,7 +42,7 @@ export default function AdminUsersPage() {
             // We need to fetch ALL profiles.
             const { data: profiles, error: profileError } = await supabase
                 .from('profiles')
-                .select('id, full_name, email, role, is_tester, referrer:profiles!referred_by(id, full_name, email)');
+                .select('id, full_name, email, role, is_tester, referred_by, referrer:profiles!referred_by(id, full_name, email)');
 
             if (profileError) throw profileError;
 
@@ -66,6 +66,20 @@ export default function AdminUsersPage() {
                 .eq('status', 'approved');
 
             // 3. Process & Merge Data
+            const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+            const getUplineAdmin = (userId: string) => {
+                let current = profileMap.get(userId);
+                let visited = new Set();
+                while (current && !visited.has(current.id)) {
+                    visited.add(current.id);
+                    if (current.role === 'admin') return current;
+                    if (!current.referred_by) break;
+                    current = profileMap.get(current.referred_by);
+                }
+                return null;
+            };
+
             const processedUsers = profiles?.map(profile => {
                 const userOrders = orders?.filter(o => o.user_id === profile.id) || [];
                 const userLicenses = licenses?.filter(l => l.user_id === profile.id) || [];
@@ -85,7 +99,8 @@ export default function AdminUsersPage() {
                     totalOrders,
                     activeProducts,
                     is_ib: ibBrokerNames.length > 0,
-                    ib_broker_names: ibBrokerNames
+                    ib_broker_names: ibBrokerNames,
+                    root_admin: getUplineAdmin(profile.id)
                 };
             }) || [];
 
@@ -120,7 +135,7 @@ export default function AdminUsersPage() {
                               user.full_name?.toLowerCase().includes(searchLower) ||
                               user.id.toLowerCase().includes(searchLower);
         
-        const matchesAdmin = selectedAdmin === 'all' || user.referrer?.email === selectedAdmin;
+        const matchesAdmin = selectedAdmin === 'all' || user.root_admin?.email === selectedAdmin;
 
         return matchesSearch && matchesAdmin;
     }).sort((a, b) => {
@@ -228,7 +243,7 @@ export default function AdminUsersPage() {
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead>ลูกค้า (User)</TableHead>
-                            <TableHead>โดนแนะนำโดย</TableHead>
+                            <TableHead>สายงาน (Upline Admin)</TableHead>
                             <TableHead className="text-center">บัญชีทดสอบ</TableHead>
                             <TableHead className="text-center">Active Products</TableHead>
                             <TableHead className="text-center">Orders (สำเร็จ)</TableHead>
@@ -259,10 +274,10 @@ export default function AdminUsersPage() {
                                         </Link>
                                     </TableCell>
                                     <TableCell>
-                                        {user.referrer ? (
+                                        {user.root_admin ? (
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-medium">{user.referrer.full_name || 'Admin'}</span>
-                                                <span className="text-[10px] text-muted-foreground">{user.referrer.email}</span>
+                                                <span className="text-sm font-medium">{user.root_admin.full_name || 'Admin'}</span>
+                                                <span className="text-[10px] text-muted-foreground">{user.root_admin.email}</span>
                                             </div>
                                         ) : (
                                             <span className="text-muted-foreground text-sm">-ไม่มี-</span>

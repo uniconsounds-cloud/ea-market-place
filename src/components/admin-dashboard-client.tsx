@@ -116,7 +116,7 @@ export function AdminDashboardClient() {
 
                 // Get ALL profiles so we can build a complete list of referrers (even if their users have no orders yet)
                 const { data: profiles } = await supabase.from('profiles')
-                    .select('id, email, full_name, role, is_tester, referrer:profiles!referred_by(email)');
+                    .select('id, email, full_name, role, is_tester, referred_by, referrer:profiles!referred_by(email)');
                 
                 // Get unique user IDs to iterate over later for Top VIP calculations
                 const userIds = Array.from(new Set([
@@ -134,19 +134,33 @@ export function AdminDashboardClient() {
                     profileMap.set(p.id, p);
                 });
 
+                const getUplineAdmin = (userId: string) => {
+                    let current = profileMap.get(userId);
+                    let visited = new Set();
+                    while (current && !visited.has(current.id)) {
+                        visited.add(current.id);
+                        if (current.role === 'admin') return current;
+                        if (!current.referred_by) break;
+                        current = profileMap.get(current.referred_by);
+                    }
+                    return null;
+                };
+
                 setAvailableAdmins(Array.from(adminsSet));
 
                 // Filter out tester data AND filter by selected admin if not 'all'
                 const realOrders = allOrders.filter(o => {
                     const profile = profileMap.get(o.user_id);
                     if (profile?.is_tester) return false;
-                    if (selectedAdmin !== 'all' && profile?.referrer?.email !== selectedAdmin) return false;
+                    const rootAdmin = getUplineAdmin(o.user_id);
+                    if (selectedAdmin !== 'all' && rootAdmin?.email !== selectedAdmin) return false;
                     return true;
                 });
                 const realLicenses = licensesData.filter(l => {
                     const profile = profileMap.get(l.user_id);
                     if (profile?.is_tester) return false;
-                    if (selectedAdmin !== 'all' && profile?.referrer?.email !== selectedAdmin) return false;
+                    const rootAdmin = getUplineAdmin(l.user_id);
+                    if (selectedAdmin !== 'all' && rootAdmin?.email !== selectedAdmin) return false;
                     return true;
                 });
 
