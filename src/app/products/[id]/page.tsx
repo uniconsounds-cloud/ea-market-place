@@ -117,7 +117,7 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                                     </ul>
                                 </div>
 
-                                {product.allow_rent !== false && <ProductPurchaseSection product={product} />}
+                                <ProductPurchaseSection product={product} />
                             </>
                         )}
                     </div>

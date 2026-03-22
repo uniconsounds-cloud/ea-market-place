@@ -110,6 +110,14 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         fetchData();
     }, [product.id]);
 
+    useEffect(() => {
+        if (product.allow_ib === false) {
+            setUseIbQuota(false);
+        } else if (product.allow_rent === false) {
+            setUseIbQuota(true);
+        }
+    }, [product.allow_ib, product.allow_rent]);
+
     // Helper for date formatting
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('th-TH', {
@@ -284,6 +292,21 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const displayLicenses = userLicenses.filter(license => license.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[license.account_number] : !ibAccounts[license.account_number]));
     const displayOrders = userOrders.filter(order => order.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[order.account_number] : !ibAccounts[order.account_number]));
 
+    if (product.allow_rent === false && ibStatus !== 'approved') {
+        return (
+            <div className="p-8 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg text-center">
+                <div className="bg-blue-500/10 p-4 rounded-full inline-flex items-center justify-center text-blue-500 mb-4">
+                    <Zap className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">สงวนสิทธิ์เฉพาะลูกค้า IB</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    สินค้ารายการนี้เปิดให้ใช้งานฟรีสำหรับลูกค้าภายใต้สายงาน IB ของ EA Easy Shop เท่านั้น
+                    หากคุณยังไม่มีสิทธิ์ กรุณากดปุ่ม <b className="text-primary">"ขอใช้ EA ฟรี"</b> ที่แบนเนอร์ด้านบนเพื่อทำการสมัครเป็นพาร์ทเนอร์
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="p-6 rounded-xl bg-gradient-to-br from-card to-background border border-border shadow-lg space-y-6">
 
@@ -391,7 +414,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             )}
 
             {/* IB User Options */}
-            {ibStatus === 'approved' && (
+            {ibStatus === 'approved' && product.allow_ib !== false && product.allow_rent !== false && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3 mb-2">
                     <h4 className="font-semibold text-primary flex items-center gap-2">
                         <Zap className="w-4 h-4" /> สิทธิพิเศษ IB ของคุณ
@@ -472,8 +495,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 )}
             </div>
 
-            {/* License Type Selection (Hidden if using IB Quota) */}
-            {!(ibStatus === 'approved' && useIbQuota) && (
+            {/* License Type Selection (Hidden if using IB Quota or Rent Disabled) */}
+            {!(ibStatus === 'approved' && useIbQuota) && product.allow_rent !== false && (
                 <div>
                     <h3 className="text-lg font-bold mb-4">เลือกรูปแบบลิขสิทธิ์</h3>
                     <div className="grid grid-cols-1 gap-3 mb-6">
