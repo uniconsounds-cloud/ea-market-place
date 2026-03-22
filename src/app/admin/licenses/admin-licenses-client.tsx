@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap, Loader2, Save, Mail } from 'lucide-react';
 
-export default function AdminLicensesClient({ initialLicenses }: { initialLicenses: any[] }) {
+export default function AdminLicensesClient({ initialLicenses, allProducts = [] }: { initialLicenses: any[], allProducts?: any[] }) {
     const [licenses, setLicenses] = useState(initialLicenses);
 
     // Filtering States
@@ -46,9 +46,9 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
     const [isProcessingOtp, setIsProcessingOtp] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // Extract unique options for dropdowns
-    const eaNames = useMemo(() => Array.from(new Set(licenses.map(l => l.products?.name).filter(Boolean))), [licenses]);
-    const eaGroups = useMemo(() => Array.from(new Set(licenses.map(l => l.products?.asset_class || l.products?.platform).filter(Boolean))), [licenses]);
+    // Extract unique options for dropdowns from ALL products in the system
+    const eaNames = useMemo(() => Array.from(new Set(allProducts.map(p => p.name).filter(Boolean))), [allProducts]);
+    const eaGroups = useMemo(() => Array.from(new Set(allProducts.map(p => p.asset_class || p.platform).filter(Boolean))), [allProducts]);
 
     // Derived Data
     const filteredLicenses = useMemo(() => {

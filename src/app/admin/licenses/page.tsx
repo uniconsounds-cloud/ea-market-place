@@ -95,7 +95,12 @@ export default async function AdminLicensesPage() {
         };
     });
 
+    // Fetch all products for the filter dropdown so it shows all EAs, not just the ones with licenses
+    const { data: allProducts } = await supabase
+        .from('products')
+        .select('name, asset_class, platform');
+
     return (
-        <AdminLicensesClient initialLicenses={licenses} />
+        <AdminLicensesClient initialLicenses={licenses} allProducts={allProducts || []} />
     );
 }
