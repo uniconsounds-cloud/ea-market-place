@@ -228,6 +228,14 @@ export default function DashboardPage() {
         return false;
     };
 
+    const hasActiveLicense = (group: GroupedProduct) => {
+        return group.items.some(item => {
+            if (item.source !== 'license') return false;
+            const timeInfo = calculateTimeRemaining(item);
+            return item.is_active && timeInfo.days > 0;
+        });
+    };
+
     if (loading) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
@@ -331,12 +339,19 @@ export default function DashboardPage() {
 
                                         <div className="flex items-center gap-2">
                                             {group.fileUrl && (
-                                                <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
-                                                    <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-muted">
-                                                        <Download className="h-4 w-4" />
-                                                        ดาวน์โหลดไฟล์
+                                                hasActiveLicense(group) ? (
+                                                    <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                        <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-muted font-bold text-primary border-primary/20">
+                                                            <Download className="h-4 w-4" />
+                                                            ดาวน์โหลดไฟล์
+                                                        </Button>
+                                                    </a>
+                                                ) : (
+                                                    <Button size="sm" variant="outline" className="gap-2 bg-muted/50 text-muted-foreground cursor-not-allowed border-dashed" disabled>
+                                                        <Download className="h-4 w-4 text-muted-foreground/50" />
+                                                        ไม่มีสิทธิ์ดาวน์โหลด (พอร์ตหมดอายุ)
                                                     </Button>
-                                                </a>
+                                                )
                                             )}
                                             <Link href={`/products/${group.productId}`}>
                                                 <Button size="sm">เพิ่มพอร์ตรับ EA</Button>
