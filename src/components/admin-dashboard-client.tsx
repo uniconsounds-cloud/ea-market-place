@@ -114,25 +114,27 @@ export function AdminDashboardClient() {
                 const allOrders = ordersResult.data || [];
                 const licensesData = licensesResult.data || [];
 
-                // Get unique user IDs to fetch profiles first
+                // Get ALL profiles so we can build a complete list of referrers (even if their users have no orders yet)
+                const { data: profiles } = await supabase.from('profiles')
+                    .select('id, email, full_name, role, is_tester, referrer:profiles!referred_by(email)');
+                
+                // Get unique user IDs to iterate over later for Top VIP calculations
                 const userIds = Array.from(new Set([
                     ...licensesData.map(l => l.user_id),
                     ...allOrders.map(o => o.user_id)
                 ].filter(Boolean)));
-
+                
                 let profileMap = new Map();
                 let adminsSet = new Set<string>();
 
-                if (userIds.length > 0) {
-                    const { data: profiles } = await supabase.from('profiles')
-                        .select('id, email, full_name, is_tester, referrer:profiles!referred_by(email)')
-                        .in('id', userIds);
+                (profiles || []).forEach((p: any) => {
+                    // Include any referrer email
+                    if (p.referrer?.email) adminsSet.add(p.referrer.email);
+                    // Also ALWAYS include admins themselves, even if they have 0 referrals
+                    if (p.role === 'admin' && p.email) adminsSet.add(p.email);
                     
-                    profileMap = new Map((profiles || []).map((p: any) => {
-                        if (p.referrer?.email) adminsSet.add(p.referrer.email);
-                        return [p.id, p];
-                    }));
-                }
+                    profileMap.set(p.id, p);
+                });
 
                 setAvailableAdmins(Array.from(adminsSet));
 
