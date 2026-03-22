@@ -48,7 +48,7 @@ export default async function AdminLicensesPage() {
     if (userIds.length > 0) {
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, email, full_name, ib_account_number')
+            .select('id, email, full_name, ib_account_number, is_tester')
             .in('id', userIds);
 
         if (profiles) {

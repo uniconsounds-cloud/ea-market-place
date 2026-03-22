@@ -112,26 +112,30 @@ export function AdminDashboardClient() {
                 const allOrders = ordersResult.data || [];
                 const licensesData = licensesResult.data || [];
 
-                // Filter completed orders (Case Insensitive)
-                const completedOrders = allOrders.filter(o => o.status?.toLowerCase() === 'completed');
-
-                // Get unique user IDs to fetch profiles
+                // Get unique user IDs to fetch profiles first
                 const userIds = Array.from(new Set([
                     ...licensesData.map(l => l.user_id),
-                    ...completedOrders.map(o => o.user_id)
+                    ...allOrders.map(o => o.user_id)
                 ].filter(Boolean)));
 
                 let profileMap = new Map();
                 if (userIds.length > 0) {
-                    const { data: profiles } = await supabase.from('profiles').select('id, email, full_name').in('id', userIds);
+                    const { data: profiles } = await supabase.from('profiles').select('id, email, full_name, is_tester').in('id', userIds);
                     profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
                 }
+
+                // Filter out tester data
+                const realOrders = allOrders.filter(o => !profileMap.get(o.user_id)?.is_tester);
+                const realLicenses = licensesData.filter(l => !profileMap.get(l.user_id)?.is_tester);
+
+                // Filter completed orders (Case Insensitive)
+                const completedOrders = realOrders.filter(o => o.status?.toLowerCase() === 'completed');
 
                 // Map Products
                 const productMap = new Map(productsData.map(p => [p.id, p]));
 
                 // Enrich Licenses
-                const enrichedLicenses: LicenseWithProfile[] = licensesData.map((l: any) => ({
+                const enrichedLicenses: LicenseWithProfile[] = realLicenses.map((l: any) => ({
                     ...l,
                     product_name: productMap.get(l.product_id)?.name || 'Unknown Product',
                     profile: profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown' }

@@ -32,6 +32,7 @@ export default function AdminOrdersPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('newest');
+    const [hideTestAccounts, setHideTestAccounts] = useState(true);
 
     useEffect(() => {
         fetchOrders();
@@ -46,7 +47,7 @@ export default function AdminOrdersPage() {
             .select(`
                 *,
                 products!orders_product_id_fkey (name, price_monthly, price_lifetime),
-                profiles!orders_user_id_profiles_fkey (full_name, email)
+                profiles!orders_user_id_profiles_fkey (full_name, email, is_tester)
             `)
             .order('created_at', { ascending: false });
 
@@ -83,7 +84,7 @@ export default function AdminOrdersPage() {
                 const mappedData = rawData.map(o => ({
                     ...o,
                     products: { name: 'Raw Product (' + o.product_id + ')', price_monthly: 0, price_lifetime: 0 },
-                    profiles: { full_name: 'Raw User', email: o.user_id, ib_status: 'none', ib_expiry_date: null }
+                    profiles: { full_name: 'Raw User', email: o.user_id, ib_status: 'none', ib_expiry_date: null, is_tester: false }
                 }));
                 setOrders(mappedData);
             }
@@ -348,6 +349,9 @@ export default function AdminOrdersPage() {
 
     // Filter Logic
     const filteredOrders = orders.filter(order => {
+        // Test Accounts Filter
+        if (hideTestAccounts && order.profiles?.is_tester) return false;
+
         // Status Filter
         if (statusFilter !== 'all' && order.status !== statusFilter) return false;
 
@@ -391,7 +395,16 @@ export default function AdminOrdersPage() {
                     />
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground mr-2 cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted/50 transition-colors">
+                        <input 
+                            type="checkbox" 
+                            className="rounded text-primary border-muted-foreground focus:ring-primary h-4 w-4"
+                            checked={hideTestAccounts}
+                            onChange={(e) => setHideTestAccounts(e.target.checked)}
+                        />
+                        ซ่อนบัญชีทดสอบ
+                    </label>
                     <Filter className="w-4 h-4 text-muted-foreground" />
                     <Select value={sortOrder} onValueChange={setSortOrder}>
                         <SelectTrigger className="w-full md:w-[180px]">
@@ -467,6 +480,9 @@ export default function AdminOrdersPage() {
                                                     </h3>
                                                     <p className="text-sm text-muted-foreground flex items-center gap-2">
                                                         <span>ลูกค้า: {order.profiles?.full_name || order.profiles?.email || 'Guest'}</span>
+                                                        {order.profiles?.is_tester && (
+                                                            <span className="text-[10px] text-orange-500 font-bold ml-1 bg-orange-500/10 px-1 rounded uppercase">Tester</span>
+                                                        )}
                                                         <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
                                                             {order.plan_type === 'monthly' ? 'รายเดือน' :
                                                                 order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :

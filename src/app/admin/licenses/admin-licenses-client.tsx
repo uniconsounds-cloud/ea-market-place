@@ -24,6 +24,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
     const [showActiveOnly, setShowActiveOnly] = useState(false);
     const [showExpiringSoon, setShowExpiringSoon] = useState(false);
     const [showIbCustomers, setShowIbCustomers] = useState(false);
+    const [hideTestAccounts, setHideTestAccounts] = useState(true);
 
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -52,6 +53,10 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
     // Derived Data
     const filteredLicenses = useMemo(() => {
         let filtered = [...licenses];
+
+        if (hideTestAccounts) {
+            filtered = filtered.filter(l => !l.profiles?.is_tester);
+        }
 
         // 1. Text Search
         if (searchQuery) {
@@ -119,7 +124,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
         }
 
         return filtered;
-    }, [licenses, searchQuery, filterEaName, filterEaGroup, filterPlan, showActiveOnly, showExpiringSoon, showIbCustomers, sortConfig]);
+    }, [licenses, searchQuery, filterEaName, filterEaGroup, filterPlan, showActiveOnly, showExpiringSoon, showIbCustomers, hideTestAccounts, sortConfig]);
 
     const requestSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -339,6 +344,10 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                             <Switch checked={showIbCustomers} onCheckedChange={setShowIbCustomers} />
                             <span>เฉพาะลูกค้า IB</span>
                         </div>
+                        <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md border text-sm cursor-pointer hover:bg-muted" onClick={() => setHideTestAccounts(!hideTestAccounts)}>
+                            <Switch checked={hideTestAccounts} onCheckedChange={setHideTestAccounts} />
+                            <span>ซ่อนบัญชีทดสอบ</span>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -384,6 +393,7 @@ export default function AdminLicensesClient({ initialLicenses }: { initialLicens
                                                 <div className="font-semibold">{license.profiles?.full_name || 'ผู้ใช้ทั่วไป'}</div>
                                                 <div className="text-xs text-muted-foreground">{license.profiles?.email}</div>
                                                 {isIB && <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded">IB {license.ib_broker_name || 'Customer'}</span>}
+                                                {license.profiles?.is_tester && <span className="inline-block mt-1 ml-1 px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-800 font-bold uppercase rounded">Tester</span>}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium">{license.products?.name}</div>
