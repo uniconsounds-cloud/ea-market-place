@@ -76,6 +76,11 @@ export async function POST(req: Request) {
             const expiry = new Date(license.expiry_date);
             const now = new Date();
             if (now > expiry) {
+                // Opportunistic Update: Auto-deactivate it in the database immediately
+                await supabase.from('licenses')
+                    .update({ is_active: false })
+                    .eq('id', license.id);
+
                 return NextResponse.json({ status: 'expired', message: 'License Expired' }, { status: 200 });
             }
         }

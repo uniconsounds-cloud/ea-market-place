@@ -14,9 +14,20 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .select('*')
         .eq('port_number', portNumber);
 
+    // Fetch initial port status
+    const { data: portStatus } = await supabase
+        .from('farm_port_status')
+        .select('*')
+        .eq('port_number', portNumber)
+        .single();
+
     return (
         <div className="min-h-screen bg-[#1a120b] text-amber-50 selection:bg-amber-500/30">
-            <FarmClient portNumber={portNumber} initialOrders={initialOrders || []} />
+            <FarmClient
+                portNumber={portNumber}
+                initialOrders={initialOrders || []}
+                initialPortStatus={portStatus || null}
+            />
         </div>
     );
 }

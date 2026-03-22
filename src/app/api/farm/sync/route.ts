@@ -19,10 +19,30 @@ export async function POST(req: Request) {
         }
 
         const payload = await req.json();
-        const { port_number, orders, summary } = payload;
+        const { port_number, orders, summary, port_status } = payload;
 
         if (!port_number || !Array.isArray(orders)) {
             return NextResponse.json({ error: 'Invalid payload structure' }, { status: 400 });
+        }
+
+        // --- Process Port Status if provided ---
+        if (port_status) {
+            const { error: portStatusError } = await supabaseAdmin
+                .from('farm_port_status')
+                .upsert({
+                    port_number: port_number,
+                    balance: port_status.balance || 0,
+                    equity: port_status.equity || 0,
+                    margin_level: port_status.margin_level || 0,
+                    account_type: port_status.account_type || 'USD',
+                    max_drawdown: port_status.max_drawdown || 0,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'port_number' });
+
+            if (portStatusError) {
+                console.error('Farm Sync Error (Port Status):', portStatusError);
+                // We don't fail the whole sync if just status fails, but log it
+            }
         }
 
         // Process orders for upsertion
@@ -33,7 +53,7 @@ export async function POST(req: Request) {
             status: o.status,
             current_pnl: typeof o.current_pnl === 'number' ? o.current_pnl : 0,
             sl_risk_percent: typeof o.sl_risk_percent === 'number' ? o.sl_risk_percent : 0,
-            raw_lot_size: typeof o.raw_lot_size === 'number' ? o.raw_lot_size : 0,
+            raw_lot_size: typeof o.raw_lot_size === 'number' ? o.raw_lot_size : o.lot || 0,
             updated_at: new Date().toISOString()
         }));
 

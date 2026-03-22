@@ -19,6 +19,13 @@ export default async function AdminLicensesPage() {
 
     if (profile?.role !== 'admin') redirect('/');
 
+    // Opportunistic Update: Auto-deactivate expired licenses before viewing
+    const nowISO = new Date().toISOString();
+    await supabase.from('licenses')
+        .update({ is_active: false })
+        .lt('expiry_date', nowISO)
+        .eq('is_active', true);
+
     // Fetch all licenses joined with products
     const { data: rawLicenses, error } = await supabase
         .from('licenses')
