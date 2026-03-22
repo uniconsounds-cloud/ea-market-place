@@ -70,47 +70,56 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
 
                     {/* Right: Info & Purchase */}
                     <div>
-                        <ProductIbBanner productId={product.id} />
-
-                        <div className="mb-6">
-                            <h1 className="text-4xl font-bold mb-3">{product.name}</h1>
-                            <div className="flex flex-wrap items-center gap-3 text-sm mb-4">
-                                <span className="bg-primary/20 text-primary px-2.5 py-0.5 rounded-full font-medium">v{product.version}</span>
-                                {product.platform && (
-                                    <span className="bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2.5 py-0.5 rounded-full font-medium uppercase">
-                                        {product.platform}
-                                    </span>
-                                )}
-                                {product.asset_class && (
-                                    <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2.5 py-0.5 rounded-full font-medium capitalize">
-                                        {product.asset_class}
-                                    </span>
-                                )}
+                        {product.allow_rent === false && product.allow_ib === false ? (
+                            <div className="mt-8 bg-muted/60 p-8 rounded-xl border border-border text-center">
+                                <h3 className="text-xl font-bold mb-2 text-muted-foreground">ปิดการขายชั่วคราว</h3>
+                                <p className="text-muted-foreground">สินค้ารายการนี้ยังไม่เปิดให้เช่าซื้อหรือสมัครใช้งานผ่านสิทธิ์ IB ในขณะนี้</p>
                             </div>
-                            {product.strategy && (
-                                <div className="inline-block bg-muted/40 text-muted-foreground px-3 py-1 rounded-lg text-xs font-medium mb-2 border border-border/50">
-                                    Strategy: {formatStrategy(product.strategy)}
+                        ) : (
+                            <>
+                                {product.allow_ib !== false && <ProductIbBanner productId={product.id} />}
+                                {/* Rest of content */}
+                                <div className="mb-6">
+                                    <h1 className="text-4xl font-bold mb-3">{product.name}</h1>
+                                    <div className="flex flex-wrap items-center gap-3 text-sm mb-4">
+                                        <span className="bg-primary/20 text-primary px-2.5 py-0.5 rounded-full font-medium">v{product.version}</span>
+                                        {product.platform && (
+                                            <span className="bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2.5 py-0.5 rounded-full font-medium uppercase">
+                                                {product.platform}
+                                            </span>
+                                        )}
+                                        {product.asset_class && (
+                                            <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2.5 py-0.5 rounded-full font-medium capitalize">
+                                                {product.asset_class}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {product.strategy && (
+                                        <div className="inline-block bg-muted/40 text-muted-foreground px-3 py-1 rounded-lg text-xs font-medium mb-2 border border-border/50">
+                                            Strategy: {formatStrategy(product.strategy)}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                            {product.description}
-                        </p>
+                                <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                                    {product.description}
+                                </p>
 
-                        <div className="mb-8">
-                            <h3 className="font-semibold mb-3">ฟีเจอร์เด่น</h3>
-                            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {product.features?.map((feature: string, i: number) => (
-                                    <li key={i} className="flex items-center text-sm">
-                                        <Check className="w-4 h-4 mr-2 text-accent" />
-                                        {feature}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                                <div className="mb-8">
+                                    <h3 className="font-semibold mb-3">ฟีเจอร์เด่น</h3>
+                                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {product.features?.map((feature: string, i: number) => (
+                                            <li key={i} className="flex items-center text-sm">
+                                                <Check className="w-4 h-4 mr-2 text-accent" />
+                                                {feature}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
-                        <ProductPurchaseSection product={product} />
+                                {product.allow_rent !== false && <ProductPurchaseSection product={product} />}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

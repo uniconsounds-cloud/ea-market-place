@@ -18,6 +18,8 @@ interface Product {
     platform?: string;
     asset_class?: string;
     strategy?: string;
+    allow_rent?: boolean;
+    allow_ib?: boolean;
 }
 
 interface PortStatus {
@@ -154,31 +156,39 @@ export function ProductCard({ product }: { product: Product }) {
                 </div>
 
                 <div className="mt-auto space-y-4">
-                    {product.price_quarterly ? (
+                    {product.allow_rent === false ? (
+                        <div className="border-t border-border/50 pt-4 pb-2 text-center bg-muted/20 rounded-b-xl -mx-6 -mb-6 mt-4">
+                            {product.allow_ib !== false ? (
+                                <span className="text-sm font-bold text-blue-400">✅ เปิดให้ขอสิทธิ์ใช้งานฟรีผ่าน IB</span>
+                            ) : (
+                                <span className="text-sm font-bold text-muted-foreground">ปิดการขายชั่วคราว</span>
+                            )}
+                        </div>
+                    ) : product.price_quarterly ? (
                         <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-4 text-center">
                             <div>
                                 <span className="text-[10px] text-muted-foreground block">รายเดือน</span>
-                                <span className="text-sm font-bold text-white">฿{product.price_monthly.toLocaleString()}</span>
+                                <span className="text-sm font-bold text-white">฿{product.price_monthly?.toLocaleString()}</span>
                             </div>
                             <div className="border-l border-border/50 pl-2">
                                 <span className="text-[10px] text-muted-foreground block">3 เดือน</span>
-                                <span className="text-sm font-bold text-white">฿{product.price_quarterly.toLocaleString()}</span>
+                                <span className="text-sm font-bold text-white">฿{product.price_quarterly?.toLocaleString()}</span>
                             </div>
                             <div className="border-l border-border/50 pl-2">
                                 <span className="text-[10px] text-muted-foreground block">ถาวร</span>
-                                <span className="text-sm font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</span>
+                                <span className="text-sm font-bold text-accent gold-glow">฿{product.price_lifetime?.toLocaleString()}</span>
                             </div>
                         </div>
                     ) : (
                         <div className="flex items-center justify-between border-t border-border/50 pt-4">
                             <div className="text-center">
                                 <span className="text-xs text-muted-foreground block">รายเดือน</span>
-                                <span className="text-lg font-bold text-white">฿{product.price_monthly.toLocaleString()}</span>
+                                <span className="text-lg font-bold text-white">฿{product.price_monthly?.toLocaleString()}</span>
                             </div>
                             <div className="h-8 w-[1px] bg-border/50" />
                             <div className="text-center">
                                 <span className="text-xs text-muted-foreground block">ถาวร (Lifetime)</span>
-                                <span className="text-lg font-bold text-accent gold-glow">฿{product.price_lifetime.toLocaleString()}</span>
+                                <span className="text-lg font-bold text-accent gold-glow">฿{product.price_lifetime?.toLocaleString()}</span>
                             </div>
                         </div>
                     )}

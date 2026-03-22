@@ -101,7 +101,9 @@ export default function ProductFormPage() {
         platform: 'mt4',
         asset_class: 'gold',
         strategy: 'trend_following',
-        min_balance: 0
+        min_balance: 0,
+        allow_rent: true,
+        allow_ib: true
     });
 
     useEffect(() => {
@@ -132,7 +134,9 @@ export default function ProductFormPage() {
                 platform: data.platform || 'mt4',
                 asset_class: data.asset_class || 'gold',
                 strategy: data.strategy || 'trend_following',
-                min_balance: data.min_balance || 0
+                min_balance: data.min_balance || 0,
+                allow_rent: data.allow_rent !== false,
+                allow_ib: data.allow_ib !== false
             });
         }
     };
@@ -309,7 +313,9 @@ export default function ProductFormPage() {
                 platform: formData.platform,
                 asset_class: formData.asset_class,
                 strategy: formData.strategy,
-                min_balance: parsedMinBalance
+                min_balance: parsedMinBalance,
+                allow_rent: formData.allow_rent,
+                allow_ib: formData.allow_ib
             };
 
             let error;
@@ -1155,16 +1161,21 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         placeholder="Ex. 100"
                     />
                 </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">สถานะ</label>
-                    <div className="flex items-center gap-2 h-10">
-                        <input
-                            type="checkbox"
-                            checked={formData.is_active}
-                            onChange={(e) => setFormData((p: any) => ({ ...p, is_active: e.target.checked }))}
-                            className="h-5 w-5"
-                        />
-                        <span className="text-sm">เปิดขาย</span>
+                <div className="space-y-3 col-span-2 md:col-span-1 border p-3 rounded-lg bg-card">
+                    <label className="text-sm font-semibold flex items-center gap-2">ช่องทางการขาย & สถานะ</label>
+                    <div className="flex flex-col gap-3 mt-2">
+                        <div className="flex items-center gap-2">
+                            <Switch checked={formData.is_active} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, is_active: val }))} />
+                            <span className="text-sm font-medium">เปิดใช้งานสินค้านี้ (Active)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Switch checked={formData.allow_rent} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_rent: val }))} disabled={!formData.is_active} />
+                            <span className="text-sm text-muted-foreground">อนุญาตให้เช่า / ซื้อขาด</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Switch checked={formData.allow_ib} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_ib: val }))} disabled={!formData.is_active} />
+                            <span className="text-sm text-muted-foreground">อนุญาตให้สมัครใช้งานผ่านสิทธิ์ IB</span>
+                        </div>
                     </div>
                 </div>
             </div>
