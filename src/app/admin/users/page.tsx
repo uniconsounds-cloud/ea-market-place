@@ -19,8 +19,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Search, Loader2, Users, ShoppingBag, CreditCard, ChevronRight, Filter } from 'lucide-react';
+import { Search, Loader2, Users, ShoppingBag, CreditCard, ChevronRight, Filter, Beaker } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 
 export default function AdminUsersPage() {
@@ -40,7 +41,7 @@ export default function AdminUsersPage() {
             // We need to fetch ALL profiles.
             const { data: profiles, error: profileError } = await supabase
                 .from('profiles')
-                .select('id, full_name, email, role'); // Removed created_at
+                .select('id, full_name, email, role, is_tester');
 
             if (profileError) throw profileError;
 
@@ -97,6 +98,17 @@ export default function AdminUsersPage() {
     };
 
     // Filter & Sort
+    const handleToggleTester = async (userId: string, currentStatus: boolean) => {
+        try {
+            const newStatus = !currentStatus;
+            const { error } = await supabase.from('profiles').update({ is_tester: newStatus }).eq('id', userId);
+            if (error) throw error;
+            setUsers(users.map(u => u.id === userId ? { ...u, is_tester: newStatus } : u));
+        } catch (error: any) {
+            alert('ล้มเหลวในการอัปเดตสถานะบัญชีทดสอบ: ' + error.message);
+        }
+    };
+
     const filteredUsers = users.filter(user => {
         const searchLower = searchQuery.toLowerCase();
         return (
@@ -196,6 +208,7 @@ export default function AdminUsersPage() {
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead>ลูกค้า (User)</TableHead>
+                            <TableHead className="text-center">บัญชีทดสอบ</TableHead>
                             <TableHead className="text-center">Active Products</TableHead>
                             <TableHead className="text-center">Orders (สำเร็จ)</TableHead>
                             <TableHead className="text-right">ยอดใช้จ่ายรวม</TableHead>
@@ -223,6 +236,15 @@ export default function AdminUsersPage() {
                                             </div>
                                             <span className="text-xs text-muted-foreground">{user.email || user.id}</span>
                                         </Link>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <div className="flex justify-center flex-col items-center gap-1">
+                                            <Switch 
+                                                checked={user.is_tester || false} 
+                                                onCheckedChange={() => handleToggleTester(user.id, user.is_tester || false)} 
+                                            />
+                                            {user.is_tester && <span className="text-[10px] text-orange-500 font-bold"><Beaker className="w-3 h-3 inline"/> Tester</span>}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         {user.activeProducts > 0 ? (

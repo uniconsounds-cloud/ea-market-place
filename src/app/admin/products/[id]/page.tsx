@@ -55,6 +55,7 @@ export default function ProductFormPage() {
         profiles?: {
             email: string;
             full_name: string;
+            is_tester?: boolean;
         };
     }
 
@@ -142,14 +143,11 @@ export default function ProductFormPage() {
             // 1. Get Orders (Completed) for Revenue & Sales
             const { data: orders } = await supabase
                 .from('orders')
-                .select('amount')
+                .select('user_id, amount')
                 .eq('product_id', id)
                 .eq('status', 'completed');
 
-            const totalSales = orders?.length || 0;
-            const totalRevenue = orders?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
-
-            // 2. Get Licenses (Step 1: Fetch Licenses)
+            // 2. Get Licenses
             const { data: licenses, error: licenseError } = await supabase
                 .from('licenses')
                 .select('*')
@@ -161,24 +159,28 @@ export default function ProductFormPage() {
             const licensesData: LicenseData[] = [];
             const rawLicenses = licenses || [];
 
-            if (rawLicenses.length > 0) {
-                // Step 2: Extract User IDs
-                const userIds = Array.from(new Set(rawLicenses.map(l => l.user_id)));
+            // Extract User IDs from both orders and licenses
+            const orderUserIds = orders?.map(o => o.user_id) || [];
+            const licenseUserIds = rawLicenses.map(l => l.user_id);
+            const userIds = Array.from(new Set([...orderUserIds, ...licenseUserIds])).filter(Boolean);
 
-                // Step 3: Fetch Profiles
+            let profileMap = new Map();
+            let ibMap = new Map();
+
+            if (userIds.length > 0) {
+                // Fetch Profiles with is_tester
                 const { data: profiles, error: profileError } = await supabase
                     .from('profiles')
-                    .select('id, email, full_name, ib_account_number')
+                    .select('id, email, full_name, ib_account_number, is_tester')
                     .in('id', userIds);
 
-                // Step 3.5: Fetch IB Memberships
+                // Fetch IB Memberships
                 const { data: ibMemberships } = await supabase
                     .from('ib_memberships')
                     .select('user_id, verification_data, brokers(name)')
                     .in('user_id', userIds)
                     .eq('status', 'approved');
 
-                const ibMap = new Map();
                 if (ibMemberships) {
                     ibMemberships.forEach(ib => {
                         if (!ibMap.has(ib.user_id)) ibMap.set(ib.user_id, []);
@@ -189,26 +191,38 @@ export default function ProductFormPage() {
                     });
                 }
 
-                // Step 4: Map Profiles to Licenses
-                const profileMap = new Map(profiles?.map(p => [p.id, p]));
-
-                rawLicenses.forEach((l: any) => {
-                    const profileData = profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown', ib_account_number: null };
-                    const userIbAccounts = ibMap.get(l.user_id) || [];
-                    const matchedIb = userIbAccounts.find((a: any) => a.account_number === l.account_number);
-
-                    const isIbPort = Boolean(matchedIb) || (profileData.ib_account_number === l.account_number);
-
-                    licensesData.push({
-                        ...l,
-                        is_ib: isIbPort,
-                        ib_broker_name: matchedIb ? matchedIb.broker_name : (profileData.ib_account_number === l.account_number ? 'Customer' : undefined),
-                        profiles: profileData
-                    });
-                });
+                if (profiles) {
+                    profileMap = new Map(profiles.map(p => [p.id, p]));
+                }
             }
 
-            const activeUsers = licensesData.length;
+            // Map Profiles to Licenses
+            rawLicenses.forEach((l: any) => {
+                const profileData = profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown', ib_account_number: null, is_tester: false };
+                const userIbAccounts = ibMap.get(l.user_id) || [];
+                const matchedIb = userIbAccounts.find((a: any) => a.account_number === l.account_number);
+
+                const isIbPort = Boolean(matchedIb) || (profileData.ib_account_number === l.account_number);
+
+                licensesData.push({
+                    ...l,
+                    is_ib: isIbPort,
+                    ib_broker_name: matchedIb ? matchedIb.broker_name : (profileData.ib_account_number === l.account_number ? 'Customer' : undefined),
+                    profiles: profileData
+                });
+            });
+
+            // Calculate REAL metrics (exclude is_tester)
+            const realOrders = orders?.filter(o => {
+                const p = profileMap.get(o.user_id);
+                return p ? !p.is_tester : true;
+            }) || [];
+
+            const totalSales = realOrders.length;
+            const totalRevenue = realOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+            
+            const realLicenses = licensesData.filter(l => !l.profiles?.is_tester);
+            const activeUsers = realLicenses.length;
 
             setStats({ totalRevenue, totalSales, activeUsers });
             setActiveLicenses(licensesData);
