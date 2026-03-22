@@ -29,6 +29,7 @@ export default function AdminUsersPage() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('spent-high');
+    const [selectedAdmin, setSelectedAdmin] = useState<string>('all');
 
     useEffect(() => {
         fetchUsers();
@@ -41,7 +42,7 @@ export default function AdminUsersPage() {
             // We need to fetch ALL profiles.
             const { data: profiles, error: profileError } = await supabase
                 .from('profiles')
-                .select('id, full_name, email, role, is_tester');
+                .select('id, full_name, email, role, is_tester, referrer:profiles!referred_by(id, full_name, email)');
 
             if (profileError) throw profileError;
 
@@ -109,13 +110,17 @@ export default function AdminUsersPage() {
         }
     };
 
+    const uniqueAdmins = Array.from(new Set(users.map(u => u.referrer?.email).filter(Boolean)));
+
     const filteredUsers = users.filter(user => {
         const searchLower = searchQuery.toLowerCase();
-        return (
-            user.email?.toLowerCase().includes(searchLower) ||
-            user.full_name?.toLowerCase().includes(searchLower) ||
-            user.id.toLowerCase().includes(searchLower)
-        );
+        const matchesSearch = user.email?.toLowerCase().includes(searchLower) ||
+                              user.full_name?.toLowerCase().includes(searchLower) ||
+                              user.id.toLowerCase().includes(searchLower);
+        
+        const matchesAdmin = selectedAdmin === 'all' || user.referrer?.email === selectedAdmin;
+
+        return matchesSearch && matchesAdmin;
     }).sort((a, b) => {
         if (sortOrder === 'spent-high') return b.totalSpent - a.totalSpent;
         if (sortOrder === 'spent-low') return a.totalSpent - b.totalSpent;
@@ -188,8 +193,21 @@ export default function AdminUsersPage() {
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto ml-auto">
                     <Filter className="w-4 h-4 text-muted-foreground" />
+                    <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                        <SelectTrigger className="w-full md:w-[200px]">
+                            <SelectValue placeholder="ผู้แนะนำ (Admin)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">ผู้แนะนำทั้งหมด</SelectItem>
+                            {uniqueAdmins.map((adminEmail: string) => (
+                                <SelectItem key={adminEmail} value={adminEmail}>
+                                    แสดงของ: {adminEmail}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Select value={sortOrder} onValueChange={setSortOrder}>
-                        <SelectTrigger className="w-full md:w-[180px]">
+                        <SelectTrigger className="w-full md:w-[150px]">
                             <SelectValue placeholder="เรียงลำดับ" />
                         </SelectTrigger>
                         <SelectContent>
@@ -208,6 +226,7 @@ export default function AdminUsersPage() {
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead>ลูกค้า (User)</TableHead>
+                            <TableHead>โดนแนะนำโดย</TableHead>
                             <TableHead className="text-center">บัญชีทดสอบ</TableHead>
                             <TableHead className="text-center">Active Products</TableHead>
                             <TableHead className="text-center">Orders (สำเร็จ)</TableHead>
@@ -236,6 +255,16 @@ export default function AdminUsersPage() {
                                             </div>
                                             <span className="text-xs text-muted-foreground">{user.email || user.id}</span>
                                         </Link>
+                                    </TableCell>
+                                    <TableCell>
+                                        {user.referrer ? (
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium">{user.referrer.full_name || 'Admin'}</span>
+                                                <span className="text-[10px] text-muted-foreground">{user.referrer.email}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-muted-foreground text-sm">-ไม่มี-</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <div className="flex justify-center flex-col items-center gap-1">
