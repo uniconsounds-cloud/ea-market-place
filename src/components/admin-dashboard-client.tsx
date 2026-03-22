@@ -96,6 +96,8 @@ export function AdminDashboardClient() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('sales-desc');
     const [filterCategory, setFilterCategory] = useState('all');
+    const [selectedAdmin, setSelectedAdmin] = useState('all');
+    const [availableAdmins, setAvailableAdmins] = useState<string[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -119,14 +121,34 @@ export function AdminDashboardClient() {
                 ].filter(Boolean)));
 
                 let profileMap = new Map();
+                let adminsSet = new Set<string>();
+
                 if (userIds.length > 0) {
-                    const { data: profiles } = await supabase.from('profiles').select('id, email, full_name, is_tester').in('id', userIds);
-                    profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+                    const { data: profiles } = await supabase.from('profiles')
+                        .select('id, email, full_name, is_tester, referrer:profiles!referred_by(email)')
+                        .in('id', userIds);
+                    
+                    profileMap = new Map((profiles || []).map((p: any) => {
+                        if (p.referrer?.email) adminsSet.add(p.referrer.email);
+                        return [p.id, p];
+                    }));
                 }
 
-                // Filter out tester data
-                const realOrders = allOrders.filter(o => !profileMap.get(o.user_id)?.is_tester);
-                const realLicenses = licensesData.filter(l => !profileMap.get(l.user_id)?.is_tester);
+                setAvailableAdmins(Array.from(adminsSet));
+
+                // Filter out tester data AND filter by selected admin if not 'all'
+                const realOrders = allOrders.filter(o => {
+                    const profile = profileMap.get(o.user_id);
+                    if (profile?.is_tester) return false;
+                    if (selectedAdmin !== 'all' && profile?.referrer?.email !== selectedAdmin) return false;
+                    return true;
+                });
+                const realLicenses = licensesData.filter(l => {
+                    const profile = profileMap.get(l.user_id);
+                    if (profile?.is_tester) return false;
+                    if (selectedAdmin !== 'all' && profile?.referrer?.email !== selectedAdmin) return false;
+                    return true;
+                });
 
                 // Filter completed orders (Case Insensitive)
                 const completedOrders = realOrders.filter(o => o.status?.toLowerCase() === 'completed');
@@ -218,7 +240,7 @@ export function AdminDashboardClient() {
         };
 
         fetchData();
-    }, []);
+    }, [selectedAdmin]);
 
     const categories = useMemo(() => {
         const cats = new Set<string>();
@@ -382,7 +404,19 @@ export function AdminDashboardClient() {
 
                 {/* ======================= TAB 1: SALES ======================= */}
                 <TabsContent value="sales" className="space-y-8 animate-in slide-in-from-bottom-2 duration-500 m-0">
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row justify-end items-center gap-4">
+                        <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                            <SelectTrigger className="w-[200px] bg-background">
+                                <SelectValue placeholder="ผู้แนะนำ (Admin)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">ลูกค้าทั้งหมดทุกแอดมิน</SelectItem>
+                                {availableAdmins.map(admin => (
+                                    <SelectItem key={admin} value={admin}>ของ: {admin}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
                         <Select value={timeRange} onValueChange={setTimeRange}>
                             <SelectTrigger className="w-[180px] bg-background">
                                 <SelectValue placeholder="ช่วงเวลา" />
@@ -571,6 +605,20 @@ export function AdminDashboardClient() {
 
                 {/* ======================= TAB 2: LICENSES ======================= */}
                 <TabsContent value="licenses" className="space-y-8 animate-in slide-in-from-bottom-2 duration-500 m-0">
+                    <div className="flex flex-col sm:flex-row justify-end items-center gap-4 mb-4">
+                        <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                            <SelectTrigger className="w-[200px] bg-background">
+                                <SelectValue placeholder="ผู้แนะนำ (Admin)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">ลูกค้าทั้งหมดทุกแอดมิน</SelectItem>
+                                {availableAdmins.map(admin => (
+                                    <SelectItem key={admin} value={admin}>ของ: {admin}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                         <Card className="bg-gradient-to-br from-card to-card/50 border-green-500/20 shadow-lg shadow-green-500/5">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
