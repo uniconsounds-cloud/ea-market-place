@@ -16,9 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type IBRequest = {
     id: string; // ib_memberships ID
@@ -39,15 +40,24 @@ type IBRequest = {
         name: string;
         ib_link: string;
     }[] | null;
+    root_admin?: {
+        full_name: string | null;
+        email: string;
+    } | null;
 };
 
-export default function AdminIbRequestsClient({ initialRequests }: { initialRequests: IBRequest[] }) {
+export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = [] }: { initialRequests: IBRequest[], uniqueAdmins?: string[] }) {
     const [requests, setRequests] = useState<IBRequest[]>(initialRequests);
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState("pending");
+    const [selectedAdmin, setSelectedAdmin] = useState<string>("all");
 
-    const pendingRequests = requests.filter(r => r.status === "pending");
-    const approvedRequests = requests.filter(r => r.status === "approved");
+    const filteredRequests = requests.filter(user => {
+        return selectedAdmin === 'all' || user.root_admin?.email === selectedAdmin;
+    });
+
+    const pendingRequests = filteredRequests.filter(r => r.status === "pending");
+    const approvedRequests = filteredRequests.filter(r => r.status === "approved");
 
     // Approval Modal State
     const [isApproveOpen, setIsApproveOpen] = useState(false);
@@ -136,13 +146,31 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                 <CardHeader className="bg-muted/20 border-b border-border/40 pb-4">
                     <CardTitle className="text-lg flex items-center justify-between">
                         <span>รายการคำขอสิทธิ์ IB</span>
-                        <div className="flex gap-2">
-                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400">
-                                รอตรวจสอบ {pendingRequests.length}
-                            </Badge>
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-400">
-                                อนุมัติแล้ว {approvedRequests.length}
-                            </Badge>
+                        <div className="flex gap-4 items-center">
+                            <div className="flex items-center gap-2 font-normal text-sm">
+                                <Filter className="w-4 h-4 text-muted-foreground" />
+                                <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="ผู้แนะนำ (Admin)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">ลูกค้าทั้งหมดทุกแอดมิน</SelectItem>
+                                        {uniqueAdmins.map((adminEmail: string) => (
+                                            <SelectItem key={adminEmail} value={adminEmail}>
+                                                แสดงของ: {adminEmail}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex gap-2">
+                                <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400">
+                                    รอตรวจสอบ {pendingRequests.length}
+                                </Badge>
+                                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-400">
+                                    อนุมัติแล้ว {approvedRequests.length}
+                                </Badge>
+                            </div>
                         </div>
                     </CardTitle>
                 </CardHeader>
@@ -170,16 +198,17 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                     <TableHeader className="bg-muted/10">
                                         <TableRow>
                                             <TableHead className="w-[200px]">ลูกค้า</TableHead>
+                                            <TableHead>สายงาน (Upline Admin)</TableHead>
                                             <TableHead>โบรกเกอร์ (Broker)</TableHead>
                                             <TableHead>ข้อมูลรอยืนยัน</TableHead>
-                                            <TableHead className="w-[180px]">วันที่ขอสิทธิ์</TableHead>
-                                            <TableHead className="text-right w-[180px]">การจัดการ</TableHead>
+                                            <TableHead className="w-[150px]">วันที่ขอสิทธิ์</TableHead>
+                                            <TableHead className="text-right w-[160px]">การจัดการ</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {pendingRequests.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground flex-col gap-2">
+                                                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground flex-col gap-2">
                                                     <div className="flex justify-center mb-2">
                                                         <CheckCircle2 className="w-10 h-10 text-muted-foreground/30" />
                                                     </div>
@@ -191,7 +220,17 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                                 <TableRow key={request.id} className="hover:bg-muted/5">
                                                     <TableCell className="font-medium">
                                                         {getName(request)}
-                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {request.id.substring(0, 8)}...</div>
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[150px]">ID: {request.id.substring(0, 8)}...</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {request.root_admin ? (
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium">{request.root_admin.full_name || 'Admin'}</span>
+                                                                <span className="text-[10px] text-muted-foreground">{request.root_admin.email}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-sm">-ไม่มี-</span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         <span className="font-semibold text-primary/80">
@@ -254,16 +293,17 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                     <TableHeader className="bg-muted/10">
                                         <TableRow>
                                             <TableHead className="w-[200px]">ลูกค้า</TableHead>
+                                            <TableHead>สายงาน (Upline Admin)</TableHead>
                                             <TableHead>โบรกเกอร์ (Broker)</TableHead>
                                             <TableHead>ข้อมูลรอยืนยัน</TableHead>
-                                            <TableHead className="w-[180px]">วันที่อนุมัติ</TableHead>
-                                            <TableHead className="text-right w-[180px]">สถานะ</TableHead>
+                                            <TableHead className="w-[150px]">วันที่อนุมัติ</TableHead>
+                                            <TableHead className="text-right w-[140px]">สถานะ</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {approvedRequests.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground flex-col gap-2">
+                                                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground flex-col gap-2">
                                                     ไม่มีลูกค้าระบบ IB ที่ได้รับอนุมัติแล้ว
                                                 </TableCell>
                                             </TableRow>
@@ -272,7 +312,17 @@ export default function AdminIbRequestsClient({ initialRequests }: { initialRequ
                                                 <TableRow key={request.id} className="hover:bg-muted/5">
                                                     <TableCell className="font-medium">
                                                         {getName(request)}
-                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">ID: {request.id.substring(0, 8)}...</div>
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[150px]">ID: {request.id.substring(0, 8)}...</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {request.root_admin ? (
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium">{request.root_admin.full_name || 'Admin'}</span>
+                                                                <span className="text-[10px] text-muted-foreground">{request.root_admin.email}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-sm">-ไม่มี-</span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         <span className="font-semibold text-primary/80">
