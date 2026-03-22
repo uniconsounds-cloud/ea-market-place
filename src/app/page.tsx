@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { HomeIbButton } from '@/components/home-ib-button';
 
 export const revalidate = 0; // Disable static caching for real-time updates
 
@@ -34,18 +35,14 @@ export default async function Home() {
             ค้นพบ Expert Advisors (EA) ที่ผ่านการตรวจสอบแล้ว ออกแบบมาเพื่อเพิ่มศักยภาพการเทรดของคุณ
             ปลอดภัย เชื่อถือได้ และขับเคลื่อนด้วยข้อมูลจริง
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="#products">
-              <Button size="lg" className="px-8 text-base">
-                ดูสินค้าทั้งหมด
-              </Button>
-            </Link>
-            <Link href="/products">
-              <Button variant="outline" size="lg" className="px-8 text-base">
-                รับสิทธิ์ใช้งาน EA ฟรี (สมัครเป็น IB)
-              </Button>
-            </Link>
-          </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="#products">
+                <Button size="lg" className="px-8 text-base">
+                  ดูสินค้าทั้งหมด
+                </Button>
+              </Link>
+              <HomeIbButton />
+            </div>
         </div>
       </section>
 
