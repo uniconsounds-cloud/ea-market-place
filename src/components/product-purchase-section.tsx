@@ -340,7 +340,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                             const isIbPort = !!ibAccounts[license.account_number];
                             const brokerName = ibAccounts[license.account_number];
                             const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
-                            const isExpired = (!isIbPort && license.type !== 'lifetime') && (days <= 0 || !license.is_active);
+                            const isExpired = !license.is_active || (license.type !== 'lifetime' && days <= 0) || (isIbPort && license.expiry_date && days <= 0);
 
                             return (
                                 <div
@@ -369,7 +369,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
                                                 {((!isIbPort && license.type !== 'lifetime') || (isIbPort && license.expiry_date)) && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${isExpired ? 'bg-red-100 text-red-600 dark:bg-red-900/30 font-bold' : days <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 font-bold' : 'bg-gray-100 text-gray-600 dark:bg-gray-800'}`}>
-                                                        {isExpired ? 'Expired' : `เหลือ ${days} วัน`}
+                                                        {isExpired ? 'หมดอายุแล้ว' : `เหลือ ${days} วัน`}
                                                     </span>
                                                 )}
                                                 {(!isIbPort && license.type === 'lifetime') && <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">Lifetime</span>}
