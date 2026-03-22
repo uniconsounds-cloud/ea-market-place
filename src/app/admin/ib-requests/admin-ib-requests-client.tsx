@@ -125,6 +125,14 @@ export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = 
         return req.profiles.full_name || req.profiles.email || 'ไม่ได้ระบุชื่อ';
     };
 
+    const getEmail = (req: IBRequest) => {
+        if (!req.profiles) return '-';
+        if (Array.isArray(req.profiles)) {
+            return req.profiles[0]?.email || '-';
+        }
+        return req.profiles.email || '-';
+    };
+
     const getBrokerName = (req: IBRequest) => {
         if (!req.brokers) return 'ไม่พบข้อมูลโบรกเกอร์';
         if (Array.isArray(req.brokers)) {
@@ -220,7 +228,7 @@ export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = 
                                                 <TableRow key={request.id} className="hover:bg-muted/5">
                                                     <TableCell className="font-medium">
                                                         {getName(request)}
-                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[150px]">ID: {request.id.substring(0, 8)}...</div>
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[150px]">{getEmail(request)}</div>
                                                     </TableCell>
                                                     <TableCell>
                                                         {request.root_admin ? (
@@ -312,7 +320,7 @@ export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = 
                                                 <TableRow key={request.id} className="hover:bg-muted/5">
                                                     <TableCell className="font-medium">
                                                         {getName(request)}
-                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[150px]">ID: {request.id.substring(0, 8)}...</div>
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[150px]">{getEmail(request)}</div>
                                                     </TableCell>
                                                     <TableCell>
                                                         {request.root_admin ? (
