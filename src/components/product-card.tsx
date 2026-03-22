@@ -157,7 +157,7 @@ export function ProductCard({ product }: { product: Product }) {
 
                 <div className="mt-auto space-y-4">
                     {product.allow_rent === false ? (
-                        <div className="border-t border-border/50 pt-4 pb-2 text-center bg-muted/20 rounded-b-xl -mx-6 -mb-6 mt-4">
+                        <div className="border-t border-border/50 pt-4 pb-2 text-center bg-muted/10 rounded-lg mb-2 mt-2">
                             {product.allow_ib !== false ? (
                                 <span className="text-sm font-bold text-blue-400">✅ เปิดให้ขอสิทธิ์ใช้งานฟรีผ่าน IB</span>
                             ) : (
