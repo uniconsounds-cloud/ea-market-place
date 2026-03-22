@@ -110,7 +110,9 @@ export default function AdminUsersPage() {
         }
     };
 
-    const uniqueAdmins = Array.from(new Set(users.map(u => u.referrer?.email).filter(Boolean)));
+    const uniqueAdmins = Array.from(
+        new Set(users.filter(u => u.role === 'admin' && u.email).map(u => u.email))
+    );
 
     const filteredUsers = users.filter(user => {
         const searchLower = searchQuery.toLowerCase();

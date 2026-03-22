@@ -128,9 +128,7 @@ export function AdminDashboardClient() {
                 let adminsSet = new Set<string>();
 
                 (profiles || []).forEach((p: any) => {
-                    // Include any referrer email
-                    if (p.referrer?.email) adminsSet.add(p.referrer.email);
-                    // Also ALWAYS include admins themselves, even if they have 0 referrals
+                    // ONLY include profiles that actually have the 'admin' role
                     if (p.role === 'admin' && p.email) adminsSet.add(p.email);
                     
                     profileMap.set(p.id, p);
