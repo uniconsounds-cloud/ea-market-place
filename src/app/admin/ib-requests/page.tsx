@@ -40,12 +40,14 @@ export default async function AdminIbRequestsPage() {
                 full_name,
                 email
             ),
-            brokers (
+            brokers!inner (
                 name,
-                ib_link
+                ib_link,
+                owner_id
             )
         `)
         .in("status", ["pending", "approved"])
+        .eq("brokers.owner_id", session.user.id)
         .order("status", { ascending: false }) // Sort pending first
         .order("updated_at", { ascending: false });
 

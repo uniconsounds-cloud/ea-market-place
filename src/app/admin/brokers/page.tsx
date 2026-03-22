@@ -27,10 +27,11 @@ export default async function AdminBrokersPage() {
         redirect("/");
     }
 
-    // Fetch brokers
+    // Fetch brokers owned by this admin
     const { data: brokers, error } = await supabase
         .from("brokers")
         .select("*")
+        .eq("owner_id", session.user.id)
         .order("created_at", { ascending: false });
 
     return <AdminBrokersClient initialBrokers={brokers || []} />;
