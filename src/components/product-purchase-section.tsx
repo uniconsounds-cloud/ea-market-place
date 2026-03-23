@@ -35,6 +35,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const [ibStatus, setIbStatus] = useState<'none' | 'pending' | 'approved'>('none');
     const [useIbQuota, setUseIbQuota] = useState(true);
     const [ibAccounts, setIbAccounts] = useState<Record<string, string>>({});
+    const [approvedBrokersList, setApprovedBrokersList] = useState<string[]>([]);
+    const [selectedIbBroker, setSelectedIbBroker] = useState<string>('');
 
     // Fetch user licenses and orders on mount
     useEffect(() => {
@@ -70,6 +72,12 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 let fetchedIbAccounts: Record<string, string> = {};
 
                 if (memberships && memberships.length > 0) {
+                    const approvedList = Array.from(new Set(memberships.filter(m => m.status === 'approved').map(m => Array.isArray((m as any).brokers) ? (m as any).brokers[0]?.name : (m as any).brokers?.name || 'Customer'))).filter(Boolean);
+                    setApprovedBrokersList(approvedList as string[]);
+                    if (approvedList.length > 0) {
+                        setSelectedIbBroker(approvedList[0] as string);
+                    }
+
                     memberships.forEach(m => {
                         if (m.verification_data) {
                             fetchedIbAccounts[m.verification_data] = Array.isArray((m as any).brokers) ? (m as any).brokers[0]?.name : (m as any).brokers?.name || 'Customer';
@@ -271,6 +279,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             if (ibStatus === 'approved' && useIbQuota) {
                 queryParams.append('isIbRequest', 'true');
+                if (selectedIbBroker) queryParams.append('ibBrokerName', selectedIbBroker);
             }
 
             if (!user) {
@@ -307,7 +316,6 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
     // Compute unique brokers and filtered ports
     const uniqueBrokers = Array.from(new Set(Object.values(ibAccounts))).filter(Boolean);
-    const ibQuotaLabel = uniqueBrokers.length > 0 ? `ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB ${uniqueBrokers.join(' / ')}` : 'ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB';
 
     // Filter ports for display to avoid rendering empty sections and drop empty port strings
     const displayLicenses = userLicenses.filter(license => license.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[license.account_number] : !ibAccounts[license.account_number]));
@@ -483,8 +491,21 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                 }}
                                 className="accent-primary"
                             />
-                            <span>{ibQuotaLabel}</span>
+                            <span>ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB{approvedBrokersList.length === 1 && ` ${approvedBrokersList[0]}`}</span>
                         </label>
+                        {useIbQuota && approvedBrokersList.length > 1 && (
+                            <div className="pl-6 pb-2">
+                                <label className="text-xs text-muted-foreground block mb-2">โปรดเลือกโบรกเกอร์ IB ที่ต้องการใช้สิทธิ์:</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {approvedBrokersList.map(broker => (
+                                       <label key={broker} className={`flex items-center gap-2 cursor-pointer p-2.5 text-xs rounded border transition-colors ${selectedIbBroker === broker ? 'border-primary bg-primary/10 font-bold text-primary' : 'border-border bg-background hover:bg-muted'}`}>
+                                           <input type="radio" name="ib_broker_choice" checked={selectedIbBroker === broker} onChange={() => setSelectedIbBroker(broker)} className="accent-primary" />
+                                           <span>{broker}</span>
+                                       </label> 
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
                             <input
                                 type="radio"

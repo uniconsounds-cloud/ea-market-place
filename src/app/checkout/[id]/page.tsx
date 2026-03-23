@@ -25,6 +25,7 @@ function CheckoutContent({ productId }: { productId: string }) {
     const initialPlan = (searchParams.get('plan') as 'monthly' | 'quarterly' | 'lifetime') || 'lifetime';
     const initialAccountNumber = searchParams.get('accountNumber') || '';
     const isIbRequest = searchParams.get('isIbRequest') === 'true';
+    const ibBrokerName = searchParams.get('ibBrokerName') || '';
 
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -185,6 +186,7 @@ function CheckoutContent({ productId }: { productId: string }) {
                 amount: isIbRequest ? 0 : (planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang,
                 status: 'pending', // Both go to pending
                 is_ib_request: isIbRequest ? true : false,
+                ib_broker_name: isIbRequest ? ibBrokerName : null,
                 slip_url: slipUrl,
                 plan_type: planType,
                 account_number: accountNumber.trim() // Save account number

@@ -267,7 +267,8 @@ export default function AdminOrdersPage() {
                         .update({
                             type: order.plan_type || 'lifetime',
                             is_active: true,
-                            expiry_date: expiryDate
+                            expiry_date: expiryDate,
+                            ...(order.ib_broker_name && { ib_broker_name: order.ib_broker_name })
                         })
                         .eq('id', existingLicense.id);
 
@@ -287,7 +288,8 @@ export default function AdminOrdersPage() {
                             type: order.plan_type || 'lifetime',
                             is_active: true,
                             expiry_date: expiryDate,
-                            account_number: port
+                            account_number: port,
+                            ib_broker_name: order.ib_broker_name || null
                         });
 
                     if (licenseError) {
@@ -384,7 +386,7 @@ export default function AdminOrdersPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">รายการสั่งซื้อ</h1>
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent pb-1">รายการสั่งซื้อ</h1>
                     <p className="text-muted-foreground">จัดการและตรวจสอบคำสั่งซื้อทั้งหมด</p>
                 </div>
                 <Button variant="outline" onClick={fetchOrders} size="sm" className="hidden md:flex">
@@ -486,16 +488,18 @@ export default function AdminOrdersPage() {
                                                             </span>
                                                         )}
                                                     </h3>
-                                                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                                    <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
                                                         <span>ลูกค้า: {order.profiles?.full_name || order.profiles?.email || 'Guest'}</span>
                                                         {order.profiles?.is_tester && (
                                                             <span className="text-[10px] text-orange-500 font-bold ml-1 bg-orange-500/10 px-1 rounded uppercase">Tester</span>
                                                         )}
-                                                        <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
-                                                            {order.plan_type === 'monthly' ? 'รายเดือน' :
-                                                                order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :
-                                                                    'ตลอดชีพ'}
-                                                        </span>
+                                                        {!order.is_ib_request && (
+                                                            <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
+                                                                {order.plan_type === 'monthly' ? 'รายเดือน' :
+                                                                    order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :
+                                                                        'ตลอดชีพ'}
+                                                            </span>
+                                                        )}
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
@@ -511,14 +515,14 @@ export default function AdminOrdersPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm mt-2 p-3 bg-muted/30 rounded-lg">
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Account Port:</span>
-                                                    <span className="font-mono font-bold text-accent">{order.account_number || '-'}</span>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3.5 bg-muted/30 rounded-lg border border-border/50">
+                                                <div className="flex flex-col gap-1 overflow-hidden">
+                                                    <span className="text-muted-foreground text-xs">Account Port:</span>
+                                                    <span className="font-mono font-bold text-accent break-all">{order.account_number || '-'}</span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">สั่งซื้อเมื่อ:</span>
-                                                    <span>{new Date(order.created_at).toLocaleString('th-TH')}</span>
+                                                <div className="flex flex-col gap-1 md:items-end">
+                                                    <span className="text-muted-foreground text-xs">สั่งซื้อเมื่อ:</span>
+                                                    <span className="font-medium text-[13px]">{new Date(order.created_at).toLocaleString('th-TH')}</span>
                                                 </div>
                                             </div>
                                         </div>
