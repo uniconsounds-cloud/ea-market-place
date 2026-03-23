@@ -85,8 +85,8 @@ export default function LicensesPage() {
                                 <div>
                                     <h3 className="font-bold text-lg">{license.products?.name}</h3>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${license.type === 'lifetime' ? 'bg-gold/10 text-gold' : 'bg-blue-500/10 text-blue-500'}`}>
-                                            {license.type === 'lifetime' ? 'ถาวร' : 'รายเดือน'}
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${license.type === 'lifetime' ? 'bg-gold/10 text-gold' : license.type === 'ib' ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'}`}>
+                                            {license.type === 'lifetime' ? 'ถาวร' : license.type === 'ib' ? 'IB (โบรกเกอร์)' : 'รายเดือน'}
                                         </span>
                                         <span>• หมดอายุ: {license.type === 'lifetime' ? 'ตลอดชีพ' : new Date(license.expiry_date).toLocaleDateString('th-TH')}</span>
                                     </div>

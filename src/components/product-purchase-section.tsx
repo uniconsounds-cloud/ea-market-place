@@ -183,7 +183,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             for (const port of filledPorts) {
                 const existingUserLicense = userLicenses.find(l => l.account_number === port);
                 if (existingUserLicense) {
-                    const isIbPort = !!ibAccounts[port];
+                    const isIbPort = existingUserLicense.type === 'ib' || !!existingUserLicense.ib_broker_name || !!ibAccounts[port];
                     if (ibStatus === 'approved' && useIbQuota) {
                         if (!isIbPort) {
                             setPortValidationMsg({ text: `พอร์ต ${port} เป็นพอร์ตปกติ ไม่สามารถขอแบบ IB ได้`, type: 'error' });

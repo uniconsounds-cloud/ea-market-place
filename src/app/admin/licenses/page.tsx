@@ -85,13 +85,13 @@ export default async function AdminLicensesPage() {
         const userIbRecords = l.user_id ? ibMembershipsMap[l.user_id] || [] : [];
         const matchedIb = userIbRecords.find(r => r.account_number === l.account_number);
 
-        const isIbLicense = Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number === l.account_number);
+        const isIbLicense = l.type === 'ib' || Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number === l.account_number);
 
         return {
             ...l,
             profiles: l.user_id ? profilesMap[l.user_id] : null,
             is_ib: isIbLicense,
-            ib_broker_name: matchedIb ? matchedIb.broker_name : (profilesMap[l.user_id]?.ib_account_number === l.account_number ? 'Customer' : undefined)
+            ib_broker_name: l.ib_broker_name || (matchedIb ? matchedIb.broker_name : (profilesMap[l.user_id]?.ib_account_number === l.account_number ? 'Customer' : undefined))
         };
     });
 

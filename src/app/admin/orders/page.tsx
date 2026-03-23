@@ -209,6 +209,35 @@ export default function AdminOrdersPage() {
                 throw new Error("ไม่พบเลขพอร์ตในออเดอร์ หรือ ข้อมูลพอร์ตว่างเปล่า");
             }
 
+            // Determine license data once for the whole order (ensures all ports in multi-port get same data)
+            let commonExpiryDate: string | null = null;
+            let commonLicenseType = order.is_ib_request ? 'ib' : (order.plan_type || 'lifetime');
+
+            if (order.is_ib_request) {
+                // IB Request gets the admin-specified expiry date
+                if (customExpiryDate) {
+                    commonExpiryDate = customExpiryDate.toISOString();
+                } else {
+                    // Fallback to 1 year
+                    const date = new Date();
+                    date.setFullYear(date.getFullYear() + 1);
+                    commonExpiryDate = date.toISOString();
+                }
+            } else {
+                // For non-IB (rental/lifetime), we extend from Today for the whole batch
+                // as requested to "make them all the same" in a single approval.
+                const startDate = new Date();
+                if (order.plan_type === 'monthly') {
+                    startDate.setMonth(startDate.getMonth() + 1);
+                    commonExpiryDate = startDate.toISOString();
+                } else if (order.plan_type === 'quarterly') {
+                    startDate.setMonth(startDate.getMonth() + 3);
+                    commonExpiryDate = startDate.toISOString();
+                } else {
+                    commonExpiryDate = new Date(9999, 11, 31).toISOString();
+                }
+            }
+
             // Loop through each port for Multi-Port support
             for (const port of accountNumbersToProcess) {
                 // Check for existing license by Account Number AND Product ID
@@ -222,42 +251,7 @@ export default function AdminOrdersPage() {
 
                 const existingLicense = existingLicenses && existingLicenses.length > 0 ? existingLicenses[0] : null;
                 console.log('Match Found for port', port, ':', existingLicense);
-
-                let expiryDate = null;
-                let startDate = new Date();
-
-                if (existingLicense) {
-                    // RENEWAL LOGIC
-                    // extend from current expiry if it's in the future, otherwise from today
-                    const currentExpiry = new Date(existingLicense.expiry_date);
-                    if (currentExpiry > startDate) {
-                        startDate = currentExpiry;
-                    }
-                }
-
-                if (order.is_ib_request) {
-                    // IB Request gets the admin-specified expiry date
-                    if (customExpiryDate) {
-                        expiryDate = customExpiryDate.toISOString();
-                    } else {
-                        // Fallback to 1 year if somehow custom date is missing
-                        const date = new Date(startDate);
-                        date.setFullYear(date.getFullYear() + 1);
-                        expiryDate = date.toISOString();
-                    }
-                } else if (order.plan_type === 'monthly') {
-                    const date = new Date(startDate);
-                    date.setMonth(date.getMonth() + 1);
-                    expiryDate = date.toISOString();
-                } else if (order.plan_type === 'quarterly') {
-                    const date = new Date(startDate);
-                    date.setMonth(date.getMonth() + 3);
-                    expiryDate = date.toISOString();
-                } else {
-                    expiryDate = new Date(9999, 11, 31).toISOString();
-                }
-
-                console.log('Calculated Expiry for', port, ':', expiryDate);
+                console.log('Applying Data for', port, ':', { type: commonLicenseType, expiry: commonExpiryDate });
 
                 if (existingLicense) {
                     // Update existing license
@@ -265,10 +259,11 @@ export default function AdminOrdersPage() {
                     const { error: updateError } = await supabase
                         .from('licenses')
                         .update({
-                            type: order.plan_type || 'lifetime',
+                            type: commonLicenseType,
                             is_active: true,
-                            expiry_date: expiryDate,
-                            ...(order.ib_broker_name && { ib_broker_name: order.ib_broker_name })
+                            expiry_date: commonExpiryDate,
+                            ...(order.ib_broker_name && { ib_broker_name: order.ib_broker_name }),
+                            is_ib_request: order.is_ib_request // flag it as IB if it is one
                         })
                         .eq('id', existingLicense.id);
 
@@ -285,11 +280,12 @@ export default function AdminOrdersPage() {
                         .insert({
                             user_id: order.user_id,
                             product_id: order.product_id,
-                            type: order.plan_type || 'lifetime',
+                            type: commonLicenseType,
                             is_active: true,
-                            expiry_date: expiryDate,
+                            expiry_date: commonExpiryDate,
                             account_number: port,
-                            ib_broker_name: order.ib_broker_name || null
+                            ib_broker_name: order.ib_broker_name || null,
+                            is_ib_request: order.is_ib_request
                         });
 
                     if (licenseError) {

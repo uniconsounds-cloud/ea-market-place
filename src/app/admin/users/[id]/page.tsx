@@ -103,8 +103,8 @@ export default function CustomerDetailsPage() {
             // Map IB ports
             const mappedLicenses = (rawLicenses || []).map((l: any) => ({
                 ...l,
-                is_ib: !!approvedIbAccounts[l.account_number] || (profileData?.ib_account_number === l.account_number),
-                ib_broker_name: approvedIbAccounts[l.account_number] || (profileData?.ib_account_number === l.account_number ? 'Customer' : undefined)
+                is_ib: l.type === 'ib' || !!approvedIbAccounts[l.account_number] || (profileData?.ib_account_number === l.account_number),
+                ib_broker_name: l.ib_broker_name || approvedIbAccounts[l.account_number] || (profileData?.ib_account_number === l.account_number ? 'Customer' : undefined)
             }));
 
             mappedLicenses.forEach((l: any) => {
