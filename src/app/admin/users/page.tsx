@@ -288,11 +288,13 @@ export default function AdminUsersPage() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="text-sm">
-                                            {user.created_at ? new Date(user.created_at).toLocaleDateString('th-TH', {
+                                            {user.created_at ? new Date(user.created_at).toLocaleString('th-TH', {
                                                 year: 'numeric',
                                                 month: 'short',
                                                 day: 'numeric',
-                                            }) : '-'}
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) + ' น.' : '-'}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">

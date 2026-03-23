@@ -127,11 +127,13 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
                                         </TableCell>
                                         <TableCell>
                                             <div className="text-sm">
-                                                {profile.created_at ? new Date(profile.created_at).toLocaleDateString('th-TH', {
+                                                {profile.created_at ? new Date(profile.created_at).toLocaleString('th-TH', {
                                                     year: 'numeric',
                                                     month: 'short',
                                                     day: 'numeric',
-                                                }) : '-'}
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                }) + ' น.' : '-'}
                                             </div>
                                         </TableCell>
                                         <TableCell>
