@@ -23,10 +23,10 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const [riskAccepted, setRiskAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Validation State
     const [portValidationMsg, setPortValidationMsg] = useState<{ text: string, type: 'error' | 'success' | 'checking' } | null>(null);
 
     // New State for active licenses and pending orders
+    const [userId, setUserId] = useState<string | null>(null);
     const [userLicenses, setUserLicenses] = useState<any[]>([]);
     const [userOrders, setUserOrders] = useState<any[]>([]);
     const [isRenewal, setIsRenewal] = useState(false);
@@ -41,6 +41,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         const fetchData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+                setUserId(user.id);
                 // 1. Fetch All Licenses (Active & Expired) to allow easy renewal
                 const { data: licenses } = await supabase
                     .from('licenses')
@@ -214,9 +215,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 .gte('expiry_date', new Date().toISOString());
 
             if (globalLicenses && globalLicenses.length > 0) {
-                const conflicts = globalLicenses.filter(l => !userLicenses.some(ul => ul.account_number === l.account_number));
+                const conflicts = globalLicenses.filter(l => l.user_id !== userId);
                 if (conflicts.length > 0) {
-                    setPortValidationMsg({ text: `หมายเลขพอร์ต ${conflicts[0].account_number} มีการใช้งานในระบบแล้ว`, type: 'error' });
+                    setPortValidationMsg({ text: `หมายเลขพอร์ต ${conflicts[0].account_number} มีการใช้งานในระบบแล้วโดยผู้ใช้อื่น ไม่สามารถใช้ซ้ำได้`, type: 'error' });
                     setIsRenewal(false);
                     return;
                 }
@@ -233,7 +234,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [accountNumbers, userLicenses, userOrders, ibStatus, useIbQuota]);
+    }, [accountNumbers, userLicenses, userOrders, ibStatus, useIbQuota, userId]);
 
 
     const handlePurchase = async () => {
