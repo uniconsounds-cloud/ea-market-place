@@ -318,8 +318,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     const uniqueBrokers = Array.from(new Set(Object.values(ibAccounts))).filter(Boolean);
 
     // Filter ports for display to avoid rendering empty sections and drop empty port strings
-    const displayLicenses = userLicenses.filter(license => license.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[license.account_number] : !ibAccounts[license.account_number]));
-    const displayOrders = userOrders.filter(order => order.account_number && ((ibStatus === 'approved' && useIbQuota) ? !!ibAccounts[order.account_number] : !ibAccounts[order.account_number]));
+    const displayLicenses = userLicenses.filter(license => license.account_number && ((ibStatus === 'approved' && useIbQuota) ? (!!license.ib_broker_name || !!ibAccounts[license.account_number]) : !(!!license.ib_broker_name || !!ibAccounts[license.account_number])));
+    const displayOrders = userOrders.filter(order => order.account_number && ((ibStatus === 'approved' && useIbQuota) ? order.is_ib_request : !order.is_ib_request));
 
     if (product.allow_rent === false && ibStatus !== 'approved') {
         return (
@@ -381,8 +381,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                     <div className="space-y-2">
                         {/* Active Licenses */}
                         {displayLicenses.map((license) => {
-                            const isIbPort = !!ibAccounts[license.account_number];
-                            const brokerName = ibAccounts[license.account_number];
+                            const isIbPort = !!license.ib_broker_name || !!ibAccounts[license.account_number];
+                            const brokerName = license.ib_broker_name || ibAccounts[license.account_number];
                             const days = calculateDaysRemaining(license.expiry_date, license.type, isIbPort);
                             const isExpired = !license.is_active || (license.type !== 'lifetime' && days <= 0) || (isIbPort && license.expiry_date && days <= 0);
 
@@ -444,7 +444,8 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
                         {/* Pending Orders */}
                         {displayOrders.map((order) => {
-                            const isIbPort = !!ibAccounts[order.account_number];
+                            const isIbPort = order.is_ib_request;
+                            const orderBrokerName = order.ib_broker_name || ibAccounts[order.account_number];
                             return (
                                 <div
                                     key={`order-${order.id}`}
@@ -461,7 +462,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
                                                 {isIbPort && (
                                                     <span className="text-[9px] text-blue-500 font-bold bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                                        IB {ibAccounts[order.account_number]}
+                                                        IB {orderBrokerName || 'Customer'}
                                                     </span>
                                                 )}
                                             </div>
@@ -536,7 +537,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-muted-foreground">ระบบจะใช้โควต้า IB ของคุณสำหรับสินค้านี้โดยอัตโนมัติ</p>
+                                    <p className="text-muted-foreground">ระบบจะใช้โควต้า IB ของคุณ{approvedBrokersList.length === 1 && ` (${approvedBrokersList[0]})`} สำหรับสินค้านี้โดยอัตโนมัติ</p>
                                 )}
                             </>
                         )}
