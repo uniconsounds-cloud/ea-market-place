@@ -383,7 +383,13 @@ export default function ProductFormPage() {
                 actionText = 'การลบสินค้า';
                 targetName = `สินค้า: ${formData.name || id}`;
             } else if (action === 'edit_license') {
-                actionText = 'การแก้ไขข้อมูล License';
+                if (editingLicense?.is_active && !editIsActive) {
+                    actionText = 'ปิดการใช้งานรูท/พอร์ต (Inactive)';
+                } else if (!editingLicense?.is_active && editIsActive) {
+                    actionText = 'เปิดการใช้งานรูท/พอร์ต (Active)';
+                } else {
+                    actionText = 'การแก้ไขข้อมูล License';
+                }
                 targetName = `License พอร์ต ${editingLicense?.account_number} ของคุณ ${editingLicense?.profiles?.full_name || 'ไม่ระบุชื่อ'} `;
             }
 

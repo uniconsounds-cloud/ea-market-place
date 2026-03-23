@@ -6,13 +6,13 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_fallback_for_b
 
 export async function POST(request: Request) {
     try {
-        const { email, productId, actionText, targetName, otp: requestedOtp } = await request.json();
+        const { email, productId, actionText, title, targetName, otp: requestedOtp } = await request.json();
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
-        const actionString = actionText || 'การลบสินค้า';
+        const actionString = actionText || title || 'การดำเนินการ';
         const targetString = targetName || `รหัสสินค้า: ${productId}`;
 
         // Generate a 6-digit OTP, or use the one provided by the client

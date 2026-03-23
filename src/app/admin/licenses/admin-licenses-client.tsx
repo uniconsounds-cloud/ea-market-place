@@ -162,7 +162,14 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                 return;
             }
 
-            const actionText = 'การแก้ไขข้อมูล License (สิทธิ์การใช้งาน)';
+            let actionText = 'การแก้ไขข้อมูล License (สิทธิ์การใช้งาน)';
+            if (editingLicense) {
+                if (editingLicense.is_active && !editIsActive) {
+                    actionText = 'ปิดการใช้งานรูท/พอร์ต (Inactive)';
+                } else if (!editingLicense.is_active && editIsActive) {
+                    actionText = 'เปิดการใช้งานรูท/พอร์ต (Active)';
+                }
+            }
             const targetName = `พอร์ต ${editingLicense?.account_number} ของคุณ ${editingLicense?.profiles?.full_name || 'ไม่ระบุชื่อ'}`;
 
             const res = await fetch('/api/admin/send-delete-otp', {

@@ -183,7 +183,14 @@ export default function CustomerDetailsPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user?.email) throw new Error("Admin user not found");
 
-            const actionText = action === 'edit_license' ? 'แก้ไขสิทธิ์การใช้งานของลูกค้า (Edit License)' : 'ลบข้อมูล';
+            let actionText = action === 'edit_license' ? 'แก้ไขสิทธิ์การใช้งานของลูกค้า (Edit License)' : 'ลบข้อมูล';
+            if (action === 'edit_license' && editingLicense) {
+                if (editingLicense.is_active && !editIsActive) {
+                    actionText = 'ปิดการใช้งานรูท/พอร์ตลูกค้า (Inactive)';
+                } else if (!editingLicense.is_active && editIsActive) {
+                    actionText = 'เปิดการใช้งานรูท/พอร์ตลูกค้า (Active)';
+                }
+            }
             const customerName = profile.full_name || profile.email;
 
             // Call the universal API
