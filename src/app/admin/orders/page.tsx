@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar } from 'lucide-react';
+import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar, Mail } from 'lucide-react';
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
@@ -488,8 +488,15 @@ export default function AdminOrdersPage() {
                                                             </span>
                                                         )}
                                                     </h3>
-                                                    <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                                                        <span>ลูกค้า: {order.profiles?.full_name || order.profiles?.email || 'Guest'}</span>
+                                                    <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+                                                        <span className="flex items-center gap-1.5 flex-wrap">
+                                                            ลูกค้า: <span className="font-medium text-foreground">{order.profiles?.full_name || 'Guest'}</span>
+                                                            {order.profiles?.email && (
+                                                                <span className="text-[11px] px-1.5 py-0.5 bg-muted rounded border border-border/50 text-muted-foreground flex items-center gap-1">
+                                                                    <Mail className="w-3 h-3" /> {order.profiles.email}
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                         {order.profiles?.is_tester && (
                                                             <span className="text-[10px] text-orange-500 font-bold ml-1 bg-orange-500/10 px-1 rounded uppercase">Tester</span>
                                                         )}
