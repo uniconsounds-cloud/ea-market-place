@@ -36,7 +36,11 @@ string InpLicenseUrl = "https://eaeze.com/api/verify-license";
 string InpProductID  = "EZM-5P-V1";    // < ==== Product ID ==== [1]
 string InpApiKey     = "KHUCHAI_SUPHAKORN";
 
-// --- 2. LICENSE CHECK LOGIC ---
+// --- 2. INTERNAL STATE ---
+datetime last_license_check = 0;
+const int license_check_interval = 900; // 15 minutes (900 seconds)
+
+// --- 3. LICENSE CHECK LOGIC ---
 bool CheckEaezeLicense() {
     char data[];
     char result[];
@@ -92,7 +96,22 @@ bool CheckEaezeLicense() {
     Print("EAEZE: Server Error (", res, "): ", error_msg);
     ShowLicenseAlert("Connection Error: " + IntegerToString(res));
     return false;
+}
 
+// Periodic check to be called in OnTick or OnTimer
+void CheckEaezeLicensePeriodic() {
+    datetime now = TimeCurrent();
+    
+    // Initial check at startup or every 15 minutes
+    if (last_license_check == 0 || (now - last_license_check) >= license_check_interval) {
+        last_license_check = now;
+        
+        Print("EAEZE: Performing periodic license check...");
+        if (!CheckEaezeLicense()) {
+            Print("EAEZE: Periodic license check failed. Removing EA from chart.");
+            ExpertRemove(); // This will stop and remove the EA completely
+        }
+    }
 }
 
 // --- 3. UI NOTIFICATION ---
