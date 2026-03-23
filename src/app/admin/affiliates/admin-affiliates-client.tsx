@@ -22,12 +22,20 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
     const [editingRateId, setEditingRateId] = useState<string | null>(null);
     const [newRate, setNewRate] = useState<string>('');
     const [saving, setSaving] = useState(false);
+    const [sortOrder, setSortOrder] = useState('newest');
 
     const filteredProfiles = profiles.filter((profile: any) =>
         (profile.full_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (profile.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (profile.referral_code?.toLowerCase() || '').includes(searchQuery.toLowerCase())
     );
+
+    const sortedProfiles = [...filteredProfiles].sort((a, b) => {
+        if (sortOrder === 'newest') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        if (sortOrder === 'oldest') return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+        if (sortOrder === 'income-high') return (b.accumulated_commission || 0) - (a.accumulated_commission || 0);
+        return 0;
+    });
 
     const handleEditStart = (profile: any) => {
         setEditingRateId(profile.id);
@@ -70,7 +78,7 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
                 </div>
             </div>
 
-            <div className="flex bg-card/50 p-4 rounded-xl border border-border/50 items-center justify-between">
+            <div className="flex flex-col md:flex-row bg-card/50 p-4 rounded-xl border border-border/50 items-center justify-between gap-4">
                 <div className="relative w-full md:w-96">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -80,6 +88,17 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
+                <div className="flex items-center gap-2 w-full md:w-auto ml-auto">
+                    <select
+                        className="flex h-10 w-full md:w-[150px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value)}
+                    >
+                        <option value="newest">สมัครล่าสุด</option>
+                        <option value="oldest">สมัครเก่าสุด</option>
+                        <option value="income-high">รายได้สูงสุด</option>
+                    </select>
+                </div>
             </div>
 
             <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -88,6 +107,7 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
                         <TableHeader>
                             <TableRow className="bg-muted/50">
                                 <TableHead>ผู้ใช้งาน</TableHead>
+                                <TableHead>วันที่สมัคร</TableHead>
                                 <TableHead>สถานะ IB</TableHead>
                                 <TableHead>แนะนำโดย (Upline)</TableHead>
                                 <TableHead className="text-center">Rate (%)</TableHead>
@@ -95,14 +115,23 @@ export default function AdminAffiliatesClient({ initialProfiles }: { initialProf
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredProfiles.length > 0 ? (
-                                filteredProfiles.map((profile: any) => (
+                            {sortedProfiles.length > 0 ? (
+                                sortedProfiles.map((profile: any) => (
                                     <TableRow key={profile.id} className="hover:bg-muted/30 transition-colors">
                                         <TableCell>
                                             <div className="font-medium text-white">{profile.full_name || 'ไม่ได้ระบุชือ'}</div>
                                             <div className="text-xs text-muted-foreground">{profile.email}</div>
                                             <div className="text-xs mt-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded inline-block font-mono">
                                                 {profile.referral_code || '-'}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-sm">
+                                                {profile.created_at ? new Date(profile.created_at).toLocaleDateString('th-TH', {
+                                                    year: 'numeric',
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                }) : '-'}
                                             </div>
                                         </TableCell>
                                         <TableCell>

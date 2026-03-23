@@ -24,6 +24,7 @@ export default async function AdminAffiliatesPage() {
             referral_code,
             commission_rate,
             accumulated_commission,
+            created_at,
             ib_memberships(status),
             referred_by,
             upline:referred_by(full_name, email)

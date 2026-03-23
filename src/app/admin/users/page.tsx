@@ -42,7 +42,7 @@ export default function AdminUsersPage() {
             // We need to fetch ALL profiles.
             const { data: profiles, error: profileError } = await supabase
                 .from('profiles')
-                .select('id, full_name, email, role, is_tester, referred_by, referrer:profiles!referred_by(id, full_name, email)');
+                .select('id, full_name, email, role, is_tester, referred_by, created_at, referrer:profiles!referred_by(id, full_name, email)');
 
             if (profileError) throw profileError;
 
@@ -142,7 +142,8 @@ export default function AdminUsersPage() {
         if (sortOrder === 'spent-high') return b.totalSpent - a.totalSpent;
         if (sortOrder === 'spent-low') return a.totalSpent - b.totalSpent;
         if (sortOrder === 'orders-high') return b.totalOrders - a.totalOrders;
-        // created_at removed
+        if (sortOrder === 'newest') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        if (sortOrder === 'oldest') return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
         return 0;
     });
 
@@ -232,6 +233,7 @@ export default function AdminUsersPage() {
                             <SelectItem value="spent-low">ยอดซื้อต่ำสุด</SelectItem>
                             <SelectItem value="orders-high">จำนวนออเดอร์มากสุด</SelectItem>
                             <SelectItem value="newest">สมัครล่าสุด</SelectItem>
+                            <SelectItem value="oldest">สมัครเก่าสุด</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -244,6 +246,7 @@ export default function AdminUsersPage() {
                         <TableRow>
                             <TableHead>ลูกค้า (User)</TableHead>
                             <TableHead>สายงาน (Upline Admin)</TableHead>
+                            <TableHead>วันที่สมัคร</TableHead>
                             <TableHead className="text-center">บัญชีทดสอบ</TableHead>
                             <TableHead className="text-center">Active Products</TableHead>
                             <TableHead className="text-center">Orders (สำเร็จ)</TableHead>
@@ -253,7 +256,7 @@ export default function AdminUsersPage() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     <Loader2 className="animate-spin h-6 w-6 mx-auto" />
                                 </TableCell>
                             </TableRow>
@@ -282,6 +285,15 @@ export default function AdminUsersPage() {
                                         ) : (
                                             <span className="text-muted-foreground text-sm">-ไม่มี-</span>
                                         )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="text-sm">
+                                            {user.created_at ? new Date(user.created_at).toLocaleDateString('th-TH', {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric',
+                                            }) : '-'}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <div className="flex justify-center flex-col items-center gap-1">
