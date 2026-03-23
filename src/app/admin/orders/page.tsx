@@ -203,93 +203,101 @@ export default function AdminOrdersPage() {
             // END AFFILIATE COMMISSION LOGIC
             // ==========================================
 
-            // Check for existing license by Account Number AND Product ID (Global check to prevent duplicates)
-            const { data: existingLicenses, error: licenseCheckError } = await supabase
-                .from('licenses')
-                .select('*')
-                .eq('product_id', order.product_id)
-                .eq('account_number', order.account_number); // Use exact match as per DB constraint
+            const accountNumbersToProcess = order.account_number ? order.account_number.split(',').map((p: string) => p.trim()).filter(Boolean) : [];
 
-            if (licenseCheckError) console.error('Error checking license:', licenseCheckError);
-
-            const existingLicense = existingLicenses && existingLicenses.length > 0 ? existingLicenses[0] : null;
-
-            console.log('Match Found:', existingLicense);
-
-            let expiryDate = null;
-            let startDate = new Date();
-
-            if (existingLicense) {
-                // RENEWAL LOGIC
-                // extend from current expiry if it's in the future, otherwise from today
-                const currentExpiry = new Date(existingLicense.expiry_date);
-                if (currentExpiry > startDate) {
-                    startDate = currentExpiry;
-                }
+            if (accountNumbersToProcess.length === 0) {
+                throw new Error("ไม่พบเลขพอร์ตในออเดอร์ หรือ ข้อมูลพอร์ตว่างเปล่า");
             }
 
-            if (order.is_ib_request) {
-                // IB Request gets the admin-specified expiry date
-                if (customExpiryDate) {
-                    expiryDate = customExpiryDate.toISOString();
-                } else {
-                    // Fallback to 1 year if somehow custom date is missing
+            // Loop through each port for Multi-Port support
+            for (const port of accountNumbersToProcess) {
+                // Check for existing license by Account Number AND Product ID
+                const { data: existingLicenses, error: licenseCheckError } = await supabase
+                    .from('licenses')
+                    .select('*')
+                    .eq('product_id', order.product_id)
+                    .eq('account_number', port); // exact match
+
+                if (licenseCheckError) console.error('Error checking license:', licenseCheckError);
+
+                const existingLicense = existingLicenses && existingLicenses.length > 0 ? existingLicenses[0] : null;
+                console.log('Match Found for port', port, ':', existingLicense);
+
+                let expiryDate = null;
+                let startDate = new Date();
+
+                if (existingLicense) {
+                    // RENEWAL LOGIC
+                    // extend from current expiry if it's in the future, otherwise from today
+                    const currentExpiry = new Date(existingLicense.expiry_date);
+                    if (currentExpiry > startDate) {
+                        startDate = currentExpiry;
+                    }
+                }
+
+                if (order.is_ib_request) {
+                    // IB Request gets the admin-specified expiry date
+                    if (customExpiryDate) {
+                        expiryDate = customExpiryDate.toISOString();
+                    } else {
+                        // Fallback to 1 year if somehow custom date is missing
+                        const date = new Date(startDate);
+                        date.setFullYear(date.getFullYear() + 1);
+                        expiryDate = date.toISOString();
+                    }
+                } else if (order.plan_type === 'monthly') {
                     const date = new Date(startDate);
-                    date.setFullYear(date.getFullYear() + 1);
+                    date.setMonth(date.getMonth() + 1);
                     expiryDate = date.toISOString();
+                } else if (order.plan_type === 'quarterly') {
+                    const date = new Date(startDate);
+                    date.setMonth(date.getMonth() + 3);
+                    expiryDate = date.toISOString();
+                } else {
+                    expiryDate = new Date(9999, 11, 31).toISOString();
                 }
-            } else if (order.plan_type === 'monthly') {
-                const date = new Date(startDate);
-                date.setMonth(date.getMonth() + 1);
-                expiryDate = date.toISOString();
-            } else if (order.plan_type === 'quarterly') {
-                const date = new Date(startDate);
-                date.setMonth(date.getMonth() + 3);
-                expiryDate = date.toISOString();
-            } else {
-                expiryDate = new Date(9999, 11, 31).toISOString();
+
+                console.log('Calculated Expiry for', port, ':', expiryDate);
+
+                if (existingLicense) {
+                    // Update existing license
+                    console.log('Updating License ID:', existingLicense.id);
+                    const { error: updateError } = await supabase
+                        .from('licenses')
+                        .update({
+                            type: order.plan_type || 'lifetime',
+                            is_active: true,
+                            expiry_date: expiryDate
+                        })
+                        .eq('id', existingLicense.id);
+
+                    if (updateError) {
+                        console.error('Update Error:', updateError);
+                        throw updateError;
+                    }
+
+                } else {
+                    // Create new license
+                    console.log('Creating New License for', port);
+                    const { error: licenseError } = await supabase
+                        .from('licenses')
+                        .insert({
+                            user_id: order.user_id,
+                            product_id: order.product_id,
+                            type: order.plan_type || 'lifetime',
+                            is_active: true,
+                            expiry_date: expiryDate,
+                            account_number: port
+                        });
+
+                    if (licenseError) {
+                        console.error('Insert Error:', licenseError);
+                        throw licenseError;
+                    }
+                }
             }
 
-            console.log('Calculated Expiry:', expiryDate);
-
-            if (existingLicense) {
-                // Update existing license
-                console.log('Updating License ID:', existingLicense.id);
-                const { error: updateError } = await supabase
-                    .from('licenses')
-                    .update({
-                        type: order.plan_type || 'lifetime',
-                        is_active: true,
-                        expiry_date: expiryDate
-                    })
-                    .eq('id', existingLicense.id);
-
-                if (updateError) {
-                    console.error('Update Error:', updateError);
-                    throw updateError;
-                }
-                alert('อนุมัติเรียบร้อย! License ถูกต่ออายุแล้ว');
-
-            } else {
-                // Create new license
-                console.log('Creating New License');
-                const { error: licenseError } = await supabase
-                    .from('licenses')
-                    .insert({
-                        user_id: order.user_id,
-                        product_id: order.product_id,
-                        type: order.plan_type || 'lifetime',
-                        is_active: true,
-                        expiry_date: expiryDate,
-                        account_number: order.account_number || ''
-                    });
-
-                if (licenseError) {
-                    console.error('Insert Error:', licenseError);
-                    throw licenseError;
-                }
-                alert('อนุมัติเรียบร้อย! License ถูกสร้างแล้ว');
-            }
+            alert(`อนุมัติเรียบร้อย! ระบบจัดการ License ให้แล้วจำนวน ${accountNumbersToProcess.length} พอร์ต`);
 
             fetchOrders();
 

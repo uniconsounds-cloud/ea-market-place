@@ -103,7 +103,9 @@ export default function ProductFormPage() {
         strategy: 'trend_following',
         min_balance: 0,
         allow_rent: true,
-        allow_ib: true
+        allow_ib: true,
+        is_multi_port: false,
+        port_count: 1
     });
 
     useEffect(() => {
@@ -136,7 +138,9 @@ export default function ProductFormPage() {
                 strategy: data.strategy || 'trend_following',
                 min_balance: data.min_balance || 0,
                 allow_rent: data.allow_rent !== false,
-                allow_ib: data.allow_ib !== false
+                allow_ib: data.allow_ib !== false,
+                is_multi_port: data.is_multi_port || false,
+                port_count: data.port_count || 1
             });
         }
     };
@@ -311,11 +315,12 @@ export default function ProductFormPage() {
                 version: formData.version,
                 is_active: formData.is_active,
                 platform: formData.platform,
-                asset_class: formData.asset_class,
                 strategy: formData.strategy,
                 min_balance: parsedMinBalance,
                 allow_rent: formData.allow_rent,
-                allow_ib: formData.allow_ib
+                allow_ib: formData.allow_ib,
+                is_multi_port: formData.is_multi_port,
+                port_count: formData.is_multi_port ? Math.min(Math.max(parseInt(formData.port_count as unknown as string) || 1, 1), 10) : 1
             };
 
             let error;
@@ -1175,6 +1180,26 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         <div className="flex items-center gap-2">
                             <Switch checked={formData.allow_ib} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_ib: val }))} disabled={!formData.is_active} />
                             <span className="text-sm text-muted-foreground">อนุญาตให้สมัครใช้งานผ่านสิทธิ์ IB</span>
+                        </div>
+                        <div className="flex flex-col gap-2 pt-2 border-t mt-1">
+                            <div className="flex items-center gap-2">
+                                <Switch checked={formData.is_multi_port} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, is_multi_port: val }))} />
+                                <span className="text-sm font-medium">เปิดโหมด Multi-Port (1 สั่งซื้อ = หลายพอร์ต)</span>
+                            </div>
+                            {formData.is_multi_port && (
+                                <div className="pl-11 pr-2">
+                                    <label className="text-xs text-muted-foreground block mb-1">จำนวนพอร์ตที่จะลดรวบยอดอนุมัติ (สูงสุด 10)</label>
+                                    <Input 
+                                        type="number" 
+                                        min="1" 
+                                        max="10" 
+                                        name="port_count"
+                                        value={formData.port_count} 
+                                        onChange={handleChange}
+                                        className="h-8 max-w-[120px]"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -18,7 +18,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps) {
     const router = useRouter();
     const [selectedType, setSelectedType] = useState<'monthly' | 'quarterly' | 'lifetime'>('lifetime');
-    const [accountNumber, setAccountNumber] = useState('');
+    const portCount = product.is_multi_port ? (product.port_count || 1) : 1;
+    const [accountNumbers, setAccountNumbers] = useState<string[]>(Array(portCount).fill(''));
     const [riskAccepted, setRiskAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -151,79 +152,100 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     // Check if entered account number matches an existing license / Validations
     useEffect(() => {
         const timeoutId = setTimeout(async () => {
-            const port = accountNumber.trim();
-            if (!port) {
+            const filledPorts = accountNumbers.map(p => p.trim()).filter(Boolean);
+            if (filledPorts.length === 0) {
                 setPortValidationMsg(null);
+                setIsRenewal(false);
+                return;
+            }
+
+            const uniquePorts = new Set(filledPorts);
+            if (uniquePorts.size !== filledPorts.length) {
+                setPortValidationMsg({ text: 'พอร์ตซ้ำกันในช่องกรอก', type: 'error' });
                 setIsRenewal(false);
                 return;
             }
 
             setPortValidationMsg({ text: 'กำลังตรวจสอบพอร์ต...', type: 'checking' });
 
-            // 1. Quick check against loaded user active licenses for this product
-            const existingUserLicense = userLicenses.find(l => l.account_number === port);
-            if (existingUserLicense) {
-                const isIbPort = !!ibAccounts[port];
+            let hasError = false;
+            let isAnyRenewal = false;
 
-                if (ibStatus === 'approved' && useIbQuota) {
-                    // Try to renew as IB
-                    if (!isIbPort) {
-                        setPortValidationMsg({ text: 'พอร์ตนี้เป็นพอร์ตเช่าซื้อปกติ ไม่สามารถขอใช้สิทธิ์ IB ได้', type: 'error' });
-                        setIsRenewal(false);
+            for (const port of filledPorts) {
+                const existingUserLicense = userLicenses.find(l => l.account_number === port);
+                if (existingUserLicense) {
+                    const isIbPort = !!ibAccounts[port];
+                    if (ibStatus === 'approved' && useIbQuota) {
+                        if (!isIbPort) {
+                            setPortValidationMsg({ text: `พอร์ต ${port} เป็นพอร์ตปกติ ไม่สามารถขอแบบ IB ได้`, type: 'error' });
+                            hasError = true;
+                            break;
+                        } else {
+                            isAnyRenewal = true;
+                        }
                     } else {
-                        // Allow IB Renewal Requests 
-                        setIsRenewal(true);
-                        setPortValidationMsg({ text: 'ขอต่ออายุสิทธิ์ IB (รอแอดมินอนุมัติ)', type: 'success' });
-                    }
-                } else {
-                    // Try to renew as Normal
-                    if (isIbPort) {
-                        setPortValidationMsg({ text: 'พอร์ตนี้เป็นพอร์ตสำหรับโควต้า IB ไม่สามารถต่ออายุแบบปกติได้', type: 'error' });
-                        setIsRenewal(false);
-                    } else {
-                        setIsRenewal(true);
-                        setPortValidationMsg({ text: 'ต่ออายุ License เดิม', type: 'success' });
+                        if (isIbPort) {
+                            setPortValidationMsg({ text: `พอร์ต ${port} เป็นโควต้า IB ไม่สามารถต่อแบบปกติได้`, type: 'error' });
+                            hasError = true;
+                            break;
+                        } else {
+                            isAnyRenewal = true;
+                        }
                     }
                 }
-                return;
             }
-
-            // 2. Quick check against pending orders for this product
-            const pendingOrder = userOrders.find(o => o.account_number === port);
-            if (pendingOrder) {
-                setPortValidationMsg({ text: 'คุณมีคำสั่งซื้อที่รอตรวจสอบสำหรับพอร์ตนี้แล้ว', type: 'error' });
+            if (hasError) {
                 setIsRenewal(false);
                 return;
             }
 
-            // 3. Global check: is this port used by someone else or for another product?
+            const pendingOrders = userOrders.filter(o => o.account_number && o.account_number.split(',').some((p: string) => filledPorts.includes(p)));
+            if (pendingOrders.length > 0) {
+                setPortValidationMsg({ text: 'คุณมีคำสั่งซื้อที่รอตรวจสอบแพ็คเกจหน้านี้สำหรับพอร์ตที่กรอกอยู่แล้ว', type: 'error' });
+                setIsRenewal(false);
+                return;
+            }
+
             const { data: globalLicenses } = await supabase
                 .from('licenses')
-                .select('id')
-                .eq('account_number', port)
+                .select('account_number, user_id')
+                .in('account_number', filledPorts)
                 .eq('is_active', true)
-                .gte('expiry_date', new Date().toISOString())
-                .limit(1);
+                .gte('expiry_date', new Date().toISOString());
 
             if (globalLicenses && globalLicenses.length > 0) {
-                setPortValidationMsg({ text: 'หมายเลขพอร์ตนี้มีการใช้งานในระบบแล้ว ไม่สามารถใช้ซ้ำได้', type: 'error' });
-                setIsRenewal(false);
-                return;
+                const conflicts = globalLicenses.filter(l => !userLicenses.some(ul => ul.account_number === l.account_number));
+                if (conflicts.length > 0) {
+                    setPortValidationMsg({ text: `หมายเลขพอร์ต ${conflicts[0].account_number} มีการใช้งานในระบบแล้ว`, type: 'error' });
+                    setIsRenewal(false);
+                    return;
+                }
             }
 
-            // All good
-            setIsRenewal(false);
-            setPortValidationMsg({ text: 'สามารถใช้พอร์ตนี้ได้', type: 'success' });
+            if (isAnyRenewal) {
+                setIsRenewal(true);
+                setPortValidationMsg({ text: 'ต่ออายุ License เดิม', type: 'success' });
+            } else {
+                setIsRenewal(false);
+                setPortValidationMsg({ text: filledPorts.length === accountNumbers.length ? 'สามารถใช้พอร์ตเหล่านี้ได้' : 'กำลังรอเลขพอร์ตให้ครบ...', type: 'success' });
+            }
 
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [accountNumber, userLicenses, userOrders, ibStatus, useIbQuota]);
+    }, [accountNumbers, userLicenses, userOrders, ibStatus, useIbQuota]);
 
 
     const handlePurchase = async () => {
-        if (!accountNumber.trim()) {
-            alert('กรุณากรอกหมายเลขพอร์ต (Account Number)');
+        const filledPorts = accountNumbers.map(p => p.trim()).filter(Boolean);
+        if (filledPorts.length < accountNumbers.length) {
+            alert(`กรุณากรอกหมายเลขพอร์ตให้ครบทั้ง ${accountNumbers.length} ช่อง`);
+            return;
+        }
+
+        const uniquePorts = new Set(filledPorts);
+        if (uniquePorts.size !== filledPorts.length) {
+            alert('คุณกรอกหมายเลขพอร์ตซ้ำกัน กรุณาตรวจสอบอีกครั้ง');
             return;
         }
 
@@ -245,7 +267,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             const queryParams = new URLSearchParams({
                 plan: selectedType,
-                accountNumber: accountNumber.trim()
+                accountNumber: filledPorts.join(',')
             });
 
             if (ibStatus === 'approved' && useIbQuota) {
@@ -282,7 +304,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
     };
 
     // Get current license details for display
-    const currentLicense = userLicenses.find(l => l.account_number === accountNumber.trim());
+    const currentLicense = userLicenses.find(l => accountNumbers.some(p => p.trim() === l.account_number));
 
     // Compute unique brokers and filtered ports
     const uniqueBrokers = Array.from(new Set(Object.values(ibAccounts))).filter(Boolean);
@@ -345,8 +367,25 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                             return (
                                 <div
                                     key={`license-${license.id}`}
-                                    className={`text-sm p-3 rounded-md border cursor-pointer transition-colors flex justify-between items-center ${accountNumber === license.account_number ? 'border-primary bg-primary/10' : isExpired ? 'border-border bg-muted/30 opacity-70 hover:opacity-100 hover:bg-muted/50' : 'border-border bg-background hover:bg-muted'}`}
-                                    onClick={() => setAccountNumber(license.account_number)}
+                                    className={`text-sm p-3 rounded-md border cursor-pointer transition-colors flex justify-between items-center ${accountNumbers.map(a => a.trim()).includes(license.account_number) ? 'border-primary bg-primary/10' : isExpired ? 'border-border bg-muted/30 opacity-70 hover:opacity-100 hover:bg-muted/50' : 'border-border bg-background hover:bg-muted'}`}
+                                    onClick={() => {
+                                        const newAccs = [...accountNumbers];
+                                        const existIdx = newAccs.findIndex(a => a.trim() === license.account_number);
+                                        if (existIdx >= 0) {
+                                            newAccs[existIdx] = '';
+                                        } else {
+                                            const emptyIdx = newAccs.findIndex(a => a.trim() === '');
+                                            if (emptyIdx >= 0) {
+                                                newAccs[emptyIdx] = license.account_number;
+                                            } else if (!product.is_multi_port) {
+                                                newAccs[0] = license.account_number;
+                                            } else {
+                                                alert(`คุณใส่พอร์ตเต็มโควต้า (${accountNumbers.length} พอร์ต) แล้ว ปลดอันเก่าออกก่อนครับ`);
+                                                return;
+                                            }
+                                        }
+                                        setAccountNumbers(newAccs);
+                                    }}
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={`p-1.5 rounded-full ${isExpired ? 'bg-gray-500/10' : 'bg-green-500/10'}`}>
@@ -376,7 +415,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                             </div>
                                         </div>
                                     </div>
-                                    {accountNumber === license.account_number && <Check className="w-4 h-4 text-primary" />}
+                                    {accountNumbers.map(a => a.trim()).includes(license.account_number) && <Check className="w-4 h-4 text-primary" />}
                                 </div>
                             );
                         })}
@@ -449,24 +488,44 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             )}
 
             {/* Account Number Input */}
-            <div className="space-y-2">
-                <Label htmlFor="accountNumber" className="text-base font-semibold">
-                    หมายเลขพอร์ต (Account Number) <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                    <Input
-                        id="accountNumber"
-                        placeholder="Ex. 12345678"
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                        className={`bg-background/50 border-input font-mono text-lg ${isRenewal ? 'border-green-500 ring-1 ring-green-500/50' : ''}`}
-                    />
-                    {isRenewal && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-500 font-medium flex items-center gap-1 bg-background px-2">
-                            <Check className="w-3 h-3" /> ต่ออายุ
-                        </div>
+            <div className="space-y-4">
+                <div className="space-y-1">
+                    <Label className="text-base font-semibold">
+                        หมายเลขพอร์ต (Account Number) <span className="text-red-500">*</span>
+                    </Label>
+                    {product.is_multi_port && (
+                        <p className="text-xs text-muted-foreground">สินค้านี้เป็นแบบ Multi-Port กรุณากรอกเลขพอร์ตให้ครบทั้ง {accountNumbers.length} ช่อง</p>
                     )}
                 </div>
+
+                <div className={`${product.is_multi_port ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "space-y-2"}`}>
+                    {accountNumbers.map((acc, index) => {
+                        const isThisPortRenewing = isRenewal && userLicenses.some(l => l.account_number === acc.trim());
+                        return (
+                            <div key={index} className="relative">
+                                {product.is_multi_port && (
+                                    <Label className="text-xs mb-1.5 block text-muted-foreground">พอร์ตที่ {index + 1}</Label>
+                                )}
+                                <Input
+                                    placeholder={product.is_multi_port ? `Ex. ${12345678 + index}` : "Ex. 12345678"}
+                                    value={acc}
+                                    onChange={(e) => {
+                                        const newAccs = [...accountNumbers];
+                                        newAccs[index] = e.target.value;
+                                        setAccountNumbers(newAccs);
+                                    }}
+                                    className={`bg-background/50 border-input font-mono text-lg ${isThisPortRenewing ? 'border-green-500 ring-1 ring-green-500/50' : ''}`}
+                                />
+                                {isThisPortRenewing && (
+                                    <div className={`absolute right-3 ${product.is_multi_port ? "top-8" : "top-1/2 -translate-y-1/2"} text-xs text-green-500 font-medium flex items-center gap-1 bg-background px-2`}>
+                                        <Check className="w-3 h-3" /> ต่ออายุ
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
                 {portValidationMsg && (
                     <div className={`text-xs mt-1.5 flex items-center gap-1 ${portValidationMsg.type === 'error' ? 'text-red-500' : portValidationMsg.type === 'success' ? 'text-green-500' : 'text-blue-500'}`}>
                         {portValidationMsg.type === 'checking' && <Loader2 className="w-3 h-3 animate-spin" />}
