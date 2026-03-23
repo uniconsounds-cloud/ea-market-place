@@ -210,9 +210,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             const { data: globalLicenses } = await supabase
                 .from('licenses')
                 .select('account_number, user_id')
-                .in('account_number', filledPorts)
-                .eq('is_active', true)
-                .gte('expiry_date', new Date().toISOString());
+                .in('account_number', filledPorts);
 
             if (globalLicenses && globalLicenses.length > 0) {
                 const conflicts = globalLicenses.filter(l => l.user_id !== userId);
