@@ -1165,6 +1165,21 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         onChange={handleChange}
                         placeholder="Ex. 100"
                     />
+                    {formData.is_multi_port && formData.min_balance > 0 && (
+                        <div className="text-xs text-muted-foreground mt-2 bg-muted/50 p-2.5 rounded-md border border-border/80">
+                            <span className="font-semibold block mb-1 text-foreground flex items-center gap-1.5"><Zap className="w-3.5 h-3.5"/> สถานะคำนวณ Multi-Port</span>
+                            <div className="grid grid-cols-[100px_1fr] gap-0.5">
+                                <span className="text-muted-foreground">ต่อพอร์ต:</span>
+                                <span className="font-medium text-foreground">${Number(formData.min_balance).toLocaleString()}</span>
+                                
+                                <span className="text-muted-foreground">จำนวน:</span>
+                                <span>{formData.port_count} พอร์ต</span>
+                                
+                                <span className="font-semibold mt-1 pt-1 border-t text-primary">รวมทั้งหมด:</span>
+                                <span className="font-bold text-primary mt-1 pt-1 border-t">${(Number(formData.min_balance) * Number(formData.port_count)).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="space-y-3 col-span-2 md:col-span-1 border p-3 rounded-lg bg-card">
                     <label className="text-sm font-semibold flex items-center gap-2">ช่องทางการขาย & สถานะ</label>

@@ -334,15 +334,30 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             {product.min_balance > 0 && (
                 <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-500 p-4 rounded-lg flex items-start gap-3 text-sm">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                    <div>
+                    <div className="w-full">
                         <div className="font-semibold text-base mb-1">
                             {(ibStatus === 'approved' && useIbQuota) ? 'บังคับทุนขั้นต่ำ' : 'ทุนแนะนำขั้นต่ำ'}:
-                            <span className="font-bold ml-1">${Number(product.min_balance).toLocaleString()}</span>
+                            {product.is_multi_port ? (
+                                <div className="mt-2 text-sm bg-yellow-500/10 px-3 py-2.5 rounded-md border border-yellow-500/20">
+                                    <div className="grid grid-cols-[130px_1fr] gap-1">
+                                        <span className="font-medium text-yellow-700 dark:text-yellow-500">ขั้นต่ำต่อพอร์ต:</span>
+                                        <span className="font-bold">${Number(product.min_balance).toLocaleString()}</span>
+                                        
+                                        <span className="font-medium text-yellow-700 dark:text-yellow-500">จำนวนพอร์ตที่ใช้:</span>
+                                        <span className="font-bold">{product.port_count} พอร์ต</span>
+                                        
+                                        <span className="font-bold text-yellow-800 dark:text-yellow-400 mt-1 pt-1 border-t border-yellow-500/20">รวมทั้งหมด:</span>
+                                        <span className="font-bold text-yellow-800 dark:text-yellow-400 mt-1 pt-1 border-t border-yellow-500/20">${(Number(product.min_balance) * Number(product.port_count)).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <span className="font-bold ml-1">${Number(product.min_balance).toLocaleString()}</span>
+                            )}
                         </div>
-                        <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80">
+                        <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80 mt-1.5">
                             {ibStatus === 'approved' && useIbQuota
-                                ? 'หากทุนไม่ถึงเกณฑ์ที่กำหนด ระบบจะไม่อนุญาตให้รัน EA เพื่อความปลอดภัยครับ'
-                                : 'ระบบขอแนะนำให้มีทุนตามเกณฑ์นี้ เพื่อประสิทธิภาพสูงสุดในการเทรดครับ'}
+                                ? (product.is_multi_port ? 'หากพอร์ตใดพอร์ตหนึ่งทุนไม่ถึงเกณฑ์ที่กำหนด ระบบจะไม่อนุญาตให้รัน EA เพื่อความปลอดภัยครับ' : 'หากทุนไม่ถึงเกณฑ์ที่กำหนด ระบบจะไม่อนุญาตให้รัน EA เพื่อความปลอดภัยครับ')
+                                : (product.is_multi_port ? 'ระบบขอแนะนำให้มีทุนตามเกณฑ์นี้ เพื่อประสิทธิภาพสูงสุดในการเทรดของแต่ละพอร์ตครับ' : 'ระบบขอแนะนำให้มีทุนตามเกณฑ์นี้ เพื่อประสิทธิภาพสูงสุดในการเทรดครับ')}
                         </p>
                     </div>
                 </div>
