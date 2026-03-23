@@ -475,49 +475,71 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             )}
 
             {/* IB User Options */}
-            {ibStatus === 'approved' && product.allow_ib !== false && product.allow_rent !== false && (
+            {ibStatus === 'approved' && product.allow_ib !== false && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3 mb-2">
                     <h4 className="font-semibold text-primary flex items-center gap-2">
                         <Zap className="w-4 h-4" /> สิทธิพิเศษ IB ของคุณ
                     </h4>
                     <div className="flex flex-col gap-2 text-sm">
-                        <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
-                            <input
-                                type="radio"
-                                name="ib_choice"
-                                checked={useIbQuota}
-                                onChange={() => {
-                                    setUseIbQuota(true);
-                                }}
-                                className="accent-primary"
-                            />
-                            <span>ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB{approvedBrokersList.length === 1 && ` ${approvedBrokersList[0]}`}</span>
-                        </label>
-                        {useIbQuota && approvedBrokersList.length > 1 && (
-                            <div className="pl-6 pb-2">
-                                <label className="text-xs text-muted-foreground block mb-2">โปรดเลือกโบรกเกอร์ IB ที่ต้องการใช้สิทธิ์:</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {approvedBrokersList.map(broker => (
-                                       <label key={broker} className={`flex items-center gap-2 cursor-pointer p-2.5 text-xs rounded border transition-colors ${selectedIbBroker === broker ? 'border-primary bg-primary/10 font-bold text-primary' : 'border-border bg-background hover:bg-muted'}`}>
-                                           <input type="radio" name="ib_broker_choice" checked={selectedIbBroker === broker} onChange={() => setSelectedIbBroker(broker)} className="accent-primary" />
-                                           <span>{broker}</span>
-                                       </label> 
-                                    ))}
-                                </div>
-                            </div>
+                        {product.allow_rent !== false ? (
+                            <>
+                                <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
+                                    <input
+                                        type="radio"
+                                        name="ib_choice"
+                                        checked={useIbQuota}
+                                        onChange={() => {
+                                            setUseIbQuota(true);
+                                        }}
+                                        className="accent-primary"
+                                    />
+                                    <span>ขอสิทธิ์ใช้งานฟรีด้วยโควต้า IB{approvedBrokersList.length === 1 && ` ${approvedBrokersList[0]}`}</span>
+                                </label>
+                                {useIbQuota && approvedBrokersList.length > 1 && (
+                                    <div className="pl-6 pb-2">
+                                        <label className="text-xs text-muted-foreground block mb-2">โปรดเลือกโบรกเกอร์ IB ที่ต้องการใช้สิทธิ์:</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {approvedBrokersList.map(broker => (
+                                            <label key={broker} className={`flex items-center gap-2 cursor-pointer p-2.5 text-xs rounded border transition-colors ${selectedIbBroker === broker ? 'border-primary bg-primary/10 font-bold text-primary' : 'border-border bg-background hover:bg-muted'}`}>
+                                                <input type="radio" name="ib_broker_choice" checked={selectedIbBroker === broker} onChange={() => setSelectedIbBroker(broker)} className="accent-primary" />
+                                                <span>{broker}</span>
+                                            </label> 
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
+                                    <input
+                                        type="radio"
+                                        name="ib_choice"
+                                        checked={!useIbQuota}
+                                        onChange={() => {
+                                            setUseIbQuota(false);
+                                        }}
+                                        className="accent-primary"
+                                    />
+                                    <span>เช่า/ซื้อ ปกติ</span>
+                                </label>
+                            </>
+                        ) : (
+                            <>
+                                {approvedBrokersList.length > 1 ? (
+                                    <div>
+                                        <label className="text-xs text-muted-foreground block mb-2">โปรดเลือกโบรกเกอร์ IB ที่ต้องการใช้สิทธิ์:</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {approvedBrokersList.map(broker => (
+                                            <label key={broker} className={`flex items-center gap-2 cursor-pointer p-2.5 text-xs rounded border transition-colors ${selectedIbBroker === broker ? 'border-primary bg-primary/10 font-bold text-primary' : 'border-border bg-background hover:bg-muted'}`}>
+                                                <input type="radio" name="ib_broker_choice_only" checked={selectedIbBroker === broker} onChange={() => setSelectedIbBroker(broker)} className="accent-primary" />
+                                                <span>{broker}</span>
+                                            </label> 
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-muted-foreground">ระบบจะใช้โควต้า IB ของคุณสำหรับสินค้านี้โดยอัตโนมัติ</p>
+                                )}
+                            </>
                         )}
-                        <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-muted/50 transition-colors border border-transparent has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
-                            <input
-                                type="radio"
-                                name="ib_choice"
-                                checked={!useIbQuota}
-                                onChange={() => {
-                                    setUseIbQuota(false);
-                                }}
-                                className="accent-primary"
-                            />
-                            <span>เช่า/ซื้อ ปกติ</span>
-                        </label>
                     </div>
                 </div>
             )}
