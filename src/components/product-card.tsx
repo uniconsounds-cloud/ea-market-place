@@ -21,6 +21,7 @@ interface Product {
     allow_rent?: boolean;
     allow_ib?: boolean;
     currency?: string;
+    additional_images?: string[];
 }
 
 interface PortStatus {
@@ -31,6 +32,10 @@ interface PortStatus {
 export function ProductCard({ product }: { product: Product }) {
     const [portStatuses, setPortStatuses] = useState<PortStatus[]>([]);
     const [loading, setLoading] = useState(true);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [isHovered, setIsHovered] = useState(false);
+
+    const allImages = [product.image_url, ...(product.additional_images || [])].filter(Boolean);
 
     useEffect(() => {
         const fetchStatus = async () => {
@@ -87,19 +92,35 @@ export function ProductCard({ product }: { product: Product }) {
         fetchStatus();
     }, [product.id]);
 
+    useEffect(() => {
+        let interval: any;
+        if (isHovered && allImages.length > 1) {
+            interval = setInterval(() => {
+                setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+            }, 1500);
+        } else {
+            setCurrentImageIndex(0);
+        }
+        return () => clearInterval(interval);
+    }, [isHovered, allImages.length]);
+
     return (
-        <div className="glass-card rounded-xl overflow-hidden hover:shadow-2xl hover:shadow-blue-900/20 transition-all duration-300 group flex flex-col h-full border-t border-white/5 relative">
+        <div 
+            className="glass-card rounded-xl overflow-hidden hover:shadow-2xl hover:shadow-blue-900/20 transition-all duration-300 group flex flex-col h-full border-t border-white/5 relative"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
 
             <div className="relative aspect-square w-full overflow-hidden bg-gray-900">
                 {/* Placeholder for Image - in real app use Next/Image */}
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-black text-white/20 text-4xl font-bold">
                     {product.name.substring(0, 2)}
                 </div>
-                {product.image_url && (
+                {allImages.length > 0 && (
                     <img
-                        src={product.image_url}
+                        src={allImages[currentImageIndex]}
                         alt={product.name}
-                        className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-all duration-500"
                     />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />

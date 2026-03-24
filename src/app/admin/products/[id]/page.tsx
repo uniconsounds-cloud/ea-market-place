@@ -106,7 +106,8 @@ export default function ProductFormPage() {
         allow_ib: true,
         is_multi_port: false,
         port_count: 1,
-        currency: 'USD'
+        currency: 'USD',
+        additional_images: [] as string[]
     });
 
     useEffect(() => {
@@ -142,7 +143,8 @@ export default function ProductFormPage() {
                 allow_ib: data.allow_ib !== false,
                 is_multi_port: data.is_multi_port || false,
                 port_count: data.port_count || 1,
-                currency: data.currency || 'USD'
+                currency: data.currency || 'USD',
+                additional_images: data.additional_images || []
             });
         }
     };
@@ -323,7 +325,9 @@ export default function ProductFormPage() {
                 allow_ib: formData.allow_ib,
                 is_multi_port: formData.is_multi_port,
                 port_count: formData.is_multi_port ? Math.min(Math.max(parseInt(formData.port_count as unknown as string) || 1, 1), 10) : 1,
-                currency: formData.currency || 'USD'
+                currency: formData.currency || 'USD',
+                asset_class: formData.asset_class,
+                additional_images: formData.additional_images
             };
 
             let error;
@@ -951,36 +955,32 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Image Upload Block */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium">รูปภาพสินค้า</label>
-                <div className="flex items-center gap-4">
-                    <div className="h-32 w-32 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-dashed border-gray-600">
-                        {formData.image_url ? (
-                            <img src={formData.image_url} alt="Preview" className="h-full w-full object-cover" />
-                        ) : (
-                            <span className="text-xs text-muted-foreground">No Image</span>
-                        )}
-                    </div>
-                    <div className="flex-1">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            id="image-upload"
-                            className="hidden"
-                            onChange={handleImageUpload}
-                            disabled={uploadingImage}
+            {/* Image Upload Block (Main + 3 Additional) */}
+            <div className="space-y-4">
+                <label className="text-sm font-medium">รูปภาพสินค้า (สูงสุด 4 รูป)</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Main Image */}
+                    <ImageUploadSlot 
+                        label="ปก (Main)" 
+                        url={formData.image_url} 
+                        onUpload={(url: string) => setFormData((p: any) => ({ ...p, image_url: url }))}
+                        uploading={uploadingImage}
+                    />
+                    
+                    {/* Additional Images */}
+                    {[0, 1, 2].map((index) => (
+                        <ImageUploadSlot 
+                            key={index}
+                            label={`รูปที่ ${index + 2}`} 
+                            url={formData.additional_images[index]} 
+                            onUpload={(url: string) => {
+                                const newImages = [...formData.additional_images];
+                                newImages[index] = url;
+                                setFormData((p: any) => ({ ...p, additional_images: newImages }));
+                            }}
+                            uploading={uploadingImage}
                         />
-                        <label htmlFor="image-upload">
-                            <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 cursor-pointer">
-                                {uploadingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                                {uploadingImage ? 'กำลังอัพโหลด...' : 'อัพโหลดรูปภาพ'}
-                            </div>
-                        </label>
-                        <p className="text-xs text-muted-foreground mt-2">
-                            รองรับไฟล์ JPG, PNG (แนะนำขนาด 1280x1280px หรือรูปแนวนอน)
-                        </p>
-                    </div>
+                    ))}
                 </div>
             </div>
 
@@ -1255,5 +1255,61 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                 บันทึกข้อมูล
             </Button>
         </form>
+    );
+}
+
+// Sub-component for individual image upload slot
+function ImageUploadSlot({ label, url, onUpload, uploading }: any) {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        try {
+            if (!e.target.files || e.target.files.length === 0) return;
+            const file = e.target.files[0];
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `products/${fileName}`;
+
+            // We need access to supabase object. Since this is outside EditForm's parent, 
+            // but defined in the same file, it should be fine if we pass supabase or use it directly if it's in scope.
+            // In this file, supabase is imported at the top.
+            const { error: uploadError } = await supabase.storage.from('products').upload(filePath, file);
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('products').getPublicUrl(filePath);
+            onUpload(data.publicUrl);
+        } catch (error: any) {
+            alert('Error uploading image: ' + error.message);
+        }
+    };
+
+    const id = `image-upload-${label.replace(/\s+/g, '-')}`;
+
+    return (
+        <div className="space-y-2">
+            <div className="h-24 w-full bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-dashed border-gray-600 relative group">
+                {url ? (
+                    <>
+                        <img src={url} alt={label} className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <label htmlFor={id} className="cursor-pointer p-2 hover:text-primary">
+                                <Upload className="h-5 w-5" />
+                            </label>
+                        </div>
+                    </>
+                ) : (
+                    <label htmlFor={id} className="cursor-pointer flex flex-col items-center gap-1 text-muted-foreground hover:text-primary transition-colors">
+                        <Upload className="h-5 w-5" />
+                        <span className="text-[10px]">{label}</span>
+                    </label>
+                )}
+            </div>
+            <input
+                type="file"
+                accept="image/*"
+                id={id}
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={uploading}
+            />
+        </div>
     );
 }
