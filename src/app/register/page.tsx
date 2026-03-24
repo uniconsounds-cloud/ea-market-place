@@ -30,7 +30,7 @@ export default function RegisterPage() {
                 return null;
             };
 
-            const refCode = getCookie('affiliate_ref');
+            const refCode = getCookie('affiliate_ref') || localStorage.getItem('affiliate_ref');
 
             const { error } = await supabase.auth.signUp({
                 email,
@@ -67,7 +67,7 @@ export default function RegisterPage() {
                 return null;
             };
 
-            const refCode = getCookie('affiliate_ref');
+            const refCode = getCookie('affiliate_ref') || localStorage.getItem('affiliate_ref');
 
             // To pass metadata with OAuth, we have to store it locally before redirect
             // or pass it via queryParams (though Supabase strips some custom params).
