@@ -43,11 +43,13 @@ string InpProductID  = "EZM-5P-V1";    // < ==== Product ID ==== [1]
 string InpApiKey     = "KHUCHAI_SUPHAKORN";
 
 // --- 2. INTERNAL STATE ---
+bool G_IsLicenseVerified = false; // Global Flag to check in main EA code
 datetime last_license_check = 0;
 const int license_check_interval = 900; // 15 minutes (900 seconds)
 
 // --- 3. LICENSE CHECK LOGIC ---
 bool CheckEaezeLicense() {
+    G_IsLicenseVerified = false; // Reset before check
     char data[];
     char result[];
     string result_headers;
@@ -81,6 +83,7 @@ bool CheckEaezeLicense() {
         
         if(StringFind(response, "\"status\":\"active\"") >= 0) {
             Print("EAEZE: License verified for account ", account_no, " | Balance: ", balance_str);
+            G_IsLicenseVerified = true;
             RemoveLicenseAlert();
             return true;
         }
@@ -113,10 +116,8 @@ void CheckEaezeLicensePeriodic() {
         last_license_check = now;
         
         Print("EAEZE: Performing periodic license check...");
-        if (!CheckEaezeLicense()) {
-            Print("EAEZE: Periodic license check failed. Removing EA from chart.");
-            ExpertRemove(); // This will stop and remove the EA completely
-        }
+        CheckEaezeLicense(); // Just update the G_IsLicenseVerified flag. 
+        // We don't call ExpertRemove() anymore to allow Auto-Resume.
     }
 }
 
