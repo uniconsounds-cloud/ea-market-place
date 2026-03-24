@@ -2,7 +2,7 @@
 //|                                              EAEZE_Licensing.mqh |
 //|                                    Copyright 2026, EAEZE Systems |
 //|                                             https://eaeze.com    |
-//|                                             update : 23 March 2026 |
+//|                                             update : 25 March 2026 |
 //+------------------------------------------------------------------+
 /*
 ============== Doing 5 Steps to Make EA Product Complete ==============
@@ -22,7 +22,8 @@
           }      
    [4] void OnTick() {
             //--- Check every 15 minutes ---
-            CheckEaezeLicensePeriodic(); 
+            CheckEaezeLicensePeriodic(); // license check (every 15 minutes)
+            if(!G_IsLicenseVerified) return; // if license is not verified, stop working
             //... already EA code ...
             }
          
@@ -167,7 +168,8 @@ int OnInit() {
 
 void OnTick() {
    //--- Check every 15 minutes ---
-   CheckEaezeLicensePeriodic(); 
+   CheckEaezeLicensePeriodic(); // license check (every 15 minutes)
+   if(!G_IsLicenseVerified) return; // if license is not verified, stop working
    
    //... already EA code ...
 }
