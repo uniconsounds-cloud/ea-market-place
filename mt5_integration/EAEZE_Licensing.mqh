@@ -2,10 +2,10 @@
 //|                                              EAEZE_Licensing.mqh |
 //|                                    Copyright 2026, EAEZE Systems |
 //|                                             https://eaeze.com    |
-//|                                             update : 11 Feb 2026 |
+//|                                             update : 23 March 2026 |
 //+------------------------------------------------------------------+
 /*
-============== Doing 4 Steps to Make EA Product Complete ==============
+============== Doing 5 Steps to Make EA Product Complete ==============
    [1] on this code : Change Product ID
    [2] on EA Product : insert Code at Top line
          #include <EAEZE_Licensing.mqh>
@@ -20,7 +20,13 @@
              //.......................    already Code
              return(INIT_SUCCEEDED);   // at the end. if none.
           }      
-   [4] on EA Product : insert Code at > OnDeinit <
+   [4] void OnTick() {
+            //--- Check every 15 minutes ---
+            CheckEaezeLicensePeriodic(); 
+            //... already EA code ...
+            }
+         
+   [5] on EA Product : insert Code at > OnDeinit <
          void OnDeinit(const int reason) {
              //----------- Copy Start Here --------------
              if(reason != REASON_INITFAILED) {
@@ -156,6 +162,13 @@ int OnInit() {
     //------------ End Here --------------
     //.......................    already Code
     return(INIT_SUCCEEDED);   // at the end. if none.
+}
+
+void OnTick() {
+   //--- Check every 15 minutes ---
+   CheckEaezeLicensePeriodic(); 
+   
+   //... already EA code ...
 }
 
 void OnDeinit(const int reason) {

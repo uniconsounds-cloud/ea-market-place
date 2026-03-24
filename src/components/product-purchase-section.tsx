@@ -349,17 +349,26 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                 <div className="mt-2 text-sm bg-yellow-500/10 px-3 py-2.5 rounded-md border border-yellow-500/20">
                                     <div className="grid grid-cols-[130px_1fr] gap-1">
                                         <span className="font-medium text-yellow-700 dark:text-yellow-500">ขั้นต่ำต่อพอร์ต:</span>
-                                        <span className="font-bold">${Number(product.min_balance).toLocaleString()}</span>
+                                        <span className="font-bold">
+                                            ${Number(product.min_balance).toLocaleString()} USD 
+                                            {product.currency === 'USC' && <span className="text-[10px] ml-1">({(Number(product.min_balance) * 100).toLocaleString()} USC)</span>}
+                                        </span>
                                         
                                         <span className="font-medium text-yellow-700 dark:text-yellow-500">จำนวนพอร์ตที่ใช้:</span>
                                         <span className="font-bold">{product.port_count} พอร์ต</span>
                                         
                                         <span className="font-bold text-yellow-800 dark:text-yellow-400 mt-1 pt-1 border-t border-yellow-500/20">รวมทั้งหมด:</span>
-                                        <span className="font-bold text-yellow-800 dark:text-yellow-400 mt-1 pt-1 border-t border-yellow-500/20">${(Number(product.min_balance) * Number(product.port_count)).toLocaleString()}</span>
+                                        <span className="font-bold text-yellow-800 dark:text-yellow-400 mt-1 pt-1 border-t border-yellow-500/20">
+                                            ${(Number(product.min_balance) * Number(product.port_count)).toLocaleString()} USD
+                                            {product.currency === 'USC' && <span className="text-[10px] ml-1">({(Number(product.min_balance) * Number(product.port_count) * 100).toLocaleString()} USC)</span>}
+                                        </span>
                                     </div>
                                 </div>
                             ) : (
-                                <span className="font-bold ml-1">${Number(product.min_balance).toLocaleString()}</span>
+                                <span className="font-bold ml-1">
+                                    ${Number(product.min_balance).toLocaleString()} USD
+                                    {product.currency === 'USC' && <span className="text-xs ml-1 font-medium">({(Number(product.min_balance) * 100).toLocaleString()} USC)</span>}
+                                </span>
                             )}
                         </div>
                         <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80 mt-1.5">

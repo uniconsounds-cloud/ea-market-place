@@ -30,13 +30,17 @@ export async function POST(req: Request) {
         if (!isUUID) {
             const { data: product } = await supabase
                 .from('products')
-                .select('id, min_balance')
+                .select('id, min_balance, currency')
                 .eq('product_key', product_id)
                 .single();
 
             if (product) {
                 targetProductUUID = product.id;
                 productMinBalance = product.min_balance || 0;
+                // If it's a Cent account product, conversion to cents (1 USD = 100 USC)
+                if (product.currency === 'USC' && productMinBalance > 0) {
+                    productMinBalance = productMinBalance * 100;
+                }
             } else {
                 // Product Key not found
                 return NextResponse.json({ status: 'invalid', message: 'Invalid Product ID/Key' }, { status: 200 });
@@ -44,11 +48,15 @@ export async function POST(req: Request) {
         } else {
             const { data: product } = await supabase
                 .from('products')
-                .select('min_balance')
+                .select('min_balance, currency')
                 .eq('id', targetProductUUID)
                 .single();
             if (product) {
                 productMinBalance = product.min_balance || 0;
+                // If it's a Cent account product, conversion to cents (1 USD = 100 USC)
+                if (product.currency === 'USC' && productMinBalance > 0) {
+                    productMinBalance = productMinBalance * 100;
+                }
             }
         }
 

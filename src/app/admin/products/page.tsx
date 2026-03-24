@@ -354,7 +354,7 @@ export default function AdminProductsPage() {
                                                 <div className="text-sm flex flex-wrap gap-4 mt-2 p-2 bg-muted/30 rounded-md border border-border/50 text-foreground w-max">
                                                     <div className="flex items-center gap-1">
                                                         <span className="text-muted-foreground font-medium">Min Balance:</span>
-                                                        <span className="font-bold text-yellow-600 dark:text-yellow-500">${product.min_balance || 0}</span>
+                                                        <span className="font-bold text-yellow-600 dark:text-yellow-500">${product.min_balance || 0} {product.currency || 'USD'}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1 ml-2">
                                                         <span className="text-muted-foreground font-medium">เช่าซื้อ:</span>

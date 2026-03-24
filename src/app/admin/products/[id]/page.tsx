@@ -105,7 +105,8 @@ export default function ProductFormPage() {
         allow_rent: true,
         allow_ib: true,
         is_multi_port: false,
-        port_count: 1
+        port_count: 1,
+        currency: 'USD'
     });
 
     useEffect(() => {
@@ -140,7 +141,8 @@ export default function ProductFormPage() {
                 allow_rent: data.allow_rent !== false,
                 allow_ib: data.allow_ib !== false,
                 is_multi_port: data.is_multi_port || false,
-                port_count: data.port_count || 1
+                port_count: data.port_count || 1,
+                currency: data.currency || 'USD'
             });
         }
     };
@@ -320,7 +322,8 @@ export default function ProductFormPage() {
                 allow_rent: formData.allow_rent,
                 allow_ib: formData.allow_ib,
                 is_multi_port: formData.is_multi_port,
-                port_count: formData.is_multi_port ? Math.min(Math.max(parseInt(formData.port_count as unknown as string) || 1, 1), 10) : 1
+                port_count: formData.is_multi_port ? Math.min(Math.max(parseInt(formData.port_count as unknown as string) || 1, 1), 10) : 1,
+                currency: formData.currency || 'USD'
             };
 
             let error;
@@ -1171,6 +1174,27 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         onChange={handleChange}
                         placeholder="Ex. 100"
                     />
+                    <div className="flex bg-muted/30 rounded-lg p-1 border mt-2">
+                        <button
+                            type="button"
+                            onClick={() => setFormData((p: any) => ({ ...p, currency: 'USD' }))}
+                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${formData.currency === 'USD' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/50'}`}
+                        >
+                            USD
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFormData((p: any) => ({ ...p, currency: 'USC' }))}
+                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${formData.currency === 'USC' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/50'}`}
+                        >
+                            USC (Cent)
+                        </button>
+                    </div>
+                    {formData.currency === 'USC' && (
+                        <p className="text-[10px] text-orange-600 mt-1 font-medium italic">
+                            * ตรวจสอบทุนพอร์ตเซนต์ที่ {(Number(formData.min_balance) * 100).toLocaleString()} USC
+                        </p>
+                    )}
                     {formData.is_multi_port && formData.min_balance > 0 && (
                         <div className="text-xs text-muted-foreground mt-2 bg-muted/50 p-2.5 rounded-md border border-border/80">
                             <span className="font-semibold block mb-1 text-foreground flex items-center gap-1.5"><Zap className="w-3.5 h-3.5"/> สถานะคำนวณ Multi-Port</span>
