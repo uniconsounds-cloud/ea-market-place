@@ -93,6 +93,11 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                                                 {product.asset_class}
                                             </span>
                                         )}
+                                        {product.currency && (
+                                            <span className="bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-0.5 rounded-full font-medium uppercase">
+                                                {product.currency}
+                                            </span>
+                                        )}
                                     </div>
                                     {product.strategy && (
                                         <div className="inline-block bg-muted/40 text-muted-foreground px-3 py-1 rounded-lg text-xs font-medium mb-2 border border-border/50">

@@ -20,6 +20,7 @@ interface Product {
     strategy?: string;
     allow_rent?: boolean;
     allow_ib?: boolean;
+    currency?: string;
 }
 
 interface PortStatus {
@@ -138,6 +139,11 @@ export function ProductCard({ product }: { product: Product }) {
                     {product.strategy && (
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
                             {product.strategy.replace('_', ' ')}
+                        </span>
+                    )}
+                    {product.currency && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-400 border border-green-500/20">
+                            {product.currency}
                         </span>
                     )}
                 </div>
