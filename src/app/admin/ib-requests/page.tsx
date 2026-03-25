@@ -34,6 +34,7 @@ export default async function AdminIbRequestsPage() {
         .select(`
             id,
             verification_data,
+            email,
             status,
             updated_at,
             user_id,

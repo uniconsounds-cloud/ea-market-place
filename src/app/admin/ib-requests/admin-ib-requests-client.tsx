@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type IBRequest = {
     id: string; // ib_memberships ID
     verification_data: string | null;
+    email: string | null;
     status: string;
     updated_at: string;
     profiles: {
@@ -246,21 +247,38 @@ export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = 
                                                         </span>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {request.verification_data ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-mono text-sm">{request.verification_data}</span>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-5 w-5 shrink-0 hover:bg-muted/50"
-                                                                    onClick={() => copyToClipboard(request.verification_data as string)}
-                                                                >
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted-foreground italic text-sm">-</span>
-                                                        )}
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {request.verification_data ? (
+                                                                <div className="flex items-center gap-2 group">
+                                                                    <Badge variant="outline" className="h-5 px-1.5 text-[10px] bg-blue-50/50 text-blue-700 border-blue-200">PORT</Badge>
+                                                                    <span className="font-mono text-sm">{request.verification_data}</span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        onClick={() => copyToClipboard(request.verification_data as string)}
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-muted-foreground italic text-xs">ไม่มีเลขพอร์ต</span>
+                                                            )}
+                                                            {request.email && (
+                                                                <div className="flex items-center gap-2 group">
+                                                                    <Badge variant="outline" className="h-5 px-1.5 text-[10px] bg-purple-50/50 text-purple-700 border-purple-200">EMAIL</Badge>
+                                                                    <span className="text-sm text-foreground/80">{request.email}</span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        onClick={() => copyToClipboard(request.email as string)}
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="text-sm text-muted-foreground">
                                                         {format(new Date(request.updated_at), 'd MMM yyyy HH:mm', { locale: th })} น.
@@ -338,21 +356,38 @@ export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = 
                                                         </span>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {request.verification_data ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-mono text-sm">{request.verification_data}</span>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-5 w-5 shrink-0 hover:bg-muted/50"
-                                                                    onClick={() => copyToClipboard(request.verification_data as string)}
-                                                                >
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted-foreground italic text-sm">-</span>
-                                                        )}
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {request.verification_data ? (
+                                                                <div className="flex items-center gap-2 group">
+                                                                    <Badge variant="outline" className="h-5 px-1.5 text-[10px] bg-blue-50/50 text-blue-700 border-blue-200">PORT</Badge>
+                                                                    <span className="font-mono text-sm">{request.verification_data}</span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        onClick={() => copyToClipboard(request.verification_data as string)}
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-muted-foreground italic text-xs">ไม่มีเลขพอร์ต</span>
+                                                            )}
+                                                            {request.email && (
+                                                                <div className="flex items-center gap-2 group">
+                                                                    <Badge variant="outline" className="h-5 px-1.5 text-[10px] bg-purple-50/50 text-purple-700 border-purple-200">EMAIL</Badge>
+                                                                    <span className="text-sm text-foreground/80">{request.email}</span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        onClick={() => copyToClipboard(request.email as string)}
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="text-sm text-muted-foreground">
                                                         {format(new Date(request.updated_at), 'd MMM yyyy HH:mm', { locale: th })} น.
@@ -385,7 +420,8 @@ export default function AdminIbRequestsClient({ initialRequests, uniqueAdmins = 
                             <div className="bg-muted/50 p-4 rounded-md border border-border/50 text-sm space-y-2">
                                 <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ลูกค้า:</span> <strong>{getName(selectedRequest)}</strong></p>
                                 <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">โบรกเกอร์:</span> <strong>{getBrokerName(selectedRequest)}</strong></p>
-                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ข้อมูลยืนยัน:</span> <strong className="font-mono text-primary">{selectedRequest.verification_data || '-'}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">เลขพอร์ต:</span> <strong className="font-mono text-primary">{selectedRequest.verification_data || '-'}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">อีเมล IB:</span> <strong className="text-primary">{selectedRequest.email || '-'}</strong></p>
                             </div>
 
                             <p className="text-sm text-muted-foreground">
