@@ -146,7 +146,7 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
 
             <div className="p-6 flex-1 flex flex-col">
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap gap-2 mb-2">
                     {product.platform && (
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
                             {product.platform}
@@ -169,11 +169,11 @@ export function ProductCard({ product }: { product: Product }) {
                     )}
                 </div>
 
-                <p className="text-muted-foreground text-sm mb-4 line-clamp-2 h-10">
+                <p className="text-muted-foreground text-sm mb-2 line-clamp-2 h-10">
                     {product.description}
                 </p>
 
-                <div className="space-y-2 mb-6 flex-1">
+                <div className="space-y-1 mb-4 flex-1">
                     {product.features?.slice(0, 3).map((feature, idx) => (
                         <div key={idx} className="flex items-center text-xs text-gray-400">
                             <Check className="h-3 w-3 mr-2 text-accent" />
@@ -182,9 +182,9 @@ export function ProductCard({ product }: { product: Product }) {
                     ))}
                 </div>
 
-                <div className="mt-auto space-y-4">
+                <div className="mt-auto space-y-3">
                     {product.allow_rent === false ? (
-                        <div className="border-t border-border/50 pt-4 pb-2 text-center bg-muted/10 rounded-lg mb-2 mt-2">
+                        <div className="border-t border-border/50 pt-3 pb-1.5 text-center bg-muted/10 rounded-lg mb-1 mt-1">
                             {product.allow_ib !== false ? (
                                 <span className="text-sm font-bold text-blue-400">✅ เปิดให้ขอสิทธิ์ใช้งานฟรีผ่าน IB</span>
                             ) : (
@@ -192,7 +192,7 @@ export function ProductCard({ product }: { product: Product }) {
                             )}
                         </div>
                     ) : product.price_quarterly ? (
-                        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-4 text-center">
+                        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-3 text-center">
                             <div>
                                 <span className="text-[10px] text-muted-foreground block">รายเดือน</span>
                                 <span className="text-sm font-bold text-white">฿{product.price_monthly?.toLocaleString()}</span>
@@ -207,7 +207,7 @@ export function ProductCard({ product }: { product: Product }) {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center justify-between border-t border-border/50 pt-4">
+                        <div className="flex items-center justify-between border-t border-border/50 pt-3">
                             <div className="text-center">
                                 <span className="text-xs text-muted-foreground block">รายเดือน</span>
                                 <span className="text-lg font-bold text-white">฿{product.price_monthly?.toLocaleString()}</span>
