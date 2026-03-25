@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Receipt, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { Receipt, User, LogOut, LayoutDashboard, ShieldCheck, Menu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,13 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet"
 
 export function Navbar() {
     const router = useRouter();
@@ -95,12 +102,12 @@ export function Navbar() {
                         className="h-10 w-auto object-contain"
                         priority
                     />
-                    <Link href="/" className="text-xl font-bold tracking-tight whitespace-nowrap">
+                    <Link href="/" className="text-xl font-bold tracking-tight whitespace-nowrap hidden sm:block">
                         EA Easy Shop
                     </Link>
                 </div>
 
-                <div className="hidden md:flex gap-6 items-center text-sm font-medium text-muted-foreground">
+                <div className="hidden md:flex gap-6 items-center text-sm font-medium text-muted-foreground mr-auto ml-10">
                     <Link href="/" className="hover:text-foreground transition-colors">ร้านค้า</Link>
                     <Link href="/dashboard" className="hover:text-foreground transition-colors">แดชบอร์ด</Link>
                     <Link href="#" className="hover:text-foreground transition-colors">ช่วยเหลือ</Link>
@@ -153,6 +160,43 @@ export function Navbar() {
                             </Link>
                         </>
                     )}
+
+                    {/* Mobile Menu */}
+                    <div className="md:hidden">
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                    <Menu className="h-6 w-6" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent side="right" className="w-[280px] bg-background/95 backdrop-blur">
+                                <SheetHeader className="text-left pb-6 border-b border-border/50">
+                                    <SheetTitle className="text-xl font-bold tracking-tight">เมนู</SheetTitle>
+                                </SheetHeader>
+                                <div className="flex flex-col gap-4 py-8">
+                                    <Link href="/" className="text-lg font-medium px-4 py-2 rounded-lg hover:bg-secondary transition-colors">ร้านค้า</Link>
+                                    <Link href="/dashboard" className="text-lg font-medium px-4 py-2 rounded-lg hover:bg-secondary transition-colors">แดชบอร์ด</Link>
+                                    <Link href="#" className="text-lg font-medium px-4 py-2 rounded-lg hover:bg-secondary transition-colors">ช่วยเหลือ</Link>
+                                    <div className="pt-4 mt-4 border-t border-border/50 flex flex-col gap-3">
+                                        {!user ? (
+                                            <>
+                                                <Link href="/login" className="w-full">
+                                                    <Button variant="outline" className="w-full justify-start py-6 text-base">เข้าสู่ระบบ</Button>
+                                                </Link>
+                                                <Link href="/register" className="w-full">
+                                                    <Button variant="gold" className="w-full justify-start py-6 text-base">สมัครสมาชิก</Button>
+                                                </Link>
+                                            </>
+                                        ) : (
+                                            <Button variant="outline" onClick={handleLogout} className="w-full justify-start py-6 text-base text-red-500 hover:text-red-600">
+                                                <LogOut className="mr-2 h-5 w-5" /> ออกจากระบบ
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    </div>
                 </div>
             </div>
         </nav>

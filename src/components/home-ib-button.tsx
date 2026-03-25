@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { ShieldCheck, Gift, Loader2, Link as LinkIcon } from "lucide-react";
+import { ShieldCheck, Gift, Loader2, Link as LinkIcon, AlertTriangle } from "lucide-react";
 
 type Broker = {
     id: string;
@@ -24,6 +24,7 @@ export function HomeIbButton() {
     // Form state
     const [isOpen, setIsOpen] = useState(false);
     const [selectedBroker, setSelectedBroker] = useState<string>("");
+    const [email, setEmail] = useState("");
     const [verificationData, setVerificationData] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,10 +80,12 @@ export function HomeIbButton() {
                 // 4. Get user's current IB memberships
                 const { data: memberships } = await supabase
                     .from('ib_memberships')
-                    .select('broker_id')
+                    .select('broker_id, status')
                     .eq('user_id', session.user.id);
 
-                const requestedBrokerIds = (memberships || []).map(m => m.broker_id);
+                const requestedBrokerIds = (memberships || [])
+                    .filter(m => m.status === 'approved' || m.status === 'pending')
+                    .map(m => m.broker_id);
                 const unappliedBrokers = brokersList.filter(b => !requestedBrokerIds.includes(b.id));
 
                 setAvailableBrokers(unappliedBrokers);
@@ -138,6 +141,7 @@ export function HomeIbButton() {
                 .insert({
                     user_id: user.id,
                     broker_id: selectedBroker,
+                    email: email.trim(),
                     verification_data: verificationData.trim(),
                     status: 'pending'
                 })
@@ -151,6 +155,7 @@ export function HomeIbButton() {
             setAvailableBrokers(prev => prev.filter(b => b.id !== selectedBroker));
             setIsOpen(false);
             setVerificationData("");
+            setEmail("");
             setSelectedBroker("");
             toast.success("ส่งคำขอสำเร็จ", { description: "ทีมงานจะตรวจสอบและอนุมัติสิทธิ์ให้ท่านโดยเร็วที่สุด" });
         } catch (error: any) {
@@ -162,7 +167,7 @@ export function HomeIbButton() {
 
     return (
         <>
-            <Button variant="outline" size="lg" className="px-8 text-base" onClick={() => setIsOpen(true)}>
+            <Button variant="gold" size="lg" className="px-8 text-base" onClick={() => setIsOpen(true)}>
                 รับสิทธิ์ใช้งาน EA ฟรี (สมัครเป็น IB)
             </Button>
             
@@ -225,10 +230,22 @@ export function HomeIbButton() {
                                 )}
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="ib-account">เลขพอร์ต หรือ อีเมล (สำหรับการยืนยันตัวตนกับโบรกเกอร์)</Label>
+                                    <Label htmlFor="ib-email">อีเมล (ที่ใช้สมัครกับโบรคเกอร์)</Label>
+                                    <Input
+                                        id="ib-email"
+                                        type="email"
+                                        placeholder="youremail@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="ib-account">เลขพอร์ต หรือ ไอดี (สำหรับการยืนยันตัวตนกับโบรกเกอร์)</Label>
                                     <Input
                                         id="ib-account"
-                                        placeholder="เช่น 12345678 หรือ youremail@gmail.com"
+                                        placeholder="เช่น 12345678"
                                         value={verificationData}
                                         onChange={(e) => setVerificationData(e.target.value)}
                                         required

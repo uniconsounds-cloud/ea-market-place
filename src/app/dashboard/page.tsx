@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,7 @@ export default function DashboardPage() {
     const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
     const [ibBrokers, setIbBrokers] = useState<string[]>([]);
     const [pendingIbRequests, setPendingIbRequests] = useState<any[]>([]);
+    const [rejectedIbRequests, setRejectedIbRequests] = useState<any[]>([]);
     const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
 
     useEffect(() => {
@@ -74,8 +75,10 @@ export default function DashboardPage() {
 
             const ibData = allIbData?.filter(ib => ib.status === 'approved') || [];
             const pendingIb = allIbData?.filter(ib => ib.status === 'pending') || [];
-
+            const rejectedIb = allIbData?.filter(ib => ib.status === 'rejected') || [];
+            
             setPendingIbRequests(pendingIb);
+            setRejectedIbRequests(rejectedIb);
 
             if (ibData.length > 0) {
                 const brokers = ibData.map((b: any) => b.brokers?.name).filter(Boolean);
@@ -277,6 +280,30 @@ export default function DashboardPage() {
                                     พอร์ต {req.verification_data} กำลังอยู่ในขั้นตอนการตรวจสอบจากแอดมิน โปรดรอประมาณ 1-12 ชั่วโมง
                                 </p>
                             </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Rejected IB Requests Alerts */}
+            {rejectedIbRequests.length > 0 && (
+                <div className="grid gap-3">
+                    {rejectedIbRequests.map((req, idx) => (
+                        <div key={idx} className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                                <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                                <div>
+                                    <h4 className="font-semibold text-red-600 dark:text-red-400">การขอสิทธิ์ IB: {req.brokers?.name || 'ไม่ระบุโบรคเกอร์'} (ไม่ผ่านการอนุมัติ)</h4>
+                                    <p className="text-sm text-red-600/80 dark:text-red-400/80 mt-1">
+                                        ข้อมูล {req.verification_data} ไม่ถูกต้องหรืออยู่นอกเงื่อนไข โปรดสมัครใหม่ด้วยข้อมูลที่ถูกต้อง
+                                    </p>
+                                </div>
+                            </div>
+                            <Link href="/">
+                                <Button variant="outline" size="sm" className="bg-white hover:bg-red-50 text-red-600 border-red-200">
+                                    สมัครใหม่อีกครั้ง
+                                </Button>
+                            </Link>
                         </div>
                     ))}
                 </div>
