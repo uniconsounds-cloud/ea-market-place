@@ -138,13 +138,13 @@ export function HomeIbButton() {
             // Insert into ib_memberships
             const { data, error } = await supabase
                 .from('ib_memberships')
-                .insert({
+                .upsert({
                     user_id: user.id,
                     broker_id: selectedBroker,
                     email: email.trim(),
                     verification_data: verificationData.trim(),
                     status: 'pending'
-                })
+                }, { onConflict: 'user_id,broker_id' })
                 .select();
 
             if (error) throw error;
