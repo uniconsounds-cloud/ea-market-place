@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
 
 export function AffiliateTracker() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -18,8 +20,13 @@ export function AffiliateTracker() {
       localStorage.setItem('affiliate_ref', ref);
       
       console.log('Affiliate reference saved:', ref);
+
+      // If user landed on /register with a ref, redirect to home page as requested
+      if (pathname === '/register') {
+        router.push('/');
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, pathname, router]);
 
   return null;
 }
