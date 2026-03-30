@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Clock, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import Image from 'next/image';
 import FarmHud from '@/components/farm-hud';
+import Image from 'next/image';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -15,26 +14,14 @@ function seededRandom(seed: number) {
 // ==========================================
 // 🛠️ CONFIGURABLE VARIABLES (สำหรับปรับจูนระยะ)
 // ==========================================
+const TILE_W = 98;
+const TILE_H_OFFSET = 55;
+const TREE_Y_OFFSET = 8;
 
-// 1. ระยะห่างความกว้าง ซ้าย-ขวา (ยิ่งน้อย ต้นไม้จะยิ่งเบียดกันแนวนอน)
-const TILE_W = 100;
-
-// 2. ระยะความลึก บน-ล่าง (ยิ่งน้อย แถวบนจะยิ่งขยับเลื่อนลงมาซ้อนทับแถวล่างมากขึ้น)
-const TILE_H_OFFSET = 55; // แนะนำ: 40-52 (เดิมปกติตามสูตรคือ TILE_W / 2)
-
-// 2.5 ปรับชดเชยความสูงของต้นไม้ให้ฐานดินเนียนไปกับพื้นหญ้า (Y Offset)
-const TREE_Y_OFFSET = 20;
-
-// 3. พื้นที่เกิดของผลไม้/ดอกไม้บนต้น (0% คือยอดขอบบนสุด, 100% คือขอบล่างสุดของรูปต้นไม้)
-const FRUIT_SPAWN_Y_MIN = 10; // ขอบเขตด้านบนสุด (เลขยิ่งน้อย ยิ่งอยู่สูง)
-const FRUIT_SPAWN_Y_MAX = 42; // ขอบเขตด้านล่างสุด (เลขยิ่งมาก ยิ่งย้อยลงมาที่โคน)
-const FRUIT_SPAWN_X_MIN = 25; // ขอบเขตซ้ายสุด
-const FRUIT_SPAWN_X_MAX = 75; // ขอบเขตขวาสุด
-
-const GRID_COLS = 10;
-const GRID_ROWS = 12;
-
-type ZoomLevel = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+const FRUIT_SPAWN_Y_MIN = 10;
+const FRUIT_SPAWN_Y_MAX = 42;
+const FRUIT_SPAWN_X_MIN = 25;
+const FRUIT_SPAWN_X_MAX = 75;
 
 // 15 predefined invisible slots on the tree bush for organic placement
 const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
@@ -45,53 +32,54 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
 
 export default function FarmClient({ portNumber, initialOrders, initialPortStatus }: { portNumber: string, initialOrders: any[], initialPortStatus?: any }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
-    const [portStatus, setPortStatus] = useState<any>(initialPortStatus);
-    const [time, setTime] = useState(new Date());
-    const [zoom, setZoom] = useState<ZoomLevel>('DAILY');
+    const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
+    const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [recentlyClosed, setRecentlyClosed] = useState<any[]>([]);
+    const [isShaking, setIsShaking] = useState(false);
+    const [hiddenTickets, setHiddenTickets] = useState<number[]>([]);
+    const ordersRef = useRef<any[]>(initialOrders);
+
+    // Sync ref with state for use in subscription cleanup
+    useEffect(() => { ordersRef.current = orders; }, [orders]);
 
     useEffect(() => {
         setIsClient(true);
-        setIsMobile(window.innerWidth < 768);
+        setTime(new Date());
+        const timer = setInterval(() => setTime(new Date()), 10000); // Only need date update occasionally
 
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        const handleResize = () => {
+            if (!containerRef.current) return;
+            const winW = window.innerWidth;
+            const winH = window.innerHeight - 110; // Space for HUD (110px)
+
+            // Base size of our isometric plot is roughly 1000x800 including depth
+            const baseW = 1100;
+            const baseH = 900;
+
+            const scaleW = winW / baseW;
+            const scaleH = winH / baseH;
+
+            // Use the smaller scale but limit zoom in for extremely large screens to maintain quality
+            let newScale = Math.min(scaleW, scaleH);
+            if (newScale > 1.2) newScale = 1.2;
+            if (newScale < 0.3) newScale = 0.3; // Minimum fallback
+
+            setScale(newScale);
+        };
+
         window.addEventListener('resize', handleResize);
+        handleResize(); // Initial call
 
-        const timer = setInterval(() => setTime(new Date()), 1000);
         return () => {
             clearInterval(timer);
             window.removeEventListener('resize', handleResize);
         };
     }, []);
 
-    // Auto-center scroll on load
-    useEffect(() => {
-        if (!isClient) return;
-        const alignCenter = () => {
-            const container = scrollContainerRef.current;
-            if (container && container.clientWidth > 0) {
-                const isDaily = zoom === 'DAILY';
-                const cw = isDaily ? 800 : zoom === 'WEEKLY' ? 2400 : 4000;
-                const ch = isDaily ? 1000 : zoom === 'WEEKLY' ? 2000 : 3000;
-                // Center it horizontally. 
-                // Because Plot 0 is at Left: 0 and Top: 200 relative to the center 100x100 div
-                container.scrollLeft = (cw - container.clientWidth) / 2;
-                // Center vertically, focusing on Plot 0 bounds (+250px below center)
-                container.scrollTop = (ch / 2) + 250 - (container.clientHeight / 2);
-            }
-        };
-
-        // Try immediately in case it's painted
-        alignCenter();
-
-        // Try again shortly after to override browser scroll restoration or delayed layout
-        const timerId = setTimeout(alignCenter, 100);
-        return () => clearTimeout(timerId);
-    }, [isClient, zoom]);
-
-
+    // --- Real-time Subscription ---
     useEffect(() => {
         const channel = supabase
             .channel(`farm_updates_${portNumber}`)
@@ -111,6 +99,19 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     } else if (payload.eventType === 'UPDATE') {
                         setOrders(prev => prev.map(o => o.ticket_id === payload.new.ticket_id ? payload.new : o));
                     } else if (payload.eventType === 'DELETE') {
+                        const closedOrder = ordersRef.current.find(o => o.ticket_id === payload.old.ticket_id);
+                        if (closedOrder) {
+                            const pnl = Number(closedOrder.current_pnl) || 0;
+                            const newEvent = { ...closedOrder, closedAt: Date.now(), isProfit: pnl >= 0 };
+                            setRecentlyClosed(prev => [...prev, newEvent]);
+
+                            if (pnl > 0) {
+                                setTimeout(() => {
+                                    setIsShaking(true);
+                                    setTimeout(() => setIsShaking(false), 500);
+                                }, 9500);
+                            }
+                        }
                         setOrders(prev => prev.filter(o => o.ticket_id !== payload.old.ticket_id));
                     }
                 }
@@ -119,272 +120,299 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         return () => { supabase.removeChannel(channel); };
     }, [portNumber]);
 
-    // Mock initial demo state if empty
-    const isDemo = orders.length === 0;
-    const displayOrders = useMemo(() => isDemo ? [
-        { ticket_id: 1001, type: 'BUY', status: 'OPEN', current_pnl: 15.50, sl_risk_percent: 5, raw_lot_size: 15 },
-        { ticket_id: 1002, type: 'SELL', status: 'OPEN', current_pnl: -45.20, sl_risk_percent: 35, raw_lot_size: 30 },
-        { ticket_id: 1004, type: 'SELL', status: 'CLOSED_TP', current_pnl: 10.00, sl_risk_percent: 0, raw_lot_size: 20 },
-        { ticket_id: 1005, type: 'BUY', status: 'CLOSED_SL', current_pnl: -5.00, sl_risk_percent: 100, raw_lot_size: 50 },
-    ] : orders, [isDemo, orders]);
+    // --- Dynamic Theming ---
+    const assetType = portStatus?.asset_type || 'GOLD';
+    const theme = useMemo(() => ({
+        open: assetType === 'FOREX' ? '/farm/asset_a_lily.png' : '/farm/asset_a_lotus.png',
+        profit: assetType === 'FOREX' ? '/farm/asset_b_orange.png' : '/farm/asset_b_apple.png',
+        dead: assetType === 'FOREX' ? '/farm/asset_c_dead_forex.png' : '/farm/asset_c_dead.png'
+    }), [assetType]);
 
-    // Derived Variables based on Zoom Level
-    const derivedStats = useMemo(() => {
+    // Cleanup recently closed orders
+    useEffect(() => {
+        if (recentlyClosed.length === 0) return;
+        const timer = setInterval(() => {
+            const now = Date.now();
+            setRecentlyClosed(prev => prev.filter(o => (now - o.closedAt) < 10000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [recentlyClosed]);
+
+    const isDemo = orders.length === 0 && !portStatus?.balance;
+    const allDisplayOrders = useMemo(() => isDemo ? Array.from({ length: 25 }).map((_, i) => ({
+        ticket_id: 2000 + i,
+        type: i % 2 === 0 ? 'BUY' : 'SELL',
+        status: 'OPEN',
+        current_pnl: i % 3 === 0 ? 309.24 : -150.00,
+        sl_risk_percent: 5,
+        raw_lot_size: 20
+    })) : orders, [isDemo, orders]);
+
+    const displayOrders = useMemo(() =>
+        allDisplayOrders.filter(o => !hiddenTickets.includes(o.ticket_id)),
+        [allDisplayOrders, hiddenTickets]);
+
+    const simulateOrderClose = (order: any) => {
+        if (hiddenTickets.includes(order.ticket_id)) return;
+        const pnl = Number(order.current_pnl) || 0;
+        const newEvent = { ...order, closedAt: Date.now(), isProfit: pnl >= 0 };
+        setRecentlyClosed(prev => [...prev, newEvent]);
+        setHiddenTickets(prev => [...prev, order.ticket_id]);
+        if (pnl > 0) {
+            setTimeout(() => {
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 500);
+            }, 9500);
+        }
+    };
+
+    const stats = useMemo(() => {
+        // If EA is sending data to farm_port_status, use that directly
+        if (portStatus?.floating_pnl !== undefined) {
+            return {
+                openOrdersCount: orders.length,
+                floatingPnl: Number(portStatus.floating_pnl),
+                totalLots: Number(portStatus.total_lots),
+                buyCount: Number(portStatus.buy_count),
+                sellCount: Number(portStatus.sell_count),
+                buyPnl: Number(portStatus.buy_pnl),
+                sellPnl: Number(portStatus.sell_pnl)
+            };
+        }
+        
+        // Fallback to local calculation for simulated data
         const openOrders = displayOrders.filter(o => o.status === 'OPEN');
         const floatingPnl = openOrders.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
-        const totalStandardLots = openOrders.reduce((sum, o) => sum + (Number(o.raw_lot_size) || 0), 0) / 100;
-
-        let totalProfit = 0;
-        let totalLoss = 0;
-
-        // Cumulative past data (In a real app, Weekly/Monthly would hit DB aggregates instead of map)
-        const closedTp = displayOrders.filter(o => o.status === 'CLOSED_TP');
-        const closedSl = displayOrders.filter(o => o.status === 'CLOSED_SL');
-
-        // Simulating data scaling based on zoom choice for effect
-        let multiplier = zoom === 'DAILY' ? 1 : zoom === 'WEEKLY' ? 5 : 20;
-
-        totalProfit = closedTp.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0) * multiplier;
-        totalLoss = Math.abs(closedSl.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0)) * multiplier;
+        const totalLots = openOrders.reduce((sum, o) => sum + (Number(o.raw_lot_size) || 0), 0) / 100;
+        const buyOrders = openOrders.filter(o => o.type === 'BUY');
+        const sellOrders = openOrders.filter(o => o.type === 'SELL');
+        const buyPnl = buyOrders.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
+        const sellPnl = sellOrders.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
 
         return {
             openOrdersCount: openOrders.length,
             floatingPnl,
-            totalStandardLots,
-            fruitCount: Math.min(Math.floor(totalProfit * 10), 1000),   // 1 Fruit = 10 cents ($0.10)
-            deadCount: Math.min(Math.floor(totalLoss * 10), 1000),      // 1 Dead = 10 cents ($0.10)
+            totalLots,
+            buyCount: buyOrders.length,
+            sellCount: sellOrders.length,
+            buyPnl,
+            sellPnl
         };
-    }, [displayOrders, zoom]);
+    }, [displayOrders, portStatus, orders]);
 
-    // Daily Plot logic: 1 Plot = 1 Day (9 trees per plot)
-    const plotsData = useMemo(() => {
-        // We render exactly 20 plots (Today + 19 past days)
-        return Array.from({ length: 20 }).map((_, pIdx) => {
-            const trees = Array.from({ length: 25 }).map(() => ({ assets: [] as any[] }));
+    const treePriority = useMemo(() => {
+        const order = Array.from({ length: 25 }).map((_, i) => ({ index: i, c: i % 5, r: Math.floor(i / 5) }));
+        return order.sort((a, b) => (a.c - a.r) - (b.c - b.r) || (a.c + a.r) - (b.c + b.r)).map(o => o.index);
+    }, []);
 
-            let plotPnl = 0;
+    const flowerPriority = useMemo(() => {
+        const order = Array.from({ length: 25 }).map((_, i) => ({
+            index: i,
+            score: (i % 5 - Math.floor(i / 5)) * 10 + (seededRandom(i * 55) * 15)
+        }));
+        return order.sort((a, b) => b.score - a.score).map(o => o.index);
+    }, []);
 
-            if (pIdx === 0) {
-                // TODAY: Open Orders + Today's PnL
-                plotPnl = derivedStats.floatingPnl;
-                let slot = 0, treeId = 0;
+    const plot = useMemo(() => {
+        const balance = Number(portStatus?.balance) || 51540.20;
+        const equity = Number(portStatus?.equity) || balance;
+        const drawdown = Math.max(0, Math.floor(((balance - equity) / balance) * 100));
 
-                // 1. Add Open Orders (Type 'A' - Golden Lotus)
-                for (let i = 0; i < derivedStats.openOrdersCount; i++) {
-                    if (treeId >= 25) break;
-                    trees[treeId].assets.push({ type: 'A', slotId: slot++ });
-                    if (slot >= 15) { slot = 0; treeId++; }
-                }
+        const treeLevels = new Array(25).fill(4);
+        let pointsToLose = drawdown;
+        for (const idx of treePriority) {
+            if (pointsToLose <= 0) break;
+            const damage = Math.min(pointsToLose, 4);
+            treeLevels[idx] -= damage;
+            pointsToLose -= damage;
+        }
 
-                // 2. Add Today's Profit or Loss Assets
-                if (plotPnl >= 0) {
-                    const todayFruits = Math.min(Math.floor(plotPnl / 0.10), 1000);
-                    for (let i = 0; i < todayFruits; i++) {
-                        if (treeId >= 25) break;
-                        trees[treeId].assets.push({ type: 'B', slotId: slot++ });
-                        if (slot >= 15) { slot = 0; treeId++; }
-                    }
-                } else {
-                    const todayDead = Math.min(Math.floor(Math.abs(plotPnl) / 0.10), 1000);
-                    for (let i = 0; i < todayDead; i++) {
-                        if (treeId >= 25) break;
-                        trees[treeId].assets.push({ type: 'C', slotId: slot++ });
-                        if (slot >= 15) { slot = 0; treeId++; }
-                    }
-                }
+        const trees = Array.from({ length: 25 }).map((_, i) => ({ assets: [] as any[], level: treeLevels[i] }));
+        const allAssets = [
+            ...displayOrders.filter(o => o.status === 'OPEN').map(o => ({ type: 'OPEN_LOTUS', ticketId: o.ticket_id })),
+            ...recentlyClosed.map(o => ({ type: o.isProfit ? 'PROFIT_FRUIT' : 'LOSS_DEAD', ticketId: o.ticket_id }))
+        ];
 
-            } else {
-                // PAST DAYS: Simulated historical data (Either Fruits OR Dead Lotus, never both)
-                let dailyFruits = Math.floor(derivedStats.fruitCount / 19);
-                let dailyDead = Math.floor(derivedStats.deadCount / 19);
-
-                // Add some organic randomness to each day
-                dailyFruits = Math.max(0, dailyFruits + Math.floor((seededRandom(pIdx) - 0.5) * 6));
-                dailyDead = Math.max(0, dailyDead + Math.floor((seededRandom(pIdx * 2) - 0.5) * 4));
-
-                // Determine net outcome: A plot can only have profit OR loss, not both mixed.
-                const netAssets = dailyFruits - dailyDead;
-                plotPnl = netAssets * 0.10;
-
-                let slot = 0, treeId = 0;
-                if (netAssets >= 0) {
-                    // Profit -> Only Fruits (Type 'B')
-                    for (let i = 0; i < netAssets; i++) {
-                        if (treeId >= 25) break;
-                        trees[treeId].assets.push({ type: 'B', slotId: slot++ });
-                        if (slot >= 15) { slot = 0; treeId++; }
-                    }
-                } else {
-                    // Loss -> Only Dead Flowers (Type 'C')
-                    const lossCount = Math.abs(netAssets);
-                    for (let i = 0; i < lossCount; i++) {
-                        if (treeId >= 25) break;
-                        trees[treeId].assets.push({ type: 'C', slotId: slot++ });
-                        if (slot >= 15) { slot = 0; treeId++; }
-                    }
-                }
-            }
-
-            return {
-                id: `plot_${pIdx}`,
-                isToday: pIdx === 0,
-                pnl: plotPnl,
-                trees: trees.sort((a, b) => seededRandom(a.assets.length) - 0.5)
-            };
+        allAssets.forEach((asset, i) => {
+            const jitteredIdx = Math.floor(Math.pow(seededRandom(i * 77 + 123), 1.8) * 25);
+            const treeIdx = flowerPriority[jitteredIdx];
+            const tree = trees[treeIdx];
+            const occupiedSlots = tree.assets.map(a => a.slotId);
+            let slotId = Math.floor(seededRandom(i * 99 + 456) * 15);
+            while (occupiedSlots.includes(slotId) && occupiedSlots.length < 15) { slotId = (slotId + 1) % 15; }
+            if (occupiedSlots.length < 15) { tree.assets.push({ ...asset, slotId }); }
         });
-    }, [derivedStats]);
 
-    // Signpost Labels
-    const signpostLabel = !isClient ? '...' : (zoom === 'DAILY'
-        ? time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()
-        : zoom === 'WEEKLY'
-            ? `WEEK 3, ${time.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }).toUpperCase()}`
-            : `${time.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase()}`);
+        return { pnl: stats.floatingPnl, trees };
+    }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority]);
 
-    // Isometric Map Scale & Auto-center tweaks for Mobile Daily View
-    // Make it much smaller on mobile screens so it doesn't overflow
-    const mapScale = zoom === 'DAILY' ? (isMobile ? 0.9 : 1.3) : zoom === 'WEEKLY' ? (isMobile ? 0.5 : 0.9) : (isMobile ? 0.3 : 0.5);
+    // --- Fetch Real History ---
+    const [history, setHistory] = useState<any[]>([]);
+    useEffect(() => {
+        const fetchHistory = async () => {
+            const { data, error } = await supabase
+                .from('farm_daily_history')
+                .select('*')
+                .eq('port_number', portNumber)
+                .order('date', { ascending: true })
+                .limit(30);
+
+            if (data) {
+                const mapped = data.map(item => {
+                    const pnl = Number(item.profit);
+                    let asset = '/farm/base_farmbox_empty.png';
+                    if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
+                    else if (pnl > 50) asset = '/farm/base_farmbox_full.png';
+                    else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
+                    else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
+                    
+                    return {
+                        id: item.id,
+                        date: new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
+                        pnl,
+                        asset
+                    };
+                });
+                setHistory(mapped);
+            }
+        };
+
+        fetchHistory();
+        
+        // Listen for history updates
+        const historyChannel = supabase
+            .channel('history_updates')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'farm_daily_history', filter: `port_number=eq.${portNumber}` }, fetchHistory)
+            .subscribe();
+
+        return () => { supabase.removeChannel(historyChannel); };
+    }, [portNumber]);
+
+    const dailyHistory = useMemo(() => history.length > 0 ? history : [], [history]);
+
+    const historyScrollRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (historyScrollRef.current) {
+            historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth;
+        }
+    }, [isClient, dailyHistory]);
 
     return (
-        <div className="flex flex-col min-h-screen w-full overflow-x-auto overflow-y-auto font-sans relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df]">
+        <div className="flex flex-col h-screen w-full overflow-hidden font-sans relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df]">
 
-            {/* Top Frame: Luxury HUD */}
             <FarmHud
                 portNumber={portNumber}
-                balance={portStatus?.balance || 51540.20} // Fallback to reference mock value if no DB row
-                equity={portStatus?.equity || 51540.20}
-                floatingPnl={derivedStats.floatingPnl}
-                totalStandardLots={derivedStats.totalStandardLots}
-                marginLevel={portStatus?.margin_level || 200}
+                balance={Number(portStatus?.balance) || 0}
+                equity={Number(portStatus?.equity) || 0}
+                floatingPnl={stats.floatingPnl}
+                totalStandardLots={stats.totalLots}
                 accountType={portStatus?.account_type || 'USC'}
-                maxDrawdown={portStatus?.max_drawdown || 0}
-                zoom={zoom}
-                onZoomChange={setZoom}
+                buyCount={stats.buyCount}
+                sellCount={stats.sellCount}
+                buyPnl={stats.buyPnl}
+                sellPnl={stats.sellPnl}
+                isShaking={isShaking}
             />
 
-            {/* Mobile Zoom Controls */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 lg:hidden bg-white/90 backdrop-blur-md rounded-full p-1.5 border border-[#e3d5b8] shadow-2xl flex gap-2 z-50">
-                <button onClick={() => setZoom('DAILY')} className={`p-3 rounded-full transition-all ${zoom === 'DAILY' ? 'bg-[#d4af37] text-white' : 'text-[#8b7355]'}`}><ZoomIn className="w-5 h-5" /></button>
-                <button onClick={() => setZoom('WEEKLY')} className={`p-3 rounded-full transition-all ${zoom === 'WEEKLY' ? 'bg-[#d4af37] text-white' : 'text-[#8b7355]'}`}><Maximize className="w-5 h-5" /></button>
-                <button onClick={() => setZoom('MONTHLY')} className={`p-3 rounded-full transition-all ${zoom === 'MONTHLY' ? 'bg-[#d4af37] text-white' : 'text-[#8b7355]'}`}><ZoomOut className="w-5 h-5" /></button>
-            </div>
-
-            {/* Main Infinite Canvas (Horizontal Scroll Area) */}
-            <div ref={scrollContainerRef} className="flex-1 w-full relative mt-24 overflow-auto scroll-smooth">
-                {/* Massive oversized frame to allow panning */}
+            <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center">
                 <div
-                    className="flex items-center justify-center pointer-events-auto relative transition-all duration-700"
-                    style={{
-                        minWidth: zoom === 'DAILY' ? '800px' : zoom === 'WEEKLY' ? '2400px' : '4000px',
-                        minHeight: zoom === 'DAILY' ? '1000px' : zoom === 'WEEKLY' ? '2000px' : '3000px'
-                    }}
+                    className="relative transition-all duration-500 ease-out origin-center"
+                    style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
                 >
+                    <div className="absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px]">
+                        {Array.from({ length: 25 }).map((_, i) => {
+                            const c = i % 5;
+                            const r = Math.floor(i / 5);
+                            const tZIndex = (c + r) + 20;
+                            const tree = plot.trees[i];
 
-                    {/* 2.5D Camera Wrapper */}
-                    <div
-                        className="relative transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] origin-center"
-                        style={{ transform: `scale(${mapScale})` }}
-                    >
-                        {/* The Group of Plots */}
-                        <div className="relative w-[100px] h-[100px] pointer-events-none">
-                            {/* Render up to 20 Plots depending on zoom context, but they all exist in DOM */}
-                            {plotsData.map((plot, pIdx) => {
-                                // Arrange plots in an expanding Zig-Zag / Grid timeline
-                                // Plot 0 (Today) is at the very front (bottom of isometric Y)
-                                const P_COLS = 5; // How wide the zigzag is
-                                const pc = pIdx % P_COLS;
-                                const pr = Math.floor(pIdx / P_COLS);
-
-                                // Base Isometric math for plot spacing
-                                const SPACING_X = 550; // px distance horizontally between plot centers
-                                const SPACING_Y = 320; // px distance vertically
-
-                                // Reverse the drawing order so plot0 is front
-                                const plotPosX = (pc - pr) * SPACING_X;
-                                const plotPosY = (pc + pr) * -SPACING_Y + 100; // Offset downwards slightly
-                                const plotZIndex = 100 - pIdx; // Today is always on top
-
-                                // Calculate individual plot date
-                                const plotDate = new Date(time);
-                                plotDate.setDate(plotDate.getDate() - pIdx);
-                                const dateString = plotDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase();
-                                const plotLabel = plot.isToday ? (isDemo ? `DEMO: ${dateString}` : `TODAY: ${dateString}`) : dateString;
-
-                                return (
-                                    <div
-                                        key={plot.id}
-                                        className="absolute transition-opacity duration-1000 ease-in-out shadow-lg"
-                                        style={{
-                                            left: `${plotPosX}px`,
-                                            top: `${plotPosY}px`,
-                                            zIndex: plotZIndex,
-                                            // Optional cull if not needed in current view, but scaling handles mostly.
-                                            opacity: (zoom === 'DAILY' && pIdx > 0) ? 0 : 1, // Hide others in Daily zoom
-                                        }}
-                                    >
-                                        {/* Wooden signpost moved into the 5x5 loop below to anchor to the front tree */}
-
-                                        {/* Render 5x5 Ground Tiles and Trees Together for perfect Z-index */}
-                                        {Array.from({ length: 25 }).map((_, i) => {
-                                            const c = i % 5;
-                                            const r = Math.floor(i / 5);
-                                            // Make Z-index naturally flow from back to front
-                                            const tZIndex = (c + r) + 20;
-
-                                            // Place a tree on every single tile
-                                            const tree = plot.trees[i];
-
-                                            return (
-                                                <div key={`tile_${i}`} className="absolute" style={{ left: `${(c - r) * TILE_W}px`, top: `${(c + r) * TILE_H_OFFSET}px`, zIndex: tZIndex, width: '280px', height: '280px' }}>
-                                                    {/* Ground Layer */}
-                                                    <Image src="/farm/base_ground.png" alt="G" fill className="object-contain object-bottom" unoptimized />
-
-                                                    {/* Tree Layer (if exists on this tile) */}
-                                                    {tree && (
-                                                        <div className="absolute inset-0 pointer-events-none" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
-                                                            <Image src="/farm/base_tree_new.png" alt="T" fill className="object-contain object-bottom drop-shadow-2xl" unoptimized priority={pIdx === 0} />
-                                                            {tree.assets.map((asset, aIdx) => {
-                                                                const slot = TREE_SLOTS[asset.slotId];
-                                                                return (
-                                                                    <div key={`s_${aIdx}`} className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl" style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 1 }}>
-                                                                        {asset.type === 'A' && <Image src="/farm/asset_a_lotus.png" alt="Open" fill className="object-contain animate-pulse" unoptimized />}
-                                                                        {asset.type === 'B' && <Image src="/farm/asset_b_apple.png" alt="Profit" fill className="object-contain" unoptimized />}
-                                                                        {asset.type === 'C' && <Image src="/farm/asset_c_dead.png" alt="Loss" fill className="object-contain opacity-90" unoptimized />}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Signpost Anchor - Only render on the very front tile (i=24) */}
-                                                    {i === 24 && (
-                                                        <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center pointer-events-auto" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
-                                                            <div className="flex flex-col gap-1.5 items-center z-10">
-                                                                <div className={`bg-[#1f1611]/95 border ${plot.pnl >= 0 ? 'border-[#4de180]/50' : 'border-red-500/50'} rounded-sm px-4 py-1.5 shadow-2xl relative`}>
-                                                                    <h3 className={`font-mono font-bold tracking-widest text-sm whitespace-nowrap ${plot.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                                                        {plot.pnl >= 0 ? '+' : ''}${plot.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                                    </h3>
-                                                                </div>
-                                                                <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
-                                                                    <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
-                                                                        {isClient ? plotLabel : '...'}
-                                                                    </h2>
-                                                                </div>
+                            return (
+                                <div
+                                    key={`tile_${i}`}
+                                    className="absolute"
+                                    style={{ left: `${(c - r) * TILE_W}px`, top: `${(c + r) * TILE_H_OFFSET}px`, zIndex: tZIndex, width: '280px', height: '280px' }}
+                                >
+                                    {isClient && (
+                                        <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                            <Image
+                                                src={
+                                                    tree.level === 4 ? '/farm/base_tree_new.png' :
+                                                        tree.level === 3 ? '/farm/base_tree_state2.png' :
+                                                            tree.level === 2 ? '/farm/base_tree_state3.png' :
+                                                                '/farm/base_tree_state4.png'
+                                                }
+                                                alt="T" fill className="object-contain object-bottom drop-shadow-2xl" unoptimized priority={true}
+                                            />
+                                            {tree.assets.map((asset, aIdx) => {
+                                                const slot = TREE_SLOTS[asset.slotId];
+                                                return (
+                                                    <div
+                                                        key={`order_${asset.ticketId || aIdx}`}
+                                                        className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl 
+                                                            ${asset.type === 'OPEN_LOTUS' ? 'animate-pulse' : ''}
+                                                            ${asset.type === 'PROFIT_FRUIT' ? 'animate-float-fade' : ''}
+                                                            ${asset.type === 'LOSS_DEAD' ? 'animate-fade-out' : ''}
+                                                        `}
+                                                        style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 1 }}
+                                                    >
+                                                        {asset.type === 'OPEN_LOTUS' && (
+                                                            <div
+                                                                className="w-full h-full relative pointer-events-auto cursor-pointer"
+                                                                onClick={() => simulateOrderClose(displayOrders.find(o => o.ticket_id === asset.ticketId))}
+                                                            >
+                                                                <Image src={theme.open} alt="O" fill className="object-contain" unoptimized />
                                                             </div>
-                                                            {/* Wooden Pole */}
-                                                            <div className="w-1.5 h-16 bg-gradient-to-b from-[#8b5a2bd0] to-[#4a2e12d0] shadow-xl relative -mt-1 rounded-b-full border-x border-[#3a220f] z-0"></div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                                        )}
+                                                        {asset.type === 'PROFIT_FRUIT' && <Image src={theme.profit} alt="P" fill className="object-contain pointer-events-none" unoptimized />}
+                                                        {asset.type === 'LOSS_DEAD' && <Image src={theme.dead} alt="L" fill className="object-contain opacity-70 pointer-events-none" unoptimized />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {i === 24 && (
+                                        <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                            <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
+                                                <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
+                                                    {(isClient && time) ? time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : '...'}
+                                                </h2>
+                                            </div>
+                                            <div className="w-1.5 h-16 bg-gradient-to-b from-[#8b5a2bd0] to-[#4a2e12d0] shadow-xl relative -mt-1 rounded-b-full border-x border-[#3a220f] z-0"></div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
+
+            {isClient && (
+                <div className="fixed bottom-0 left-0 w-full h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col pt-2">
+                    <div className="flex justify-between px-6 mb-1">
+                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">DAILY HARVEST HISTORY (30D)</span>
+                    </div>
+                    <div
+                        ref={historyScrollRef}
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-start gap-4 px-6 pb-2 no-scrollbar"
+                    >
+                        {dailyHistory.map((item) => (
+                            <div key={item.id} className="flex-shrink-0 flex flex-col items-center group">
+                                <div className="relative w-20 h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
+                                    <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
+                                </div>
+                                <div className="mt-1 flex flex-col items-center">
+                                    <span className="text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
+                                    <span className={`text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                        {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

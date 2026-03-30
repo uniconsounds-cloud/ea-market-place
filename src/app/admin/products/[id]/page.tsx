@@ -958,30 +958,53 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
             {/* Image Upload Block (Main + 3 Additional) */}
             <div className="space-y-4">
                 <label className="text-sm font-medium">รูปภาพสินค้า (สูงสุด 4 รูป)</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {/* Main Image */}
-                    <ImageUploadSlot 
-                        label="ปก (Main)" 
-                        url={formData.image_url} 
-                        onUpload={(url: string) => setFormData((p: any) => ({ ...p, image_url: url }))}
-                        uploading={uploadingImage}
-                    />
+                    <div className="space-y-2">
+                        <ImageUploadSlot 
+                            label="ปก (Main)" 
+                            url={formData.image_url} 
+                            onUpload={(url: string) => setFormData((p: any) => ({ ...p, image_url: url }))}
+                            uploading={uploadingImage}
+                        />
+                        <Input 
+                            placeholder="/assets/image_name.png"
+                            value={formData.image_url}
+                            onChange={(e) => setFormData((p: any) => ({ ...p, image_url: e.target.value }))}
+                            className="text-xs font-mono h-8"
+                        />
+                    </div>
                     
                     {/* Additional Images */}
                     {[0, 1, 2].map((index) => (
-                        <ImageUploadSlot 
-                            key={index}
-                            label={`รูปที่ ${index + 2}`} 
-                            url={formData.additional_images[index]} 
-                            onUpload={(url: string) => {
-                                const newImages = [...formData.additional_images];
-                                newImages[index] = url;
-                                setFormData((p: any) => ({ ...p, additional_images: newImages }));
-                            }}
-                            uploading={uploadingImage}
-                        />
+                        <div key={index} className="space-y-2">
+                            <ImageUploadSlot 
+                                key={index}
+                                label={`รูปที่ ${index + 2}`} 
+                                url={formData.additional_images[index]} 
+                                onUpload={(url: string) => {
+                                    const newImages = [...formData.additional_images];
+                                    newImages[index] = url;
+                                    setFormData((p: any) => ({ ...p, additional_images: newImages }));
+                                }}
+                                uploading={uploadingImage}
+                            />
+                            <Input 
+                                placeholder="/assets/extra_image.png"
+                                value={formData.additional_images[index] || ''}
+                                onChange={(e) => {
+                                    const newImages = [...formData.additional_images];
+                                    newImages[index] = e.target.value;
+                                    setFormData((p: any) => ({ ...p, additional_images: newImages }));
+                                }}
+                                className="text-xs font-mono h-8"
+                            />
+                        </div>
                     ))}
                 </div>
+                <p className="text-[10px] text-muted-foreground italic">
+                    * คุณสามารถอัปโหลดผ่าน Supabase (ถ้ามีโควตา) หรือพิมพ์พาธไฟล์ในเครื่องลงไปตรงๆ เช่น /assets/name.png (แนะนำ)
+                </p>
             </div>
 
             {/* File Upload Block */}
@@ -991,10 +1014,11 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                             <Input
+                                name="file_url"
                                 value={formData.file_url}
-                                readOnly
-                                placeholder="URL ของไฟล์ (อัพโหลดหรือใส่เอง)"
-                                className="bg-muted"
+                                onChange={handleChange}
+                                placeholder="/assets/your_ea.ex4"
+                                className="bg-background font-mono"
                             />
                         </div>
                         <input
