@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
-import { User, ShieldCheck, Check, Info } from 'lucide-react';
+import { User, ShieldCheck, Check, Info, AlertTriangle } from 'lucide-react';
 import { ROOT_ADMINS } from '@/lib/constants';
 import { toast } from 'sonner';
 
