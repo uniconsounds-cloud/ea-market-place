@@ -200,14 +200,14 @@ export function AdminDashboardClient() {
 
                 // Filter out tester data AND filter by selected admin if not 'all'
                 const realOrders = allOrders.filter(o => {
-                    const profile = profileMap.get(o.user_id);
+                    const profile = pMap.get(o.user_id);
                     if (profile?.is_tester) return false;
                     const rootAdmin = getUplineAdmin(o.user_id);
                     if (selectedAdmin !== 'all' && rootAdmin?.email !== selectedAdmin) return false;
                     return true;
                 });
                 const realLicenses = licensesData.filter(l => {
-                    const profile = profileMap.get(l.user_id);
+                    const profile = pMap.get(l.user_id);
                     if (profile?.is_tester) return false;
                     const rootAdmin = getUplineAdmin(l.user_id);
                     if (selectedAdmin !== 'all' && rootAdmin?.email !== selectedAdmin) return false;
@@ -224,7 +224,7 @@ export function AdminDashboardClient() {
                 const enrichedLicenses: LicenseWithProfile[] = realLicenses.map((l: any) => ({
                     ...l,
                     product_name: productMap.get(l.product_id)?.name || 'Unknown Product',
-                    profile: profileMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown' }
+                    profile: pMap.get(l.user_id) || { email: 'Unknown', full_name: 'Unknown' }
                 }));
 
                 const activeLicensesList = enrichedLicenses.filter(l => l.is_active);
@@ -349,6 +349,23 @@ export function AdminDashboardClient() {
         return map;
     }, [rawLicenses]);
 
+    // Recursive helper to find the top admin
+    const getRootAdminByUserId = (userId: string | null | undefined) => {
+        if (!userId) return null;
+        let current = profileMap.get(userId);
+        let visited = new Set();
+        let lastAdmin = null;
+        while (current && !visited.has(current.id)) {
+            visited.add(current.id);
+            const isRoot = current.email === 'juntarasate@gmail.com' || current.email === 'bctutor123@gmail.com';
+            if (isRoot) return current;
+            if (current.role === 'admin') lastAdmin = current;
+            if (!current.referred_by) break;
+            current = profileMap.get(current.referred_by);
+        }
+        return lastAdmin;
+    };
+
     // Sales Date Filter Logic
     const [timeRange, setTimeRange] = useState('30d'); // 1d, 3d, 7d, 30d, all
 
@@ -381,21 +398,6 @@ export function AdminDashboardClient() {
 
     // --- Advanced Stats Calculation ---
     const advancedStats = useMemo(() => {
-        // 1. Root Admin Helper (Using the state profileMap)
-        const getRootAdminByUserId = (userId: string) => {
-            let current = profileMap.get(userId);
-            let visited = new Set();
-            let lastAdmin = null;
-            while (current && !visited.has(current.id)) {
-                visited.add(current.id);
-                const isRoot = current.email === 'juntarasate@gmail.com' || current.email === 'bctutor123@gmail.com';
-                if (isRoot) return current;
-                if (current.role === 'admin') lastAdmin = current;
-                if (!current.referred_by) break;
-                current = profileMap.get(current.referred_by);
-            }
-            return lastAdmin;
-        };
 
         // 2. Filter data by selectedAdmin
         const getProfilesInNode = (rootAdminEmail: string) => {
