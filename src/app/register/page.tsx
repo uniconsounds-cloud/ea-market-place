@@ -160,20 +160,9 @@ export default function RegisterPage() {
                                         <p className="font-bold text-foreground">{referralData.name}</p>
                                     </div>
                                 </div>
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="text-[10px] text-muted-foreground hover:text-foreground"
-                                    onClick={() => {
-                                        setReferralData(null);
-                                        // Clear cookies/localStorage if they want to override
-                                        document.cookie = "affiliate_ref=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                                        localStorage.removeItem('affiliate_ref');
-                                        toast.info("คุณขอยกเลิกผู้แนะนำเดิม กรุณาเลือกคนใหม่");
-                                    }}
-                                >
-                                    เปลี่ยน
-                                </Button>
+                                <div className="text-[10px] text-muted-foreground/50 italic px-2">
+                                    สมัครผ่านลิงก์
+                                </div>
                             </div>
                         ) : (
                             <div className="space-y-3">
