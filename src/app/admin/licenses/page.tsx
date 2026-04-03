@@ -71,9 +71,20 @@ export default async function AdminLicensesPage() {
                 if (!ibMembershipsMap[ib.user_id]) {
                     ibMembershipsMap[ib.user_id] = [];
                 }
+                
+                // Extraction logic to handle brokers object or array
+                let bName = 'IB Account';
+                if (ib.brokers) {
+                    if (Array.isArray(ib.brokers)) {
+                        bName = ib.brokers[0]?.name || 'IB Account';
+                    } else {
+                        bName = (ib.brokers as any).name || 'IB Account';
+                    }
+                }
+
                 ibMembershipsMap[ib.user_id].push({
-                    account_number: ib.verification_data,
-                    broker_name: Array.isArray((ib as any).brokers) ? (ib as any).brokers[0]?.name : (ib as any).brokers?.name || 'Customer'
+                    account_number: ib.verification_data?.trim(),
+                    broker_name: bName
                 });
             });
         }
@@ -81,17 +92,34 @@ export default async function AdminLicensesPage() {
 
     // Merge Data
     const licenses = (rawLicenses || []).map(l => {
+        const port = l.account_number?.trim();
         // Check if this specific license port number is an approved IB port
         const userIbRecords = l.user_id ? ibMembershipsMap[l.user_id] || [] : [];
-        const matchedIb = userIbRecords.find(r => r.account_number === l.account_number);
+        const matchedIb = userIbRecords.find(r => r.account_number === port);
 
-        const isIbLicense = l.type === 'ib' || Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number === l.account_number);
+        // Fallback: If no port match, check if user has ANY approved IB membership
+        const firstAvailableBroker = userIbRecords.length > 0 ? userIbRecords[0].broker_name : undefined;
+
+        // Final label decision
+        let finalBrokerName = l.ib_broker_name;
+        if (!finalBrokerName) {
+            if (matchedIb) {
+                finalBrokerName = matchedIb.broker_name;
+            } else if (profilesMap[l.user_id]?.ib_account_number?.trim() === port) {
+                // If it matches legacy profile port, try to use first available broker name as a hint
+                finalBrokerName = firstAvailableBroker || 'IB Account';
+            } else if (l.type === 'ib') {
+                finalBrokerName = firstAvailableBroker || 'IB Account';
+            }
+        }
+
+        const isIbLicense = l.type === 'ib' || Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number?.trim() === port);
 
         return {
             ...l,
             profiles: l.user_id ? profilesMap[l.user_id] : null,
             is_ib: isIbLicense,
-            ib_broker_name: l.ib_broker_name || (matchedIb ? matchedIb.broker_name : (profilesMap[l.user_id]?.ib_account_number === l.account_number ? 'Customer' : undefined))
+            ib_broker_name: finalBrokerName
         };
     });
 

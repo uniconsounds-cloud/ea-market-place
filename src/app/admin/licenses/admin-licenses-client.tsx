@@ -399,7 +399,11 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                                             <td className="px-4 py-3">
                                                 <div className="font-semibold">{license.profiles?.full_name || 'ผู้ใช้ทั่วไป'}</div>
                                                 <div className="text-xs text-muted-foreground">{license.profiles?.email}</div>
-                                                {isIB && <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded">IB {license.ib_broker_name || 'Customer'}</span>}
+                                                {isIB && (
+                                                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 text-[9px] bg-blue-500/10 text-blue-600 rounded-full font-bold border border-blue-200 uppercase tracking-tighter">
+                                                        <Zap className="w-2.5 h-2.5" /> IB {license.ib_broker_name || 'Account'}
+                                                    </span>
+                                                )}
                                                 {license.profiles?.is_tester && <span className="inline-block mt-1 ml-1 px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-800 font-bold uppercase rounded">Tester</span>}
                                             </td>
                                             <td className="px-4 py-3">
@@ -408,7 +412,9 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                                             </td>
                                             <td className="px-4 py-3 capitalize">
                                                 {isIB ? (
-                                                    <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded text-xs font-bold border border-blue-200">IB {license.ib_broker_name || 'Customer'}</span>
+                                                    <span className="text-blue-700 bg-blue-50 px-2 py-1 rounded text-[11px] font-bold border border-blue-200 flex items-center gap-1 w-fit">
+                                                        <Zap className="w-3 h-3" /> {license.ib_broker_name ? `IB (${license.ib_broker_name})` : 'IB Account'}
+                                                    </span>
                                                 ) : license.type === 'lifetime' ? (
                                                     <span className="text-orange-600 bg-orange-100 px-2 py-0.5 rounded text-xs font-bold border border-orange-200">Lifetime</span>
                                                 ) : license.type}
@@ -493,7 +499,7 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                                 {editingLicense.is_ib ? (
                                     <div className="space-y-3 pt-2 border-t border-border">
                                         <Label className="flex items-center gap-2 text-blue-600 font-bold">
-                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB {editingLicense.ib_broker_name || 'Customer'})
+                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB {editingLicense.ib_broker_name || 'Account'})
                                         </Label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <Button

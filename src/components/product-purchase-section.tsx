@@ -698,7 +698,7 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             {/* Risk Disclosure Section */}
             <div className="space-y-4 pt-4 border-t border-border">
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 h-32 overflow-y-auto text-xs text-muted-foreground">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 h-32 overflow-y-auto text-xs text-white">
                     <h4 className="font-bold text-destructive mb-2 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4" /> คำเตือนความเสี่ยง (Risk Disclosure)
                     </h4>
