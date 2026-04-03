@@ -493,21 +493,6 @@ export function AdminDashboardClient() {
         return metrics;
     }, [filteredSalesOrders, products, rawLicenses, selectedAdmin, profileMap]);
 
-    // Redefine getRootAdminByUserId as a standalone if needed elsewhere or just use it inside useMemo
-    const getRootAdminByUserId = (userId: string) => {
-        let current = profileMap.get(userId);
-        let visited = new Set();
-        let lastAdmin = null;
-        while (current && !visited.has(current.id)) {
-            visited.add(current.id);
-            const isRoot = current.email === 'juntarasate@gmail.com' || current.email === 'bctutor123@gmail.com';
-            if (isRoot) return current;
-            if (current.role === 'admin') lastAdmin = current;
-            if (!current.referred_by) break;
-            current = profileMap.get(current.referred_by);
-        }
-        return lastAdmin;
-    };
 
 
     // Filter & Sort Logic
