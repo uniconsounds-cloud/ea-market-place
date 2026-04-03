@@ -331,17 +331,20 @@ export default function AdminOrdersPage() {
 
             // 3. Deactivate License (if exists)
             if (order.account_number && order.product_id) {
-                const { error: licenseError } = await supabase
-                    .from('licenses')
-                    .update({ is_active: false })
-                    .eq('user_id', order.user_id)
-                    .eq('product_id', order.product_id)
-                    .eq('account_number', order.account_number);
+                const portsToDeactivate = order.account_number.split(',').map((p: string) => p.trim()).filter(Boolean);
+                
+                if (portsToDeactivate.length > 0) {
+                    const { error: licenseError } = await supabase
+                        .from('licenses')
+                        .update({ is_active: false })
+                        .eq('user_id', order.user_id)
+                        .eq('product_id', order.product_id)
+                        .in('account_number', portsToDeactivate); // Use .in() for multiple ports
 
-                if (licenseError) {
-                    console.error('Error deactivating license:', licenseError);
-                    // Don't throw here, as order is already rejected. Just warn.
-                    alert('Order rejected but failed to deactivate license. Please check database.');
+                    if (licenseError) {
+                        console.error('Error deactivating licenses:', licenseError);
+                        alert('Order rejected but failed to deactivate some licenses. Please check database.');
+                    }
                 }
             }
 

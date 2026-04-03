@@ -56,19 +56,20 @@ function CheckoutContent({ productId }: { productId: string }) {
     // Check for existing license on mount to show renewal info
     useEffect(() => {
         const checkLicense = async () => {
-            const key = initialAccountNumber.trim();
-            if (!key || !productId) return;
+            const ports = initialAccountNumber.split(',').map(p => p.trim()).filter(Boolean);
+            if (ports.length === 0 || !productId) return;
 
             // Get User first
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
+            // Search for ANY of the ports in the license table
             const { data: licenses } = await supabase
                 .from('licenses')
                 .select('*')
                 .eq('user_id', user.id)
                 .eq('product_id', productId)
-                .eq('account_number', key)
+                .in('account_number', ports) // Check multiple ports
                 .limit(1);
 
             if (licenses && licenses.length > 0) {
@@ -146,11 +147,12 @@ function CheckoutContent({ productId }: { productId: string }) {
             }
 
             // 1.5 GLOBAL VALIDATION AGAIN (Security Check)
-            // Query for ANY active license with this account number (ANY PRODUCT)
+            // Query for ANY active license with THESE account numbers (ANY PRODUCT)
+            const ports = accountNumber.split(',').map(p => p.trim()).filter(Boolean);
             const { data: globalLicenses } = await supabase
                 .from('licenses')
-                .select('user_id, product_id, expiry_date')
-                .eq('account_number', accountNumber.trim())
+                .select('user_id, product_id, account_number, expiry_date')
+                .in('account_number', ports) // Check each individual port
                 .eq('is_active', true)
                 .gte('expiry_date', new Date().toISOString()) // Only check if not expired
                 .limit(1);
@@ -158,23 +160,27 @@ function CheckoutContent({ productId }: { productId: string }) {
             const globalLicense = globalLicenses?.[0];
 
             if (globalLicense && (!user || (globalLicense.user_id !== user.id) || (globalLicense.product_id !== product.id))) {
-                alert('หมายเลขพอร์ตนี้ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้');
+                alert(`หมายเลขพอร์ต ${globalLicense.account_number} ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`);
                 setSubmitting(false);
                 return;
             }
 
             // 1.8 PENDING ORDERS VALIDATION (Duplicate Check)
-            const { data: existingOrders } = await supabase
+            // We check if this user already requested these ports for this product
+            const { data: allPendingOrders } = await supabase
                 .from('orders')
-                .select('id, status')
+                .select('id, status, account_number')
                 .eq('user_id', user.id)
                 .eq('product_id', product.id)
-                .eq('account_number', accountNumber.trim())
-                .eq('status', 'pending')
-                .limit(1);
+                .eq('status', 'pending');
 
-            if (existingOrders && existingOrders.length > 0) {
-                alert('คุณมีคำขอสิทธิ์สำหรับพอร์ตนี้ที่กำลังรอตรวจสอบอยู่แล้ว ไม่สามารถส่งซ้ำได้');
+            const hasPendingConflict = allPendingOrders?.some(order => {
+                const existingOrderPorts = (order.account_number || '').split(',').map((p: string) => p.trim()).filter(Boolean);
+                return ports.some(p => existingOrderPorts.includes(p));
+            });
+
+            if (hasPendingConflict) {
+                alert('คุณมีคำขอสิทธิ์สำหรับพอร์ตหนึ่งในรายการนี้ที่กำลังรอตรวจสอบอยู่แล้ว ไม่สามารถส่งซ้ำได้');
                 setSubmitting(false);
                 return;
             }

@@ -577,8 +577,9 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                                     placeholder={product.is_multi_port ? `Ex. ${12345678 + index}` : "Ex. 12345678"}
                                     value={acc}
                                     onChange={(e) => {
+                                        const newValue = e.target.value.replace(/[^0-9]/g, '');
                                         const newAccs = [...accountNumbers];
-                                        newAccs[index] = e.target.value;
+                                        newAccs[index] = newValue;
                                         setAccountNumbers(newAccs);
                                     }}
                                     className={`bg-background/50 border-input font-mono text-lg ${isThisPortRenewing ? 'border-green-500 ring-1 ring-green-500/50' : ''}`}
