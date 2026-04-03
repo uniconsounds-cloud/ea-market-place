@@ -44,25 +44,36 @@ export function ProductIbBanner({ productId }: { productId: string }) {
                     .eq('id', session.user.id)
                     .single();
 
-                // 2. Find Root Admin Owner
+                // 2. Find Root Admin Owner (Ultimate Upline)
                 let rootOwnerId = profile?.referred_by;
-                for (let i = 0; i < 5; i++) {
+                let candidateId = null;
+
+                // Trace up to 10 levels to find one of the 2 primary admins
+                for (let i = 0; i < 10; i++) {
                     if (!rootOwnerId) break;
 
                     const { data: uplineProfile } = await supabase
                         .from('profiles')
-                        .select('id, email, referred_by')
+                        .select('id, email, role, referred_by')
                         .eq('id', rootOwnerId)
                         .single();
 
                     if (!uplineProfile) break;
 
+                    // If we hit a root admin, this is our target
                     if (uplineProfile.email === 'juntarasate@gmail.com' || uplineProfile.email === 'bctutor123@gmail.com') {
-                        rootOwnerId = uplineProfile.id;
+                        candidateId = uplineProfile.id;
                         break;
                     }
+
+                    // Store intermediary admin as fallback if needed
+                    if (uplineProfile.role === 'admin' && !candidateId) {
+                        candidateId = uplineProfile.id;
+                    }
+
                     rootOwnerId = uplineProfile.referred_by;
                 }
+                rootOwnerId = candidateId;
 
                 // 3. Get active brokers owned by that Root Admin (or all if no root)
                 let brokerQuery = supabase

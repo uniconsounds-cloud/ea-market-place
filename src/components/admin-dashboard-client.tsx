@@ -137,13 +137,24 @@ export function AdminDashboardClient() {
                 const getUplineAdmin = (userId: string) => {
                     let current = profileMap.get(userId);
                     let visited = new Set();
+                    let lastAdmin = null;
+
                     while (current && !visited.has(current.id)) {
                         visited.add(current.id);
-                        if (current.role === 'admin') return current;
+
+                        // Root Admin Emails
+                        const isRoot = current.email === 'juntarasate@gmail.com' || current.email === 'bctutor123@gmail.com';
+                        if (isRoot) return current;
+
+                        // Intermediary Admin Check
+                        if (current.role === 'admin') {
+                            lastAdmin = current;
+                        }
+
                         if (!current.referred_by) break;
                         current = profileMap.get(current.referred_by);
                     }
-                    return null;
+                    return lastAdmin;
                 };
 
                 setAvailableAdmins(Array.from(adminsSet));
