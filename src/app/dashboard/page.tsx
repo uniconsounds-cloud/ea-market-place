@@ -497,7 +497,17 @@ export default function DashboardPage() {
                                                         </div>
 
                                                         {/* Right Action Menu */}
-                                                        <div className="flex justify-end items-center gap-2 min-w-[100px]">
+                                                        <div className="flex justify-end items-center gap-2 min-w-[150px]">
+                                                            {/* View Farm Button (Only for ports that have been synced) */}
+                                                            {!isOrder && item.account_number && (
+                                                                <Link href={`/farm/${item.account_number}`} target="_blank">
+                                                                    <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20">
+                                                                        <Activity className="w-3 h-3" />
+                                                                        ดูฟาร์ม
+                                                                    </Button>
+                                                                </Link>
+                                                            )}
+
                                                             {/* Delete Button (Cleanup) */}
                                                             {(isOrder && (item.status === 'pending' || item.status === 'rejected')) || 
                                                              (!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 0))) ? (

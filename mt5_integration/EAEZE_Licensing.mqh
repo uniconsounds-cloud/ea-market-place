@@ -88,20 +88,21 @@ bool CheckEaezeLicense() {
     if(res == 200) {
         string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
         
-        if(StringFind(response, "\"status\":\"active\"") >= 0) {
+        // Use a more flexible search (only look for the value part)
+        if(StringFind(response, "\"active\"") >= 0 || StringFind(response, "active") >= 0) {
             Print("EAEZE: License verified for account ", account_no, " | Balance: ", balance_str);
             G_IsLicenseVerified = true;
             RemoveLicenseAlert();
             return true;
         }
         
-        if(StringFind(response, "\"status\":\"insufficient_balance\"") >= 0) {
+        if(StringFind(response, "\"insufficient_balance\"") >= 0) {
              Print("EAEZE License Failed (Balance): ", response);
              ShowLicenseAlert("Balance is too low for this EA. (Account: " + account_no + ")");
              return false;
         }
 
-        if(StringFind(response, "\"status\":\"invalid\"") >= 0 || StringFind(response, "\"status\":\"expired\"") >= 0) {
+        if(StringFind(response, "\"invalid\"") >= 0 || StringFind(response, "\"expired\"") >= 0) {
              Print("EAEZE License Failed: ", response);
              ShowLicenseAlert("License Invalid or Expired for Account: " + account_no);
              return false;
