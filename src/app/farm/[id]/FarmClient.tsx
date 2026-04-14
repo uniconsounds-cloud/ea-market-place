@@ -500,17 +500,17 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             </div>
 
             {isClient && (
-                <div className="fixed bottom-0 left-0 w-full h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col pt-2">
-                    <div className="flex justify-between px-6 mb-1">
-                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
-                            <span className="hidden sm:inline">Daily Harvest </span>History (30D)
+                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col pt-2 pb-1 sm:pb-0">
+                    <div className="flex justify-end sm:justify-between px-4 sm:px-6 mb-1">
+                        <span className="hidden sm:inline text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
+                            Daily Harvest History (30D)
                         </span>
                         <button 
                             onClick={() => {
                                 const key = prompt("Enter API Key to download history:");
                                 if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
                             }}
-                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
+                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-2 sm:px-3 py-1 rounded transition-colors uppercase font-bold"
                         >
                             <span className="hidden sm:inline">Export 90D History (.CSV)</span>
                             <span className="sm:hidden">90D</span>
@@ -519,11 +519,11 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     </div>
                     <div
                         ref={historyScrollRef}
-                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-start gap-3 sm:gap-4 px-6 pb-2 no-scrollbar"
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-start gap-4 sm:gap-6 px-4 sm:px-6 pb-0 sm:pb-2 no-scrollbar"
                     >
                         {dailyHistory.map((item) => (
                             <div key={item.id} className="flex-shrink-0 flex flex-col items-center group">
-                                <div className="relative w-12 h-12 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
+                                <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
                                     <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
                                 </div>
                                 <div className="mt-1 flex flex-col items-center">

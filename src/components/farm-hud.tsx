@@ -70,7 +70,7 @@ export default function FarmHud({
     return (
         <div 
             onClick={() => { console.log("HUD Clicked"); if(onClick) onClick(); }}
-            className="fixed top-0 left-0 w-full h-28 sm:h-32 bg-[#16120e] text-[#e8dcb9] z-[100] border-b border-amber-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
+            className="w-full h-28 sm:h-32 bg-[#16120e] text-[#e8dcb9] z-[100] border-b border-amber-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
         >
             {/* Background Texture/Gradient */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-[#2a1d0f]/50 to-black/60 pointer-events-none" />
