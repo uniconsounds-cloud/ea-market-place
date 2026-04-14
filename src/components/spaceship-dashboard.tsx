@@ -65,11 +65,12 @@ export default function SpaceshipDashboard({
             <Cpu className="w-6 h-6 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tighter text-white uppercase">{systemCode.replace('_', ' ')} <span className="text-cyan-500">{eaVersion}</span></h1>
+            <h1 className="text-xl font-bold tracking-tighter text-white uppercase">EasyGold Farming <span className="text-cyan-500">{eaVersion}</span></h1>
             <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase tracking-widest">
               <span className="flex items-center gap-1"><CircleDot className="w-2 h-2 text-green-500" /> SYSTEM_ONLINE</span>
               <span className="border-l border-slate-700 pl-2">PORT_{portNumber}</span>
-              <span className="border-l border-slate-700 pl-2">TYPE_{assetType}</span>
+              <span className="border-l border-slate-700 pl-2">ASSET_{assetType}</span>
+              {accountType === 'USC' && <span className="border-l border-slate-700 pl-2 text-amber-500">MODE_CENT</span>}
             </div>
           </div>
         </div>
@@ -100,7 +101,7 @@ export default function SpaceshipDashboard({
                 <Shield className="w-3 h-3" /> Net Liquidity
             </div>
             <div className="text-4xl font-black text-white tracking-tighter flex items-baseline gap-2">
-              {formatValue(stats.balance)} <span className="text-xs text-slate-500">{unit}</span>
+              {accountType === 'USC' ? '' : '$'}{formatValue(stats.balance)} <span className="text-xs text-slate-500">{unit}</span>
             </div>
             <div className="mt-4 flex flex-col gap-2">
                 <div className="flex justify-between text-[11px] mb-1">
@@ -120,7 +121,7 @@ export default function SpaceshipDashboard({
           <div className={`bg-[#0f172a]/80 border ${stats.floatingPnl >= 0 ? 'border-green-900/50' : 'border-red-900/50'} rounded-lg p-6 relative`}>
             <div className="text-xs text-slate-500 uppercase mb-1">Live Floating Exposure</div>
             <div className={`text-4xl font-black tracking-tighter ${pnlColor} flex items-baseline gap-2`}>
-              {stats.floatingPnl >= 0 ? '+' : ''}{formatValue(stats.floatingPnl)} <span className="text-xs opacity-50">{unit}</span>
+              {stats.floatingPnl >= 0 ? '+' : ''}{accountType === 'USC' ? '' : '$'}{formatValue(stats.floatingPnl)} <span className="text-xs opacity-50">{unit}</span>
             </div>
             <div className="mt-4 text-[10px] text-slate-500 flex justify-between uppercase">
                 <span>Today Closed Profit</span>

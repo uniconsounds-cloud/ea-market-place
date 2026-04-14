@@ -12,6 +12,7 @@ type FarmHudProps = {
     todayProfit: number; // Added for Today Result
     totalStandardLots: number;
     accountType: string;
+    assetType: string; // Added assetType
     buyCount: number;
     sellCount: number;
     buyPnl: number;
@@ -28,6 +29,7 @@ export default function FarmHud({
     todayProfit,
     totalStandardLots,
     accountType,
+    assetType, // Added assetType
     buyCount,
     sellCount,
     buyPnl,
@@ -60,6 +62,9 @@ export default function FarmHud({
     else if (displayPnl > 50) todayHarvestAsset = '/farm/base_farmbox_full.png';
     else if (displayPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
     else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+
+    const isUSC = accountType === 'USC' || accountType === 'CENT';
+    const currencyPrefix = isUSC ? '' : '$';
 
     return (
         <div 
@@ -151,21 +156,23 @@ export default function FarmHud({
                     <div className="flex-1 flex flex-col justify-center min-w-0">
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
-                                <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">EA EasyGold | {portNumber}</h1>
+                                <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
+                                    EasyGold Farming | {portNumber} | <span className="text-white/60">{assetType}</span> {isUSC && <span className="bg-amber-600/30 text-amber-500 px-1 rounded text-[8px] ml-1">[CENT]</span>}
+                                </h1>
                                 <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
-                                    ${equity.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    {currencyPrefix}{equity.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                 </div>
                             </div>
                             <div className="text-right flex flex-col items-end">
                                 <div className="flex gap-1 sm:gap-2 items-center mb-0.5">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase">BALANCE</span>
                                     <span className="font-mono text-[10px] sm:text-sm font-bold text-[#cfa545] tracking-wider">
-                                        ${balance.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                        {currencyPrefix}{balance.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                     </span>
                                 </div>
                                 <div className={`text-[8px] sm:text-[10px] font-mono font-black tracking-tighter ${floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                    {floatingPnl >= 0 ? '+' : ''}${floatingPnl.toFixed(2)} (${((floatingPnl / balance) * 100).toFixed(2)}%)
+                                    {floatingPnl >= 0 ? '+' : ''}{currencyPrefix}{floatingPnl.toFixed(2)} ({((floatingPnl / balance) * 100).toFixed(2)}%)
                                 </div>
                             </div>
                         </div>
@@ -228,7 +235,7 @@ export default function FarmHud({
                     <div className="flex flex-col pr-1">
                         <span className="text-[8px] lg:text-[10px] text-amber-200/40 uppercase font-black tracking-widest leading-none mb-1">Today Result</span>
                         <span className={`text-xs lg:text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm`}>
-                            {todayProfit >= 0 ? '+' : ''}${todayProfit.toFixed(2)}
+                            {todayProfit >= 0 ? '+' : ''}{currencyPrefix}{todayProfit.toFixed(2)}
                         </span>
                         <div className="text-[8px] text-white/20 font-mono mt-0.5 uppercase tracking-tighter">
                             LOTS: {totalStandardLots.toFixed(2)} | {accountType}

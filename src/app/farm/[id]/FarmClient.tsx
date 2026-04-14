@@ -386,6 +386,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     buyPnl={stats.buyPnl}
                     sellPnl={stats.sellPnl}
                     todayProfit={stats.todayProfit}
+                    assetType={assetType}
                     isShaking={isShaking}
                     onClick={handleSecretToggle}
                 />
@@ -491,7 +492,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                 <div className="mt-1 flex flex-col items-center">
                                     <span className="text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
                                     <span className={`text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                        {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
+                                        {item.pnl >= 0 ? '+' : ''}{portStatus?.account_type === 'USC' ? '' : '$'}{item.pnl.toFixed(2)}
                                     </span>
                                 </div>
                             </div>
