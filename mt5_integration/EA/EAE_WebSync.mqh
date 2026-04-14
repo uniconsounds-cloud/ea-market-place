@@ -19,6 +19,7 @@
 // Default to direct Supabase integration for new EAs
 datetime g_eae_last_sync_time = 0;
 int      g_eae_sync_interval  = 20; // Default: Sync every 20 seconds
+bool     g_eae_full_sync_mode = true; // Start with true to ensure initial data
 string   g_eae_api_url        = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data";
 
 // Internal System Key (Do not change)
@@ -146,8 +147,11 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    // 2. Build Full Payload for Supabase RPC
    string payload = "{";
    payload += "\"p_payload\": {";
+   payload += "\"is_heartbeat\":" + (g_eae_full_sync_mode ? "false" : "true") + ",";
    payload += "\"snapshot\":" + snapshot_json + ",";
-   payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
+   if(g_eae_full_sync_mode) {
+      payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
+   }
    payload += "\"today_profit\":" + DoubleToString(EAE_CalculateTodayProfit(), 2) + ",";
    payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
@@ -178,6 +182,14 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
       string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
       Print("EAE Sync Server Error (", res, "): ", err_resp);
       return false;
+   }
+   
+   // 4. Parse response for on-demand sync control
+   string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   if(StringFind(response, "\"should_sync_full\":true") >= 0) {
+      g_eae_full_sync_mode = true;
+   } else {
+      g_eae_full_sync_mode = false;
    }
    
    return true;

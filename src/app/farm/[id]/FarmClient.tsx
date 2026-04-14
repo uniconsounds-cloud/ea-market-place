@@ -92,6 +92,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
     useEffect(() => {
         const channel = supabase
             .channel(`farm_updates_${portNumber}`)
+            // Existing subscription logic...
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'farm_port_status', filter: `port_number=eq.${portNumber}` },
@@ -126,7 +127,19 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 }
             )
             .subscribe();
-        return () => { supabase.removeChannel(channel); };
+
+        // [ON-DEMAND SYNC] Signal to the server that we are actively viewing this port
+        const pingInterval = setInterval(async () => {
+            await supabase.rpc('ping_farm_view', { p_port_number: portNumber });
+        }, 20000); // Ping every 20 seconds
+
+        // Initial ping
+        supabase.rpc('ping_farm_view', { p_port_number: portNumber });
+
+        return () => { 
+            supabase.removeChannel(channel); 
+            clearInterval(pingInterval);
+        };
     }, [portNumber]);
 
     // --- Dynamic Theming ---
