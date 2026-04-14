@@ -260,7 +260,7 @@ export default function SettingsPage() {
                                         setCopySuccess(true);
                                         setTimeout(() => setCopySuccess(false), 2000);
                                     }}
-                                    variant="secondary"
+                                    variant="outline"
                                 >
                                     {copySuccess ? 'Copied!' : 'Copy'}
                                 </Button>
