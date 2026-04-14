@@ -202,7 +202,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 balance: Number(portStatus.balance),
                 equity: Number(portStatus.equity),
                 maxDrawdown: Number(portStatus.max_drawdown || 0),
-                todayProfit: Number(portStatus.today_pnl || 0)
+                todayProfit: Number(portStatus.today_pnl || 0),
+                serverTime: portStatus.server_time ? new Date(Number(portStatus.server_time) * 1000) : new Date()
             };
         }
         
@@ -405,6 +406,29 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 />
             </div>
 
+            {/* NEW: 1-Day Trading Timeline Bar */}
+            <div className="relative z-[65] w-full bg-black/40 border-b border-amber-900/20 py-1 sm:py-2">
+                <div className="max-w-7xl mx-auto px-4 relative">
+                    {/* Base bar */}
+                    <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
+                        {/* Progress bar (decreasing remaining time visualization) */}
+                        <div 
+                            className="absolute top-0 right-0 h-full bg-gradient-to-l from-amber-600/80 to-amber-400/30 transition-all duration-1000"
+                            style={{ width: `${100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100}%` }}
+                        />
+                    </div>
+                    {/* Hour Markers (24 hours) */}
+                    <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
+                        {Array.from({ length: 25 }).map((_, i) => (
+                            <div 
+                                key={`h_${i}`} 
+                                className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} 
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center">
                 <div
                     className="relative transition-all duration-500 ease-out origin-center"
@@ -482,24 +506,28 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             {isClient && (
                 <div className="fixed bottom-0 left-0 w-full h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col pt-2">
                     <div className="flex justify-between px-6 mb-1">
-                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">DAILY HARVEST HISTORY (30D)</span>
+                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
+                            <span className="hidden sm:inline">Daily Harvest </span>History (30D)
+                        </span>
                         <button 
                             onClick={() => {
                                 const key = prompt("Enter API Key to download history:");
                                 if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
                             }}
-                            className="text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
+                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
                         >
-                            Export 90D History (.CSV)
+                            <span className="hidden sm:inline">Export 90D History (.CSV)</span>
+                            <span className="sm:hidden">90D</span>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         </button>
                     </div>
                     <div
                         ref={historyScrollRef}
-                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-start gap-4 px-6 pb-2 no-scrollbar"
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-start gap-3 sm:gap-4 px-6 pb-2 no-scrollbar"
                     >
                         {dailyHistory.map((item) => (
                             <div key={item.id} className="flex-shrink-0 flex flex-col items-center group">
-                                <div className="relative w-20 h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
+                                <div className="relative w-12 h-12 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
                                     <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
                                 </div>
                                 <div className="mt-1 flex flex-col items-center">

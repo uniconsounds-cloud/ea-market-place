@@ -76,7 +76,7 @@ export default function FarmHud({
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-[#2a1d0f]/50 to-black/60 pointer-events-none" />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
-            <div className="relative max-w-7xl mx-auto flex items-center h-28 px-4 gap-4 sm:gap-8">
+            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6">
 
                 {/* Left: Luxury Analog Clock Motif */}
                 <div className="flex flex-shrink-0 w-16 h-16 sm:w-24 sm:h-24 relative flex-col items-center justify-center">
@@ -98,58 +98,83 @@ export default function FarmHud({
                 {/* DIAGNOSTICS CENTER: Buy/Sell Bars + Balance/Equity */}
                 <div className="flex-1 flex items-center gap-3 sm:gap-8 min-w-0">
                     
-                    {/* Buy/Sell Vertical Energy Bars + PnL Indicators */}
-                    <div className="flex gap-4 flex-shrink-0">
+                    {/* Buy/Sell Thermometers (4-bar on mobile, detailed on desktop) */}
+                    <div className="flex gap-1 sm:gap-4 flex-shrink-0 items-end">
                         {/* BUY GROUP (B) */}
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-end gap-1.5 h-12 sm:h-16">
-                                {/* Order Count Bar */}
-                                <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/20 overflow-hidden shadow-inner">
-                                    <div 
-                                        className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000 shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-                                        style={{ height: `${Math.min((buyCount / 10) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                {/* PnL Indicator Line */}
-                                <div className="relative w-[1.5px] h-full bg-white/5 rounded-full overflow-visible">
-                                    {/* Zero Center Mark */}
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-[1px] bg-white/40 z-10" />
-                                    {/* Dynamic PnL Segment */}
-                                    <div 
-                                        className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${buyPnl >= 0 ? 'bg-cyan-400 bottom-1/2 rounded-t-full shadow-[0_0_5px_rgba(34,211,238,0.6)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_5px_rgba(239,68,68,0.6)]'}`}
-                                        style={{ 
-                                            height: `${Math.min(50, Math.abs((buyPnl / (balance * 0.02)) * 50))}%` 
-                                        }}
-                                    />
+                        <div className="flex gap-0.5 sm:gap-2 items-center">
+                            {/* Desktop Count Label */}
+                            <div className="hidden sm:flex flex-col items-end gap-0.5 text-[8px] font-mono text-cyan-400/70">
+                                <span>B</span>
+                                <span className="font-black">{buyCount}</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center">
+                                <div className="flex items-end gap-0.5 sm:gap-1 h-10 sm:h-14">
+                                    {/* Order Count Bar */}
+                                    <div className="relative w-1 sm:w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden">
+                                        <div 
+                                            className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000 shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                                            style={{ height: `${Math.min((buyCount / 10) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                    {/* PnL Indicator Line + Scale */}
+                                    <div className="relative w-1 sm:w-2.5 h-full flex flex-row-reverse items-center overflow-visible">
+                                        <div className="w-[1.5px] h-full bg-white/5 rounded-full relative">
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 sm:w-2.5 h-[1px] bg-white/30 z-10" />
+                                            {/* Scale Ticks Desktop */}
+                                            <div className="hidden sm:block absolute top-[25%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
+                                            <div className="hidden sm:block absolute top-[75%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
+                                            
+                                            <div 
+                                                className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${buyPnl >= 0 ? 'bg-cyan-400 bottom-1/2 rounded-t-full' : 'bg-red-500 top-1/2 rounded-b-full'}`}
+                                                style={{ height: `${Math.min(50, Math.abs((buyPnl / (balance * 0.02)) * 50))}%` }}
+                                            />
+                                        </div>
+                                        {/* Numeric Label Desktop */}
+                                        <div className="hidden sm:block absolute right-3 whitespace-nowrap text-[7px] font-mono font-bold text-cyan-400/80">
+                                            {buyPnl >= 0 ? '+' : ''}{buyPnl.toFixed(2)}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <span className="text-[7px] sm:text-[8px] font-bold text-cyan-400">B</span>
                         </div>
 
                         {/* SELL GROUP (S) */}
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-end gap-1.5 h-12 sm:h-16">
-                                {/* Order Count Bar */}
-                                <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-orange-500/20 overflow-hidden shadow-inner">
-                                    <div 
-                                        className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000 shadow-[0_0_8px_rgba(249,115,22,0.5)]"
-                                        style={{ height: `${Math.min((sellCount / 10) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                {/* PnL Indicator Line */}
-                                <div className="relative w-[1.5px] h-full bg-white/5 rounded-full overflow-visible">
-                                    {/* Zero Center Mark */}
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-[1px] bg-white/40 z-10" />
-                                    {/* Dynamic PnL Segment */}
-                                    <div 
-                                        className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${sellPnl >= 0 ? 'bg-orange-400 bottom-1/2 rounded-t-full shadow-[0_0_5px_rgba(251,146,60,0.6)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_5px_rgba(239,68,68,0.6)]'}`}
-                                        style={{ 
-                                            height: `${Math.min(50, Math.abs((sellPnl / (balance * 0.02)) * 50))}%` 
-                                        }}
-                                    />
+                        <div className="flex gap-0.5 sm:gap-2 items-center">
+                            <div className="flex flex-col items-center">
+                                <div className="flex items-end gap-0.5 sm:gap-1 h-10 sm:h-14">
+                                    {/* Order Count Bar */}
+                                    <div className="relative w-1 sm:w-1.5 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden">
+                                        <div 
+                                            className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000 shadow-[0_0_8px_rgba(249,115,22,0.5)]"
+                                            style={{ height: `${Math.min((sellCount / 10) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                    {/* PnL Indicator Line + Scale */}
+                                    <div className="relative w-1 sm:w-2.5 h-full flex items-center overflow-visible">
+                                        <div className="w-[1.5px] h-full bg-white/5 rounded-full relative">
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 sm:w-2.5 h-[1px] bg-white/30 z-10" />
+                                            {/* Scale Ticks Desktop */}
+                                            <div className="hidden sm:block absolute top-[25%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
+                                            <div className="hidden sm:block absolute top-[75%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
+                                            
+                                            <div 
+                                                className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${sellPnl >= 0 ? 'bg-orange-400 bottom-1/2 rounded-t-full' : 'bg-red-500 top-1/2 rounded-b-full'}`}
+                                                style={{ height: `${Math.min(50, Math.abs((sellPnl / (balance * 0.02)) * 50))}%` }}
+                                            />
+                                        </div>
+                                        {/* Numeric Label Desktop */}
+                                        <div className="hidden sm:block absolute left-3 whitespace-nowrap text-[7px] font-mono font-bold text-orange-400/80">
+                                            {sellPnl >= 0 ? '+' : ''}{sellPnl.toFixed(2)}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <span className="text-[7px] sm:text-[8px] font-bold text-orange-400">S</span>
+                            {/* Desktop Count Label */}
+                            <div className="hidden sm:flex flex-col items-start gap-0.5 text-[8px] font-mono text-orange-400/70">
+                                <span>S</span>
+                                <span className="font-black">{sellCount}</span>
+                            </div>
                         </div>
                     </div>
 
@@ -157,19 +182,19 @@ export default function FarmHud({
                     <div className="flex-1 flex flex-col justify-center min-w-0">
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
-                                <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                    EasyGold Farming | {portNumber} | <span className="text-white/60">{assetType}</span> <span className="text-amber-500/80">| {accountType?.toUpperCase().trim() === 'USC' ? 'USC' : 'USD'}</span>
+                                <h1 className="text-[11px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
+                                    <span className="hidden sm:inline">{assetType} | </span>{portNumber}
                                 </h1>
                                 <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
-                                    {currencyPrefix}{equity.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    {currencyPrefix}{equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                             </div>
                             <div className="text-right flex flex-col items-end">
                                 <div className="flex gap-1 sm:gap-2 items-center mb-0.5">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase">BALANCE</span>
                                     <span className="font-mono text-[10px] sm:text-sm font-bold text-[#cfa545] tracking-wider">
-                                        {currencyPrefix}{balance.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                        {currencyPrefix}{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                 </div>
                                 <div className={`text-[8px] sm:text-[10px] font-mono font-black tracking-tighter ${floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
@@ -229,17 +254,20 @@ export default function FarmHud({
                 </div>
 
                 {/* Right: Today Harvest Icon & Result */}
-                <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3 bg-black/30 border border-amber-900/30 rounded-lg p-1 sm:p-2 sm:pl-3 ml-1 sm:ml-2">
-                    <div className={`relative w-12 h-12 lg:w-16 lg:h-16 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
+                <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24">
+                    <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
                         <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                     </div>
-                    <div className="flex flex-col pr-1">
-                        <span className="text-[8px] lg:text-[10px] text-amber-200/40 uppercase font-black tracking-widest leading-none mb-1">Today Result</span>
-                        <span className={`text-xs lg:text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm`}>
+                    <div className="flex flex-col pr-1 justify-center">
+                        <span className="hidden sm:block text-[8px] lg:text-[10px] text-amber-200/40 uppercase font-black tracking-widest leading-none mb-1">Today Result</span>
+                        <span className={`text-[11px] sm:text-sm lg:text-xl font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm leading-none`}>
                             {todayProfit >= 0 ? '+' : ''}{currencyPrefix}{todayProfit.toFixed(2)}
                         </span>
-                        <div className="text-[8px] text-white/20 font-mono mt-0.5 uppercase tracking-tighter">
-                            LOTS: {totalStandardLots.toFixed(2)} | {accountType}
+                        {/* More visible USC Label */}
+                        <div className="flex items-center gap-1 mt-0.5">
+                           <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
+                           <span className="hidden sm:inline text-[7px] text-white/20">|</span>
+                           <span className="hidden sm:inline text-[7px] text-white/20 uppercase">LOTS: {totalStandardLots.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
