@@ -388,7 +388,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
     return (
         <div className="flex flex-col h-screen w-full overflow-hidden font-sans relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df] select-none">
 
-            <div className="relative z-[70]">
+            {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
+            <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
                     portNumber={portNumber}
                     balance={Number(portStatus?.balance) || 0}
@@ -405,32 +406,26 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     isShaking={isShaking}
                     onClick={handleSecretToggle}
                 />
-            </div>
-
-            {/* NEW: 1-Day Trading Timeline Bar */}
-            <div className="relative z-[65] w-full bg-black/40 border-b border-amber-900/20 py-1 sm:py-2">
-                <div className="max-w-7xl mx-auto px-4 relative">
-                    {/* Base bar */}
-                    <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
-                        {/* Progress bar (decreasing remaining time visualization) */}
-                        <div 
-                            className="absolute top-0 right-0 h-full bg-gradient-to-l from-amber-600/80 to-amber-400/30 transition-all duration-1000"
-                            style={{ width: `${100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100}%` }}
-                        />
-                    </div>
-                    {/* Hour Markers (24 hours) */}
-                    <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
-                        {Array.from({ length: 25 }).map((_, i) => (
+                
+                {/* 1-Day Trading Timeline Bar */}
+                <div className="relative w-full bg-black/40 border-y border-amber-900/20 py-1 sm:py-2">
+                    <div className="max-w-7xl mx-auto px-4 relative">
+                        <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
                             <div 
-                                key={`h_${i}`} 
-                                className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} 
+                                className="absolute top-0 right-0 h-full bg-gradient-to-l from-amber-600/80 to-amber-400/30 transition-all duration-1000"
+                                style={{ width: `${100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100}%` }}
                             />
-                        ))}
+                        </div>
+                        <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
+                            {Array.from({ length: 25 }).map((_, i) => (
+                                <div key={`h_${i}`} className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} />
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center">
+            <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center mt-36 sm:mt-44">
                 <div
                     className="relative transition-all duration-500 ease-out origin-center"
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}

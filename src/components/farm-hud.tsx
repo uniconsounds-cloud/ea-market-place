@@ -70,25 +70,25 @@ export default function FarmHud({
     return (
         <div 
             onClick={() => { console.log("HUD Clicked"); if(onClick) onClick(); }}
-            className="fixed top-0 left-0 w-full bg-[#16120e] text-[#e8dcb9] z-[100] border-b-2 border-amber-900/80 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
+            className="fixed top-0 left-0 w-full h-28 sm:h-32 bg-[#16120e] text-[#e8dcb9] z-[100] border-b border-amber-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
         >
             {/* Background Texture/Gradient */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-[#2a1d0f]/50 to-black/60 pointer-events-none" />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
-            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6">
+            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6 py-2 sm:py-4">
 
                 {/* Left: Luxury Analog Clock Motif */}
-                <div className="flex flex-shrink-0 w-16 h-16 sm:w-24 sm:h-24 relative flex-col items-center justify-center">
-                    <div className="absolute inset-0 rounded-full border-2 sm:border-4 border-[#cfa545] shadow-[0_0_15px_rgba(207,165,69,0.3)] bg-[#110e0b]"></div>
-                    <div className="absolute inset-0.5 sm:inset-1 rounded-full border border-amber-800 bg-gradient-to-b from-[#1c1814] to-[#0a0806]">
+                <div className="flex flex-shrink-0 w-16 h-16 sm:w-24 sm:h-24 relative flex-col items-center justify-center my-auto mx-1 sm:mx-2">
+                    <div className="absolute inset-0 rounded-full border border-[#cfa545]/60 shadow-[0_0_15px_rgba(207,165,69,0.3)] bg-[#110e0b]"></div>
+                    <div className="absolute inset-1 sm:inset-2 rounded-full border border-amber-800/50 bg-gradient-to-b from-[#1c1814] to-[#0a0806]">
                         <span className="absolute top-0.5 sm:top-1 left-1/2 -translate-x-1/2 text-[6px] sm:text-[8px] text-[#cfa545]">12</span>
                         <span className="absolute bottom-0.5 sm:bottom-1 left-1/2 -translate-x-1/2 text-[6px] sm:text-[8px] text-[#cfa545]">6</span>
                         {isClient && (
                             <>
-                                <div className="absolute top-1/2 left-1/2 w-[1px] h-[30%] bg-amber-200 origin-bottom rounded-full" style={{ transform: `translate(-50%, -100%) rotate(${hourDeg}deg)` }} />
+                                <div className="absolute top-1/2 left-1/2 w-[1px] h-[30%] bg-amber-200/80 origin-bottom rounded-full" style={{ transform: `translate(-50%, -100%) rotate(${hourDeg}deg)` }} />
                                 <div className="absolute top-1/2 left-1/2 w-[1px] h-[40%] bg-amber-400 origin-bottom rounded-full" style={{ transform: `translate(-50%, -100%) rotate(${minuteDeg}deg)` }} />
-                                <div className="absolute top-1/2 left-1/2 w-[0.5px] h-[45%] bg-red-800 origin-bottom" style={{ transform: `translate(-50%, -100%) rotate(${secondDeg}deg)` }} />
+                                <div className="absolute top-1/2 left-1/2 w-[0.5px] h-[45%] bg-red-800/80 origin-bottom" style={{ transform: `translate(-50%, -100%) rotate(${secondDeg}deg)` }} />
                                 <div className="absolute top-1/2 left-1/2 w-1 sm:w-1.5 h-1 sm:h-1.5 bg-[#cfa545] rounded-full -translate-x-1/2 -translate-y-1/2" />
                             </>
                         )}
@@ -98,82 +98,73 @@ export default function FarmHud({
                 {/* DIAGNOSTICS CENTER: Buy/Sell Bars + Balance/Equity */}
                 <div className="flex-1 flex items-center gap-3 sm:gap-8 min-w-0">
                     
-                    {/* Buy/Sell Thermometers (4-bar on mobile, detailed on desktop) */}
-                    <div className="flex gap-1 sm:gap-4 flex-shrink-0 items-end">
-                        {/* BUY GROUP (B) */}
-                        <div className="flex gap-0.5 sm:gap-2 items-center">
-                            {/* Desktop Count Label */}
-                            <div className="hidden sm:flex flex-col items-end gap-0.5 text-[8px] font-mono text-cyan-400/70">
+                    {/* Buy/Sell Thermometers (4-bar Row on mobile, Detailed on desktop) */}
+                    <div className="flex gap-1.5 sm:gap-5 flex-shrink-0 items-center">
+                        {/* BUY GROUP */}
+                        <div className="flex flex-col items-center gap-1">
+                            {/* Counter at TOP */}
+                            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-mono font-black text-cyan-400">
                                 <span>B</span>
-                                <span className="font-black">{buyCount}</span>
+                                <span className="opacity-80">{buyCount}</span>
                             </div>
-                            
-                            <div className="flex flex-col items-center">
-                                <div className="flex items-end gap-0.5 sm:gap-1 h-10 sm:h-14">
-                                    {/* Order Count Bar */}
-                                    <div className="relative w-1 sm:w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden">
+
+                            <div className="flex items-end gap-1 sm:gap-1.5 h-12 sm:h-16">
+                                {/* Order Count Bar - Scaling relative to max of B/S */}
+                                <div className="relative w-1.5 sm:w-2 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden shadow-inner">
+                                    <div 
+                                        className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000 shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                                        style={{ height: `${Math.max(5, (buyCount / Math.max(1, buyCount, sellCount)) * 100)}%` }}
+                                    />
+                                </div>
+                                {/* PnL Indicator Line + Scale */}
+                                <div className="relative w-2 sm:w-3.5 h-full flex flex-col items-center overflow-visible">
+                                    <div className="w-[3px] sm:w-[5px] h-full bg-white/10 rounded-full relative">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 sm:w-6 h-[1.5px] bg-white/50 z-10" />
+                                        
                                         <div 
-                                            className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000 shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-                                            style={{ height: `${Math.min((buyCount / 10) * 100, 100)}%` }}
+                                            className={`absolute left-0 right-0 transition-all duration-1000 ${buyPnl >= 0 ? 'bg-cyan-400 bottom-1/2 rounded-t-full shadow-[0_0_12px_rgba(34,211,238,0.8)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_12px_rgba(239,68,68,0.8)]'}`}
+                                            style={{ height: `${Math.min(50, Math.abs((buyPnl / (Math.max(1, balance) * 0.01)) * 50))}%` }}
                                         />
                                     </div>
-                                    {/* PnL Indicator Line + Scale */}
-                                    <div className="relative w-1 sm:w-2.5 h-full flex flex-row-reverse items-center overflow-visible">
-                                        <div className="w-[1.5px] h-full bg-white/5 rounded-full relative">
-                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 sm:w-2.5 h-[1px] bg-white/30 z-10" />
-                                            {/* Scale Ticks Desktop */}
-                                            <div className="hidden sm:block absolute top-[25%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
-                                            <div className="hidden sm:block absolute top-[75%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
-                                            
-                                            <div 
-                                                className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${buyPnl >= 0 ? 'bg-cyan-400 bottom-1/2 rounded-t-full' : 'bg-red-500 top-1/2 rounded-b-full'}`}
-                                                style={{ height: `${Math.min(50, Math.abs((buyPnl / (balance * 0.02)) * 50))}%` }}
-                                            />
-                                        </div>
-                                        {/* Numeric Label Desktop */}
-                                        <div className="hidden sm:block absolute right-3 whitespace-nowrap text-[7px] font-mono font-bold text-cyan-400/80">
-                                            {buyPnl >= 0 ? '+' : ''}{buyPnl.toFixed(2)}
-                                        </div>
-                                    </div>
                                 </div>
+                            </div>
+                            {/* PnL Label at BOTTOM */}
+                            <div className={`text-[7px] sm:text-[8px] font-mono font-bold ${buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}`}>
+                                {buyPnl >= 0 ? '+' : ''}{buyPnl.toFixed(2)}
                             </div>
                         </div>
 
-                        {/* SELL GROUP (S) */}
-                        <div className="flex gap-0.5 sm:gap-2 items-center">
-                            <div className="flex flex-col items-center">
-                                <div className="flex items-end gap-0.5 sm:gap-1 h-10 sm:h-14">
-                                    {/* Order Count Bar */}
-                                    <div className="relative w-1 sm:w-1.5 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden">
+                        {/* SELL GROUP */}
+                        <div className="flex flex-col items-center gap-1">
+                            {/* Counter at TOP */}
+                            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-mono font-black text-orange-400">
+                                <span>S</span>
+                                <span className="opacity-80">{sellCount}</span>
+                            </div>
+
+                            <div className="flex items-end gap-1 sm:gap-1.5 h-12 sm:h-16">
+                                {/* Order Count Bar - Scaling relative to max of B/S */}
+                                <div className="relative w-1.5 sm:w-2 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden shadow-inner">
+                                    <div 
+                                        className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000 shadow-[0_0_8px_rgba(249,115,22,0.5)]"
+                                        style={{ height: `${Math.max(5, (sellCount / Math.max(1, buyCount, sellCount)) * 100)}%` }}
+                                    />
+                                </div>
+                                {/* PnL Indicator Line + Scale */}
+                                <div className="relative w-2 sm:w-3.5 h-full flex flex-col items-center overflow-visible">
+                                    <div className="w-[3px] sm:w-[5px] h-full bg-white/10 rounded-full relative">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 sm:w-6 h-[1.5px] bg-white/50 z-10" />
+                                        
                                         <div 
-                                            className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000 shadow-[0_0_8px_rgba(249,115,22,0.5)]"
-                                            style={{ height: `${Math.min((sellCount / 10) * 100, 100)}%` }}
+                                            className={`absolute left-0 right-0 transition-all duration-1000 ${sellPnl >= 0 ? 'bg-orange-400 bottom-1/2 rounded-t-full shadow-[0_0_12px_rgba(251,146,60,0.8)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_12px_rgba(239,68,68,0.8)]'}`}
+                                            style={{ height: `${Math.min(50, Math.abs((sellPnl / (Math.max(1, balance) * 0.01)) * 50))}%` }}
                                         />
-                                    </div>
-                                    {/* PnL Indicator Line + Scale */}
-                                    <div className="relative w-1 sm:w-2.5 h-full flex items-center overflow-visible">
-                                        <div className="w-[1.5px] h-full bg-white/5 rounded-full relative">
-                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 sm:w-2.5 h-[1px] bg-white/30 z-10" />
-                                            {/* Scale Ticks Desktop */}
-                                            <div className="hidden sm:block absolute top-[25%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
-                                            <div className="hidden sm:block absolute top-[75%] left-1/2 -translate-x-1/2 w-1.5 h-[1px] bg-white/10" />
-                                            
-                                            <div 
-                                                className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${sellPnl >= 0 ? 'bg-orange-400 bottom-1/2 rounded-t-full' : 'bg-red-500 top-1/2 rounded-b-full'}`}
-                                                style={{ height: `${Math.min(50, Math.abs((sellPnl / (balance * 0.02)) * 50))}%` }}
-                                            />
-                                        </div>
-                                        {/* Numeric Label Desktop */}
-                                        <div className="hidden sm:block absolute left-3 whitespace-nowrap text-[7px] font-mono font-bold text-orange-400/80">
-                                            {sellPnl >= 0 ? '+' : ''}{sellPnl.toFixed(2)}
-                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            {/* Desktop Count Label */}
-                            <div className="hidden sm:flex flex-col items-start gap-0.5 text-[8px] font-mono text-orange-400/70">
-                                <span>S</span>
-                                <span className="font-black">{sellCount}</span>
+                            {/* PnL Label at BOTTOM */}
+                            <div className={`text-[7px] sm:text-[8px] font-mono font-bold ${sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}>
+                                {sellPnl >= 0 ? '+' : ''}{sellPnl.toFixed(2)}
                             </div>
                         </div>
                     </div>
