@@ -63,8 +63,9 @@ export default function FarmHud({
     else if (displayPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
     else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
 
-    const isUSC = accountType === 'USC' || accountType === 'CENT';
+    const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
+    const unitSuffix = isUSC ? ' USC' : ' USD';
 
     return (
         <div 
@@ -157,7 +158,7 @@ export default function FarmHud({
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
                                 <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                    EasyGold Farming | {portNumber} | <span className="text-white/60">{assetType}</span> {isUSC && <span className="bg-amber-600/30 text-amber-500 px-1 rounded text-[8px] ml-1">[CENT]</span>}
+                                    EasyGold Farming | {portNumber} | <span className="text-white/60">{assetType}</span> <span className="text-amber-500/80">| {accountType?.toUpperCase().trim() === 'USC' ? 'USC' : 'USD'}</span>
                                 </h1>
                                 <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>

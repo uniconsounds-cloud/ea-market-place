@@ -149,6 +149,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    payload += "\"snapshot\":" + snapshot_json + ",";
    payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
    payload += "\"today_profit\":" + DoubleToString(EAE_CalculateTodayProfit(), 2) + ",";
+   payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
    payload += "},";
    payload += "\"p_api_key\":\"" + g_eae_api_key + "\"";
