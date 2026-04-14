@@ -227,7 +227,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             balance: Number(portStatus?.balance) || 51540.20,
             equity: Number(portStatus?.equity) || (51540.20 + floatingPnl),
             maxDrawdown: Math.max(0, Math.floor(((Number(portStatus?.balance || 51540.20) - Number(portStatus?.equity || 51540.20)) / Number(portStatus?.balance || 51540.20)) * 100)),
-            todayProfit: Number(portStatus?.today_pnl || 0)
+            todayProfit: Number(portStatus?.today_pnl || 0),
+            serverTime: new Date()
         };
     }, [displayOrders, portStatus, orders]);
 
