@@ -9,6 +9,7 @@ type FarmHudProps = {
     balance: number;
     equity: number;
     floatingPnl: number;
+    todayProfit: number; // Added for Today Result
     totalStandardLots: number;
     accountType: string;
     buyCount: number;
@@ -24,6 +25,7 @@ export default function FarmHud({
     balance,
     equity,
     floatingPnl,
+    todayProfit,
     totalStandardLots,
     accountType,
     buyCount,
@@ -53,10 +55,11 @@ export default function FarmHud({
     const hourDeg = hours * 30 + minutes * 0.5;
 
     let todayHarvestAsset = '/farm/base_farmbox_empty.png';
-    if (floatingPnl < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
-    else if (floatingPnl > 50) todayHarvestAsset = '/farm/base_farmbox_full.png';
-    else if (floatingPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
-    else if (floatingPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+    const displayPnl = todayProfit; // Today Result uses Today's Closed Profit
+    if (displayPnl < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
+    else if (displayPnl > 50) todayHarvestAsset = '/farm/base_farmbox_full.png';
+    else if (displayPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
+    else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
 
     return (
         <div 
@@ -162,7 +165,7 @@ export default function FarmHud({
                                     </span>
                                 </div>
                                 <div className={`text-[8px] sm:text-[10px] font-mono font-black tracking-tighter ${floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                    {floatingPnl >= 0 ? '+' : ''}{((floatingPnl / balance) * 100).toFixed(2)}%
+                                    {floatingPnl >= 0 ? '+' : ''}${floatingPnl.toFixed(2)} (${((floatingPnl / balance) * 100).toFixed(2)}%)
                                 </div>
                             </div>
                         </div>
@@ -224,8 +227,8 @@ export default function FarmHud({
                     </div>
                     <div className="flex flex-col pr-1">
                         <span className="text-[8px] lg:text-[10px] text-amber-200/40 uppercase font-black tracking-widest leading-none mb-1">Today Result</span>
-                        <span className={`text-xs lg:text-base font-mono font-black ${floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm`}>
-                            {floatingPnl >= 0 ? '+' : ''}${floatingPnl.toFixed(2)}
+                        <span className={`text-xs lg:text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm`}>
+                            {todayProfit >= 0 ? '+' : ''}${todayProfit.toFixed(2)}
                         </span>
                         <div className="text-[8px] text-white/20 font-mono mt-0.5 uppercase tracking-tighter">
                             LOTS: {totalStandardLots.toFixed(2)} | {accountType}

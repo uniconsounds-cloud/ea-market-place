@@ -74,6 +74,36 @@ string EAE_BuildOrdersJson()
 }
 
 //+------------------------------------------------------------------+
+//| Calculate total closed profit for the current day                |
+//+------------------------------------------------------------------+
+double EAE_CalculateTodayProfit()
+{
+   double profit = 0;
+   datetime todayStart = (TimeCurrent() / 86400) * 86400; // Start of day 00:00
+   
+   if(HistorySelect(todayStart, TimeCurrent()))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket > 0)
+         {
+            // Only count if it's a profit/loss relevant deal
+            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+            {
+               profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+               profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+               profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+            }
+         }
+      }
+   }
+   return profit;
+}
+
+//+------------------------------------------------------------------+
 //| Send a full modular snapshot to the web server                   |
 //+------------------------------------------------------------------+
 bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
@@ -118,9 +148,10 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    payload += "\"p_payload\": {";
    payload += "\"snapshot\":" + snapshot_json + ",";
    payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
+   payload += "\"today_profit\":" + DoubleToString(EAE_CalculateTodayProfit(), 2) + ",";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
    payload += "},";
-   payload += "\"p_api_key\":\"" + g_eae_api_key + "\""; // Forward original key if needed
+   payload += "\"p_api_key\":\"" + g_eae_api_key + "\"";
    payload += "}";
 
    // 3. Dispatch WebRequest (Async-style with short timeout)
@@ -139,6 +170,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    
    if(res == -1) {
       Print("EAE Sync Error (WebRequest failed): ", GetLastError());
+      return false;
+   }
+   
+   if(res != 200) {
+      string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+      Print("EAE Sync Server Error (", res, "): ", err_resp);
       return false;
    }
    

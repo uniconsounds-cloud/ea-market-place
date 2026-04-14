@@ -188,7 +188,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 sellPnl: Number(portStatus.sell_pnl),
                 balance: Number(portStatus.balance),
                 equity: Number(portStatus.equity),
-                maxDrawdown: Number(portStatus.max_drawdown || 0)
+                maxDrawdown: Number(portStatus.max_drawdown || 0),
+                todayProfit: Number(portStatus.today_pnl || 0)
             };
         }
         
@@ -211,7 +212,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             sellPnl,
             balance: Number(portStatus?.balance) || 51540.20,
             equity: Number(portStatus?.equity) || (51540.20 + floatingPnl),
-            maxDrawdown: Math.max(0, Math.floor(((Number(portStatus?.balance || 51540.20) - Number(portStatus?.equity || 51540.20)) / Number(portStatus?.balance || 51540.20)) * 100))
+            maxDrawdown: Math.max(0, Math.floor(((Number(portStatus?.balance || 51540.20) - Number(portStatus?.equity || 51540.20)) / Number(portStatus?.balance || 51540.20)) * 100)),
+            todayProfit: Number(portStatus?.today_pnl || 0)
         };
     }, [displayOrders, portStatus, orders]);
 
@@ -351,7 +353,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                         buyCount: stats.buyCount,
                         sellCount: stats.sellCount,
                         buyPnl: stats.buyPnl,
-                        sellPnl: stats.sellPnl
+                        sellPnl: stats.sellPnl,
+                        todayProfit: stats.todayProfit
                     }}
                     accountType={portStatus?.account_type || 'USC'}
                     assetType={assetType}
@@ -382,6 +385,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     sellCount={stats.sellCount}
                     buyPnl={stats.buyPnl}
                     sellPnl={stats.sellPnl}
+                    todayProfit={stats.todayProfit}
                     isShaking={isShaking}
                     onClick={handleSecretToggle}
                 />

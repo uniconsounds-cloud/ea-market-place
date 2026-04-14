@@ -26,6 +26,7 @@ interface SpaceshipDashboardProps {
     sellCount: number;
     buyPnl: number;
     sellPnl: number;
+    todayProfit: number;
   };
   accountType: string;
   assetType: string;
@@ -122,8 +123,8 @@ export default function SpaceshipDashboard({
               {stats.floatingPnl >= 0 ? '+' : ''}{formatValue(stats.floatingPnl)} <span className="text-xs opacity-50">{unit}</span>
             </div>
             <div className="mt-4 text-[10px] text-slate-500 flex justify-between uppercase">
-                <span>Volatility Buffer</span>
-                <span className="text-slate-300">Active</span>
+                <span>Today Closed Profit</span>
+                <span className={stats.todayProfit >= 0 ? 'text-green-400' : 'text-red-400'}>{stats.todayProfit >= 0 ? '+' : ''}{formatValue(stats.todayProfit)}</span>
             </div>
           </div>
 
