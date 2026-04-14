@@ -16,6 +16,7 @@ type FarmHudProps = {
     buyPnl: number;
     sellPnl: number;
     isShaking?: boolean;
+    onClick?: () => void;
 };
 
 export default function FarmHud({
@@ -30,6 +31,7 @@ export default function FarmHud({
     buyPnl,
     sellPnl,
     isShaking = false,
+    onClick,
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
@@ -57,7 +59,10 @@ export default function FarmHud({
     else if (floatingPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
 
     return (
-        <div className="fixed top-0 left-0 w-full bg-[#16120e] text-[#e8dcb9] z-[100] border-b-2 border-amber-900/80 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden">
+        <div 
+            onClick={() => { console.log("HUD Clicked"); if(onClick) onClick(); }}
+            className="fixed top-0 left-0 w-full bg-[#16120e] text-[#e8dcb9] z-[100] border-b-2 border-amber-900/80 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
+        >
             {/* Background Texture/Gradient */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-[#2a1d0f]/50 to-black/60 pointer-events-none" />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />

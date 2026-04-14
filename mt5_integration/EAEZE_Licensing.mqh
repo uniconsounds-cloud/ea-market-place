@@ -1,9 +1,9 @@
 //+------------------------------------------------------------------+
-//|                                              EAEZE_Licensing.mqh |
-//|                                    Copyright 2026, EAEZE Systems |
-//|                                             https://eaeze.com    |
-//|                                             update : 25 March 2026 |
-//+------------------------------------------------------------------+
+#ifndef __EAEZE_LICENSING_MQH__
+#define __EAEZE_LICENSING_MQH__
+
+// --- GLOBAL LICENSE STATE ---
+bool G_IsLicenseVerified = false; // Moved to top for visibility
 /*
 ============== Doing 5 Steps to Make EA Product Complete ==============
    [1] on this code : Change Product ID
@@ -41,10 +41,9 @@
 // --- 1. SETTINGS & INPUTS ---
 string InpLicenseUrl = "https://eaeze.com/api/verify-license";
 string InpProductID  = "EZM-5P-V1";    // < ==== Product ID ==== [1]
-string InpApiKey     = "KHUCHAI_SUPHAKORN";
+input string InpApiKey     = "KHUCHAI_SUP_LEGACY"; // Partner Key
 
 // --- 2. INTERNAL STATE ---
-bool G_IsLicenseVerified = false; // Global Flag to check in main EA code
 datetime last_license_check = 0;
 const int license_check_interval = 900; // 15 minutes (900 seconds)
 
@@ -184,3 +183,5 @@ void OnDeinit(const int reason) {
 }
 
 =============================================*/
+
+#endif // __EAEZE_LICENSING_MQH__

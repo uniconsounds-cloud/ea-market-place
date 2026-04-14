@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import FarmHud from '@/components/farm-hud';
 import Image from 'next/image';
+import SpaceshipDashboard from '@/components/spaceship-dashboard';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -40,6 +41,9 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
     const [recentlyClosed, setRecentlyClosed] = useState<any[]>([]);
     const [isShaking, setIsShaking] = useState(false);
     const [hiddenTickets, setHiddenTickets] = useState<number[]>([]);
+    const [viewMode, setViewMode] = useState<'farm' | 'spaceship'>('farm');
+    const [clickCount, setClickCount] = useState(0);
+    const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const ordersRef = useRef<any[]>(initialOrders);
 
     // Sync ref with state for use in subscription cleanup
@@ -72,6 +76,11 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
 
         window.addEventListener('resize', handleResize);
         handleResize(); // Initial call
+
+        // Re-calculate on viewMode change as well
+        if (viewMode === 'farm') {
+            setTimeout(handleResize, 50); 
+        }
 
         return () => {
             clearInterval(timer);
@@ -176,7 +185,10 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 buyCount: Number(portStatus.buy_count),
                 sellCount: Number(portStatus.sell_count),
                 buyPnl: Number(portStatus.buy_pnl),
-                sellPnl: Number(portStatus.sell_pnl)
+                sellPnl: Number(portStatus.sell_pnl),
+                balance: Number(portStatus.balance),
+                equity: Number(portStatus.equity),
+                maxDrawdown: Number(portStatus.max_drawdown || 0)
             };
         }
         
@@ -196,7 +208,10 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             buyCount: buyOrders.length,
             sellCount: sellOrders.length,
             buyPnl,
-            sellPnl
+            sellPnl,
+            balance: Number(portStatus?.balance) || 51540.20,
+            equity: Number(portStatus?.equity) || (51540.20 + floatingPnl),
+            maxDrawdown: Math.max(0, Math.floor(((Number(portStatus?.balance || 51540.20) - Number(portStatus?.equity || 51540.20)) / Number(portStatus?.balance || 51540.20)) * 100))
         };
     }, [displayOrders, portStatus, orders]);
 
@@ -297,22 +312,80 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         }
     }, [isClient, dailyHistory]);
 
-    return (
-        <div className="flex flex-col h-screen w-full overflow-hidden font-sans relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df]">
+    const handleSecretToggle = () => {
+        if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+        
+        setClickCount(prev => {
+            const nextCount = prev + 1;
+            console.log(`[EAEZE] Secret Click Count: ${nextCount}/5`);
+            
+            if (nextCount >= 5) {
+                console.log("[EAEZE] Toggle View Mode from:", viewMode);
+                const nextMode = viewMode === 'farm' ? 'spaceship' : 'farm';
+                setViewMode(nextMode);
+                window.scrollTo(0,0);
+                // Trigger a resize calculation to fix layout after unmounting spaceship
+                setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+                return 0;
+            }
+            return nextCount;
+        });
 
-            <FarmHud
-                portNumber={portNumber}
-                balance={Number(portStatus?.balance) || 0}
-                equity={Number(portStatus?.equity) || 0}
-                floatingPnl={stats.floatingPnl}
-                totalStandardLots={stats.totalLots}
-                accountType={portStatus?.account_type || 'USC'}
-                buyCount={stats.buyCount}
-                sellCount={stats.sellCount}
-                buyPnl={stats.buyPnl}
-                sellPnl={stats.sellPnl}
-                isShaking={isShaking}
-            />
+        clickTimeoutRef.current = setTimeout(() => {
+            setClickCount(0);
+            clickTimeoutRef.current = null;
+        }, 2000);
+    };
+
+    if (viewMode === 'spaceship') {
+        return (
+            <div className="relative">
+                <SpaceshipDashboard 
+                    portNumber={portNumber}
+                    stats={{
+                        balance: stats.balance,
+                        equity: stats.equity,
+                        floatingPnl: stats.floatingPnl,
+                        maxDrawdown: stats.maxDrawdown,
+                        totalLots: stats.totalLots,
+                        buyCount: stats.buyCount,
+                        sellCount: stats.sellCount,
+                        buyPnl: stats.buyPnl,
+                        sellPnl: stats.sellPnl
+                    }}
+                    accountType={portStatus?.account_type || 'USC'}
+                    assetType={assetType}
+                    systemCode={portStatus?.system_code}
+                    eaVersion={portStatus?.ea_version}
+                />
+                {/* Visual indicator for secret toggle back */}
+                <div 
+                    className="fixed top-0 left-0 w-20 h-20 z-[100] cursor-pointer opacity-0 hover:opacity-10"
+                    onClick={handleSecretToggle}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col h-screen w-full overflow-hidden font-sans relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df] select-none">
+
+            <div className="relative z-[70]">
+                <FarmHud
+                    portNumber={portNumber}
+                    balance={Number(portStatus?.balance) || 0}
+                    equity={Number(portStatus?.equity) || 0}
+                    floatingPnl={stats.floatingPnl}
+                    totalStandardLots={stats.totalLots}
+                    accountType={portStatus?.account_type || 'USC'}
+                    buyCount={stats.buyCount}
+                    sellCount={stats.sellCount}
+                    buyPnl={stats.buyPnl}
+                    sellPnl={stats.sellPnl}
+                    isShaking={isShaking}
+                    onClick={handleSecretToggle}
+                />
+            </div>
 
             <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center">
                 <div
@@ -392,6 +465,15 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 <div className="fixed bottom-0 left-0 w-full h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col pt-2">
                     <div className="flex justify-between px-6 mb-1">
                         <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">DAILY HARVEST HISTORY (30D)</span>
+                        <button 
+                            onClick={() => {
+                                const key = prompt("Enter API Key to download history:");
+                                if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
+                            }}
+                            className="text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
+                        >
+                            Export 90D History (.CSV)
+                        </button>
                     </div>
                     <div
                         ref={historyScrollRef}

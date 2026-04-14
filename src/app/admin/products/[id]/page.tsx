@@ -308,15 +308,15 @@ export default function ProductFormPage() {
             }
 
             const payload = {
-                name: formData.name,
-                product_key: formData.product_key || null,
-                description: formData.description,
+                name: formData.name.trim(),
+                product_key: formData.product_key?.trim() || null,
+                description: formData.description.trim(),
                 price_monthly: parseFloat(formData.price_monthly as unknown as string),
                 price_quarterly: formData.price_quarterly ? parseFloat(formData.price_quarterly as unknown as string) : null,
                 price_lifetime: parseFloat(formData.price_lifetime as unknown as string),
-                image_url: formData.image_url,
-                file_url: formData.file_url,
-                version: formData.version,
+                image_url: formData.image_url.trim(),
+                file_url: formData.file_url.trim(),
+                version: formData.version.trim(),
                 is_active: formData.is_active,
                 platform: formData.platform,
                 strategy: formData.strategy,
@@ -325,9 +325,9 @@ export default function ProductFormPage() {
                 allow_ib: formData.allow_ib,
                 is_multi_port: formData.is_multi_port,
                 port_count: formData.is_multi_port ? Math.min(Math.max(parseInt(formData.port_count as unknown as string) || 1, 1), 10) : 1,
-                currency: formData.currency || 'USD',
+                currency: formData.currency?.trim() || 'USD',
                 asset_class: formData.asset_class,
-                additional_images: formData.additional_images
+                additional_images: formData.additional_images.map(img => img.trim())
             };
 
             let error;

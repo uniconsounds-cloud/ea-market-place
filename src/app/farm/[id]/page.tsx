@@ -22,7 +22,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .single();
 
     return (
-        <div className="min-h-screen bg-[#1a120b] text-amber-50 selection:bg-amber-500/30">
+        <div className="min-h-screen bg-[#1a120b] text-amber-50">
             <FarmClient
                 portNumber={portNumber}
                 initialOrders={initialOrders || []}
