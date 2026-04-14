@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,28 @@ export default function DashboardPage() {
     const [pendingIbRequests, setPendingIbRequests] = useState<any[]>([]);
     const [rejectedIbRequests, setRejectedIbRequests] = useState<any[]>([]);
     const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
+
+    const handleDeleteItem = async (id: string, source: 'license' | 'order') => {
+        const confirmMsg = source === 'license' 
+            ? "ยืนยันการลบรายการพอร์ตนี้? (ข้อมูลประวัติและ Dashboard ทั้งหมดของพอร์ตนี้จะถูกลบถาวร)" 
+            : "ยืนยันการลบรายการออเดอร์นี้?";
+        
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const { data, error } = await supabase.rpc('delete_dashboard_item', {
+                p_item_id: id,
+                p_source: source
+            });
+
+            if (error) throw error;
+            
+            // Refresh data
+            window.location.reload(); 
+        } catch (error: any) {
+            alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+        }
+    };
 
     useEffect(() => {
         const initData = async () => {
@@ -475,7 +497,21 @@ export default function DashboardPage() {
                                                         </div>
 
                                                         {/* Right Action Menu */}
-                                                        <div className="flex justify-end min-w-[100px]">
+                                                        <div className="flex justify-end items-center gap-2 min-w-[100px]">
+                                                            {/* Delete Button (Cleanup) */}
+                                                            {(isOrder && (item.status === 'pending' || item.status === 'rejected')) || 
+                                                             (!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 0))) ? (
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="ghost" 
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                                                    onClick={() => handleDeleteItem(item.id, isOrder ? 'order' : 'license')}
+                                                                    title="ลบออกจากรายการ"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            ) : null}
+
                                                             {!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 30)) ? (
                                                                 <Link href={`/products/${group.productId}?renew=${item.account_number}`}>
                                                                     <Button size="sm" variant="outline" className="h-8 text-xs bg-background">
@@ -483,7 +519,7 @@ export default function DashboardPage() {
                                                                     </Button>
                                                                 </Link>
                                                             ) : (
-                                                                <div className="w-[70px]"></div> // Spacing placeholder
+                                                                <div className="w-[32px]"></div> // Minimal placeholder if no renew but has delete
                                                             )}
                                                         </div>
                                                     </div>
