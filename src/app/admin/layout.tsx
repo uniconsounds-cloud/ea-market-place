@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon, Key } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon, Key, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
