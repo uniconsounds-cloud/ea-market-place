@@ -26,6 +26,10 @@ export default function SettingsPage() {
     const [loadingKey, setLoadingKey] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
 
+    // WebRequest State
+    const [urlCopySuccess, setUrlCopySuccess] = useState(false);
+    const webRequestUrl = "https://mfrspvzxmpksqnzcrysz.supabase.co";
+
     useEffect(() => {
         const fetchProfile = async () => {
             try {
@@ -269,6 +273,37 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground">
                             * นำรหัสนี้ไปใส่ในช่อง <b>"Partner API Key"</b> ของ EA ใน MetaTrader 5
                         </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5 space-y-3">
+                        <Label className="text-sm font-medium">Allow WebRequest URL</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                value={webRequestUrl}
+                                readOnly
+                                className="bg-muted/50 font-mono text-xs opacity-80"
+                            />
+                            <Button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(webRequestUrl);
+                                    setUrlCopySuccess(true);
+                                    setTimeout(() => setUrlCopySuccess(false), 2000);
+                                }}
+                                variant="outline"
+                            >
+                                {urlCopySuccess ? 'Copied!' : 'Copy'}
+                            </Button>
+                        </div>
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                            <p className="text-[11px] leading-relaxed text-blue-300">
+                                <b>วิธีตั้งค่าใน MT5:</b><br />
+                                1. ไปที่เมนู <b>Tools</b> &gt; <b>Options</b><br />
+                                2. เลือกแท็บ <b>Expert Advisors</b><br />
+                                3. ติ๊กถูกที่ช่อง <b>"Allow WebRequest for listed URL:"</b><br />
+                                4. กดปุ่มกากบาท (+) แล้วนำ URL ด้านบนมาวาง (Paste)<br />
+                                5. กด <b>OK</b> เพื่อบันทึก
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
