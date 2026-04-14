@@ -21,6 +21,11 @@ export default function SettingsPage() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
+    // API Key State
+    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [loadingKey, setLoadingKey] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
+
     useEffect(() => {
         const fetchProfile = async () => {
             try {
@@ -37,6 +42,18 @@ export default function SettingsPage() {
 
                     if (profile) {
                         setFullName(profile.full_name || '');
+                    }
+
+                    // Fetch API Key
+                    const { data: keyData } = await supabase
+                        .from('api_keys')
+                        .select('key_value')
+                        .eq('user_id', user.id)
+                        .eq('status', 'active')
+                        .single();
+                    
+                    if (keyData) {
+                        setApiKey(keyData.key_value);
                     }
                 }
             } catch (error) {
@@ -213,6 +230,47 @@ export default function SettingsPage() {
                         )}
                     </Button>
                 </form>
+            </div>
+
+            {/* API Key Section */}
+            <div className="glass-card p-6 rounded-xl border border-white/10 space-y-6">
+                <div className="flex items-center gap-4 border-b border-border/50 pb-4">
+                    <div className="p-3 bg-purple-500/20 rounded-full">
+                        <Save className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-semibold">การเชื่อมต่อ EA (API Key)</h2>
+                        <p className="text-sm text-muted-foreground">ใช้กุญแจนี้เพื่อเชื่อมต่อ EA ของคุณกับหน้า Dashboard บนเว็บไซต์</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="grid gap-2">
+                        <Label>รหัส API Key ส่วนตัวของคุณ</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                value={apiKey || 'ยังไม่มีรหัส API กรุณาติดต่อแอดมิน'}
+                                readOnly
+                                className="bg-muted/50 font-mono tracking-wider text-purple-300"
+                            />
+                            {apiKey && (
+                                <Button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(apiKey);
+                                        setCopySuccess(true);
+                                        setTimeout(() => setCopySuccess(false), 2000);
+                                    }}
+                                    variant="secondary"
+                                >
+                                    {copySuccess ? 'Copied!' : 'Copy'}
+                                </Button>
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            * นำรหัสนี้ไปใส่ในช่อง <b>"Partner API Key"</b> ของ EA ใน MetaTrader 5
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );

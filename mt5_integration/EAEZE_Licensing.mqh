@@ -39,9 +39,12 @@ bool G_IsLicenseVerified = false; // Moved to top for visibility
 */
 //+------------------------------------------------------------------+
 // --- 1. SETTINGS & INPUTS ---
-string InpLicenseUrl = "https://eaeze.com/api/verify-license";
+string InpLicenseUrl = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/verify_ea_license";
 string InpProductID  = "EZM-5P-V1";    // < ==== Product ID ==== [1]
-input string InpApiKey     = "KHUCHAI_SUP_LEGACY"; // Partner Key
+input string InpPartnerApiKey = "EZE-123456"; // Your Personal API Key (Check dashboard)
+
+// Internal System Key (Do not change)
+string G_SystemApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo";
 
 // --- 2. INTERNAL STATE ---
 datetime last_license_check = 0;
@@ -57,11 +60,15 @@ bool CheckEaezeLicense() {
     string account_no = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
     string balance_str = DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2);
     
-    string post_data  = "{\"account_number\":\"" + account_no + "\", \"product_id\":\"" + InpProductID + "\", \"balance\":" + balance_str + "}";
+    // Updated payload for Supabase RPC
+    string post_data  = "{\"p_account_no\":\"" + account_no + "\", \"p_product_id\":\"" + InpProductID + "\", \"p_balance\":" + balance_str + "}";
     int len = StringToCharArray(post_data, data, 0, WHOLE_ARRAY, CP_UTF8);
     if (len > 0) ArrayResize(data, len - 1);
     
-    string headers = "Content-Type: application/json\r\n" + "x-api-key: " + InpApiKey + "\r\n";
+    // Headers for direct Supabase REST API access
+    string headers = "Content-Type: application/json\r\n" + 
+                     "apikey: " + G_SystemApiKey + "\r\n" +
+                     "Authorization: Bearer " + G_SystemApiKey + "\r\n";
     
     ResetLastError();
     int res = WebRequest("POST", InpLicenseUrl, headers, 10000, data, result, result_headers);

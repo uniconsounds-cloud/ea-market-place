@@ -73,6 +73,12 @@ const SidebarContent = ({
                     จัดการลิขสิทธิ์
                 </Button>
             </Link>
+            <Link href="/admin/partners" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start text-purple-400">
+                    <Save className="mr-2 h-4 w-4" />
+                    พาร์ทเนอร์ (API Keys)
+                </Button>
+            </Link>
             <Link href="/admin/settings" onClick={onClose}>
                 <Button variant="ghost" className="w-full justify-start">
                     <Settings className="mr-2 h-4 w-4" />

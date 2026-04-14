@@ -110,8 +110,9 @@ void EG_Farming_MonitorInit(string api_key)
 
    EAE_DashboardInit(ChartID(), g_eae_dashboard_prefix);
 
-   // Initialize WebSync with the Partner API Key (Default sync interval 30s)
-   EAE_WebSyncInit("https://eaeze.com/api/mt5/sync", api_key, 30);
+   // Unified Sync: Using direct Supabase RPC (Default set in EAE_WebSync.mqh)
+   // We pass the InpApiKey (which is the Supabase Anon Key)
+   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", api_key, 20);
 
    g_eae_initialized = true;
 }

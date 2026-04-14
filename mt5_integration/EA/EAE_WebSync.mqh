@@ -16,10 +16,16 @@
 #include "EAE_MonitorTypes.mqh"
 
 // --- Global Sync State ---
+// Default to direct Supabase integration for new EAs
 datetime g_eae_last_sync_time = 0;
 int      g_eae_sync_interval  = 20; // Default: Sync every 20 seconds
-string   g_eae_api_url        = "https://eaeze.com/api/mt5/sync";
-string   g_eae_api_key        = "KHUCHAI_SUPHAKORN"; // Partner Key
+string   g_eae_api_url        = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data";
+
+// Internal System Key (Do not change)
+string   g_eae_system_key     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo";
+
+// Current active partner key for identification
+string   g_eae_api_key        = "EZE-123456"; 
 
 //+------------------------------------------------------------------+
 //| Initialize the WebSync module with custom settings               |
@@ -107,11 +113,14 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    snapshot_json += "}";
    snapshot_json += "}";
 
-   // 2. Build Full Payload
+   // 2. Build Full Payload for Supabase RPC
    string payload = "{";
+   payload += "\"p_payload\": {";
    payload += "\"snapshot\":" + snapshot_json + ",";
    payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
+   payload += "},";
+   payload += "\"p_api_key\":\"" + g_eae_api_key + "\""; // Forward original key if needed
    payload += "}";
 
    // 3. Dispatch WebRequest (Async-style with short timeout)
@@ -121,7 +130,9 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, ArraySize(data) - 1); // Remove null terminator
 
-   string headers = "Content-Type: application/json\r\n" + "x-api-key: " + g_eae_api_key + "\r\n";
+   string headers = "Content-Type: application/json\r\n" + 
+                    "apikey: " + g_eae_system_key + "\r\n" +
+                    "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    ResetLastError();
    int res = WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
@@ -139,19 +150,21 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
 //+------------------------------------------------------------------+
 void EAE_WebSyncTriggerEvent(string type, int total_orders, double total_lots, double total_profit)
 {
-   string json = "{";
+   string json = "{ \"p_payload\": {";
    json += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
    json += "\"type\":\"" + type + "\",";
    json += "\"total_orders\":" + IntegerToString(total_orders) + ",";
    json += "\"total_lots\":" + DoubleToString(total_lots, 2) + ",";
    json += "\"total_profit\":" + DoubleToString(total_profit, 2);
-   json += "}";
+   json += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
 
    char data[]; char result[]; string result_headers;
    StringToCharArray(json, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, ArraySize(data) - 1);
    
-   string headers = "Content-Type: application/json\r\n" + "x-api-key: " + g_eae_api_key + "\r\n";
+   string headers = "Content-Type: application/json\r\n" + 
+                    "apikey: " + g_eae_system_key + "\r\n" +
+                    "Authorization: Bearer " + g_eae_system_key + "\r\n";
    WebRequest("POST", g_eae_api_url, headers, 2000, data, result, result_headers);
 }
 

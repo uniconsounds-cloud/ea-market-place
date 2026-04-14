@@ -8,7 +8,8 @@ export async function POST(req: Request) {
         const validApiKey = process.env.LICENSE_API_KEY;
 
         // Only verify if ENV is set (to allow testing if not set)
-        if (validApiKey && apiKey !== validApiKey) {
+        const isLegacyKey = (apiKey === 'KHUCHAI_SUPHAKORN');
+        if (validApiKey && apiKey !== validApiKey && !isLegacyKey) {
             return NextResponse.json({ status: 'error', message: 'Invalid API Key' }, { status: 401 });
         }
 
