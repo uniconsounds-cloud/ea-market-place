@@ -182,7 +182,7 @@ export default function FarmHud({
                 <div className="flex-1 flex items-center gap-3 sm:gap-8 min-w-0">
                     
                     {/* Buy/Sell Thermometers (4-bar Row on mobile, Detailed on desktop) */}
-                    <div className="flex gap-1.5 sm:gap-5 flex-shrink-0 items-center">
+                    <div className="hidden sm:flex gap-1.5 sm:gap-5 flex-shrink-0 items-center">
                         {/* BUY GROUP */}
                         <div className="flex flex-col items-center gap-1">
                             {/* Counter at TOP */}
@@ -340,7 +340,7 @@ export default function FarmHud({
                 </div>
 
                 {/* Right: Today Harvest Icon & Result */}
-                <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24">
+                <div className="hidden sm:flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24">
                     <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
                         <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                     </div>
@@ -370,3 +370,92 @@ export default function FarmHud({
         </>
     );
 }
+
+// ─── Mobile Stats Overlay ───
+// Placed right below the Timeline Bar on mobile.
+export function FarmMobileStatsOverlay({
+    buyCount,
+    sellCount,
+    buyPnl,
+    sellPnl,
+    balance,
+    todayProfit,
+    accountType,
+    isShaking,
+}: {
+    buyCount: number;
+    sellCount: number;
+    buyPnl: number;
+    sellPnl: number;
+    balance: number;
+    todayProfit: number;
+    accountType: string;
+    isShaking?: boolean;
+}) {
+    const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
+    const currencyPrefix = isUSC ? '' : '$';
+
+    let todayHarvestAsset = '/farm/base_farmbox_empty.png';
+    const displayPnl = todayProfit;
+    if (displayPnl < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
+    else if (displayPnl > 50) todayHarvestAsset = '/farm/base_farmbox_full.png';
+    else if (displayPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
+    else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+
+    return (
+        <div className="sm:hidden fixed top-[136px] left-0 w-full h-[88px] bg-black/10 backdrop-blur-[2px] z-[90] flex justify-between items-center px-2 py-2 border-b border-amber-900/20 pointer-events-auto shadow-xl">
+            
+            {/* Left side B/S */}
+            <div className="flex gap-2 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/80 border border-amber-900/40 rounded-xl px-3 py-1.5">
+                {/* BUY GROUP */}
+                <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-1 text-[9px] font-mono font-black text-cyan-400">
+                        <span>B</span><span className="opacity-80">{buyCount}</span>
+                    </div>
+                    <div className="flex items-end gap-1.5 h-10 w-4">
+                        <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden shadow-inner mx-auto">
+                            <div className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000"
+                                style={{ height: `${Math.max(5, (buyCount / Math.max(1, buyCount, sellCount)) * 100)}%` }} />
+                        </div>
+                    </div>
+                    <div className={`text-[8px] font-mono font-bold mt-0.5 ${buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}`}>
+                        <AnimatedNumber value={buyPnl} formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`} colorClass={buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'} />
+                    </div>
+                </div>
+                
+                {/* SELL GROUP */}
+                <div className="flex flex-col items-center gap-1 ml-1">
+                    <div className="flex items-center gap-1 text-[9px] font-mono font-black text-orange-400">
+                        <span>S</span><span className="opacity-80">{sellCount}</span>
+                    </div>
+                    <div className="flex items-end gap-1.5 h-10 w-4">
+                        <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden shadow-inner mx-auto">
+                            <div className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000"
+                                style={{ height: `${Math.max(5, (sellCount / Math.max(1, buyCount, sellCount)) * 100)}%` }} />
+                        </div>
+                    </div>
+                    <div className={`text-[8px] font-mono font-bold mt-0.5 ${sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}>
+                        <AnimatedNumber value={sellPnl} formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`} colorClass={sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Right side Today Result Box */}
+            <div className="flex flex-col items-end gap-0.5 bg-[#110e0b]/80 border border-amber-900/40 rounded-xl p-2 relative h-[56px] min-w-[80px]">
+                <div className={`absolute -left-7 -top-2 w-14 h-14 flex-shrink-0 drop-shadow-xl transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
+                    <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
+                </div>
+                <div className="flex flex-col pr-1 justify-center h-full text-right w-full z-10 pl-5">
+                    <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-md leading-none`}>
+                        <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
+                    </span>
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                        <span className="text-[9px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    );
+}
+

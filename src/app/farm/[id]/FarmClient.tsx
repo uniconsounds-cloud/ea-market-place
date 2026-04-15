@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import FarmHud from '@/components/farm-hud';
+import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 
@@ -500,9 +500,22 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                 <div key={`h_${i}`} className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} />
                             ))}
                         </div>
+                        <TimelineBar serverTime={stats.serverTime} dayPercent={stats.brokerDayPercent} />
                     </div>
                 </div>
             </div>
+
+            {/* MOBILE ONLY OVERLAY DOCKED BELOW HEADER */}
+            <FarmMobileStatsOverlay
+                buyCount={stats.buyCount}
+                sellCount={stats.sellCount}
+                buyPnl={stats.buyPnl}
+                sellPnl={stats.sellPnl}
+                balance={Number(portStatus?.balance) || 0}
+                todayProfit={stats.todayProfit}
+                accountType={portStatus?.account_type || 'USC'}
+                isShaking={isShaking}
+            />
 
             <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center mt-36 sm:mt-44">
                 <div
