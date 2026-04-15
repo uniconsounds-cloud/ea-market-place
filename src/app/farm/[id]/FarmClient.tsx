@@ -398,29 +398,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 .limit(30);
 
             if (data) {
-                const today = new Date();
-                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                
-                const filteredData = data.filter(item => item.date !== todayStr);
-                const mapped = filteredData.map(item => {
-                    const pnl = Number(item.profit);
-                    let asset = '/farm/base_farmbox_empty.png';
-                    if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
-                    else if (pnl > 50) asset = '/farm/base_farmbox_full.png';
-                    else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
-                    else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
-                    
-                    // Append T00:00:00 so JS parses it as local timezone midnight instead of UTC midnight.
-                    // This prevents the date from shifting to the previous day for users in timezones behind UTC.
-                    const localDate = new Date(item.date + 'T00:00:00');
-                    return {
-                        id: item.id,
-                        date: localDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
-                        pnl,
-                        asset
-                    };
-                });
-                setHistory(mapped);
+                setHistory(data);
             }
         };
 
@@ -435,7 +413,34 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         return () => { supabase.removeChannel(historyChannel); };
     }, [portNumber]);
 
-    const dailyHistory = useMemo(() => history.length > 0 ? history : [], [history]);
+    const brokerDateStr = useMemo(() => {
+        const d = stats.serverTime;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }, [stats.serverTime]);
+
+    const dailyHistory = useMemo(() => {
+        if (!history.length) return [];
+        
+        // Filter out the broker's "today"
+        const filteredData = history.filter(item => item.date !== brokerDateStr);
+        
+        return filteredData.map(item => {
+            const pnl = Number(item.profit);
+            let asset = '/farm/base_farmbox_empty.png';
+            if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
+            else if (pnl > 50) asset = '/farm/base_farmbox_full.png';
+            else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
+            else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
+            
+            const localDate = new Date(item.date + 'T00:00:00');
+            return {
+                id: item.id,
+                date: localDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
+                pnl,
+                asset
+            };
+        });
+    }, [history, brokerDateStr]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -623,7 +628,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                         <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
                                                 <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
-                                                    {(isClient && time) ? time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : '...'}
+                                                    {isClient ? stats.serverTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : '...'}
                                                 </h2>
                                             </div>
                                             <div className="w-1.5 h-16 bg-gradient-to-b from-[#8b5a2bd0] to-[#4a2e12d0] shadow-xl relative -mt-1 rounded-b-full border-x border-[#3a220f] z-0"></div>
