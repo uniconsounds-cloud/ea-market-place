@@ -160,6 +160,53 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         return () => clearInterval(timer);
     }, [recentlyClosed]);
 
+    // Auto-detect closed orders from portStatus dropping
+    const prevOpenCountRef = useRef(0);
+    const prevTodayProfitRef = useRef(0);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    useEffect(() => {
+        const currentOpenCount = (Number(portStatus?.buy_count) || 0) + (Number(portStatus?.sell_count) || 0);
+        const currentTodayProfit = Number(portStatus?.today_pnl || 0);
+
+        if (isInitialLoad) {
+            // First time receiving data
+            if (currentOpenCount !== undefined && portStatus?.balance) {
+                setIsInitialLoad(false);
+                prevOpenCountRef.current = currentOpenCount;
+                prevTodayProfitRef.current = currentTodayProfit;
+            }
+            return;
+        }
+
+        if (prevOpenCountRef.current > 0 && currentOpenCount < prevOpenCountRef.current) {
+            const diff = prevOpenCountRef.current - currentOpenCount;
+            const actualDiff = Math.min(diff, 10); // cap animations to avoid lag
+            
+            const pnlDiff = currentTodayProfit - prevTodayProfitRef.current;
+            const isProfit = pnlDiff >= 0;
+
+            const newEvents = Array.from({ length: actualDiff }).map((_, i) => ({
+                ticket_id: Date.now() + i, // synthetic ID
+                closedAt: Date.now(),
+                isProfit: isProfit
+            }));
+
+            setRecentlyClosed(prev => [...prev, ...newEvents]);
+
+            if (isProfit) {
+                // Fruit floats up for 10s, then box shakes
+                setTimeout(() => {
+                    setIsShaking(true);
+                    setTimeout(() => setIsShaking(false), 500);
+                }, 9500);
+            }
+        }
+
+        prevOpenCountRef.current = currentOpenCount;
+        prevTodayProfitRef.current = currentTodayProfit;
+    }, [portStatus?.buy_count, portStatus?.sell_count, portStatus?.today_pnl, isInitialLoad]);
+
     const isDemo = orders.length === 0 && !portStatus?.balance;
     const allDisplayOrders = useMemo(() => isDemo ? Array.from({ length: 25 }).map((_, i) => ({
         ticket_id: 2000 + i,
