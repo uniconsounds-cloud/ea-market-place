@@ -142,7 +142,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
     }, [portNumber]);
 
     // --- Dynamic Theming ---
-    const assetType = portStatus?.asset_type || 'GOLD';
+    const rawAsset = portStatus?.asset_type || 'GOLD';
+    const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
     const theme = useMemo(() => ({
         open: assetType === 'FOREX' ? '/farm/asset_a_lily.png' : '/farm/asset_a_lotus.png',
         profit: assetType === 'FOREX' ? '/farm/asset_b_orange.png' : '/farm/asset_b_apple.png',
