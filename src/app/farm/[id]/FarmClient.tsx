@@ -318,9 +318,12 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
                     else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
                     
+                    // Append T00:00:00 so JS parses it as local timezone midnight instead of UTC midnight.
+                    // This prevents the date from shifting to the previous day for users in timezones behind UTC.
+                    const localDate = new Date(item.date + 'T00:00:00');
                     return {
                         id: item.id,
-                        date: new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
+                        date: localDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
                         pnl,
                         asset
                     };
