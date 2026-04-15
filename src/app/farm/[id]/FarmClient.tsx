@@ -41,6 +41,10 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
     const [recentlyClosed, setRecentlyClosed] = useState<any[]>([]);
     const [isShaking, setIsShaking] = useState(false);
     const [hiddenTickets, setHiddenTickets] = useState<number[]>([]);
+    
+    // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
+    const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
+    const lastDayRef = useRef('');
     const [viewMode, setViewMode] = useState<'farm' | 'spaceship'>('farm');
     const [clickCount, setClickCount] = useState(0);
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -111,16 +115,11 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     } else if (payload.eventType === 'DELETE') {
                         const closedOrder = ordersRef.current.find(o => o.ticket_id === payload.old.ticket_id);
                         if (closedOrder) {
-                            const pnl = Number(closedOrder.current_pnl) || 0;
-                            const newEvent = { ...closedOrder, closedAt: Date.now(), isProfit: pnl >= 0 };
-                            setRecentlyClosed(prev => [...prev, newEvent]);
-
-                            if (pnl > 0) {
-                                setTimeout(() => {
-                                    setIsShaking(true);
-                                    setTimeout(() => setIsShaking(false), 500);
-                                }, 9500);
-                            }
+                            pendingCloseQueue.current.push({
+                                ticket_id: closedOrder.ticket_id,
+                                pnl: Number(closedOrder.current_pnl) || 0,
+                                closedAt: Date.now()
+                            });
                         }
                         setOrders(prev => prev.filter(o => o.ticket_id !== payload.old.ticket_id));
                     }
@@ -163,25 +162,91 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
     // Auto-detect closed orders from portStatus dropping
     const prevOpenCountRef = useRef(0);
     const prevTodayProfitRef = useRef(0);
+    // Batch orders closing aggregator for "รวบไม้" (Grid closes)
+    const pendingCloseQueue = useRef<{ ticket_id: number, pnl: number, closedAt: number }[]>([]);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (pendingCloseQueue.current.length > 0) {
+                const now = Date.now();
+                const lastItem = pendingCloseQueue.current[pendingCloseQueue.current.length - 1];
+                
+                // Wait 400ms after the last delete event to ensure the whole batch has finished arriving
+                if (now - lastItem.closedAt > 400) {
+                    const batch = pendingCloseQueue.current;
+                    pendingCloseQueue.current = [];
+                    
+                    const totalPnl = batch.reduce((sum, o) => sum + o.pnl, 0);
+                    const isProfit = totalPnl >= 0;
+                    
+                    const newEvents = batch.map(o => ({
+                        ticket_id: o.ticket_id,
+                        closedAt: now,
+                        isProfit: isProfit // Uniform profit/loss logic for the entire basket
+                    }));
+                    
+                    setRecentlyClosed(prev => [...prev, ...newEvents]);
+                    
+                    if (isProfit) {
+                        setTimeout(() => {
+                            setIsShaking(true);
+                            setTimeout(() => setIsShaking(false), 500);
+                        }, 9500);
+                    }
+                }
+            }
+        }, 100);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Cleanup old events
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setRecentlyClosed(prev => prev.filter(e => Date.now() - e.closedAt < 15000));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Ignore 0 profit momentarily caused by EA sync delays
+    useEffect(() => {
+        if (!portStatus) return;
+        const currentPnl = Number(portStatus.today_pnl || 0);
+        
+        let serverDate = new Date();
+        if (portStatus.server_time) {
+            serverDate = new Date(Number(portStatus.server_time) * 1000);
+        }
+        
+        const dayStr = serverDate.toISOString().split('T')[0];
+        
+        if (lastDayRef.current !== dayStr) {
+            // New day or first load
+            lastDayRef.current = dayStr;
+            setSmoothedTodayProfit(currentPnl);
+        } else {
+            // Same day: if currentPnl drops to exactly 0 suddenly but it was positive, ignore it!
+            if (currentPnl === 0 && smoothedTodayProfit > 0) {
+                // momentary 0 drop, ignore
+            } else {
+                setSmoothedTodayProfit(currentPnl);
+            }
+        }
+    }, [portStatus?.today_pnl, portStatus?.server_time, smoothedTodayProfit]);
+
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     useEffect(() => {
         const currentOpenCount = (Number(portStatus?.buy_count) || 0) + (Number(portStatus?.sell_count) || 0);
-        const currentTodayProfit = Number(portStatus?.today_pnl || 0);
 
         if (isInitialLoad) {
-            // First time receiving data
             if (currentOpenCount !== undefined && portStatus?.balance) {
-                setIsInitialLoad(false);
                 prevOpenCountRef.current = currentOpenCount;
-                prevTodayProfitRef.current = currentTodayProfit;
+                setIsInitialLoad(false);
             }
             return;
         }
 
         prevOpenCountRef.current = currentOpenCount;
-        prevTodayProfitRef.current = currentTodayProfit;
-    }, [portStatus?.buy_count, portStatus?.sell_count, portStatus?.today_pnl, isInitialLoad]);
+    }, [portStatus?.buy_count, portStatus?.sell_count, isInitialLoad]);
 
     const isDemo = orders.length === 0 && !portStatus?.balance;
     const allDisplayOrders = useMemo(() => isDemo ? Array.from({ length: 25 }).map((_, i) => ({
@@ -451,7 +516,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     sellCount={stats.sellCount}
                     buyPnl={stats.buyPnl}
                     sellPnl={stats.sellPnl}
-                    todayProfit={stats.todayProfit}
+                    todayProfit={smoothedTodayProfit}
                     assetType={assetType}
                     isShaking={isShaking}
                     onClick={handleSecretToggle}
@@ -491,7 +556,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 buyPnl={stats.buyPnl}
                 sellPnl={stats.sellPnl}
                 balance={Number(portStatus?.balance) || 0}
-                todayProfit={stats.todayProfit}
+                todayProfit={smoothedTodayProfit}
                 accountType={portStatus?.account_type || 'USC'}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
