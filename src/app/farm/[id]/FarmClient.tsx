@@ -412,9 +412,10 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     <div className="max-w-7xl mx-auto px-4 relative">
                         <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
                             {/* Bar anchored RIGHT = remaining time. Full at open, shrinks leftward until close */}
+                            {/* Uses browser `time` (stable local clock) instead of server_time to avoid timezone jumps */}
                             <div 
                                 className="absolute top-0 right-0 h-full bg-gradient-to-r from-amber-300/30 via-amber-400/60 to-amber-500/90 transition-all duration-1000 rounded-full"
-                                style={{ width: `${Math.max(0, 100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100)}%` }}
+                                style={{ width: `${Math.max(0, 100 - ((time?.getHours() ?? new Date().getHours()) * 60 + (time?.getMinutes() ?? new Date().getMinutes())) / (24 * 60) * 100)}%` }}
                             />
                         </div>
                         <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
