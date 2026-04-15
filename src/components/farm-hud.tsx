@@ -465,8 +465,8 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[56px] min-w-[135px] flex items-center px-3">
-                {/* Profit Text moved to the left */}
+            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[56px] min-w-[135px] flex items-start px-3 pt-2">
+                {/* Profit Text on Top-Left */}
                 <div className="relative z-20 flex-1 -ml-1">
                     <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
