@@ -368,4 +368,5 @@ export default function FarmHud({
             <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-[#cfa545]/20 to-transparent pointer-events-none" />
         </div>
         </>
+    );
 }
