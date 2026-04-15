@@ -405,16 +405,16 @@ export function FarmMobileStatsOverlay({
     else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
 
     return (
-        <div className="sm:hidden fixed top-[136px] left-0 w-full h-[88px] bg-black/10 backdrop-blur-[2px] z-[90] flex justify-between items-center px-2 py-2 border-b border-amber-900/20 pointer-events-auto shadow-xl">
+        <div className="sm:hidden fixed top-[94px] left-0 w-full h-[88px] bg-black/5 backdrop-blur-[2px] z-[90] flex justify-between items-center px-1.5 pt-1 border-b border-amber-900/10 pointer-events-auto">
             
             {/* Left side B/S */}
-            <div className="flex gap-2 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/80 border border-amber-900/40 rounded-xl px-3 h-[72px]">
+            <div className="flex gap-1.5 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/90 border border-amber-900/40 rounded-xl px-2 h-[80px]">
                 {/* BUY GROUP */}
-                <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-center gap-1 text-[9px] font-mono font-black text-cyan-400">
+                <div className="flex flex-col items-center gap-0.5">
+                    <div className="flex items-center gap-1 text-[8px] font-mono font-black text-cyan-400 leading-none">
                         <span>B</span><span className="opacity-80">{buyCount}</span>
                     </div>
-                    <div className="flex items-end gap-1.5 h-10">
+                    <div className="flex items-end gap-1 h-10">
                         {/* Order Count Bar */}
                         <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden shadow-inner">
                             <div className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000 shadow-[0_0_4px_rgba(6,182,212,0.5)]"
@@ -431,17 +431,17 @@ export function FarmMobileStatsOverlay({
                             </div>
                         </div>
                     </div>
-                    <div className={`text-[8px] font-mono font-bold mt-0.5 ${buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}`}>
+                    <div className={`text-[8px] font-mono font-bold leading-none ${buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}`}>
                         <AnimatedNumber value={buyPnl} formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`} colorClass={buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'} />
                     </div>
                 </div>
                 
                 {/* SELL GROUP */}
-                <div className="flex flex-col items-center gap-1 ml-1">
-                    <div className="flex items-center gap-1 text-[9px] font-mono font-black text-orange-400">
+                <div className="flex flex-col items-center gap-0.5 ml-1">
+                    <div className="flex items-center gap-1 text-[8px] font-mono font-black text-orange-400 leading-none">
                         <span>S</span><span className="opacity-80">{sellCount}</span>
                     </div>
-                    <div className="flex items-end gap-1.5 h-10">
+                    <div className="flex items-end gap-1 h-10">
                         {/* Order Count Bar */}
                         <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden shadow-inner">
                             <div className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000 shadow-[0_0_4px_rgba(249,115,22,0.5)]"
@@ -458,22 +458,22 @@ export function FarmMobileStatsOverlay({
                             </div>
                         </div>
                     </div>
-                    <div className={`text-[8px] font-mono font-bold mt-0.5 ${sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}>
+                    <div className={`text-[8px] font-mono font-bold leading-none ${sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}>
                         <AnimatedNumber value={sellPnl} formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`} colorClass={sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'} />
                     </div>
                 </div>
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[72px] min-w-[135px] flex items-start px-3 pt-2">
+            <div className="bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start px-2.5 pt-1.5">
                 {/* Profit Text on Top-Left */}
-                <div className="relative z-20 flex-1 -ml-1">
-                    <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
+                <div className="relative z-20 flex-1">
+                    <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
                 </div>
                 {/* Box Image on Bottom-Right */}
-                <div className={`absolute -right-2 -bottom-2 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
+                <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
                     <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                 </div>
             </div>
