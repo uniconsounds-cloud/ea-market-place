@@ -357,7 +357,11 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 .limit(30);
 
             if (data) {
-                const mapped = data.map(item => {
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                
+                const filteredData = data.filter(item => item.date !== todayStr);
+                const mapped = filteredData.map(item => {
                     const pnl = Number(item.profit);
                     let asset = '/farm/base_farmbox_empty.png';
                     if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
@@ -634,7 +638,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                 const key = prompt("Enter API Key to download history:");
                                 if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
                             }}
-                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-900/40 hover:bg-amber-800/60 text-amber-200/80 border border-amber-700/50 rounded-lg transition-colors"
+                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-900/40 hover:bg-amber-800/60 text-amber-200/80 border border-amber-700/50 rounded-lg transition-colors ml-auto"
                         >
                             <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                             <span className="text-[9px] font-bold uppercase">90D</span>
