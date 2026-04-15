@@ -465,15 +465,15 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[56px] min-w-[100px] flex px-2 pt-1.5">
-                {/* Profit Text on Top-Left */}
-                <div className="relative z-20 w-fit">
+            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[56px] min-w-[135px] flex items-center px-3">
+                {/* Profit Text moved to the left */}
+                <div className="relative z-20 flex-1 -ml-1">
                     <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
                 </div>
-                {/* Box Image on Right */}
-                <div className={`absolute -right-6 -top-3 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
+                {/* Box Image shifted slightly right but still inside/on-the-edge of the border */}
+                <div className={`absolute -right-2 -top-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
                     <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                 </div>
             </div>
