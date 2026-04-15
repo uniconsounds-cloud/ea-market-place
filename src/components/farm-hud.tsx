@@ -153,16 +153,16 @@ export default function FarmHud({
         `}</style>
         <div 
             onClick={() => { console.log("HUD Clicked"); if(onClick) onClick(); }}
-            className="w-full h-28 sm:h-32 bg-[#16120e] text-[#e8dcb9] z-[100] border-b border-amber-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
+            className="w-full h-20 sm:h-32 bg-[#16120e] text-[#e8dcb9] z-[100] border-b border-amber-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
         >
             {/* Background Texture/Gradient */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-[#2a1d0f]/50 to-black/60 pointer-events-none" />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
-            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6 py-2 sm:py-4">
+            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6 py-1 sm:py-4">
 
                 {/* Left: Luxury Analog Clock Motif */}
-                <div className="flex flex-shrink-0 w-16 h-16 sm:w-24 sm:h-24 relative flex-col items-center justify-center my-auto mx-1 sm:mx-2">
+                <div className="flex flex-shrink-0 w-14 h-14 sm:w-24 sm:h-24 relative flex-col items-center justify-center my-auto mx-1 sm:mx-2">
                     <div className="absolute inset-0 rounded-full border border-[#cfa545]/60 shadow-[0_0_15px_rgba(207,165,69,0.3)] bg-[#110e0b]"></div>
                     <div className="absolute inset-1 sm:inset-2 rounded-full border border-amber-800/50 bg-gradient-to-b from-[#1c1814] to-[#0a0806]">
                         <span className="absolute top-0.5 sm:top-1 left-1/2 -translate-x-1/2 text-[6px] sm:text-[8px] text-[#cfa545]">12</span>
@@ -408,7 +408,7 @@ export function FarmMobileStatsOverlay({
         <div className="sm:hidden fixed top-[136px] left-0 w-full h-[88px] bg-black/10 backdrop-blur-[2px] z-[90] flex justify-between items-center px-2 py-2 border-b border-amber-900/20 pointer-events-auto shadow-xl">
             
             {/* Left side B/S */}
-            <div className="flex gap-2 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/80 border border-amber-900/40 rounded-xl px-3 py-1.5">
+            <div className="flex gap-2 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/80 border border-amber-900/40 rounded-xl px-3 h-[72px]">
                 {/* BUY GROUP */}
                 <div className="flex flex-col items-center gap-1">
                     <div className="flex items-center gap-1 text-[9px] font-mono font-black text-cyan-400">
@@ -465,15 +465,15 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[56px] min-w-[135px] flex items-start px-3 pt-2">
+            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[72px] min-w-[135px] flex items-start px-3 pt-2">
                 {/* Profit Text on Top-Left */}
                 <div className="relative z-20 flex-1 -ml-1">
                     <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
                 </div>
-                {/* Box Image shifted slightly right but still inside/on-the-edge of the border */}
-                <div className={`absolute -right-2 -top-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
+                {/* Box Image on Bottom-Right */}
+                <div className={`absolute -right-2 -bottom-2 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
                     <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                 </div>
             </div>
