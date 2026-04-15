@@ -116,12 +116,14 @@ export default function FarmHud({
     const minuteDeg = minutes * 6 + seconds * 0.1;
     const hourDeg = hours * 30 + minutes * 0.5;
 
+    const isUSD = accountType?.toUpperCase().trim() === 'USD' || accountType?.toUpperCase().trim() === 'STANDARD';
+    const centsValue = isUSD ? todayProfit * 100 : todayProfit;
+
     let todayHarvestAsset = '/farm/base_farmbox_empty.png';
-    const displayPnl = todayProfit; // Today Result uses Today's Closed Profit
-    if (displayPnl < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
-    else if (displayPnl > 50) todayHarvestAsset = '/farm/base_farmbox_full.png';
-    else if (displayPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
-    else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
+    else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.png';
+    else if (centsValue > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.png';
+    else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
 
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
@@ -397,12 +399,14 @@ export function FarmMobileStatsOverlay({
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
 
+    const isUSD_Mobile = !isUSC;
+    const centsValue_Mobile = isUSD_Mobile ? todayProfit * 100 : todayProfit;
+
     let todayHarvestAsset = '/farm/base_farmbox_empty.png';
-    const displayPnl = todayProfit;
-    if (displayPnl < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
-    else if (displayPnl > 50) todayHarvestAsset = '/farm/base_farmbox_full.png';
-    else if (displayPnl > 10) todayHarvestAsset = '/farm/base_farmbox_mid.png';
-    else if (displayPnl > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
+    else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.png';
+    else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.png';
+    else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
 
     return (
         <div className="sm:hidden fixed top-[94px] left-0 w-full h-[88px] bg-black/5 backdrop-blur-[2px] z-[90] flex justify-between items-center px-1.5 pt-1 border-b border-amber-900/10 pointer-events-auto">

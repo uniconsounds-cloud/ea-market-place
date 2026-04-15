@@ -427,11 +427,14 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         
         return filteredData.map(item => {
             const pnl = Number(item.profit);
+            const isUSD = accountType?.toUpperCase().trim() === 'USD' || accountType?.toUpperCase().trim() === 'STANDARD';
+            const cents = isUSD ? pnl * 100 : pnl;
+            
             let asset = '/farm/base_farmbox_empty.png';
             if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
-            else if (pnl > 50) asset = '/farm/base_farmbox_full.png';
-            else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
-            else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
+            else if (cents > 2000) asset = '/farm/base_farmbox_full.png';
+            else if (cents > 1000) asset = '/farm/base_farmbox_mid.png';
+            else if (cents > 0) asset = '/farm/base_farmbox_min.png';
             
             // Re-parse the date string into a localized Thailand date for display
             const localDate = new Date(item.date + 'T00:00:00');
