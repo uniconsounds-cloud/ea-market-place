@@ -500,7 +500,6 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                 <div key={`h_${i}`} className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} />
                             ))}
                         </div>
-                        <TimelineBar serverTime={stats.serverTime} dayPercent={stats.brokerDayPercent} />
                     </div>
                 </div>
             </div>
