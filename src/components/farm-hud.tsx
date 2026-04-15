@@ -202,7 +202,7 @@ export default function FarmHud({
                                 {/* PnL Indicator Line + Scale */}
                                 <div className="relative w-2 sm:w-3.5 h-full flex flex-col items-center overflow-visible">
                                     <div className="w-[3px] sm:w-[5px] h-full bg-white/10 rounded-full relative">
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 sm:w-6 h-[1.5px] bg-white/50 z-10" />
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] sm:w-[7px] h-[1.5px] bg-white/50 z-10" />
                                         
                                         <div 
                                             className={`absolute left-0 right-0 transition-all duration-1000 ${buyPnl >= 0 ? 'bg-cyan-400 bottom-1/2 rounded-t-full shadow-[0_0_12px_rgba(34,211,238,0.8)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_12px_rgba(239,68,68,0.8)]'}`}
@@ -240,7 +240,7 @@ export default function FarmHud({
                                 {/* PnL Indicator Line + Scale */}
                                 <div className="relative w-2 sm:w-3.5 h-full flex flex-col items-center overflow-visible">
                                     <div className="w-[3px] sm:w-[5px] h-full bg-white/10 rounded-full relative">
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 sm:w-6 h-[1.5px] bg-white/50 z-10" />
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] sm:w-[7px] h-[1.5px] bg-white/50 z-10" />
                                         
                                         <div 
                                             className={`absolute left-0 right-0 transition-all duration-1000 ${sellPnl >= 0 ? 'bg-orange-400 bottom-1/2 rounded-t-full shadow-[0_0_12px_rgba(251,146,60,0.8)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_12px_rgba(239,68,68,0.8)]'}`}
@@ -414,10 +414,21 @@ export function FarmMobileStatsOverlay({
                     <div className="flex items-center gap-1 text-[9px] font-mono font-black text-cyan-400">
                         <span>B</span><span className="opacity-80">{buyCount}</span>
                     </div>
-                    <div className="flex items-end gap-1.5 h-10 w-4">
-                        <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden shadow-inner mx-auto">
-                            <div className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000"
+                    <div className="flex items-end gap-1.5 h-10">
+                        {/* Order Count Bar */}
+                        <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-cyan-500/10 overflow-hidden shadow-inner">
+                            <div className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300 transition-all duration-1000 shadow-[0_0_4px_rgba(6,182,212,0.5)]"
                                 style={{ height: `${Math.max(5, (buyCount / Math.max(1, buyCount, sellCount)) * 100)}%` }} />
+                        </div>
+                        {/* PnL Indicator Line + Scale */}
+                        <div className="relative w-1.5 h-full flex flex-col items-center overflow-visible">
+                            <div className="w-[3px] h-full bg-white/10 rounded-full relative">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[1px] bg-white/50 z-10" />
+                                <div 
+                                    className={`absolute left-0 right-0 transition-all duration-1000 ${buyPnl >= 0 ? 'bg-cyan-400 bottom-1/2 rounded-t-full shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_8px_rgba(239,68,68,0.8)]'}`}
+                                    style={{ height: `${Math.min(50, Math.abs((buyPnl / (Math.max(1, balance) * 0.01)) * 50))}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                     <div className={`text-[8px] font-mono font-bold mt-0.5 ${buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}`}>
@@ -430,10 +441,21 @@ export function FarmMobileStatsOverlay({
                     <div className="flex items-center gap-1 text-[9px] font-mono font-black text-orange-400">
                         <span>S</span><span className="opacity-80">{sellCount}</span>
                     </div>
-                    <div className="flex items-end gap-1.5 h-10 w-4">
-                        <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden shadow-inner mx-auto">
-                            <div className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000"
+                    <div className="flex items-end gap-1.5 h-10">
+                        {/* Order Count Bar */}
+                        <div className="relative w-1.5 h-full bg-black/40 rounded-full border border-orange-500/10 overflow-hidden shadow-inner">
+                            <div className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-300 transition-all duration-1000 shadow-[0_0_4px_rgba(249,115,22,0.5)]"
                                 style={{ height: `${Math.max(5, (sellCount / Math.max(1, buyCount, sellCount)) * 100)}%` }} />
+                        </div>
+                        {/* PnL Indicator Line + Scale */}
+                        <div className="relative w-1.5 h-full flex flex-col items-center overflow-visible">
+                            <div className="w-[3px] h-full bg-white/10 rounded-full relative">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[1px] bg-white/50 z-10" />
+                                <div 
+                                    className={`absolute left-0 right-0 transition-all duration-1000 ${sellPnl >= 0 ? 'bg-orange-400 bottom-1/2 rounded-t-full shadow-[0_0_8px_rgba(251,146,60,0.8)]' : 'bg-red-500 top-1/2 rounded-b-full shadow-[0_0_8px_rgba(239,68,68,0.8)]'}`}
+                                    style={{ height: `${Math.min(50, Math.abs((sellPnl / (Math.max(1, balance) * 0.01)) * 50))}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                     <div className={`text-[8px] font-mono font-bold mt-0.5 ${sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}>
