@@ -2,7 +2,67 @@
 
 import Image from 'next/image';
 import { Clock } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+// ─── Animated Number: Breathing pulse + Slot machine roll on value change ───
+function AnimatedNumber({
+    value,
+    formatter,
+    colorClass,
+    className = ''
+}: {
+    value: number;
+    formatter: (v: number) => string;
+    colorClass: string;
+    className?: string;
+}) {
+    const [shown, setShown] = useState(value);
+    const [incoming, setIncoming] = useState<number | null>(null);
+    const [phase, setPhase] = useState<'idle' | 'rolling'>('idle');
+    const [goingUp, setGoingUp] = useState(true);
+    const t1 = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const t2 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (Math.abs(value - shown) < 0.005) return;
+        if (phase === 'rolling') return; // avoid rapid-fire conflicts
+        setGoingUp(value > shown);
+        setIncoming(value);
+        setPhase('rolling');
+
+        t1.current = setTimeout(() => {
+            setShown(value);
+            setIncoming(null);
+        }, 280);
+        t2.current = setTimeout(() => setPhase('idle'), 450);
+
+        return () => {
+            if (t1.current) clearTimeout(t1.current);
+            if (t2.current) clearTimeout(t2.current);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
+
+    const outStyle: React.CSSProperties = phase === 'rolling' ? {
+        animation: `slotOut${goingUp ? 'Up' : 'Down'} 0.28s ease-in forwards`
+    } : {
+        animation: 'pnlBreathe 3.5s ease-in-out infinite'
+    };
+
+    const inStyle: React.CSSProperties = {
+        position: 'absolute', top: 0, left: 0, right: 0,
+        animation: `slotIn${goingUp ? 'Up' : 'Down'} 0.28s ease-out forwards`,
+    };
+
+    return (
+        <span className={`relative inline-block overflow-hidden ${colorClass} ${className}`} style={{ verticalAlign: 'baseline' }}>
+            <span style={outStyle}>{formatter(shown)}</span>
+            {phase === 'rolling' && incoming !== null && (
+                <span style={inStyle}>{formatter(incoming)}</span>
+            )}
+        </span>
+    );
+}
 
 type FarmHudProps = {
     portNumber: string;
@@ -68,6 +128,29 @@ export default function FarmHud({
     const unitSuffix = isUSC ? ' USC' : ' USD';
 
     return (
+        <>
+        <style>{`
+            @keyframes pnlBreathe {
+                0%, 100% { opacity: 0.65; }
+                50% { opacity: 1; }
+            }
+            @keyframes slotOutUp {
+                from { transform: translateY(0); opacity: 1; }
+                to   { transform: translateY(-110%); opacity: 0; }
+            }
+            @keyframes slotInUp {
+                from { transform: translateY(110%); opacity: 0; }
+                to   { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes slotOutDown {
+                from { transform: translateY(0); opacity: 1; }
+                to   { transform: translateY(110%); opacity: 0; }
+            }
+            @keyframes slotInDown {
+                from { transform: translateY(-110%); opacity: 0; }
+                to   { transform: translateY(0); opacity: 1; }
+            }
+        `}</style>
         <div 
             onClick={() => { console.log("HUD Clicked"); if(onClick) onClick(); }}
             className="w-full h-28 sm:h-32 bg-[#16120e] text-[#e8dcb9] z-[100] border-b border-amber-900/40 shadow-[0_4px_20px_rgba(0,0,0,0.8)] overflow-hidden cursor-pointer select-none pointer-events-auto"
@@ -130,7 +213,11 @@ export default function FarmHud({
                             </div>
                             {/* PnL Label at BOTTOM */}
                             <div className={`text-[7px] sm:text-[8px] font-mono font-bold ${buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}`}>
-                                {buyPnl >= 0 ? '+' : ''}{buyPnl.toFixed(2)}
+                                <AnimatedNumber
+                                    value={buyPnl}
+                                    formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`}
+                                    colorClass={buyPnl >= 0 ? 'text-cyan-400/80' : 'text-red-400/80'}
+                                />
                             </div>
                         </div>
 
@@ -164,7 +251,11 @@ export default function FarmHud({
                             </div>
                             {/* PnL Label at BOTTOM */}
                             <div className={`text-[7px] sm:text-[8px] font-mono font-bold ${sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}`}>
-                                {sellPnl >= 0 ? '+' : ''}{sellPnl.toFixed(2)}
+                                <AnimatedNumber
+                                    value={sellPnl}
+                                    formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`}
+                                    colorClass={sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'}
+                                />
                             </div>
                         </div>
                     </div>
@@ -189,7 +280,11 @@ export default function FarmHud({
                                     </span>
                                 </div>
                                 <div className={`text-[8px] sm:text-[10px] font-mono font-black tracking-tighter ${floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                    {floatingPnl >= 0 ? '+' : ''}{currencyPrefix}{floatingPnl.toFixed(2)} ({((floatingPnl / balance) * 100).toFixed(2)}%)
+                                    <AnimatedNumber
+                                        value={floatingPnl}
+                                        formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)} (${((v / balance) * 100).toFixed(2)}%)`}
+                                        colorClass={floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -252,7 +347,11 @@ export default function FarmHud({
                     <div className="flex flex-col pr-1 justify-center">
                         <span className="hidden sm:block text-[8px] lg:text-[10px] text-amber-200/40 uppercase font-black tracking-widest leading-none mb-1">Today Result</span>
                         <span className={`text-[11px] sm:text-sm lg:text-xl font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm leading-none`}>
-                            {todayProfit >= 0 ? '+' : ''}{currencyPrefix}{todayProfit.toFixed(2)}
+                            <AnimatedNumber
+                                value={todayProfit}
+                                formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`}
+                                colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'}
+                            />
                         </span>
                         {/* More visible USC Label */}
                         <div className="flex items-center gap-1 mt-0.5">
@@ -268,5 +367,5 @@ export default function FarmHud({
             {/* Top Right small decorator */}
             <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-[#cfa545]/20 to-transparent pointer-events-none" />
         </div>
-    );
+        </>
 }
