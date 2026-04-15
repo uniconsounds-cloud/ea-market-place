@@ -203,7 +203,15 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 equity: Number(portStatus.equity),
                 maxDrawdown: Number(portStatus.max_drawdown || 0),
                 todayProfit: Number(portStatus.today_pnl || 0),
-                serverTime: portStatus.server_time ? new Date(Number(portStatus.server_time) * 1000) : new Date()
+                serverTime: portStatus.server_time ? new Date(Number(portStatus.server_time) * 1000) : new Date(),
+                // Correct broker day progress: use modulo to extract HH:MM from raw broker timestamp
+                // (avoids timezone mismatch since MQL5 TimeCurrent is broker-local, not UTC)
+                brokerDayPercent: (() => {
+                    const raw = Number(portStatus.server_time);
+                    if (!raw) return null;
+                    const secFromMidnight = raw % 86400;
+                    return secFromMidnight / 86400 * 100;
+                })()
             };
         }
         
@@ -228,7 +236,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             equity: Number(portStatus?.equity) || (51540.20 + floatingPnl),
             maxDrawdown: Math.max(0, Math.floor(((Number(portStatus?.balance || 51540.20) - Number(portStatus?.equity || 51540.20)) / Number(portStatus?.balance || 51540.20)) * 100)),
             todayProfit: Number(portStatus?.today_pnl || 0),
-            serverTime: new Date()
+            serverTime: new Date(),
+            brokerDayPercent: null
         };
     }, [displayOrders, portStatus, orders]);
 
@@ -412,11 +421,20 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     <div className="max-w-7xl mx-auto px-4 relative">
                         <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
                             {/* Bar anchored RIGHT = remaining time. Full at open, shrinks leftward until close */}
-                            {/* Uses browser `time` (stable local clock) instead of server_time to avoid timezone jumps */}
-                            <div 
-                                className="absolute top-0 right-0 h-full bg-gradient-to-r from-amber-300/30 via-amber-400/60 to-amber-500/90 transition-all duration-1000 rounded-full"
-                                style={{ width: `${Math.max(0, 100 - ((time?.getHours() ?? new Date().getHours()) * 60 + (time?.getMinutes() ?? new Date().getMinutes())) / (24 * 60) * 100)}%` }}
-                            />
+                            {/* brokerDayPercent uses raw server_time % 86400 to avoid timezone mismatch */}
+                            {(() => {
+                                const pct = stats.brokerDayPercent !== null
+                                    ? stats.brokerDayPercent
+                                    : ((time?.getHours() ?? new Date().getHours()) * 60 + (time?.getMinutes() ?? new Date().getMinutes())) / (24 * 60) * 100;
+                                const remaining = Math.max(0, 100 - pct);
+                                return (
+                                    <div 
+                                        className="absolute top-0 right-0 h-full bg-gradient-to-r from-amber-300/30 via-amber-400/60 to-amber-500/90 transition-all duration-1000 rounded-full"
+                                        style={{ width: `${remaining}%` }}
+                                    />
+                                );
+                            })()
+                            }
                         </div>
                         <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
                             {Array.from({ length: 25 }).map((_, i) => (
