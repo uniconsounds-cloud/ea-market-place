@@ -356,8 +356,8 @@ export default function FarmHud({
                         {/* More visible USC Label */}
                         <div className="flex items-center gap-1 mt-0.5">
                            <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
-                           <span className="hidden sm:inline text-[7px] text-white/20">|</span>
-                           <span className="hidden sm:inline text-[7px] text-white/20 uppercase">LOTS: {totalStandardLots.toFixed(2)}</span>
+                           <span className="inline sm:inline text-[7px] text-white/20">|</span>
+                           <span className="inline sm:inline text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-1">{totalStandardLots.toFixed(2)}</span></span>
                         </div>
                     </div>
                 </div>
@@ -390,6 +390,7 @@ export function FarmMobileStatsOverlay({
     balance: number;
     todayProfit: number;
     accountType: string;
+    totalStandardLots: number;
     isShaking?: boolean;
 }) {
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
@@ -450,7 +451,9 @@ export function FarmMobileStatsOverlay({
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
                     <div className="flex items-center justify-end gap-1 mt-1">
-                        <span className="text-[9px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
+                        <span className="text-[8px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
+                        <span className="text-[7px] text-white/20">|</span>
+                        <span className="text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-0.5">{totalStandardLots.toFixed(2)}</span></span>
                     </div>
                 </div>
             </div>

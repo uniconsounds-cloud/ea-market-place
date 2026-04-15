@@ -517,6 +517,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 balance={Number(portStatus?.balance) || 0}
                 todayProfit={stats.todayProfit}
                 accountType={portStatus?.account_type || 'USC'}
+                totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
             />
 
