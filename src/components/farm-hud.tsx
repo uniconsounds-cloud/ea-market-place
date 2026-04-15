@@ -266,8 +266,8 @@ export default function FarmHud({
                     <div className="flex-1 flex flex-col justify-center min-w-0">
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
-                                <h1 className="text-[11px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                    <span className="hidden sm:inline">{assetType} | </span>{portNumber}
+                                <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
+                                    <span className="hidden sm:inline">EasyGold Farming | </span>{assetType} | {portNumber} | {accountType}
                                 </h1>
                                 <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
