@@ -381,6 +381,7 @@ export function FarmMobileStatsOverlay({
     balance,
     todayProfit,
     accountType,
+    totalStandardLots,
     isShaking,
 }: {
     buyCount: number;
