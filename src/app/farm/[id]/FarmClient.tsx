@@ -411,9 +411,9 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 <div className="relative w-full bg-black/40 border-y border-amber-900/20 py-1 sm:py-2">
                     <div className="max-w-7xl mx-auto px-4 relative">
                         <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
-                            {/* Bar starts full-width at left (open) and shrinks toward right as time passes */}
+                            {/* Bar anchored RIGHT = remaining time. Full at open, shrinks leftward until close */}
                             <div 
-                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-500/90 via-amber-400/60 to-amber-300/30 transition-all duration-1000 rounded-full"
+                                className="absolute top-0 right-0 h-full bg-gradient-to-r from-amber-300/30 via-amber-400/60 to-amber-500/90 transition-all duration-1000 rounded-full"
                                 style={{ width: `${Math.max(0, 100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100)}%` }}
                             />
                         </div>
