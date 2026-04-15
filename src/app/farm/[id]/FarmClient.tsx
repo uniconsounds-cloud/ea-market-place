@@ -425,9 +425,11 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         // Filter out the broker's "today" using Thailand timezone reference
         const filteredData = history.filter(item => item.date !== brokerDateStr);
         
+        const accountType = portStatus?.account_type || 'USC';
+
         return filteredData.map(item => {
             const pnl = Number(item.profit);
-            const isUSD = accountType?.toUpperCase().trim() === 'USD' || accountType?.toUpperCase().trim() === 'STANDARD';
+            const isUSD = accountType.toUpperCase().trim() === 'USD' || accountType.toUpperCase().trim() === 'STANDARD';
             const cents = isUSD ? pnl * 100 : pnl;
             
             let asset = '/farm/base_farmbox_empty.png';
@@ -445,7 +447,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 asset
             };
         });
-    }, [history, brokerDateStr]);
+    }, [history, brokerDateStr, portStatus?.account_type]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
