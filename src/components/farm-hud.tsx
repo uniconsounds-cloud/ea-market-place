@@ -465,19 +465,16 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="flex flex-col items-end gap-0.5 bg-[#110e0b]/80 border border-amber-900/40 rounded-xl p-2 relative h-[56px] min-w-[80px]">
-                <div className={`absolute -left-10 -top-3 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
-                    <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
-                </div>
-                <div className="flex flex-col pr-1 justify-center h-full text-right w-full z-10 pl-6">
-                    <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-md leading-none`}>
+            <div className="bg-[#110e0b]/80 border border-amber-900/40 rounded-xl relative h-[56px] min-w-[100px] flex px-2 pt-1.5">
+                {/* Profit Text on Top-Left */}
+                <div className="relative z-20 w-fit">
+                    <span className={`text-base font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                        <span className="text-[8px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
-                        <span className="text-[7px] text-white/20">|</span>
-                        <span className="text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-0.5">{totalStandardLots.toFixed(2)}</span></span>
-                    </div>
+                </div>
+                {/* Box Image on Right */}
+                <div className={`absolute -right-6 -top-3 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
+                    <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                 </div>
             </div>
 
