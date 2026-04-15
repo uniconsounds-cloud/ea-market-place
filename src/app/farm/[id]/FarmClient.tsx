@@ -407,13 +407,14 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     onClick={handleSecretToggle}
                 />
                 
-                {/* 1-Day Trading Timeline Bar */}
+                {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
                 <div className="relative w-full bg-black/40 border-y border-amber-900/20 py-1 sm:py-2">
                     <div className="max-w-7xl mx-auto px-4 relative">
                         <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
+                            {/* Bar starts full-width at left (open) and shrinks toward right as time passes */}
                             <div 
-                                className="absolute top-0 right-0 h-full bg-gradient-to-l from-amber-600/80 to-amber-400/30 transition-all duration-1000"
-                                style={{ width: `${100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100}%` }}
+                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-500/90 via-amber-400/60 to-amber-300/30 transition-all duration-1000 rounded-full"
+                                style={{ width: `${Math.max(0, 100 - (stats.serverTime.getHours() * 60 + stats.serverTime.getMinutes()) / (24 * 60) * 100)}%` }}
                             />
                         </div>
                         <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
@@ -500,9 +501,10 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             </div>
 
             {isClient && (
-                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col pt-2 pb-1 sm:pb-0">
-                    <div className="flex justify-end sm:justify-between px-4 sm:px-6 mb-1">
-                        <span className="hidden sm:inline text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
+                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
+                    {/* Desktop header row */}
+                    <div className="hidden sm:flex justify-between px-6 pt-2 mb-1">
+                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
                             Daily Harvest History (30D)
                         </span>
                         <button 
@@ -510,30 +512,43 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                 const key = prompt("Enter API Key to download history:");
                                 if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
                             }}
-                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-2 sm:px-3 py-1 rounded transition-colors uppercase font-bold"
+                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
                         >
-                            <span className="hidden sm:inline">Export 90D History (.CSV)</span>
-                            <span className="sm:hidden">90D</span>
+                            Export 90D History (.CSV)
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         </button>
                     </div>
+
+                    {/* Crates scroll row (mobile: inline 90D button at END of scroll, desktop: fill remaining space) */}
                     <div
                         ref={historyScrollRef}
-                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-start gap-4 sm:gap-6 px-4 sm:px-6 pb-0 sm:pb-2 no-scrollbar"
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar"
                     >
                         {dailyHistory.map((item) => (
                             <div key={item.id} className="flex-shrink-0 flex flex-col items-center group">
                                 <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
                                     <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
                                 </div>
-                                <div className="mt-1 flex flex-col items-center">
-                                    <span className="text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
-                                    <span className={`text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                <div className="flex flex-col items-center">
+                                    <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
+                                    <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
                                         {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
                                     </span>
                                 </div>
                             </div>
                         ))}
+
+                        {/* Mobile-only: Square 90D button at the end, same size as crate */}
+                        <button 
+                            onClick={() => {
+                                const key = prompt("Enter API Key to download history:");
+                                if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
+                            }}
+                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-900/40 hover:bg-amber-800/60 text-amber-200/80 border border-amber-700/50 rounded-lg transition-colors"
+                        >
+                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span className="text-[9px] font-bold uppercase">90D</span>
+                        </button>
                     </div>
                 </div>
             )}
