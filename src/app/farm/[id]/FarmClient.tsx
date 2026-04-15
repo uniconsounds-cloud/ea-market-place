@@ -269,8 +269,19 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         }
 
         const trees = Array.from({ length: 25 }).map((_, i) => ({ assets: [] as any[], level: treeLevels[i] }));
+        // Use real orders if available, otherwise generate synthetic flowers from portStatus counts
+        // (farm_active_orders may be empty due to heartbeat sync not sending orders)
+        const realOpenOrders = displayOrders.filter(o => o.status === 'OPEN');
+        const totalOpenFromStatus = (Number(portStatus?.buy_count) || 0) + (Number(portStatus?.sell_count) || 0);
+        
+        const openLotusAssets = realOpenOrders.length > 0
+            ? realOpenOrders.map(o => ({ type: 'OPEN_LOTUS', ticketId: o.ticket_id }))
+            : totalOpenFromStatus > 0
+                ? Array.from({ length: Math.min(totalOpenFromStatus, 100) }).map((_, i) => ({ type: 'OPEN_LOTUS', ticketId: 90000 + i }))
+                : [];
+
         const allAssets = [
-            ...displayOrders.filter(o => o.status === 'OPEN').map(o => ({ type: 'OPEN_LOTUS', ticketId: o.ticket_id })),
+            ...openLotusAssets,
             ...recentlyClosed.map(o => ({ type: o.isProfit ? 'PROFIT_FRUIT' : 'LOSS_DEAD', ticketId: o.ticket_id }))
         ];
 
