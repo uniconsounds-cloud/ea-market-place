@@ -415,13 +415,14 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
 
     const brokerDateStr = useMemo(() => {
         const d = stats.serverTime;
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        // Use Thailand time as the constant reference for the dashboard
+        return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // 'en-CA' gives YYYY-MM-DD
     }, [stats.serverTime]);
 
     const dailyHistory = useMemo(() => {
         if (!history.length) return [];
         
-        // Filter out the broker's "today"
+        // Filter out the broker's "today" using Thailand timezone reference
         const filteredData = history.filter(item => item.date !== brokerDateStr);
         
         return filteredData.map(item => {
@@ -432,6 +433,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
             else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
             
+            // Re-parse the date string into a localized Thailand date for display
             const localDate = new Date(item.date + 'T00:00:00');
             return {
                 id: item.id,
@@ -628,7 +630,12 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                                         <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
                                                 <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
-                                                    {isClient ? stats.serverTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : '...'}
+                                                    {isClient ? stats.serverTime.toLocaleDateString('en-GB', { 
+                                                        day: 'numeric', 
+                                                        month: 'short', 
+                                                        year: 'numeric',
+                                                        timeZone: 'Asia/Bangkok'
+                                                    }).toUpperCase() : '...'}
                                                 </h2>
                                             </div>
                                             <div className="w-1.5 h-16 bg-gradient-to-b from-[#8b5a2bd0] to-[#4a2e12d0] shadow-xl relative -mt-1 rounded-b-full border-x border-[#3a220f] z-0"></div>
