@@ -179,30 +179,6 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             return;
         }
 
-        if (prevOpenCountRef.current > 0 && currentOpenCount < prevOpenCountRef.current) {
-            const diff = prevOpenCountRef.current - currentOpenCount;
-            const actualDiff = Math.min(diff, 10); // cap animations to avoid lag
-            
-            const pnlDiff = currentTodayProfit - prevTodayProfitRef.current;
-            const isProfit = pnlDiff >= 0;
-
-            const newEvents = Array.from({ length: actualDiff }).map((_, i) => ({
-                ticket_id: Date.now() + i, // synthetic ID
-                closedAt: Date.now(),
-                isProfit: isProfit
-            }));
-
-            setRecentlyClosed(prev => [...prev, ...newEvents]);
-
-            if (isProfit) {
-                // Fruit floats up for 10s, then box shakes
-                setTimeout(() => {
-                    setIsShaking(true);
-                    setTimeout(() => setIsShaking(false), 500);
-                }, 9500);
-            }
-        }
-
         prevOpenCountRef.current = currentOpenCount;
         prevTodayProfitRef.current = currentTodayProfit;
     }, [portStatus?.buy_count, portStatus?.sell_count, portStatus?.today_pnl, isInitialLoad]);
