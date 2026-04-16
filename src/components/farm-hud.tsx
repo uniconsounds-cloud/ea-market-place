@@ -479,9 +479,9 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start px-2.5 pt-1.5">
+            <div className="bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start p-[2px]">
                 {/* Profit Text on Top-Left */}
-                <div className="relative z-20 flex-1">
+                <div className="relative z-20 flex-1 pl-[2px] pt-[2px]">
                     <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
@@ -491,7 +491,7 @@ export function FarmMobileStatsOverlay({
                     </div>
                 </div>
                 {/* Port Number on Bottom-Left */}
-                <div className="absolute left-2.5 bottom-1.5 z-20">
+                <div className="absolute left-[4px] bottom-1.5 z-20">
                     <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{portNumber}</span>
                 </div>
                 {/* Box Image on Bottom-Right */}
