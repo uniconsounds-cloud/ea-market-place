@@ -380,6 +380,7 @@ export default function FarmHud({
 // ─── Mobile Stats Overlay ───
 // Placed right below the Timeline Bar on mobile.
 export function FarmMobileStatsOverlay({
+    portNumber,
     buyCount,
     sellCount,
     buyPnl,
@@ -392,6 +393,7 @@ export function FarmMobileStatsOverlay({
     totalStandardLots,
     isShaking,
 }: {
+    portNumber: string;
     buyCount: number;
     sellCount: number;
     buyPnl: number;
@@ -483,10 +485,14 @@ export function FarmMobileStatsOverlay({
                     <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
-                    <div className="flex flex-col gap-0 mt-0.5">
+                    <div className="flex flex-col gap-0 mt-[-2px]">
                         <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">MAX DD: <span className="text-red-500/80">{currencyPrefix}{dailyMaxDrawdown.toFixed(2)}</span></span>
                         <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">LOTS: <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
                     </div>
+                </div>
+                {/* Port Number on Bottom-Left */}
+                <div className="absolute left-2.5 bottom-1.5 z-20">
+                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{portNumber}</span>
                 </div>
                 {/* Box Image on Bottom-Right */}
                 <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>

@@ -566,6 +566,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
 
             {/* MOBILE ONLY OVERLAY DOCKED BELOW HEADER */}
             <FarmMobileStatsOverlay
+                portNumber={portNumber}
                 buyCount={stats.buyCount}
                 sellCount={stats.sellCount}
                 buyPnl={stats.buyPnl}
