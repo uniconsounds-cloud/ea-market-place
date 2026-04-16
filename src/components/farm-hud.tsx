@@ -388,6 +388,8 @@ export function FarmMobileStatsOverlay({
     sellPnl,
     balance,
     todayProfit,
+    todayClosedLots,
+    dailyMaxDrawdown,
     accountType,
     totalStandardLots,
     isShaking,
