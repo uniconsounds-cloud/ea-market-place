@@ -7,7 +7,7 @@ import { ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { HomeIbButton } from '@/components/home-ib-button';
 
-export const revalidate = 0; // Disable static caching for real-time updates
+export const revalidate = 60; // Cache the landing page for 60 seconds to reduce Vercel CPU usage
 
 export default async function Home() {
   const { data: products } = await supabase

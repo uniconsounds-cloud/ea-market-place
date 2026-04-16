@@ -2,6 +2,15 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl
+    
+    // 1. EARLY EXIT: Skip middleware for all API routes and internal Next.js paths
+    // These paths don't need auth session refresh or affiliate tracking in the middleware context.
+    // MT5 Sync calls hit /api frequently; skipping them here saves huge CPU.
+    if (pathname.startsWith('/api/') || pathname.startsWith('/_next/') || pathname.includes('.')) {
+        return NextResponse.next()
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -26,18 +35,19 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // This will refresh session if expired - required for Server Components
-    // https://supabase.com/docs/guides/auth/server-side/nextjs
-    await supabase.auth.getUser()
+    // 2. Only refresh session for pages that likely need it (Admin, Farm, Dashboard)
+    // Avoid running this for every single landing page visit if possible.
+    if (pathname.startsWith('/admin') || pathname.startsWith('/farm') || pathname.startsWith('/dashboard')) {
+        await supabase.auth.getUser()
+    }
 
-    // Referral Tracking Logic
-    // If the URL has ?ref=abc123, save it as a cookie for 30 days
+    // 3. Referral Tracking Logic
     const refCode = request.nextUrl.searchParams.get('ref');
     if (refCode) {
         response.cookies.set('affiliate_ref', refCode, {
             path: '/',
             maxAge: 60 * 60 * 24 * 30, // 30 days
-            httpOnly: false, // Must be false so client-side register form can read it
+            httpOnly: false,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
         });
@@ -53,7 +63,7 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
-         * Feel free to modify this pattern to include more paths.
+         * - .png, .jpg, .jpeg, .gif, .svg, .webp (public images)
          */
         '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
