@@ -105,6 +105,74 @@ double EAE_CalculateTodayProfit()
 }
 
 //+------------------------------------------------------------------+
+//| Calculate total closed lots for the current day                  |
+//+------------------------------------------------------------------+
+double EAE_CalculateTodayClosedLots()
+{
+   double total_lots = 0;
+   datetime todayStart = (TimeCurrent() / 86400) * 86400; // Start of day 00:00
+   
+   if(HistorySelect(todayStart, TimeCurrent()))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket > 0)
+         {
+            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+            {
+               total_lots += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+            }
+         }
+      }
+   }
+   return total_lots;
+}
+
+//+------------------------------------------------------------------+
+//| Update and Get Daily Max Drawdown (Fixed Amount)                 |
+//| Persists peak DD in a Global Variable until midnight reset       |
+//+------------------------------------------------------------------+
+double EAE_GetDailyMaxDrawdown()
+{
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
+   double current_pnl = equity - balance;
+   
+   string gv_peak_name = "EAE_PeakEquity_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string gv_max_dd_name = "EAE_MaxDD_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string gv_date_name = "EAE_LastDate_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   
+   datetime today_start = (TimeCurrent() / 86400) * 86400;
+   
+   // Reset if new day
+   if(!GlobalVariableCheck(gv_date_name) || GlobalVariableGet(gv_date_name) != (double)today_start)
+   {
+      GlobalVariableSet(gv_peak_name, balance);
+      GlobalVariableSet(gv_max_dd_name, 0);
+      GlobalVariableSet(gv_date_name, (double)today_start);
+   }
+   
+   double peak = GlobalVariableGet(gv_peak_name);
+   if(equity > peak) {
+      peak = equity;
+      GlobalVariableSet(gv_peak_name, peak);
+   }
+   
+   double current_dd = peak - equity;
+   double max_dd = GlobalVariableGet(gv_max_dd_name);
+   
+   if(current_dd > max_dd) {
+      max_dd = current_dd;
+      GlobalVariableSet(gv_max_dd_name, max_dd);
+   }
+   
+   return max_dd;
+}
+
+//+------------------------------------------------------------------+
 //| Send a full modular snapshot to the web server                   |
 //+------------------------------------------------------------------+
 bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
@@ -153,6 +221,8 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
       payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
    }
    payload += "\"today_profit\":" + DoubleToString(EAE_CalculateTodayProfit(), 2) + ",";
+   payload += "\"today_closed_lots\":" + DoubleToString(EAE_CalculateTodayClosedLots(), 2) + ",";
+   payload += "\"daily_max_drawdown\":" + DoubleToString(EAE_GetDailyMaxDrawdown(), 2) + ",";
    payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
    payload += "},";

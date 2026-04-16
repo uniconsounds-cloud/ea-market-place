@@ -77,6 +77,8 @@ type FarmHudProps = {
     sellCount: number;
     buyPnl: number;
     sellPnl: number;
+    todayClosedLots: number;
+    dailyMaxDrawdown: number;
     isShaking?: boolean;
     onClick?: () => void;
 };
@@ -94,6 +96,8 @@ export default function FarmHud({
     sellCount,
     buyPnl,
     sellPnl,
+    todayClosedLots,
+    dailyMaxDrawdown,
     isShaking = false,
     onClick,
 }: FarmHudProps) {
@@ -359,7 +363,9 @@ export default function FarmHud({
                         <div className="flex items-center gap-1 mt-0.5">
                            <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black uppercase tracking-widest">{accountType}</span>
                            <span className="inline sm:inline text-[7px] text-white/20">|</span>
-                           <span className="inline sm:inline text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-1">{totalStandardLots.toFixed(2)}</span></span>
+                           <span className="inline sm:inline text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-1">{todayClosedLots.toFixed(2)}</span></span>
+                           <span className="inline sm:inline text-[7px] text-white/20 ml-1">|</span>
+                           <span className="inline sm:inline text-[8px] text-white/40 uppercase">MAX DD:<span className="text-red-500/80 ml-1">{currencyPrefix}{dailyMaxDrawdown.toFixed(2)}</span></span>
                         </div>
                     </div>
                 </div>
@@ -392,6 +398,8 @@ export function FarmMobileStatsOverlay({
     sellPnl: number;
     balance: number;
     todayProfit: number;
+    todayClosedLots: number;
+    dailyMaxDrawdown: number;
     accountType: string;
     totalStandardLots: number;
     isShaking?: boolean;
@@ -475,6 +483,10 @@ export function FarmMobileStatsOverlay({
                     <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
+                    <div className="flex flex-col gap-0.5 mt-1">
+                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest">LOTS: <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
+                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest">MAX DD: <span className="text-red-500/80">{currencyPrefix}{dailyMaxDrawdown.toFixed(2)}</span></span>
+                    </div>
                 </div>
                 {/* Box Image on Bottom-Right */}
                 <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>

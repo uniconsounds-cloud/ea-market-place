@@ -530,6 +530,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     buyPnl={stats.buyPnl}
                     sellPnl={stats.sellPnl}
                     todayProfit={smoothedTodayProfit}
+                    todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
+                    dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                     assetType={assetType}
                     isShaking={isShaking}
                     onClick={handleSecretToggle}
@@ -571,6 +573,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 balance={Number(portStatus?.balance) || 0}
                 todayProfit={smoothedTodayProfit}
                 accountType={portStatus?.account_type || 'USC'}
+                todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
+                dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
             />
