@@ -486,8 +486,8 @@ export function FarmMobileStatsOverlay({
                         <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                     </span>
                     <div className="flex flex-col gap-0 mt-[-2px]">
-                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">MAX DD: <span className="text-red-500/80">{currencyPrefix}{dailyMaxDrawdown.toFixed(2)}</span></span>
-                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">LOTS: <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
+                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">MaxDD: <span className="text-red-500/80">{currencyPrefix}{dailyMaxDrawdown.toFixed(2)}</span></span>
+                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">Lots: <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
                     </div>
                 </div>
                 {/* Port Number on Bottom-Left */}
