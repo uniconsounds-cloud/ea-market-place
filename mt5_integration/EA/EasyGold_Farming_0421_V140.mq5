@@ -43,9 +43,10 @@
 //|  1.406 - FIX: Daily Profit Tracker robust sync optimization.                                     |
 //|  1.407 - NEW: ABRG (Adaptive Basket Risk Guard) with Cluster Hibernation and Soft Exits.         |
 //|  1.408 - NEW: Smart Follow System (Decoupled Follow limits, ATR default, separate ABRG count).   |
+//|  1.500 - NEW: Multi-Cluster Grid, Dynamic Magic Allocation, BE Anchor Merging.                 |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.408"
+#property version   "1.500"
 
 // At top of file
 #include "EAE_MonitorTypes.mqh"
@@ -56,7 +57,7 @@
 #include "EAE_FileLogger.mqh"
 #include "EAEZE_Licensing.mqh"
 
-#define EA_VERSION "1.407"
+#define EA_VERSION "1.500"
 
 //==================================================================//
 // [LICENSE] Runtime restrictions (EDIT HERE)                        //
@@ -878,6 +879,30 @@ double BasketProfitByMagicSide(const int magic, const ENUM_POSITION_TYPE side)
    return sum;
 }
 
+// [NEW] V1.500: Calculate Break-Even (Weighted Average) Price for a specific cluster
+double CalculateBreakEvenPriceByMagicSide(const int magic, const ENUM_POSITION_TYPE side)
+{
+   int total = PositionsTotal();
+   double sum_weighted_px = 0.0;
+   double sum_vol = 0.0;
+
+   for(int i=0; i<total; i++)
+   {
+      if(!SelectPositionByIndex(i)) continue;
+      if(PositionGetString(POSITION_SYMBOL) != _Symbol) continue;
+      if((int)PositionGetInteger(POSITION_MAGIC) != magic) continue;
+      if((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) != side) continue;
+
+      double vol = PositionGetDouble(POSITION_VOLUME);
+      double px = PositionGetDouble(POSITION_PRICE_OPEN);
+      sum_weighted_px += (px * vol);
+      sum_vol += vol;
+   }
+   
+   if(sum_vol <= 0.0) return 0.0;
+   return sum_weighted_px / sum_vol;
+}
+
 bool CloseAllByMagicSide(const int magic, const ENUM_POSITION_TYPE side)
 {
    bool ok = true;
@@ -1214,12 +1239,13 @@ string SeqBuildComment(const bool isBuy, const string rawTag)
 //==================================================================//
 // [600] TRADE - Actions                                               //
 //==================================================================//
-bool PlaceBuy(double vol, const string comment)
+bool PlaceBuy(double vol, const string comment, const int target_magic = 0)
 {
    if(!CanOpenNewOrdersNow()) return false;
 
    vol = NormalizeVolume(_Symbol, vol);
-   g_trade.SetExpertMagicNumber(g_magicBuy);
+   int magic = (target_magic > 0) ? target_magic : g_magicBuy;
+   g_trade.SetExpertMagicNumber(magic);
    g_trade.SetDeviationInPoints(InpSlippagePoints);
 
    double sl = 0.0;
@@ -1232,12 +1258,13 @@ bool PlaceBuy(double vol, const string comment)
    return ok;
 }
 
-bool PlaceSell(double vol, const string comment)
+bool PlaceSell(double vol, const string comment, const int target_magic = 0)
 {
    if(!CanOpenNewOrdersNow()) return false;
 
    vol = NormalizeVolume(_Symbol, vol);
-   g_trade.SetExpertMagicNumber(g_magicSell);
+   int magic = (target_magic > 0) ? target_magic : g_magicSell;
+   g_trade.SetExpertMagicNumber(magic);
    g_trade.SetDeviationInPoints(InpSlippagePoints);
 
    double sl = 0.0;
@@ -2407,8 +2434,11 @@ void TryRescue()
                      // [ABRG] Check Hibernation/Cluster Permission
                      if(ABRG_IsAllowed(g_eae_buy_state)) 
                      {
+                        // [V1.500] Calculate dynamic cluster magic number
+                        int target_magic = ABRG_GetClusterMagicNumber(rescue_cntB, g_magicBuy, InpMaxOrderLoss);
+                        
                         if(g_lotsB <= 0.0) g_lotsB = InpLots;
-                        if(PlaceBuy(g_lotsB, "RTB"))
+                        if(PlaceBuy(g_lotsB, "RTB", target_magic))
                         {
                            g_lotsB += InpLotPlusB;
                            if(g_lotsB > InpUpperLimitLotSize) g_lotsB = InpUpperLimitLotSize;
@@ -2452,8 +2482,11 @@ void TryRescue()
                      // [ABRG] Check Hibernation/Cluster Permission
                      if(ABRG_IsAllowed(g_eae_sell_state))
                      {
+                        // [V1.500] Calculate dynamic cluster magic number
+                        int target_magic = ABRG_GetClusterMagicNumber(rescue_cntS, g_magicSell, InpMaxOrderLoss);
+                        
                         if(g_lotsS <= 0.0) g_lotsS = InpLots;
-                        if(PlaceSell(g_lotsS, "RTS"))
+                        if(PlaceSell(g_lotsS, "RTS", target_magic))
                         {
                            g_lotsS += InpLotPlusS;
                            if(g_lotsS > InpUpperLimitLotSize) g_lotsS = InpUpperLimitLotSize;
@@ -2526,23 +2559,80 @@ void TryFollow()
    }
 }
 
+// [NEW] V1.500: Multi-Cluster Virtual Merging and Independent TP Logic
+void TryMultiClusterBasketClose(const int base_magic, const ENUM_POSITION_TYPE side)
+{
+   int max_chunks = (InpMaxOrderLoss - InpABRG_FreezeCount) / InpABRG_ClusterSize + 1;
+   if(max_chunks <= 0) max_chunks = 1;
+   
+   double global_profit = BasketProfitByMagicSide(base_magic, side);
+   int global_count = CountPositionsByMagicSide(base_magic, side);
+   
+   // 1. Process Independent Clusters
+   for(int i = 0; i < max_chunks; i++)
+   {
+      int cluster_magic = base_magic + ((i + 1) * 2);
+      int cluster_count = CountPositionsByMagicSide(cluster_magic, side);
+      if(cluster_count == 0) continue;
+      
+      double cluster_profit = BasketProfitByMagicSide(cluster_magic, side);
+      double cluster_be = CalculateBreakEvenPriceByMagicSide(cluster_magic, side);
+      
+      string anchor_name = StringFormat("EAE_AnchorBE_%d", cluster_magic);
+      bool is_merged = false;
+      
+      // Check Anchor to determine Merged status
+      if(GlobalVariableCheck(anchor_name))
+      {
+         double anchor_be = GlobalVariableGet(anchor_name);
+         if(side == POSITION_TYPE_BUY && cluster_be < anchor_be) is_merged = true;
+         if(side == POSITION_TYPE_SELL && cluster_be > anchor_be) is_merged = true;
+      }
+      
+      if(is_merged)
+      {
+         // Add to Global Basket
+         global_profit += cluster_profit;
+         global_count += cluster_count;
+      }
+      else
+      {
+         // Independent! Check its own target
+         if(cluster_count >= 2 && cluster_profit >= InpCloseMoney)
+         {
+            CloseAllByMagicSideTagged("TP_LOCAL", cluster_magic, side);
+            GlobalVariableSet(anchor_name, cluster_be); // Set new anchor
+            PrintFormat("MultiCluster: Local Cluster %d closed independently. New Anchor BE = %f", cluster_magic, cluster_be);
+         }
+      }
+   }
+   
+   // 2. Process Global Basket (Base + Merged + Follow)
+   if(global_count >= 2 && global_profit >= InpCloseMoney)
+   {
+      CloseAllByMagicSideTagged("TP_GLOBAL", base_magic, side);
+      
+      // Also forcefully close all intermediate clusters since the global crisis is averted
+      for(int i = 0; i < max_chunks; i++)
+      {
+         int cluster_magic = base_magic + ((i + 1) * 2);
+         if(CountPositionsByMagicSide(cluster_magic, side) > 0)
+         {
+            CloseAllByMagicSideTagged("TP_MERGED", cluster_magic, side);
+         }
+         
+         // Clean up all anchors for a fresh start
+         string anchor_name = StringFormat("EAE_AnchorBE_%d", cluster_magic);
+         if(GlobalVariableCheck(anchor_name)) GlobalVariableDel(anchor_name);
+      }
+      PrintFormat("MultiCluster: Global Basket closed successfully. Cleared all anchors.");
+   }
+}
+
 void TryBasketClose()
 {
-   int cntB = CountPositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
-   if(cntB >= 2)
-   {
-      double pB = BasketProfitByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
-      if(pB >= InpCloseMoney)
-         CloseAllByMagicSideTagged("TP", g_magicBuy, POSITION_TYPE_BUY);
-   }
-
-   int cntS = CountPositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
-   if(cntS >= 2)
-   {
-      double pS = BasketProfitByMagicSide(g_magicSell, POSITION_TYPE_SELL);
-      if(pS >= InpCloseMoney)
-         CloseAllByMagicSideTagged("TP", g_magicSell, POSITION_TYPE_SELL);
-   }
+   TryMultiClusterBasketClose(g_magicBuy, POSITION_TYPE_BUY);
+   TryMultiClusterBasketClose(g_magicSell, POSITION_TYPE_SELL);
 }
 
 //==================================================================//

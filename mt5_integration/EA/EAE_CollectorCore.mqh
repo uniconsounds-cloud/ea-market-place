@@ -111,7 +111,17 @@ bool EAE_CollectSideRuntimeState(const string symbol,
 
       if(pos_symbol != symbol)
          continue;
-      if(pos_magic != magic)
+         
+      // [V1.500] Multi-Cluster Magic Range Check
+      // Accepts base magic AND any dynamically generated local cluster magic (offset by 2s)
+      bool isValidMagic = false;
+      if(pos_magic >= magic && pos_magic <= magic + 30) // Buffer of 30 covers ~15 chunks
+      {
+         if((pos_magic - magic) % 2 == 0)
+            isValidMagic = true;
+      }
+      
+      if(!isValidMagic)
          continue;
 
       if(side == EAE_SIDE_BUY && pos_type != POSITION_TYPE_BUY)

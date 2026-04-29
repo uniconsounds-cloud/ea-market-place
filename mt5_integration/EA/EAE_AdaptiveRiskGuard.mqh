@@ -133,6 +133,40 @@ void ABRG_MonitorSide(EAE_SideRuntimeState &state)
    }
 }
 
+// --- [NEW] V1.500: Multi-Cluster Dynamic Magic Number Allocation ---
+// Calculates which Magic Number a new order should get based on its index.
+// It ensures:
+// 1. First cluster (1-30) gets BaseMagic.
+// 2. Middle clusters (31-50, 51-70...) get BaseMagic + (chunkIndex * 2).
+// 3. Final cluster (the remainder up to MaxOrderLoss) gets BaseMagic again (Merged).
+int ABRG_GetClusterMagicNumber(const int rescue_count, const int base_magic, const int max_order_loss)
+{
+   // 1. If we haven't reached the first cluster limit, use base magic (Global)
+   if(rescue_count < InpABRG_FreezeCount)
+      return base_magic;
+      
+   // 2. Calculate remaining orders allowed
+   int remaining_total = max_order_loss - InpABRG_FreezeCount;
+   if(remaining_total <= 0) return base_magic; // Safety
+   
+   // 3. Calculate which chunk we are currently in (0-indexed after FreezeCount)
+   int order_over_freeze = rescue_count - InpABRG_FreezeCount;
+   int current_chunk_idx = order_over_freeze / InpABRG_ClusterSize;
+   
+   // 4. Calculate total number of full chunks possible
+   int total_chunks = remaining_total / InpABRG_ClusterSize;
+   
+   // 5. If we are in the FINAL possible chunk (or beyond), it MUST be the Global Anchor
+   if(current_chunk_idx >= total_chunks)
+      return base_magic;
+      
+   // 6. Otherwise, it is an independent middle cluster! 
+   // Offset by 2 for each chunk to avoid colliding Buy/Sell (Buy=Odd, Sell=Even)
+   // Chunk 0 => +2, Chunk 1 => +4, etc.
+   int magic_offset = (current_chunk_idx + 1) * 2;
+   return base_magic + magic_offset;
+}
+
 // Permission check: Returns true if trading is allowed
 bool ABRG_IsAllowed(EAE_SideRuntimeState &state)
 {
