@@ -97,6 +97,8 @@ struct EAE_SideRuntimeState
    int      current_age_sec;
 
    int      open_count;
+   int      rescue_count;        // [NEW] Entry + Rescue orders only
+   int      follow_count;        // [NEW] Follow orders only
    double   open_lots;
    double   floating_pnl;
 
@@ -104,9 +106,17 @@ struct EAE_SideRuntimeState
    double   peak_open_lots;
    double   peak_floating_profit;
    double   peak_floating_loss;
+   double   peak_floating_dd_pct; // [NEW] Worst DD% during cycle
 
    int      prev_open_count;
    datetime last_update_time;
+   double   be_price;            // [NEW] Weighted average entry
+
+   // [NEW] ABRG State Tracking (V1.407)
+   int      abrg_risk_score;     // 0-5
+   bool     abrg_is_hibernating; // Waiting for gap
+   double   abrg_frozen_price;   // Price when frozen
+   int      abrg_cluster_count;  // Trades since thaw
 };
 
 struct EAE_BasketCloseRecord
@@ -129,6 +139,7 @@ struct EAE_BasketCloseRecord
    double   max_open_lots_cycle;
    double   max_floating_profit;
    double   max_floating_loss;
+   double   max_floating_dd_pct; // [NEW] Worst DD% during cycle
 
    double   balance_after_close;
    double   equity_after_close;
@@ -166,6 +177,17 @@ struct EAE_BasketStatsSummary
    datetime last_close_time;
 };
 
+struct EAE_DailySummary
+{
+   datetime date;
+   long     account_login;
+   double   max_dd_pct;
+   double   total_profit;
+   double   total_lots;
+   int      buy_cycles;
+   int      sell_cycles;
+};
+
 struct EAE_RealtimeSnapshot
 {
    EAE_SystemIdentity     identity;
@@ -190,14 +212,23 @@ void EAE_InitSideState(EAE_SideRuntimeState &state, const int side)
    state.oldest_open_time     = 0;
    state.current_age_sec      = 0;
    state.open_count           = 0;
+   state.rescue_count         = 0;
+   state.follow_count         = 0;
    state.open_lots            = 0.0;
    state.floating_pnl         = 0.0;
    state.peak_open_count      = 0;
    state.peak_open_lots       = 0.0;
-   state.peak_floating_profit = 0.0;
-   state.peak_floating_loss   = 0.0;
+   state.peak_floating_profit  = 0.0;
+   state.peak_floating_loss    = 0.0;
+   state.peak_floating_dd_pct  = 0.0;
    state.prev_open_count      = 0;
    state.last_update_time     = 0;
+   state.be_price             = 0.0;
+   
+   state.abrg_risk_score      = 0;
+   state.abrg_is_hibernating  = false;
+   state.abrg_frozen_price    = 0.0;
+   state.abrg_cluster_count   = 0;
 }
 
 void EAE_InitStatsSummary(EAE_BasketStatsSummary &sum, const int side)

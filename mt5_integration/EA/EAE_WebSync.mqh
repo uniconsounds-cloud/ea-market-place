@@ -28,6 +28,12 @@ string   g_eae_system_key     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 // Current active partner key for identification
 string   g_eae_api_key        = "EZE-123456"; 
 
+// --- Smart Sync State ---
+string   g_eae_last_sync_hash = "";
+string   g_eae_sync_status    = "IDLE"; // Shared status for UI: IDLE, SYNCING, OK, ERR
+datetime g_eae_last_heartbeat = 0;
+const int g_eae_heartbeat_interval = 300; // Force full sync every 5 minutes even if no change
+
 //+------------------------------------------------------------------+
 //| Initialize the WebSync module with custom settings               |
 //+------------------------------------------------------------------+
@@ -74,102 +80,136 @@ string EAE_BuildOrdersJson()
    return json;
 }
 
-//+------------------------------------------------------------------+
-//| Calculate total closed profit for the current day                |
-//+------------------------------------------------------------------+
-double EAE_CalculateTodayProfit()
-{
-   double profit = 0;
-   datetime todayStart = (TimeCurrent() / 86400) * 86400; // Start of day 00:00
-   
-   if(HistorySelect(todayStart, TimeCurrent()))
-   {
-      int total = HistoryDealsTotal();
-      for(int i = 0; i < total; i++)
-      {
-         ulong ticket = HistoryDealGetTicket(i);
-         if(ticket > 0)
-         {
-            // Only count if it's a profit/loss relevant deal
-            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
-            {
-               profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
-               profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
-               profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
-            }
-         }
-      }
-   }
-   return profit;
-}
+
 
 //+------------------------------------------------------------------+
-//| Calculate total closed lots for the current day                  |
+//| Update and Get Daily Max Drawdown (PERCENTAGE)                   |
+//| Persists peak DD% in a Global Variable until midnight reset       |
 //+------------------------------------------------------------------+
-double EAE_CalculateTodayClosedLots()
-{
-   double total_lots = 0;
-   datetime todayStart = (TimeCurrent() / 86400) * 86400; // Start of day 00:00
-   
-   if(HistorySelect(todayStart, TimeCurrent()))
-   {
-      int total = HistoryDealsTotal();
-      for(int i = 0; i < total; i++)
-      {
-         ulong ticket = HistoryDealGetTicket(i);
-         if(ticket > 0)
-         {
-            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
-            {
-               total_lots += HistoryDealGetDouble(ticket, DEAL_VOLUME);
-            }
-         }
-      }
-   }
-   return total_lots;
-}
-
-//+------------------------------------------------------------------+
-//| Update and Get Daily Max Drawdown (Fixed Amount)                 |
-//| Persists peak DD in a Global Variable until midnight reset       |
-//+------------------------------------------------------------------+
-double EAE_GetDailyMaxDrawdown()
+double EAE_GetDailyMaxDrawdownPct()
 {
    double balance = AccountInfoDouble(ACCOUNT_BALANCE);
    double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
-   double current_pnl = equity - balance;
+   if(balance <= 0) return 0.0;
    
-   string gv_peak_name = "EAE_PeakEquity_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   string gv_max_dd_name = "EAE_MaxDD_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   string gv_date_name = "EAE_LastDate_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   double current_pnl = equity - balance;
+   double current_dd_pct = (current_pnl < 0 ? MathAbs(current_pnl) / balance * 100.0 : 0.0);
+   
+   string gv_max_dd_name = "EAE_MaxDDPct_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string gv_date_name   = "EAE_LastDateVal_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    
    datetime today_start = (TimeCurrent() / 86400) * 86400;
    
    // Reset if new day
    if(!GlobalVariableCheck(gv_date_name) || GlobalVariableGet(gv_date_name) != (double)today_start)
    {
-      GlobalVariableSet(gv_peak_name, balance);
       GlobalVariableSet(gv_max_dd_name, 0);
       GlobalVariableSet(gv_date_name, (double)today_start);
    }
    
-   double peak = GlobalVariableGet(gv_peak_name);
-   if(equity > peak) {
-      peak = equity;
-      GlobalVariableSet(gv_peak_name, peak);
+   double max_dd_pct = GlobalVariableGet(gv_max_dd_name);
+   if(current_dd_pct > max_dd_pct) {
+      max_dd_pct = current_dd_pct;
+      GlobalVariableSet(gv_max_dd_name, max_dd_pct);
    }
    
-   double current_dd = peak - equity;
-   double max_dd = GlobalVariableGet(gv_max_dd_name);
+   return max_dd_pct;
+}
+
+//+------------------------------------------------------------------+
+//| Scan MT5 History for a summary of a specific day                 |
+//+------------------------------------------------------------------+
+bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, EAE_DailySummary &out_sum)
+{
+   datetime start = (targetDay / 86400) * 86400;
+   datetime end   = start + 86399;
    
-   if(current_dd > max_dd) {
-      max_dd = current_dd;
-      GlobalVariableSet(gv_max_dd_name, max_dd);
+   ZeroMemory(out_sum);
+   out_sum.date          = start;
+   out_sum.account_login = AccountInfoInteger(ACCOUNT_LOGIN);
+   
+   if(!HistorySelect(start, end)) return false;
+   
+   int total = HistoryDealsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket <= 0) continue;
+      
+      long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+      if(magicB != 0 && magicS != 0) {
+         if(magic != magicB && magic != magicS) continue;
+      }
+      
+      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+      if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+      {
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+         out_sum.total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+         
+         // In Farming, an 'OUT' deal usually signifies a layer close. 
+         // For 'Cycles', we look for specific comments or just count outcomes.
+         // A more accurate cycle count would require looking for 'BASKET_CLOSE' tags.
+         string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+         if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
+         {
+            if(magic == magicB) out_sum.buy_cycles++;
+            else                out_sum.sell_cycles++;
+         }
+      }
    }
    
-   return max_dd;
+   // Daily Max DD is retrieved from persistence
+   out_sum.max_dd_pct = EAE_GetDailyMaxDrawdownPct();
+   
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Push a Daily Performance Summary to the Cloud (UPSERT mode)      |
+//+------------------------------------------------------------------+
+void EAE_WebSyncPushDailySummary(const EAE_DailySummary &sum)
+{
+   string json = "{ \"p_payload\": {";
+   json += "\"type\":\"DAILY_SUMMARY\",";
+   json += "\"port_number\":\"" + IntegerToString(sum.account_login) + "\",";
+   json += "\"date\":\"" + TimeToString(sum.date, TIME_DATE) + "\",";
+   json += "\"profit\":" + DoubleToString(sum.total_profit, 2) + ",";
+   json += "\"lots\":" + DoubleToString(sum.total_lots, 2) + ",";
+   json += "\"max_dd_pct\":" + DoubleToString(sum.max_dd_pct, 2) + ",";
+   json += "\"buy_cycles\":" + IntegerToString(sum.buy_cycles) + ",";
+   json += "\"sell_cycles\":" + IntegerToString(sum.sell_cycles);
+   json += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
+
+   char data[]; char result[]; string result_headers;
+   StringToCharArray(json, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, ArraySize(data) - 1);
+   
+   string headers = "Content-Type: application/json\r\n" + 
+                    "apikey: " + g_eae_system_key + "\r\n" +
+                    "Authorization: Bearer " + g_eae_system_key + "\r\n";
+   
+   Print("EAE: Sending Daily Summary for ", TimeToString(sum.date, TIME_DATE));
+   WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
+}
+
+//+------------------------------------------------------------------+
+//| Calculate a unique hash for the current state to detect changes  |
+//+------------------------------------------------------------------+
+string EAE_CalculateDataHash(const EAE_RealtimeSnapshot &snap)
+{
+   // Combine critical metrics into a string to detect "Real Changes"
+   return StringFormat("%d|%.2f|%.2f|%.2f|%d|%.2f|%d|%.2f",
+      AccountInfoInteger(ACCOUNT_LOGIN),
+      snap.account.balance,
+      snap.account.equity,
+      snap.buy_state.floating_pnl,
+      snap.buy_state.open_count,
+      snap.sell_state.floating_pnl,
+      snap.sell_state.open_count,
+      PositionsTotal());
 }
 
 //+------------------------------------------------------------------+
@@ -182,7 +222,19 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    if(!force_now && (now - g_eae_last_sync_time < g_eae_sync_interval))
       return false;
       
+   // Smart Delta Sync Check
+   string current_hash = EAE_CalculateDataHash(snap);
+   bool is_heartbeat = (now - g_eae_last_heartbeat >= g_eae_heartbeat_interval);
+   
+   if(!force_now && !is_heartbeat && current_hash == g_eae_last_sync_hash)
+   {
+      g_eae_sync_status = "IDLE";
+      return false; // Skip redundant sync
+   }
+
+   g_eae_sync_status = "SYNCING";
    g_eae_last_sync_time = now;
+   if(is_heartbeat) g_eae_last_heartbeat = now;
 
    // 1. Construct Snapshot Data JSON manually (to avoid external JSON libs)
    string snapshot_json = "{";
@@ -218,16 +270,44 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    payload += "\"is_heartbeat\":" + (g_eae_full_sync_mode ? "false" : "true") + ",";
    payload += "\"snapshot\":" + snapshot_json + ",";
    if(g_eae_full_sync_mode) {
-      payload += "\"orders\":"   + EAE_BuildOrdersJson() + ",";
+      payload += "\"orders\":"       + EAE_BuildOrdersJson() + ",";
    }
-   payload += "\"today_profit\":" + DoubleToString(EAE_CalculateTodayProfit(), 2) + ",";
-   payload += "\"today_closed_lots\":" + DoubleToString(EAE_CalculateTodayClosedLots(), 2) + ",";
-   payload += "\"daily_max_drawdown\":" + DoubleToString(EAE_GetDailyMaxDrawdown(), 2) + ",";
-   payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
-   payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
+   
+   // --- Daily Performance (V1.406 Optimization) ---
+   EAE_DailySummary today;
+   EAE_ScanHistoryDailySummary(TimeCurrent(), snap.identity.magic_buy, snap.identity.magic_sell, today);
+   
+   payload += "\"today_profit\":"     + DoubleToString(today.total_profit, 2) + ",";
+   payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
+   payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
+   payload += "\"server_time\":"      + IntegerToString(TimeCurrent()) + ",";
+   payload += "\"port_number\":\""    + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
    payload += "},";
-   payload += "\"p_api_key\":\"" + g_eae_api_key + "\"";
+   payload += "\"p_api_key\":\""      + g_eae_api_key + "\"";
    payload += "}";
+
+   // --- [NEW] Daily Summary Persistence / Day-Change Trigger ---
+   datetime today_start = (TimeCurrent() / 86400) * 86400;
+   string gv_last_sync_date = "EAE_LastDailySync_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   
+   if(GlobalVariableCheck(gv_last_sync_date))
+   {
+      datetime last_date = (datetime)GlobalVariableGet(gv_last_sync_date);
+      if(today_start > last_date)
+      {
+         // Day has changed! Send summary for the PREVIOUS day.
+         EAE_DailySummary prev;
+         if(EAE_ScanHistoryDailySummary(last_date, snap.identity.magic_buy, snap.identity.magic_sell, prev))
+         {
+            EAE_WebSyncPushDailySummary(prev);
+            GlobalVariableSet(gv_last_sync_date, (double)today_start);
+         }
+      }
+   }
+   else
+   {
+      GlobalVariableSet(gv_last_sync_date, (double)today_start);
+   }
 
    // 3. Dispatch WebRequest (Async-style with short timeout)
    char data[];
@@ -244,15 +324,21 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    int res = WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
    
    if(res == -1) {
+      g_eae_sync_status = "ERR: CONN";
       Print("EAE Sync Error (WebRequest failed): ", GetLastError());
       return false;
    }
    
    if(res != 200) {
+      g_eae_sync_status = "ERR: " + IntegerToString(res);
       string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
       Print("EAE Sync Server Error (", res, "): ", err_resp);
       return false;
    }
+   
+   // Update last hash on successful sync
+   g_eae_last_sync_hash = current_hash;
+   g_eae_sync_status = "OK";
    
    // 4. Parse response for on-demand sync control
    string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);

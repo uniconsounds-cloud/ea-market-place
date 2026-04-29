@@ -41,9 +41,11 @@ string                 g_eae_dashboard_prefix = "EGF0410";
 bool                   g_eae_initialized = false;
 
 datetime g_eae_last_snapshot_log_time = 0;
-string   g_eae_snapshot_file_name     = "EG_Farming_Snapshot_Live.csv";
-string   g_eae_close_file_name        = "EG_Farming_BasketClose.csv";
-string   g_eae_summary_state_file_name= "EG_Farming_SummaryState.csv";
+string   g_eae_snapshot_file_name     = "";
+string   g_eae_close_file_name        = "";
+string   g_eae_summary_state_file_name= "";
+
+bool     g_eae_data_loaded            = false; // Lazy load flag
 
    long EG_Farming_GetBuyMagic()
    {
@@ -75,6 +77,19 @@ void EG_Farming_BuildIdentity(EAE_SystemIdentity &id)
    id.magic_sell     = EG_Farming_GetSellMagic();
 }
 
+// Generate unique file names to prevent contention
+void EG_Farming_BuildFileNames()
+{
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   string sym = _Symbol;
+   StringReplace(sym, "/", "_"); 
+   StringReplace(sym, "\\", "_");
+
+   g_eae_snapshot_file_name      = StringFormat("EG_Farming_Snap_%d_%s.csv", login, sym);
+   g_eae_close_file_name         = StringFormat("EG_Farming_Close_%d_%s.csv", login, sym);
+   g_eae_summary_state_file_name = StringFormat("EG_Farming_Summary_%d_%s.csv", login, sym);
+}
+
 // Build one full realtime snapshot
 bool EG_Farming_BuildRealtimeSnapshot(EAE_RealtimeSnapshot &out_snap)
 {
@@ -89,10 +104,11 @@ bool EG_Farming_BuildRealtimeSnapshot(EAE_RealtimeSnapshot &out_snap)
    return true;
 }
 
-// Init monitoring module
+// Init monitoring module (Instant Phase)
 void EG_Farming_MonitorInit(string api_key)
 {
    EG_Farming_BuildIdentity(g_eae_identity);
+   EG_Farming_BuildFileNames();
 
    EAE_InitSideState(g_eae_buy_state,  EAE_SIDE_BUY);
    EAE_InitSideState(g_eae_sell_state, EAE_SIDE_SELL);
@@ -100,21 +116,31 @@ void EG_Farming_MonitorInit(string api_key)
    EAE_InitStatsSummary(g_eae_buy_summary,  EAE_SIDE_BUY);
    EAE_InitStatsSummary(g_eae_sell_summary, EAE_SIDE_SELL);
 
+   // [FAST] Only initialize the UI shell shell here
+   EAE_DashboardInit(ChartID(), g_eae_dashboard_prefix);
+
+   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", api_key, 20);
+   
+   g_eae_initialized = true;
+   g_eae_data_loaded = false; // Trigger heavy load in first Timer cycle
+}
+
+// Heavy loading (Lazy Phase)
+void EG_Farming_MonitorLoadState()
+{
+   if(g_eae_data_loaded) return;
+   
+   Print("EA Monitor: Performing Heavy Data Load...");
+   
    // Load persisted summary state if available
-   EAE_LoadSummaryStateCsv(g_eae_summary_state_file_name,
-                           g_eae_buy_summary,
-                           g_eae_sell_summary);
+   if(EAE_LoadSummaryStateCsv(g_eae_summary_state_file_name, g_eae_buy_summary, g_eae_sell_summary))
+      Print("EA Monitor: Summary state loaded from unique storage.");
 
    EAE_CollectAccountSnapshot(g_eae_account);
    EAE_CollectSymbolMeta(_Symbol, g_eae_symbol_meta);
-
-   EAE_DashboardInit(ChartID(), g_eae_dashboard_prefix);
-
-   // Unified Sync: Using direct Supabase RPC (Default set in EAE_WebSync.mqh)
-   // We pass the InpApiKey (which is the Supabase Anon Key)
-   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", api_key, 20);
-
-   g_eae_initialized = true;
+   
+   g_eae_data_loaded = true;
+   Print("EA Monitor: Data Load Complete.");
 }
 
 // Cleanup monitoring module
@@ -129,75 +155,11 @@ void EG_Farming_MonitorDeinit()
    g_eae_initialized = false;
 }
 
-// Lightweight update on tick
+// [REMOVED] Logic moved to MonitorOnTimer to avoid interfering with OnTick trading.
 void EG_Farming_MonitorOnTick()
 {
-   if(!g_eae_initialized)
-      return;
-
-   // Read latest runtime states
-   EAE_CollectSideRuntimeState(_Symbol, EG_Farming_GetBuyMagic(),  EAE_SIDE_BUY,  g_eae_buy_state);
-   EAE_CollectSideRuntimeState(_Symbol, EG_Farming_GetSellMagic(), EAE_SIDE_SELL, g_eae_sell_state);
-
-   // Use current account/meta for close record enrichment
-   EAE_CollectAccountSnapshot(g_eae_account);
-   EAE_CollectSymbolMeta(_Symbol, g_eae_symbol_meta);
-
-   // Track BUY
-   bool has_close_buy = false;
-   EAE_BasketCloseRecord rec_buy;
-   EAE_TrackerUpdateSide(g_eae_buy_state,
-                         g_eae_buy_summary,
-                         g_eae_account,
-                         g_eae_symbol_meta,
-                         _Symbol,
-                         EG_Farming_GetBuyMagic(),
-                         EAE_CLOSE_UNKNOWN,
-                         rec_buy,
-                         has_close_buy);
-
-   if(has_close_buy)
-   {
-      g_eae_last_close_buy = rec_buy;
-      g_eae_has_last_buy   = true;
-   
-      EAE_SaveSummaryStateCsv(g_eae_summary_state_file_name,
-                              g_eae_identity,
-                              g_eae_buy_summary,
-                              g_eae_sell_summary);
-                              
-      // Real-time Event: Trigger immediate sync to web dashboard on basket closure
-      EAE_WebSyncTriggerEvent("BATCH_CLOSE", rec_buy.closed_count, rec_buy.closed_lots, rec_buy.realized_pnl);
-   }
-
-   // Track SELL
-   bool has_close_sell = false;
-   EAE_BasketCloseRecord rec_sell;
-   EAE_TrackerUpdateSide(g_eae_sell_state,
-                         g_eae_sell_summary,
-                         g_eae_account,
-                         g_eae_symbol_meta,
-                         _Symbol,
-                         EG_Farming_GetSellMagic(),
-                         EAE_CLOSE_UNKNOWN,
-                         rec_sell,
-                         has_close_sell);
-
-   if(has_close_sell)
-   {
-      g_eae_last_close_sell = rec_sell;
-      g_eae_has_last_sell   = true;
-   
-      EAE_SaveSummaryStateCsv(g_eae_summary_state_file_name,
-                              g_eae_identity,
-                              g_eae_buy_summary,
-                              g_eae_sell_summary);
-                              
-      // Real-time Event: Trigger immediate sync to web dashboard on basket closure
-      EAE_WebSyncTriggerEvent("BATCH_CLOSE", rec_sell.closed_count, rec_sell.closed_lots, rec_sell.realized_pnl);
-   }
-   
 }
+
 
 // Timer update for dashboard and future file/api outputs
 void EG_Farming_MonitorOnTimer()
@@ -205,8 +167,37 @@ void EG_Farming_MonitorOnTimer()
    if(!g_eae_initialized)
       return;
 
+   // [LAZY] Perform heavy load on first timer event (keeps OnInit instant)
+   if(!g_eae_data_loaded)
+      EG_Farming_MonitorLoadState();
+
+   // [DECOUPLED] Read latest runtime states in Timer (moved from OnTick to be non-intrusive)
+   EAE_CollectSideRuntimeState(_Symbol, EG_Farming_GetBuyMagic(),  EAE_SIDE_BUY,  g_eae_buy_state);
+   EAE_CollectSideRuntimeState(_Symbol, EG_Farming_GetSellMagic(), EAE_SIDE_SELL, g_eae_sell_state);
+
+   // Use current account/meta for close record enrichment
    EAE_CollectAccountSnapshot(g_eae_account);
    EAE_CollectSymbolMeta(_Symbol, g_eae_symbol_meta);
+
+   // Track BUY Basket Closures
+   bool has_close_buy = false;
+   EAE_BasketCloseRecord rec_buy;
+   EAE_TrackerUpdateSide(g_eae_buy_state, g_eae_buy_summary, g_eae_account, g_eae_symbol_meta, _Symbol, EG_Farming_GetBuyMagic(), EAE_CLOSE_UNKNOWN, rec_buy, has_close_buy);
+
+   if(has_close_buy) {
+      EAE_SaveSummaryStateCsv(g_eae_summary_state_file_name, g_eae_identity, g_eae_buy_summary, g_eae_sell_summary);
+      EAE_WebSyncTriggerEvent("BATCH_CLOSE", rec_buy.closed_count, rec_buy.closed_lots, rec_buy.realized_pnl);
+   }
+
+   // Track SELL Basket Closures
+   bool has_close_sell = false;
+   EAE_BasketCloseRecord rec_sell;
+   EAE_TrackerUpdateSide(g_eae_sell_state, g_eae_sell_summary, g_eae_account, g_eae_symbol_meta, _Symbol, EG_Farming_GetSellMagic(), EAE_CLOSE_UNKNOWN, rec_sell, has_close_sell);
+
+   if(has_close_sell) {
+      EAE_SaveSummaryStateCsv(g_eae_summary_state_file_name, g_eae_identity, g_eae_buy_summary, g_eae_sell_summary);
+      EAE_WebSyncTriggerEvent("BATCH_CLOSE", rec_sell.closed_count, rec_sell.closed_lots, rec_sell.realized_pnl);
+   }
 
    EAE_RealtimeSnapshot snap;
    if(EG_Farming_BuildRealtimeSnapshot(snap))

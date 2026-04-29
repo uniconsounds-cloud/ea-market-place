@@ -88,8 +88,11 @@ bool EAE_CollectSideRuntimeState(const string symbol,
                                  EAE_SideRuntimeState &io_state)
 {
    int      count      = 0;
+   int      rescue_cnt = 0;
+   int      follow_cnt = 0;
    double   lots       = 0.0;
    double   floating   = 0.0;
+   double   sum_weighted_px = 0.0;
    datetime oldest     = 0;
    int      total      = PositionsTotal();
 
@@ -117,8 +120,19 @@ bool EAE_CollectSideRuntimeState(const string symbol,
          continue;
 
       count++;
-      lots     += PositionGetDouble(POSITION_VOLUME);
+      
+      // Parse comment to distinguish Follow vs Rescue
+      string comment = PositionGetString(POSITION_COMMENT);
+      if(StringFind(comment, "FOL") >= 0)
+         follow_cnt++;
+      else
+         rescue_cnt++;
+
+      double pos_lots = PositionGetDouble(POSITION_VOLUME);
+      lots     += pos_lots;
       floating += PositionGetDouble(POSITION_PROFIT);
+      
+      sum_weighted_px += (pos_lots * PositionGetDouble(POSITION_PRICE_OPEN));
 
       datetime open_time = (datetime)PositionGetInteger(POSITION_TIME);
       if(oldest == 0 || open_time < oldest)
@@ -126,9 +140,12 @@ bool EAE_CollectSideRuntimeState(const string symbol,
    }
 
    io_state.open_count       = count;
+   io_state.rescue_count     = rescue_cnt;
+   io_state.follow_count     = follow_cnt;
    io_state.open_lots        = lots;
    io_state.floating_pnl     = floating;
    io_state.oldest_open_time = oldest;
+   io_state.be_price         = (lots > 0 ? sum_weighted_px / lots : 0.0);
    io_state.basket_active    = (count > 0);
    io_state.current_age_sec  = (oldest > 0 ? (int)(TimeCurrent() - oldest) : 0);
    io_state.last_update_time = TimeCurrent();

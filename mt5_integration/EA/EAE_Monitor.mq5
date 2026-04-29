@@ -83,7 +83,11 @@ void OnTimer()
       }
    }
    
-   // 3. Perform Sync
+   // 3. Perform Sync (Enhanced V1.406 with Daily Stats)
+   // We pass identity magics so history scanner knows what to look for
+   g_snapshot.identity.magic_buy  = 0; // Monitor mode: Scan all or specify
+   g_snapshot.identity.magic_sell = 0; 
+   
    EAE_WebSyncPerform(g_snapshot);
 }
 

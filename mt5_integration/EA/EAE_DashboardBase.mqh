@@ -122,13 +122,9 @@ string EAE_Dash_Name(const string prefix, const string key)
 
 void EAE_Dash_DeleteByPrefix(const long chart_id, const string prefix)
 {
-   int total = ObjectsTotal(chart_id, 0, -1);
-   for(int i = total - 1; i >= 0; i--)
-   {
-      string name = ObjectName(chart_id, i, 0, -1);
-      if(StringFind(name, prefix) == 0)
-         ObjectDelete(chart_id, name);
-   }
+   // [OPTIMIZED] High-speed native MT5 deletion 
+   // Replaces slow manual loop that scans every object on the chart
+   ObjectsDeleteAll(chart_id, prefix);
 }
 
 bool EAE_Dash_EnsureRect(const long chart_id,
@@ -257,7 +253,7 @@ void EAE_Dash_DrawPortInfo(const long chart_id,
                         EAE_Dash_Name(prefix, "PORT_SECTION_TXT"),
                         x + EAE_Dash_ScaleI(6),
                         y + EAE_Dash_ScaleI(6),
-                        "PORT INFO",
+                        "PORT INFO : " + EG_Farming_GetDashboardGateStatus(),
                         EAE_MON_TEXT_HEADER,
                         EAE_MON_FONT_SIZE());
 
@@ -386,7 +382,9 @@ void EAE_Dash_DrawSummaryTable(const long chart_id,
 // -----------------------------
 void EAE_DashboardInit(const long chart_id, const string prefix)
 {
-   EAE_Dash_DeleteByPrefix(chart_id, prefix);
+   // [OPTIMIZED] Skip full-chart wipe on startup to avoid 43s hang.
+   // Dashboard objects will be instantly updated/overwritten by name instead.
+   // EAE_Dash_DeleteByPrefix(chart_id, prefix);
 }
 
 void EAE_DashboardDeinit(const long chart_id, const string prefix)
@@ -421,6 +419,7 @@ void EAE_DashboardRender(const EAE_RealtimeSnapshot &snap)
    int port_y = base_y + EAE_MON_TITLE_H() + EAE_MON_PANEL_GAP();
    EAE_Dash_DrawPortInfo(ChartID(), prefix, base_x, port_y, snap);
 
+   // Summary table
    int sum_y = port_y + port_block_h + EAE_MON_PANEL_GAP();
    EAE_Dash_DrawSummaryTable(ChartID(), prefix, base_x, sum_y, snap);
 }

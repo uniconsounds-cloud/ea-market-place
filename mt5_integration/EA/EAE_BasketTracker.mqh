@@ -69,11 +69,15 @@ bool EAE_TrackerUpdateSide(EAE_SideRuntimeState   &state,
       state.peak_open_lots       = state.open_lots;
       state.peak_floating_profit = MathMax(0.0, state.floating_pnl);
       state.peak_floating_loss   = MathMin(0.0, state.floating_pnl);
+      
+      double bal = acc.balance;
+      state.peak_floating_dd_pct = (bal > 0 && state.floating_pnl < 0) ? (MathAbs(state.floating_pnl) / bal * 100.0) : 0.0;
    }
 
    // Basket active, update peaks
    if(state.open_count > 0)
    {
+      double bal = acc.balance;
       if(state.open_count > state.peak_open_count)
          state.peak_open_count = state.open_count;
 
@@ -85,6 +89,10 @@ bool EAE_TrackerUpdateSide(EAE_SideRuntimeState   &state,
 
       if(state.floating_pnl < state.peak_floating_loss)
          state.peak_floating_loss = state.floating_pnl;
+         
+      double curr_dd_pct = (bal > 0 && state.floating_pnl < 0) ? (MathAbs(state.floating_pnl) / bal * 100.0) : 0.0;
+      if(curr_dd_pct > state.peak_floating_dd_pct)
+         state.peak_floating_dd_pct = curr_dd_pct;
    }
 
    // Basket ended
@@ -105,6 +113,7 @@ bool EAE_TrackerUpdateSide(EAE_SideRuntimeState   &state,
       out_record.max_open_lots_cycle   = state.peak_open_lots;
       out_record.max_floating_profit   = state.peak_floating_profit;
       out_record.max_floating_loss     = state.peak_floating_loss;
+      out_record.max_floating_dd_pct   = state.peak_floating_dd_pct;
       out_record.balance_after_close   = acc.balance;
       out_record.equity_after_close    = acc.equity;
       out_record.spread_at_close       = meta.spread_points;

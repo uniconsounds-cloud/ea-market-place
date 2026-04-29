@@ -10,7 +10,38 @@
 
 string EG_Farming_GetDashboardTitle()
 {
-   return "EASYGOLD Farming V.1";
+   string lic_status  = (G_IsLicenseVerified ? "" : "[VERIFYING...] ");
+   string sync_status = (g_eae_sync_status == "IDLE" ? "" : "[" + g_eae_sync_status + "] ");
+   
+   string fri_status = "";
+   if(g_friState == EZ_STATE_FRI_MANAGE)      fri_status = "[FRI: MANAGE] ";
+   else if(g_friState == EZ_STATE_FRI_SOFT)   fri_status = "[FRI: SOFT CLOSE] ";
+   else if(g_friState == EZ_STATE_FRI_FORCE)  fri_status = "[FRI: FORCE CLOSE] ";
+   else if(g_friState == EZ_STATE_WEEKEND_PAUSE)  fri_status = "[FRI: PAUSED] ";
+   else if(g_friState == EZ_STATE_EARLYDAY_PAUSE) fri_status = "[ECL: PAUSED] ";
+
+   if(g_friRescueBlocked) fri_status += "[FRI: GROWTH STOP] ";
+
+   // --- [NEW] Breaker / Cooldown Status (High Priority) ---
+   string brk_status = "";
+   if(g_breakerRescueBlocked) brk_status = "[BREAKER: RESCUE STOP] ";
+   
+   datetime now = TimeCurrent();
+   if(now < g_globalCooldownUntil)
+   {
+      int remain = (int)(g_globalCooldownUntil - now);
+      brk_status = StringFormat("[COOLDOWN: %02d:%02d] ", remain/60, remain%60);
+   }
+
+   // --- [NEW] Market Gate / Risk Alert (High Priority) ---
+   string gate_alert = "";
+   if(g_marketGateBlocked) gate_alert = "[GATE: STOP] ";
+   
+   string risk_alert = "";
+   if(g_eae_buy_state.abrg_risk_score >= 2) risk_alert += StringFormat("[RISK-B: %d] ", g_eae_buy_state.abrg_risk_score);
+   if(g_eae_sell_state.abrg_risk_score >= 2) risk_alert += StringFormat("[RISK-S: %d] ", g_eae_sell_state.abrg_risk_score);
+
+   return "EASYGOLD Farming V1.4 " + lic_status + sync_status + brk_status + gate_alert + risk_alert + fri_status;
 }
 
 int EG_Farming_GetBasketColumnCount()
@@ -68,6 +99,11 @@ string EG_Farming_GetBasketCellValue(const int row_side,
    }
 
    return "";
+}
+
+string EG_Farming_GetDashboardGateStatus()
+{
+   return g_marketGateStatus;
 }
 
 #endif // __EG_FARMING_DASHBOARD_MAP_MQH__
