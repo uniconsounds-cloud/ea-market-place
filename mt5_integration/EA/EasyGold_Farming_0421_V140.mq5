@@ -44,9 +44,10 @@
 //|  1.407 - NEW: ABRG (Adaptive Basket Risk Guard) with Cluster Hibernation and Soft Exits.         |
 //|  1.408 - NEW: Smart Follow System (Decoupled Follow limits, ATR default, separate ABRG count).   |
 //|  1.500 - NEW: Multi-Cluster Grid, Dynamic Magic Allocation, BE Anchor Merging.                 |
+//|  1.501 - UI/UX: Grouped inputs with headers, hid internal variables, string time parsing.        |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.500"
+#property version   "1.501"
 
 // At top of file
 #include "EAE_MonitorTypes.mqh"
@@ -57,7 +58,7 @@
 #include "EAE_FileLogger.mqh"
 #include "EAEZE_Licensing.mqh"
 
-#define EA_VERSION "1.500"
+#define EA_VERSION "1.501"
 
 //==================================================================//
 // [LICENSE] Runtime restrictions (EDIT HERE)                        //
@@ -176,16 +177,18 @@ CTrade g_trade;
 // [100] INPUTS - Trading (original-like)                            //
 //==================================================================//
 // [PATCH 008] CHANGE: Reduce Inputs - only essential parameters remain as 'input'. Others are internal variables.
+sinput string InpHeader_Basic     = "--- Basic Trading Settings ---";
 input double InpUpperLimitLotSize = 0.1;  // Upper_limit_lot_size
 input double InpLots              = 0.01;  // Lots (initial)
 input double InpCloseMoney        = 10.0;  // Close_Money (USC)
 input double InpLotPlusB          = 0.01;  // Lot_plus_B
 input double InpLotPlusS          = 0.01;  // Lot_plus_S
 input int    InpMaxOrderLoss      = 100;   // Max_Order_Loss
+input int    InpMagicStart        = 4800;  // MagicStart
+
 bool   InpModeSell          = true;  // Mode_Sell
 bool   InpModeBuy           = true;  // Mode_Buy
-input int    InpMagicStart        = 4800;  // MagicStart
-int    InpCounterTrendSL_Points = 6000; // [PATCH 006] CHANGE: Counter-trend SL distance in POINTS (0=disabled)
+int    InpCounterTrendSL_Points = 0; // [UPDATED] V1.501: Default to 0 (disabled)
 
 //==================================================================//
 // [110] INPUTS - Signal / Indicators                                //
@@ -218,9 +221,9 @@ double InpRTS_AtrMultiplier = 0.2;
 //==================================================================//
 double InpFollowGridPips    = 0.0;  // If >0 => fixed pips range in NoNearby check
 double InpFollowAtrMult     = 0.5;  // [UPDATED] V1.408: Default to ATR-based grid (0.5x)
-input int InpMaxFollowOrders = 20;  // [NEW] Max Follow Orders allowed
+int    InpMaxFollowOrders   = 20;   // [HIDDEN] Max Follow Orders allowed
 bool   InpFollowUseSL       = true;
-int    InpFollowSL_Pips     = 6000;
+int    InpFollowSL_Pips     = 300;  // [UPDATED] V1.501: Default to 300 pips
 
 //==================================================================//
 // [140] INPUTS - Basket profit                                      //
@@ -250,6 +253,7 @@ int  InpDashAlphaBG           = 220;   // Background alpha (0..255)
 int  InpDashAlphaGrid         = 180;   // Grid alpha (0..255)
 
 // Dashboard scaling
+sinput string InpHeader_Dash          = "--- Dashboard Settings ---";
 bool   InpDashAutoScale       = true;   // Auto scale by chart width in pixels
 input double InpDashUserScale       = 0.7;    // Auto scale
 int    InpDashBaseChartW      = 1600;   // Reference chart width for scale=1.0
@@ -267,20 +271,24 @@ input int    InpDashFontSize        = 15;     // Font size (scaled)
 // [170] INPUTS - Daily Trade Window (server time)                   //
 //==================================================================//
 // EA blocks NEW orders from (Close - StopBeforeClose) to (Open + StartAfterOpen).
-// DOW is not used in this daily mode.
-input int    InpMarketCloseHour      = 23; // Market Close Hour
-input int    InpMarketCloseMin       = 0; // Market Close Min
-input int    InpMarketOpenHour       = 1; // Market Open Hour
-input int    InpMarketOpenMin        = 0; // Market Open Min
+sinput string InpHeader_Hours         = "--- Market Hours ---";
+input string InpMarketCloseTime      = "00:00"; // Market Close Time (HH:MM)
+input string InpMarketOpenTime       = "01:00"; // Market Open Time (HH:MM)
 input int    InpStopBeforeClose_Min  = 60; // Before Close Min
 input int    InpStartAfterOpen_Min   = 60; // After Open Min
+
+int g_marketCloseHour = 0;
+int g_marketCloseMin  = 0;
+int g_marketOpenHour  = 0;
+int g_marketOpenMin   = 0;
 
 //==================================================================//
 // [175] INPUTS - Friday Safety (8-6-4-1 Rule)                       //
 //==================================================================//
+sinput string InpHeader_Friday        = "--- Friday Strategy ---";
 input double InpFridayProfitTargetMoney        = 3000.0; // Friday Profit (USC)
-input int    InpFriLockProfitBefore_Hours      = 6;      // Fri Lock Profit Start (Hrs)
-input double InpFriRescueGrowthLimit_Pct       = 10.0;   // Fri Rescue Growth Limit (%)
+int    InpFriLockProfitBefore_Hours      = 6;      // [HIDDEN] Fri Lock Profit Start (Hrs)
+double InpFriRescueGrowthLimit_Pct       = 10.0;   // [HIDDEN] Fri Rescue Growth Limit (%)
 
 // Internal thresholds (8-6-4-1 Control Block)
 int    G_FriStartManage_Hours = 8; // [8h] Block new entries, snapshot DD
@@ -304,16 +312,18 @@ input string InpEarlyCloseDate = "2026.12.24"; // Early Close Date
 //==================================================================//
 // [180] INPUTS - Circuit Breaker (High Priority)                   //
 //==================================================================//
+sinput string InpHeader_Breaker       = "--- Circuit Breaker ---";
 input bool   InpEnableBreaker        = false;  // Enable Circuit Breaker
 input double InpBreakerLevel1_Pct    = 18.0;   // Level 1: Stop Rescue (%)
 input double InpBreakerLevel2_Pct    = 28.0;   // Level 2: Hard Close (%)
-input int    InpBreakerVerify_Sec    = 5;      // Level 2 Verify (Sec)
+int    InpBreakerVerify_Sec    = 5;      // [HIDDEN] Level 2 Verify (Sec)
 input int    InpBreakerCooldown_Min  = 30;     // Cooldown after Close (Min)
 
 //==================================================================//
 // [185] INPUTS - Market Safety Gates                               //
 //==================================================================//
-input bool   InpEnableMarketGates    = false;  // Enable Market Safety Gates
+sinput string InpHeader_Gates         = "--- Market Safety Gates ---";
+input bool   InpEnableMarketGates    = true;   // Enable Market Safety Gates
 
 // Internal Config (Edit here to change limits)
 const int    G_GATE_VELOCITY_LIMIT   = 1500;   // Velocity Limit (Points in M5)
@@ -444,14 +454,14 @@ enum ENUM_FRIDAY_RULE
 //==================================================================//
 
 
-input ENUM_FRIDAY_RULE InpFriRule = EZ_RULE_FIXED_8_6_4_1; // Friday Strategy
+ENUM_FRIDAY_RULE InpFriRule = EZ_RULE_FIXED_8_6_4_1; // [HIDDEN] Friday Strategy
 
 sinput string   InpABRG_Header = "--- Adaptive Risk Guard (ABRG) ---";
 input bool     InpEnableABRG        = true;     // Enable Risk Guard
 input int      InpABRG_FreezeCount  = 30;       // Hibernation Order Count
 input int      InpABRG_GapPoints    = 4000;     // Cluster Gap (Points)
 input int      InpABRG_ClusterSize  = 20;       // Max Orders per Cluster
-input double   InpABRG_BE_ExitBuffer = 100.0;   // Soft Exit BE Buffer (Points)
+double   InpABRG_BE_ExitBuffer = 100.0;   // [HIDDEN] Soft Exit BE Buffer (Points)
 
 #include "EAE_AdaptiveRiskGuard.mqh" // [NEW] V1.407
 
@@ -532,7 +542,7 @@ datetime DateAt(const datetime anchor, const int hour, const int min)
 
 bool IsInBlockedWindow(const datetime now, const datetime closeDT)
 {
-   datetime openDT = DateAt(closeDT, InpMarketOpenHour, InpMarketOpenMin);
+   datetime openDT = DateAt(closeDT, g_marketOpenHour, g_marketOpenMin);
    if(openDT <= closeDT) openDT += 86400;
 
    datetime start = closeDT - (datetime)(InpStopBeforeClose_Min * 60);
@@ -544,7 +554,7 @@ bool IsInBlockedWindow(const datetime now, const datetime closeDT)
 bool CanOpenNewOrdersNow()
 {
    datetime now = TimeCurrent();
-   datetime closeToday = DateAt(now, InpMarketCloseHour, InpMarketCloseMin);
+   datetime closeToday = DateAt(now, g_marketCloseHour, g_marketCloseMin);
    datetime closeYday  = closeToday - 86400;
 
    if(IsInBlockedWindow(now, closeToday)) return false;
@@ -558,7 +568,7 @@ bool CanOpenNewOrdersNow()
 //==================================================================//
 int TimeToDailyCloseSec(const datetime now)
 {
-   datetime closeDT = DateAt(now, InpMarketCloseHour, InpMarketCloseMin);
+   datetime closeDT = DateAt(now, g_marketCloseHour, g_marketCloseMin);
    if(closeDT <= now) closeDT += 86400;
    return (int)(closeDT - now);
 }
@@ -2653,7 +2663,21 @@ void OnTimer()
 
 int OnInit()
 {
-   Print("==== EASYGOLD FARMING (v1.4.0) ZERO-LAG ATTACH ====");
+   Print("==== EASYGOLD FARMING (v1.501) ZERO-LAG ATTACH ====");
+   
+   // [V1.501] Parse Market Time Strings into global integers
+   string closeParts[];
+   if(StringSplit(InpMarketCloseTime, ':', closeParts) >= 2)
+   {
+      g_marketCloseHour = (int)StringToInteger(closeParts[0]);
+      g_marketCloseMin  = (int)StringToInteger(closeParts[1]);
+   }
+   string openParts[];
+   if(StringSplit(InpMarketOpenTime, ':', openParts) >= 2)
+   {
+      g_marketOpenHour = (int)StringToInteger(openParts[0]);
+      g_marketOpenMin  = (int)StringToInteger(openParts[1]);
+   }
    
    // [INSTANT RETURN] 
    // We only setup the background boot sequence here.
