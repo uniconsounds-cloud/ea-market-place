@@ -967,12 +967,6 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                             onUpload={(url: string) => setFormData((p: any) => ({ ...p, image_url: url }))}
                             uploading={uploadingImage}
                         />
-                        <Input 
-                            placeholder="/assets/image_name.png"
-                            value={formData.image_url}
-                            onChange={(e) => setFormData((p: any) => ({ ...p, image_url: e.target.value }))}
-                            className="text-xs font-mono h-8"
-                        />
                     </div>
                     
                     {/* Additional Images */}
@@ -989,21 +983,11 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                                 }}
                                 uploading={uploadingImage}
                             />
-                            <Input 
-                                placeholder="/assets/extra_image.png"
-                                value={formData.additional_images[index] || ''}
-                                onChange={(e) => {
-                                    const newImages = [...formData.additional_images];
-                                    newImages[index] = e.target.value;
-                                    setFormData((p: any) => ({ ...p, additional_images: newImages }));
-                                }}
-                                className="text-xs font-mono h-8"
-                            />
                         </div>
                     ))}
                 </div>
                 <p className="text-[10px] text-muted-foreground italic">
-                    * คุณสามารถอัปโหลดผ่าน Supabase (ถ้ามีโควตา) หรือพิมพ์พาธไฟล์ในเครื่องลงไปตรงๆ เช่น /assets/name.png (แนะนำ)
+                    * คลิกที่กรอบสี่เหลี่ยมเพื่ออัปโหลดไฟล์รูปภาพ ระบบจะทำการจัดเก็บและผูก URL ให้อัตโนมัติ
                 </p>
             </div>
 
@@ -1017,8 +1001,9 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                                 name="file_url"
                                 value={formData.file_url}
                                 onChange={handleChange}
-                                placeholder="/assets/your_ea.ex4"
-                                className="bg-background font-mono"
+                                placeholder="อัปโหลดไฟล์ EA ของคุณ..."
+                                className="bg-background font-mono text-muted-foreground"
+                                readOnly
                             />
                         </div>
                         <input

@@ -41,7 +41,7 @@ string EG_Farming_GetDashboardTitle()
    if(g_eae_buy_state.abrg_risk_score >= 2) risk_alert += StringFormat("[RISK-B: %d] ", g_eae_buy_state.abrg_risk_score);
    if(g_eae_sell_state.abrg_risk_score >= 2) risk_alert += StringFormat("[RISK-S: %d] ", g_eae_sell_state.abrg_risk_score);
 
-   return "EASYGOLD Farming V1.4 " + lic_status + sync_status + brk_status + gate_alert + risk_alert + fri_status;
+   return "EASYGOLD Farming V" + EA_VERSION + " " + lic_status + sync_status + brk_status + gate_alert + risk_alert + fri_status;
 }
 
 int EG_Farming_GetBasketColumnCount()

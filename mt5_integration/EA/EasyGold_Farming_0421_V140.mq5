@@ -50,6 +50,8 @@
 #property version   "1.501"
 
 // At top of file
+#define EA_VERSION "1.501"
+
 #include "EAE_MonitorTypes.mqh"
 #include "EAE_CollectorCore.mqh"
 #include "EAE_BasketTracker.mqh"
@@ -57,8 +59,6 @@
 #include "EAE_DashboardBase.mqh"
 #include "EAE_FileLogger.mqh"
 #include "EAEZE_Licensing.mqh"
-
-#define EA_VERSION "1.501"
 
 //==================================================================//
 // [LICENSE] Runtime restrictions (EDIT HERE)                        //
@@ -286,7 +286,7 @@ int g_marketOpenMin   = 0;
 // [175] INPUTS - Friday Safety (8-6-4-1 Rule)                       //
 //==================================================================//
 sinput string InpHeader_Friday        = "--- Friday Strategy ---";
-input double InpFridayProfitTargetMoney        = 3000.0; // Friday Profit (USC)
+input double InpFridayProfitTargetMoney        = 2000.0; // Friday Profit (USC)
 int    InpFriLockProfitBefore_Hours      = 6;      // [HIDDEN] Fri Lock Profit Start (Hrs)
 double InpFriRescueGrowthLimit_Pct       = 10.0;   // [HIDDEN] Fri Rescue Growth Limit (%)
 
