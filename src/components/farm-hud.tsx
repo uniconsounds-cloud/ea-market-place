@@ -80,6 +80,7 @@ type FarmHudProps = {
     todayClosedLots: number;
     dailyMaxDrawdown: number;
     isShaking?: boolean;
+    systemCode?: string;
     onClick?: () => void;
 };
 
@@ -99,6 +100,7 @@ export default function FarmHud({
     todayClosedLots,
     dailyMaxDrawdown,
     isShaking = false,
+    systemCode,
     onClick,
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
@@ -271,7 +273,7 @@ export default function FarmHud({
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
                                 <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                    <span className="hidden sm:inline">EasyGold Farming | </span>{assetType} | {portNumber} | {accountType}
+                                    <span className="hidden sm:inline">{systemCode?.toUpperCase().includes('EASYM') ? 'EasyM | ' : 'EasyGold Farming | '}</span>{assetType} | {portNumber} | {accountType}
                                 </h1>
                                 <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
