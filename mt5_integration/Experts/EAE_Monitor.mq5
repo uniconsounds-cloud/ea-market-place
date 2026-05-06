@@ -14,8 +14,8 @@
 // --- Inputs ---
 input string   InpApiKey      = "EZE-YOUR-KEY"; // Partner API Key
 input int      InpSyncSeconds = 20;             // Sync Interval (Seconds)
-input string   InpAssetType   = "GOLD";         // Asset Type (GOLD/FOREX/BTC)
-input string   InpSystemCode  = "EAE_MONITOR";  // System Identifier
+input string   InpAssetType   = "FOREX";        // Asset Type (GOLD/FOREX/CRYPTO)
+input string   InpSystemCode  = "EASYM";        // System Identifier (e.g. EASYM, EAE_MONITOR)
 
 // --- State ---
 EAE_RealtimeSnapshot g_snapshot;
@@ -69,7 +69,7 @@ void OnTimer()
       {
          long type = PositionGetInteger(POSITION_TYPE);
          double lots = PositionGetDouble(POSITION_VOLUME);
-         double pnl = PositionGetDouble(POSITION_PROFIT);
+         double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP) + PositionGetDouble(POSITION_COMMISSION);
          
          if(type == POSITION_TYPE_BUY) {
             g_snapshot.buy_state.open_count++;

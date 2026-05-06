@@ -534,6 +534,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                     dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                     assetType={assetType}
                     isShaking={isShaking}
+                    systemCode={portStatus?.system_code}
                     onClick={handleSecretToggle}
                 />
                 

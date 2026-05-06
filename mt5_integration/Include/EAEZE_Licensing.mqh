@@ -40,7 +40,10 @@ bool G_IsLicenseVerified = false; // Moved to top for visibility
 //+------------------------------------------------------------------+
 // --- 1. SETTINGS & INPUTS ---
 string InpLicenseUrl = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/verify_ea_license";
-string InpProductID  = "EZM-5P-V1";    // < ==== Product ID ==== [1]
+#ifndef EA_PRODUCT_ID
+   #define EA_PRODUCT_ID "EZM-5P-V1"    // < ==== Default Product ID for EasyGold ==== [1]
+#endif
+string InpProductID  = EA_PRODUCT_ID;
 input string InpPartnerApiKey = "EZE-123456"; // Your Personal API Key (Check dashboard)
 
 // Internal System Key (Do not change)

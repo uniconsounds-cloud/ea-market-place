@@ -556,9 +556,11 @@ bool CanOpenNewOrdersNow()
    datetime now = TimeCurrent();
    datetime closeToday = DateAt(now, g_marketCloseHour, g_marketCloseMin);
    datetime closeYday  = closeToday - 86400;
+   datetime closeTmw   = closeToday + 86400;
 
    if(IsInBlockedWindow(now, closeToday)) return false;
    if(IsInBlockedWindow(now, closeYday))  return false;
+   if(IsInBlockedWindow(now, closeTmw))   return false;
 
    return true;
 }
