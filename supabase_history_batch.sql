@@ -35,8 +35,8 @@ BEGIN
                 port_number, 
                 date, 
                 profit, 
-                max_dd, 
-                lots
+                max_drawdown, 
+                closed_lots
             )
             VALUES (
                 p_port_number,
@@ -47,8 +47,8 @@ BEGIN
             )
             ON CONFLICT (port_number, date) DO UPDATE SET
                 profit = EXCLUDED.profit,
-                max_dd = EXCLUDED.max_dd,
-                lots = EXCLUDED.lots;
+                max_drawdown = EXCLUDED.max_drawdown,
+                closed_lots = EXCLUDED.closed_lots;
         END LOOP;
     END IF;
 
