@@ -378,8 +378,11 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
       {
          if(!first) json_array += ",";
          
+         string date_str = TimeToString(sum.date, TIME_DATE);
+         StringReplace(date_str, ".", "-"); // Convert YYYY.MM.DD to YYYY-MM-DD
+         
          json_array += "{";
-         json_array += "\"date\":\"" + TimeToString(sum.date, TIME_DATE) + "\",";
+         json_array += "\"date\":\"" + date_str + "\",";
          json_array += "\"profit\":" + DoubleToString(sum.total_profit, 2) + ",";
          json_array += "\"lots\":" + DoubleToString(sum.total_lots, 2) + ",";
          json_array += "\"max_dd\":" + DoubleToString(sum.max_dd_pct, 2);
@@ -408,12 +411,13 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
                     
    ResetLastError();
    int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
    
-   if(res == 200) {
+   if(res == 200 && StringFind(response, "\"success\":false") < 0) {
       Print("EAE WebSync: Successfully pushed " + IntegerToString(days_to_sync) + " days of history.");
       return true;
    } else {
-      Print("EAE WebSync: Failed to push history batch. Err: " + IntegerToString(res));
+      Print("EAE WebSync: Failed to push history batch. Res: ", res, " Resp: ", response);
       return false;
    }
 }
