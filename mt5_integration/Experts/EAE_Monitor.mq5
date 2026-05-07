@@ -11,10 +11,8 @@
 // --- Include Core Sync Library ---
 #include "EAE_WebSync.mqh"
 
-// --- Inputs ---
 input string   InpApiKey      = "EZE-YOUR-KEY"; // Partner API Key
 input int      InpSyncSeconds = 20;             // Sync Interval (Seconds)
-input string   InpAssetType   = "FOREX";        // Asset Type (GOLD/FOREX/CRYPTO)
 input string   InpSystemCode  = "EASYM";        // System Identifier (e.g. EASYM, EAE_MONITOR)
 
 // --- State ---
@@ -29,7 +27,7 @@ int OnInit()
    EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", InpApiKey, InpSyncSeconds);
    
    // Pre-fill Identity
-   g_snapshot.identity.product_family = InpAssetType;
+   g_snapshot.identity.product_family = EAE_AutoDetectAssetType(Symbol());
    g_snapshot.identity.system_code    = InpSystemCode;
    g_snapshot.identity.ea_name        = "EAE Universal Monitor";
    g_snapshot.identity.ea_version     = "1.00";
@@ -87,6 +85,9 @@ void OnTimer()
    // We pass identity magics so history scanner knows what to look for
    g_snapshot.identity.magic_buy  = 0; // Monitor mode: Scan all or specify
    g_snapshot.identity.magic_sell = 0; 
+   
+   // --- [NEW] Self-Healing 30-Day Sync Check ---
+   EAE_WebSyncCheckAndPushHistory(0, 0);
    
    EAE_WebSyncPerform(g_snapshot);
 }

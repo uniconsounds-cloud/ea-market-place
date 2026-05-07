@@ -274,5 +274,24 @@ string EAE_SecondsToHMS(const int sec)
    int x = s % 60;
    return StringFormat("%02d:%02d:%02d", h, m, x);
 }
+//==================================================================
+// AUTO-DETECT ASSET TYPE
+//==================================================================
+string EAE_AutoDetectAssetType(string sym)
+{
+   string s = sym;
+   StringToUpper(s);
+   
+   // Check for Crypto
+   if(StringFind(s, "BTC") >= 0 || StringFind(s, "ETH") >= 0 || StringFind(s, "XRP") >= 0 || StringFind(s, "LTC") >= 0 || StringFind(s, "CRYPTO") >= 0)
+      return "CRYPTO";
+      
+   // Check for Gold / Metals
+   if(StringFind(s, "XAU") >= 0 || StringFind(s, "GOLD") >= 0 || StringFind(s, "XAG") >= 0 || StringFind(s, "SILVER") >= 0)
+      return "GOLD";
+      
+   // Default to Forex for all other pairs (EUR, GBP, JPY, USD, etc.)
+   return "FOREX";
+}
 
 #endif // __EAE_MONITOR_TYPES_MQH__

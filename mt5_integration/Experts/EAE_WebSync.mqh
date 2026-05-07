@@ -340,6 +340,10 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    g_eae_last_sync_hash = current_hash;
    g_eae_sync_status = "OK";
    
+   // --- [NEW] Update Last Online Time for Self-Healing ---
+   string gv_last_online = "EAE_LastOnline_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   GlobalVariableSet(gv_last_online, (double)now);
+   
    // 4. Parse response for on-demand sync control
    string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
    if(StringFind(response, "\"should_sync_full\":true") >= 0) {
@@ -349,6 +353,107 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    }
    
    return true;
+}
+
+//+------------------------------------------------------------------+
+//| Push a Batch of Daily Histories to Supabase                      |
+//+------------------------------------------------------------------+
+bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
+{
+   if(days_to_sync <= 0) return false;
+   if(days_to_sync > 30) days_to_sync = 30;
+   
+   string json_array = "[";
+   bool first = true;
+   
+   datetime now = TimeCurrent();
+   datetime today_start = (now / 86400) * 86400;
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   
+   for(int i = 0; i < days_to_sync; i++)
+   {
+      datetime target_day = today_start - (i * 86400);
+      EAE_DailySummary sum;
+      if(EAE_ScanHistoryDailySummary(target_day, magicB, magicS, sum))
+      {
+         if(!first) json_array += ",";
+         
+         json_array += "{";
+         json_array += "\"date\":\"" + TimeToString(sum.date, TIME_DATE) + "\",";
+         json_array += "\"profit\":" + DoubleToString(sum.total_profit, 2) + ",";
+         json_array += "\"lots\":" + DoubleToString(sum.total_lots, 2) + ",";
+         json_array += "\"max_dd\":" + DoubleToString(sum.max_dd_pct, 2);
+         json_array += "}";
+         first = false;
+      }
+   }
+   json_array += "]";
+   
+   if(first) return true; // No data found, but count it as success
+   
+   string payload = "{";
+   payload += "\"p_port_number\":\"" + IntegerToString(login) + "\",";
+   payload += "\"p_history_array\":" + json_array + ",";
+   payload += "\"p_api_key\":\"" + g_eae_api_key + "\"";
+   payload += "}";
+
+   char data[]; char result[]; string result_headers;
+   StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, ArraySize(data) - 1);
+   
+   string url = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_history_batch";
+   string headers = "Content-Type: application/json\r\n" + 
+                    "apikey: " + g_eae_system_key + "\r\n" +
+                    "Authorization: Bearer " + g_eae_system_key + "\r\n";
+                    
+   ResetLastError();
+   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   
+   if(res == 200) {
+      Print("EAE WebSync: Successfully pushed " + IntegerToString(days_to_sync) + " days of history.");
+      return true;
+   } else {
+      Print("EAE WebSync: Failed to push history batch. Err: " + IntegerToString(res));
+      return false;
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Self-Healing Boot Check: Call this in OnTimer                    |
+//+------------------------------------------------------------------+
+void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
+{
+   static bool checked = false;
+   if(checked) return;
+   
+   string gv_last_online = "EAE_LastOnline_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   int days_to_sync = 30; // Default if no GV exists
+   
+   if(GlobalVariableCheck(gv_last_online))
+   {
+      datetime last_online = (datetime)GlobalVariableGet(gv_last_online);
+      datetime now = TimeCurrent();
+      int diff_sec = (int)(now - last_online);
+      
+      if(diff_sec > 0) {
+         days_to_sync = (diff_sec / 86400) + 1; // Round up to cover the missing gap
+      } else {
+         days_to_sync = 0;
+      }
+   }
+   
+   if(days_to_sync > 0)
+   {
+      if(days_to_sync > 30) days_to_sync = 30;
+      Print("EAE WebSync: Self-Healing Triggered. Missing days: ", days_to_sync);
+      EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS);
+   }
+   else
+   {
+      Print("EAE WebSync: History is up to date.");
+   }
+   
+   checked = true; // Only check once per EA Boot
 }
 
 //+------------------------------------------------------------------+

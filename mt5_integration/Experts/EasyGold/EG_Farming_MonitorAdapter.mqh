@@ -65,10 +65,10 @@ void EG_Farming_BuildIdentity(EAE_SystemIdentity &id)
    id.product_family = "EasyGold";
    id.family_code    = "EG";
    id.strategy_name  = "Farming";
-   id.system_code    = "EG_FARMING";
-   id.asset_class    = EAE_ASSET_METAL;
+   id.system_code    = "EasyGold Farming";
+   id.asset_class    = EAE_AutoDetectAssetType(_Symbol);
 
-   id.ea_name        = "EasyGold_Farming_0410_V1";
+   id.ea_name        = "EasyGold Farming";
    id.ea_version     = "V1";
 
    id.symbol         = _Symbol;
@@ -208,6 +208,9 @@ void EG_Farming_MonitorOnTimer()
       {
          g_eae_last_snapshot_log_time = TimeCurrent();
       }
+      
+      // --- [NEW] Self-Healing 30-Day Sync Check ---
+      EAE_WebSyncCheckAndPushHistory(EG_Farming_GetBuyMagic(), EG_Farming_GetSellMagic());
       
       // Perform Periodic Web Sync (Throttled based on EAE_WebSync settings)
       // This sends both Summary metrics (Spaceship) and Active Orders (Farm UI)

@@ -36,16 +36,16 @@ void EM_BuildIdentity(EAE_SystemIdentity &id)
    
    // Check which EA is running based on the EA_PRODUCT_ID macro
    if(StringFind(InpProductID, "MAX") >= 0) {
-       id.system_code = "EASYM_MAX";
-       id.ea_name     = "EasyM_MAX";
+       id.system_code = "EasyM MAX";
+       id.ea_name     = "EasyM MAX";
    } else {
-       id.system_code = "EASYM_MINI";
-       id.ea_name     = "EasyM_MINI";
+       id.system_code = "EasyM mini";
+       id.ea_name     = "EasyM mini";
    }
 
    id.family_code    = "EM";
    id.strategy_name  = "Multi-Currency";
-   id.asset_class    = EAE_ASSET_FOREX;
+   id.asset_class    = EAE_AutoDetectAssetType(_Symbol);
 
    id.ea_version     = "V1";
 
@@ -129,6 +129,9 @@ void EM_MonitorOnTimer()
    snap.buy_state    = g_em_buy_state;
    snap.sell_state   = g_em_sell_state;
    snap.timestamp    = TimeCurrent();
+   
+   // --- [NEW] Self-Healing 30-Day Sync Check ---
+   EAE_WebSyncCheckAndPushHistory(InpMagicBase, InpMagicBase);
    
    // Sync to web
    EAE_WebSyncPerform(snap);
