@@ -24,12 +24,13 @@ EAE_SideRuntimeState   g_em_sell_state;
 bool                   g_em_initialized = false;
 bool                   g_em_data_loaded = false; 
 
-// We assume InpMagicBase is declared in the main EA file
-extern long InpMagicBase;
+// We will initialize magic base during EM_BuildIdentity
+long g_em_magic_base = 0;
 
 // Build identity once
-void EM_BuildIdentity(EAE_SystemIdentity &id)
+void EM_BuildIdentity(EAE_SystemIdentity &id, long magicBase)
 {
+   g_em_magic_base = magicBase;
    id.brand_name     = "EA Easy Shop Marketplace";
    id.site_name      = "eaeze.com";
    id.product_family = "EasyM";
@@ -45,14 +46,14 @@ void EM_BuildIdentity(EAE_SystemIdentity &id)
 
    id.family_code    = "EM";
    id.strategy_name  = "Multi-Currency";
-   id.asset_class    = EAE_AutoDetectAssetType(_Symbol);
+   id.product_family = EAE_AutoDetectAssetType(_Symbol);
 
    id.ea_version     = "V1";
 
    id.symbol         = "MULTI"; // Multi-currency
    id.chart_id       = ChartID();
-   id.magic_buy      = InpMagicBase;
-   id.magic_sell     = InpMagicBase;
+   id.magic_buy      = g_em_magic_base;
+   id.magic_sell     = g_em_magic_base;
 }
 
 // Custom Collector for Multi-Currency EasyM
@@ -70,11 +71,12 @@ void EM_CollectRuntimeState()
 
       long pos_magic = PositionGetInteger(POSITION_MAGIC);
       // Only count orders belonging to EasyM (magic >= base and magic < base + 100)
-      if(pos_magic < InpMagicBase || pos_magic >= InpMagicBase + 100) continue;
+      if(pos_magic < g_em_magic_base || pos_magic >= g_em_magic_base + 100) continue;
 
       long pos_type = PositionGetInteger(POSITION_TYPE);
       double vol = PositionGetDouble(POSITION_VOLUME);
-      double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP) + PositionGetDouble(POSITION_COMMISSION);
+      // Removed POSITION_COMMISSION to fix deprecation warning
+      double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
 
       if(pos_type == POSITION_TYPE_BUY) {
          g_em_buy_state.open_count++;
@@ -89,9 +91,9 @@ void EM_CollectRuntimeState()
 }
 
 // Init monitoring module
-void EM_MonitorInit()
+void EM_MonitorInit(long magicBase)
 {
-   EM_BuildIdentity(g_em_identity);
+   EM_BuildIdentity(g_em_identity, magicBase);
    EAE_InitSideState(g_em_buy_state,  EAE_SIDE_BUY);
    EAE_InitSideState(g_em_sell_state, EAE_SIDE_SELL);
 
@@ -131,7 +133,7 @@ void EM_MonitorOnTimer()
    snap.timestamp    = TimeCurrent();
    
    // --- [NEW] Self-Healing 30-Day Sync Check ---
-   EAE_WebSyncCheckAndPushHistory(InpMagicBase, InpMagicBase);
+   EAE_WebSyncCheckAndPushHistory(g_em_magic_base, g_em_magic_base);
    
    // Sync to web
    EAE_WebSyncPerform(snap);

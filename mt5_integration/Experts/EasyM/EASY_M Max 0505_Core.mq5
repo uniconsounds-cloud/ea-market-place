@@ -23,7 +23,7 @@
 //|  - DashboardUpdate skips disabled symbols                          |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.12.8.m9"
+#property version   "1.12"
 #property description "EASY_M Max0324 (10Pairs)"
 
 #include <Trade/Trade.mqh>
@@ -2189,7 +2189,7 @@ int OnInit()
         return(INIT_FAILED);
     }
     RemoveLicenseAlert();
-    EM_MonitorInit();
+    EM_MonitorInit(InpMagicBase);
    
    g_dashChart = ChartID();
 
