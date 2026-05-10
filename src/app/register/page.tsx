@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -11,7 +11,7 @@ import { User, ShieldCheck, Check, Info, AlertTriangle } from 'lucide-react';
 import { ROOT_ADMINS } from '@/lib/constants';
 import { toast } from 'sonner';
 
-export default function RegisterPage() {
+function RegisterContent() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
@@ -331,5 +331,13 @@ export default function RegisterPage() {
             </div>
             <Footer />
         </div>
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>}>
+            <RegisterContent />
+        </Suspense>
     );
 }
