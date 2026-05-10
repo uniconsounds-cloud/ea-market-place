@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
+import Link from 'next/link';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 
 // --- Utilities ---
@@ -718,16 +719,13 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
                             Demo Harvest History (Scaled x{scaleFactor})
                         </span>
-                        <button 
-                            onClick={() => {
-                                const key = prompt("Enter API Key to download history:");
-                                if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
-                            }}
-                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
+                        <Link 
+                            href="/dashboard"
+                            className="flex items-center gap-1.5 text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-3.5 py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
                         >
-                            Export 90D History (.CSV)
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        </button>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                            กลับสู่หน้าหลัก Dashboard
+                        </Link>
                     </div>
 
                     {/* Crates scroll row (mobile: inline 90D button at END of scroll, desktop: fill remaining space) */}
@@ -750,16 +748,13 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         ))}
 
                         {/* Mobile-only: Square 90D button at the end, same size as crate */}
-                        <button 
-                            onClick={() => {
-                                const key = prompt("Enter API Key to download history:");
-                                if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
-                            }}
-                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-900/40 hover:bg-amber-800/60 text-amber-200/80 border border-amber-700/50 rounded-lg transition-colors ml-auto"
+                        <Link 
+                            href="/dashboard"
+                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 rounded-lg transition-colors ml-auto font-bold text-center px-1"
                         >
-                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            <span className="text-[9px] font-bold uppercase">90D</span>
-                        </button>
+                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            <span className="text-[8px] uppercase tracking-tighter">แดชบอร์ด</span>
+                        </Link>
                     </div>
                 </div>
             )}

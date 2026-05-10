@@ -48,6 +48,7 @@ export default function DashboardPage() {
     const [pendingIbRequests, setPendingIbRequests] = useState<any[]>([]);
     const [rejectedIbRequests, setRejectedIbRequests] = useState<any[]>([]);
     const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
+    const [hasDemoChallenge, setHasDemoChallenge] = useState<boolean>(false);
 
     const handleDeleteItem = async (id: string, source: 'license' | 'order') => {
         const confirmMsg = source === 'license' 
@@ -80,6 +81,14 @@ export default function DashboardPage() {
                 return;
             }
             setUser(user);
+
+            // Check if user has joined demo challenge
+            const { data: demoChallengeData } = await supabase
+                .from('demo_challenges')
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle();
+            setHasDemoChallenge(!!demoChallengeData);
 
             // Fetch Profile for legacy fallback IB account
             const { data: profileData } = await supabase
@@ -288,6 +297,14 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-muted-foreground mt-1">จัดการ License, ติดตามสถานะออเดอร์ และดาวน์โหลด EA</p>
                 </div>
+                {hasDemoChallenge && (
+                    <Link href="/farm/demo" className="shrink-0 w-full md:w-auto">
+                        <Button className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-extrabold shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 border-0 flex items-center justify-center gap-2 h-10 px-5">
+                            <Activity className="w-4 h-4 animate-pulse" />
+                            ดูพอร์ตเดโมจำลอง ($100 Challenge)
+                        </Button>
+                    </Link>
+                )}
             </div>
 
             {/* Pending IB Requests Alerts */}
