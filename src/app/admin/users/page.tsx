@@ -19,21 +19,152 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Search, Loader2, Users, ShoppingBag, CreditCard, ChevronRight, Filter, Beaker } from 'lucide-react';
+import { Search, Loader2, Users, ShoppingBag, CreditCard, ChevronRight, Filter, Beaker, Edit2, Check, X, GitPullRequest } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { toast } from 'sonner';
 
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortOrder, setSortOrder] = useState('spent-high');
+    const [sortOrder, setSortOrder] = useState('newest'); // Default to สมัครล่าสุด
     const [selectedAdmin, setSelectedAdmin] = useState<string>('all');
+
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [transferRequests, setTransferRequests] = useState<any[]>([]);
+    
+    // Dialog State
+    const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [selectedUserForTransfer, setSelectedUserForTransfer] = useState<any>(null);
+    const [selectedTargetAdminId, setSelectedTargetAdminId] = useState<string>('');
+    const [transferLoading, setTransferLoading] = useState(false);
 
     useEffect(() => {
         fetchUsers();
+        fetchCurrentUser();
+        fetchTransferRequests();
     }, []);
+
+    const fetchCurrentUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            setCurrentUser(user);
+        }
+    };
+
+    const fetchTransferRequests = async () => {
+        const { data, error } = await supabase
+            .from('admin_transfer_requests')
+            .select(`
+                *,
+                customer:profiles!customer_id(full_name, email),
+                source_admin:profiles!source_admin_id(full_name, email),
+                target_admin:profiles!target_admin_id(full_name, email),
+                requester:profiles!requester_id(full_name, email)
+            `)
+            .eq('status', 'pending');
+        
+        if (data) {
+            setTransferRequests(data);
+        }
+    };
+
+    const handleApproveTransfer = async (req: any) => {
+        try {
+            const isSourceAdmin = currentUser && req.source_admin_id === currentUser.id;
+            const isTargetAdmin = currentUser && req.target_admin_id === currentUser.id;
+
+            if (!isSourceAdmin && !isTargetAdmin) {
+                toast.error("คุณไม่มีสิทธิ์ในการอนุมัติคำขอนี้");
+                return;
+            }
+
+            const updates: any = {};
+            if (isSourceAdmin) updates.source_approved = true;
+            if (isTargetAdmin) updates.target_approved = true;
+
+            const { error } = await supabase
+                .from('admin_transfer_requests')
+                .update(updates)
+                .eq('id', req.id);
+
+            if (error) throw error;
+            
+            toast.success("อนุมัติคำขอเปลี่ยนสายงานสำเร็จ!");
+            fetchTransferRequests();
+            fetchUsers(); // Refresh user list
+        } catch (e: any) {
+            alert("ล้มเหลวในการอนุมัติ: " + e.message);
+        }
+    };
+
+    const handleRejectTransfer = async (requestId: string) => {
+        if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธและยกเลิกคำขอนี้?")) return;
+        try {
+            const { error } = await supabase
+                .from('admin_transfer_requests')
+                .update({ status: 'rejected' })
+                .eq('id', requestId);
+
+            if (error) throw error;
+            
+            toast.success("ปฏิเสธคำขอเปลี่ยนสายงานแล้ว");
+            fetchTransferRequests();
+        } catch (e: any) {
+            alert("ล้มเหลวในการปฏิเสธ: " + e.message);
+        }
+    };
+
+    const handleOpenTransferDialog = (user: any) => {
+        setSelectedUserForTransfer(user);
+        setSelectedTargetAdminId('');
+        setIsTransferOpen(true);
+    };
+
+    const handleCreateTransferRequest = async () => {
+        if (!selectedUserForTransfer || !selectedTargetAdminId) return;
+        
+        setTransferLoading(true);
+        try {
+            const sourceAdminId = selectedUserForTransfer.root_admin?.id || null;
+            const targetAdminId = selectedTargetAdminId;
+            const customerId = selectedUserForTransfer.id;
+            const requesterId = currentUser?.id;
+
+            if (!requesterId) throw new Error("กรุณาเข้าสู่ระบบก่อนทำรายการ");
+            if (sourceAdminId === targetAdminId) {
+                toast.error("ไม่สามารถเปลี่ยนสายงานไปยังแอดมินคนเดิมได้");
+                setTransferLoading(false);
+                return;
+            }
+
+            const { error } = await supabase
+                .from('admin_transfer_requests')
+                .insert([{
+                    customer_id: customerId,
+                    source_admin_id: sourceAdminId,
+                    target_admin_id: targetAdminId,
+                    requester_id: requesterId,
+                    source_approved: (requesterId === sourceAdminId || sourceAdminId === null),
+                    target_approved: (requesterId === targetAdminId),
+                    status: 'pending'
+                }]);
+
+            if (error) throw error;
+
+            toast.success("ส่งคำขอเปลี่ยนสายงานเรียบร้อยแล้ว! รอการยืนยันจากแอดมินที่เกี่ยวข้อง");
+            setIsTransferOpen(false);
+            fetchTransferRequests();
+        } catch (e: any) {
+            alert("ล้มเหลวในการสร้างคำขอ: " + e.message);
+        } finally {
+            setTransferLoading(false);
+        }
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -170,6 +301,72 @@ export default function AdminUsersPage() {
                 </Button>
             </div>
 
+            {/* Pending Transfer Requests */}
+            {transferRequests.length > 0 && (
+                <Card className="border-gold/20 bg-gold/5 mb-6">
+                    <CardContent className="p-4">
+                        <h3 className="font-bold text-gold flex items-center gap-2 mb-3">
+                            <GitPullRequest className="w-5 h-5 animate-pulse" />
+                            คำขอเปลี่ยนสายงานรอยืนยัน ({transferRequests.length})
+                        </h3>
+                        <div className="space-y-3">
+                            {transferRequests.map((req) => {
+                                const isSourceAdmin = currentUser && req.source_admin_id === currentUser.id;
+                                const isTargetAdmin = currentUser && req.target_admin_id === currentUser.id;
+                                const needsMyApproval = (isSourceAdmin && !req.source_approved) || (isTargetAdmin && !req.target_approved);
+
+                                return (
+                                    <div key={req.id} className="bg-card p-4 rounded-xl border border-border/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-semibold text-foreground">
+                                                ย้ายลูกค้า: <span className="text-gold font-bold">{req.customer?.full_name || 'ลูกค้า'}</span> ({req.customer?.email})
+                                            </p>
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                                                <span>ผู้แนะนำเดิม: <strong className="text-red-400 font-medium">{req.source_admin?.full_name || '-ไม่มี-'}</strong></span>
+                                                <span>➡️</span>
+                                                <span>ผู้แนะนำใหม่: <strong className="text-green-400 font-medium">{req.target_admin?.full_name || 'แอดมินปลายทาง'}</strong></span>
+                                                <span className="px-1.5 py-0.5 bg-muted rounded">ผู้ส่งคำขอ: {req.requester?.full_name || 'แอดมิน'}</span>
+                                            </div>
+                                            <div className="flex gap-2 text-[10px] mt-2">
+                                                <span className={`px-2 py-0.5 rounded font-bold ${req.source_approved ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>
+                                                    แอดมินต้นสาย: {req.source_approved ? 'ยืนยันแล้ว' : 'รอยืนยัน'}
+                                                </span>
+                                                <span className={`px-2 py-0.5 rounded font-bold ${req.target_approved ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>
+                                                    แอดมินปลายสาย: {req.target_approved ? 'ยืนยันแล้ว' : 'รอยืนยัน'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {needsMyApproval ? (
+                                            <div className="flex gap-2 shrink-0">
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline" 
+                                                    className="h-9 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                                    onClick={() => handleRejectTransfer(req.id)}
+                                                >
+                                                    <X className="w-3.5 h-3.5 mr-1" /> ปฏิเสธ
+                                                </Button>
+                                                <Button 
+                                                    size="sm" 
+                                                    className="h-9 bg-gold hover:bg-gold/85 text-black font-bold shadow-md shadow-gold/10"
+                                                    onClick={() => handleApproveTransfer(req)}
+                                                >
+                                                    <Check className="w-3.5 h-3.5 mr-1" /> ยืนยันสลับสายงาน
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground/60 italic bg-muted/30 px-3 py-1.5 rounded-lg">
+                                                กำลังรอการอนุมัติจากอีกฝ่าย...
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-gradient-to-br from-card to-card/50">
@@ -288,14 +485,24 @@ export default function AdminUsersPage() {
                                         </Link>
                                     </TableCell>
                                     <TableCell>
-                                        {user.root_admin ? (
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium">{user.root_admin.full_name || 'Admin'}</span>
-                                                <span className="text-[10px] text-muted-foreground">{user.root_admin.email}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-muted-foreground text-sm">-ไม่มี-</span>
-                                        )}
+                                        <div className="flex items-center gap-2 group/upline">
+                                            {user.root_admin ? (
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium">{user.root_admin.full_name || 'Admin'}</span>
+                                                    <span className="text-[10px] text-muted-foreground">{user.root_admin.email}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground text-sm">-ไม่มี-</span>
+                                            )}
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="w-8 h-8 opacity-0 group-hover/upline:opacity-100 transition-opacity"
+                                                onClick={() => handleOpenTransferDialog(user)}
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5 text-gold" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="text-sm">
@@ -346,6 +553,61 @@ export default function AdminUsersPage() {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Transfer Line Dialog */}
+            <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+                <DialogContent className="sm:max-w-md bg-background border-border shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold">ขอเปลี่ยนสายงานลูกค้า (Transfer Line)</DialogTitle>
+                        <DialogDescription className="text-muted-foreground text-xs">
+                            การเปลี่ยนสายงานจะเกิดขึ้นก็ต่อเมื่อได้รับการอนุมัติแบบคู่ (Double Confirmation) จากทั้งแอดมินต้นสายและแอดมินปลายสายเรียบร้อยแล้ว
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedUserForTransfer && (
+                        <div className="space-y-4 pt-2">
+                            <div className="bg-muted/50 p-4 rounded-xl border border-border/50 text-sm space-y-2.5">
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ลูกค้า:</span> <strong>{selectedUserForTransfer.full_name || 'No Name'}</strong></p>
+                                <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">อีเมล:</span> <strong className="font-mono">{selectedUserForTransfer.email}</strong></p>
+                                <p>
+                                    <span className="text-muted-foreground mr-2 inline-block w-[100px]">ผู้แนะนำปัจจุบัน:</span> 
+                                    <strong className="text-red-400">{selectedUserForTransfer.root_admin?.full_name || '-ไม่มี-'}</strong>
+                                    {selectedUserForTransfer.root_admin && <span className="text-xs text-muted-foreground block ml-[108px]">{selectedUserForTransfer.root_admin.email}</span>}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-sm font-semibold">เลือกผู้แนะนำใหม่ (แอดมินปลายสาย)</Label>
+                                <Select value={selectedTargetAdminId} onValueChange={setSelectedTargetAdminId}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="เลือกแอดมินปลายทาง..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {users.filter(u => u.role === 'admin' && u.email && u.id !== selectedUserForTransfer.root_admin?.id).map((admin) => (
+                                            <SelectItem key={admin.id} value={admin.id}>
+                                                {admin.full_name || admin.email} ({admin.email})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex gap-3 justify-end pt-3">
+                                <Button variant="outline" onClick={() => setIsTransferOpen(false)} disabled={transferLoading}>
+                                    ยกเลิก
+                                </Button>
+                                <Button 
+                                    onClick={handleCreateTransferRequest} 
+                                    disabled={transferLoading || !selectedTargetAdminId}
+                                    className="bg-gold hover:bg-gold/85 text-black font-bold"
+                                >
+                                    {transferLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <GitPullRequest className="w-4 h-4 mr-2" />}
+                                    ส่งคำขอยืนยัน
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
