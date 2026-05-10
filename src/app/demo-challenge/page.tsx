@@ -83,11 +83,23 @@ function DemoChallengeContent() {
             const randomOffset = offsets[Math.floor(Math.random() * offsets.length)];
             const finalRisk = parseFloat((selectedRisk + randomOffset).toFixed(2));
             
+            let finalReferrerId = ref || null;
+            if (!finalReferrerId) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('referred_by')
+                    .eq('id', user.id)
+                    .single();
+                if (profile && profile.referred_by) {
+                    finalReferrerId = profile.referred_by;
+                }
+            }
+
             const payload = {
                 user_id: user.id,
                 risk_level: finalRisk,
                 current_balance: 10000, // 10,000 USC = $100
-                referrer_id: ref || null
+                referrer_id: finalReferrerId
             };
 
             const { error } = await supabase
