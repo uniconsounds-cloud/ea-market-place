@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/navbar';
@@ -14,13 +14,27 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    
+    const redirectParam = searchParams.get('redirect') || '/dashboard';
+    const refParam = searchParams.get('ref');
+
+    // Build the query string to pass along
+    const queryParams = new URLSearchParams();
+    if (redirectParam !== '/dashboard') queryParams.set('redirect', redirectParam);
+    if (refParam) queryParams.set('ref', refParam);
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+    const finalRedirectUrl = refParam && redirectParam === '/demo-challenge' 
+        ? `/demo-challenge?ref=${refParam}` 
+        : redirectParam;
 
     // Redirect if already logged in
     useEffect(() => {
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                router.replace('/dashboard');
+                router.replace(finalRedirectUrl);
             }
         };
         checkSession();
@@ -43,7 +57,7 @@ export default function LoginPage() {
 
             // Force hard refresh to update all Server Components
             router.refresh();
-            router.push('/dashboard');
+            router.push(finalRedirectUrl);
         } catch (err: any) {
             setError(err.message);
             setLoading(false);
@@ -143,7 +157,7 @@ export default function LoginPage() {
 
                     <div className="mt-6 text-center text-sm">
                         <span className="text-muted-foreground">ยังไม่มีบัญชีใช่ไหม? </span>
-                        <Link href="/register" className="text-primary hover:underline font-medium">
+                        <Link href={`/register${queryString}`} className="text-primary hover:underline font-medium">
                             สมัครสมาชิก
                         </Link>
                     </div>

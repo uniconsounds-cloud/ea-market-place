@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/navbar';
@@ -21,6 +21,10 @@ export default function RegisterPage() {
     const [selectedAdmin, setSelectedAdmin] = useState<string | null>(null);
     const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    
+    const refParam = searchParams.get('ref');
+    const redirectParam = searchParams.get('redirect');
 
     useEffect(() => {
         const fetchReferrerAndAdmins = async () => {
@@ -34,7 +38,35 @@ export default function RegisterPage() {
 
             const refCode = getCookie('affiliate_ref') || (typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null);
 
-            if (refCode) {
+            // Handle ref from query param (which might be a UUID from demo-challenge link)
+            if (refParam) {
+                // If it looks like a UUID (length > 20)
+                if (refParam.length > 20) {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('referral_code, full_name')
+                        .eq('id', refParam)
+                        .single();
+                    if (data) {
+                        setReferralData({ code: data.referral_code, name: data.full_name });
+                        setSelectedAdmin(data.referral_code);
+                        // Store it for Google Login
+                        if (typeof window !== 'undefined') localStorage.setItem('affiliate_ref', data.referral_code);
+                    }
+                } else {
+                    // It's a standard referral code
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('referral_code, full_name')
+                        .eq('referral_code', refParam)
+                        .single();
+                    if (data) {
+                        setReferralData({ code: data.referral_code, name: data.full_name });
+                        setSelectedAdmin(data.referral_code);
+                        if (typeof window !== 'undefined') localStorage.setItem('affiliate_ref', data.referral_code);
+                    }
+                }
+            } else if (refCode) {
                 const { data } = await supabase
                     .from('profiles')
                     .select('referral_code, full_name')
@@ -43,6 +75,7 @@ export default function RegisterPage() {
                 
                 if (data) {
                     setReferralData({ code: data.referral_code, name: data.full_name });
+                    setSelectedAdmin(data.referral_code);
                 }
             }
 
@@ -91,7 +124,14 @@ export default function RegisterPage() {
 
             // Check if email confirmation is required (default in Supabase)
             alert("สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชีของคุณ");
-            router.push('/login');
+            
+            // Build redirect URL to login page preserving params
+            const queryParams = new URLSearchParams();
+            if (redirectParam) queryParams.set('redirect', redirectParam);
+            if (refParam) queryParams.set('ref', refParam);
+            const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+            
+            router.push(`/login${queryString}`);
         } catch (err: any) {
             setError(err.message);
         } finally {
