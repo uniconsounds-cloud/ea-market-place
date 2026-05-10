@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, Key, CreditCard, Settings, LogOut, LayoutDashboard, Users } from 'lucide-react';
+import { Home, Key, CreditCard, Settings, LogOut, LayoutDashboard, Users, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
@@ -13,6 +13,7 @@ const sidebarItems = [
     { href: '/dashboard', label: 'ภาพรวม', icon: LayoutDashboard },
     // { href: '/dashboard/licenses', label: 'License ของฉัน', icon: Key }, // Removed as per request
     { href: '/dashboard/billing', label: 'การชำระเงิน', icon: CreditCard },
+    { href: '/farm/demo', label: 'ฟาร์มจำลอง (Demo)', icon: Gamepad2 },
     { href: '/dashboard/affiliate', label: 'แนะนำเพื่อน (Affiliate)', icon: Users },
     { href: '/dashboard/settings', label: 'ตั้งค่าบัญชี', icon: Settings },
 ];

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon, Key, Save } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon, Key, Save, Gamepad2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
@@ -71,6 +71,12 @@ const SidebarContent = ({
                 <Button variant="ghost" className="w-full justify-start">
                     <Key className="mr-2 h-4 w-4" />
                     จัดการลิขสิทธิ์
+                </Button>
+            </Link>
+            <Link href="/admin/demo-challenge" onClick={onClose}>
+                <Button variant="ghost" className="w-full justify-start text-orange-400">
+                    <Gamepad2 className="mr-2 h-4 w-4" />
+                    แคมเปญ Demo Challenge
                 </Button>
             </Link>
             <Link href="/admin/partners" onClick={onClose}>

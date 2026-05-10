@@ -82,6 +82,9 @@ type FarmHudProps = {
     isShaking?: boolean;
     systemCode?: string;
     onClick?: () => void;
+    title?: string;
+    customName?: string;
+    adminMessage?: string | null;
 };
 
 export default function FarmHud({
@@ -102,9 +105,13 @@ export default function FarmHud({
     isShaking = false,
     systemCode,
     onClick,
+    title,
+    customName,
+    adminMessage,
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
+    const [messageIndex, setMessageIndex] = useState(0);
 
     useEffect(() => {
         setIsClient(true);
@@ -112,6 +119,14 @@ export default function FarmHud({
         const timer = setInterval(() => setTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        if (!adminMessage) return;
+        const msgTimer = setInterval(() => {
+            setMessageIndex(prev => (prev === 0 ? 1 : 0));
+        }, 6000);
+        return () => clearInterval(msgTimer);
+    }, [adminMessage]);
 
     // Extract time components for the analog clock
     const seconds = time?.getSeconds() || 0;
@@ -167,7 +182,7 @@ export default function FarmHud({
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-[#2a1d0f]/50 to-black/60 pointer-events-none" />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
-            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6 py-1 sm:py-4">
+            <div className="relative max-w-7xl mx-auto flex items-center h-full px-2 sm:px-4 gap-2 sm:gap-6 py-2 sm:py-3">
 
                 {/* Left: Luxury Analog Clock Motif */}
                 <div className="flex flex-shrink-0 w-14 h-14 sm:w-24 sm:h-24 relative flex-col items-center justify-center my-auto mx-1 sm:mx-2">
@@ -272,11 +287,18 @@ export default function FarmHud({
                     <div className="flex-1 flex flex-col justify-center min-w-0">
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
-                                <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                    <span className="hidden sm:inline">
-                                        {systemCode && systemCode !== 'EAE_GENERIC' ? `${systemCode} | ` : 'EasyGold Farming | '}
-                                    </span>{assetType} | {portNumber} | {accountType}
-                                </h1>
+                                {title ? (
+                                    <h1 className="text-[11px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
+                                        {title}
+                                    </h1>
+                                ) : (
+                                    <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
+                                        <span className="hidden sm:inline">
+                                            {systemCode && systemCode !== 'EAE_GENERIC' ? `${systemCode} | ` : 'EasyGold Farming | '}
+                                        </span>
+                                        {assetType} | {portNumber} | {accountType}
+                                    </h1>
+                                )}
                                 <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
                                     {currencyPrefix}{equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -346,6 +368,20 @@ export default function FarmHud({
                                 }}
                            />
                         </div>
+
+                        {/* Broadcast / Custom Name Ticker */}
+                        {isClient && (customName || adminMessage) && (
+                            <div className="relative h-4 sm:h-5 mt-1 sm:mt-1.5 overflow-hidden w-full bg-black/20 rounded-sm">
+                                <div className={`absolute inset-0 flex justify-center items-center w-full px-2 text-[9px] sm:text-[10px] font-bold tracking-widest transition-all duration-700 ease-in-out ${messageIndex === 0 ? 'translate-y-0 opacity-100 text-amber-200' : '-translate-y-full opacity-0'}`}>
+                                    {customName ? customName : '🎯 MY DEMO PORT'}
+                                </div>
+                                {adminMessage && (
+                                    <div className={`absolute inset-0 flex justify-center items-center w-full px-2 text-[9px] sm:text-[10px] font-bold tracking-widest transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100 text-[#4de180]' : 'translate-y-full opacity-0'}`}>
+                                        {adminMessage}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

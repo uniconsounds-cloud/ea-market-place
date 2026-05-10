@@ -16,6 +16,7 @@ export default function SettingsPage() {
     // Profile State
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
+    const [portName, setPortName] = useState('');
 
     // Password State
     const [newPassword, setNewPassword] = useState('');
@@ -46,6 +47,16 @@ export default function SettingsPage() {
 
                     if (profile) {
                         setFullName(profile.full_name || '');
+                    }
+
+                    // Fetch Demo Challenge Port Name
+                    const { data: demo } = await supabase
+                        .from('demo_challenges')
+                        .select('port_name')
+                        .eq('user_id', user.id)
+                        .single();
+                    if (demo) {
+                        setPortName(demo.port_name || '');
                     }
 
                     // Fetch API Key
@@ -80,6 +91,13 @@ export default function SettingsPage() {
                 .eq('id', user.id);
 
             if (error) throw error;
+
+            // Also update Demo Challenge port name if they have one
+            await supabase
+                .from('demo_challenges')
+                .update({ port_name: portName })
+                .eq('user_id', user.id);
+
             alert('บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว');
         } catch (error) {
             console.error('Error updating profile:', error);
@@ -165,6 +183,19 @@ export default function SettingsPage() {
                             placeholder="กรอกชื่อ-นามสกุลของคุณ"
                             className="bg-background/50"
                         />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="portName">ชื่อพอร์ตจำลอง (Demo Port Name)</Label>
+                        <Input
+                            id="portName"
+                            value={portName}
+                            onChange={(e) => setPortName(e.target.value)}
+                            placeholder="เช่น My Awesome Port"
+                            maxLength={30}
+                            className="bg-background/50 text-amber-200 border-amber-900/50"
+                        />
+                        <p className="text-xs text-muted-foreground">ชื่อนี้จะไปปรากฏในหน้า Farm HUD ของแคมเปญ Demo Challenge</p>
                     </div>
 
                     <Button type="submit" disabled={savingProfile} className="w-full sm:w-auto">
