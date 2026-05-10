@@ -132,21 +132,24 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         const proportionalRatio = 0.1 * scaleFactor;
 
                         if (payload.eventType === 'INSERT') {
+                            const newOrder = payload.new as any;
                             const scaledOrder = {
-                                ...payload.new,
-                                current_pnl: Number(payload.new.current_pnl || 0) * proportionalRatio,
-                                raw_lot_size: Number(payload.new.raw_lot_size || 0) * proportionalRatio
+                                ...newOrder,
+                                current_pnl: Number(newOrder.current_pnl || 0) * proportionalRatio,
+                                raw_lot_size: Number(newOrder.raw_lot_size || 0) * proportionalRatio
                             };
                             setOrders(prev => [...prev.filter(o => o.ticket_id !== scaledOrder.ticket_id), scaledOrder]);
                         } else if (payload.eventType === 'UPDATE') {
+                            const newOrder = payload.new as any;
                             const scaledOrder = {
-                                ...payload.new,
-                                current_pnl: Number(payload.new.current_pnl || 0) * proportionalRatio,
-                                raw_lot_size: Number(payload.new.raw_lot_size || 0) * proportionalRatio
+                                ...newOrder,
+                                current_pnl: Number(newOrder.current_pnl || 0) * proportionalRatio,
+                                raw_lot_size: Number(newOrder.raw_lot_size || 0) * proportionalRatio
                             };
                             setOrders(prev => prev.map(o => o.ticket_id === scaledOrder.ticket_id ? scaledOrder : o));
                         } else if (payload.eventType === 'DELETE') {
-                            const closedOrder = ordersRef.current.find(o => o.ticket_id === payload.old.ticket_id);
+                            const oldOrder = payload.old as any;
+                            const closedOrder = ordersRef.current.find(o => o.ticket_id === oldOrder.ticket_id);
                             if (closedOrder) {
                                 pendingCloseQueue.current.push({
                                     ticket_id: closedOrder.ticket_id,
@@ -154,7 +157,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     closedAt: Date.now()
                                 });
                             }
-                            setOrders(prev => prev.filter(o => o.ticket_id !== payload.old.ticket_id));
+                            setOrders(prev => prev.filter(o => o.ticket_id !== oldOrder.ticket_id));
                         }
                         
                         return currentStatus; // Return unmodified to avoid state update loops
