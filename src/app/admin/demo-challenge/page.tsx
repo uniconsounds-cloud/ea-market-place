@@ -154,7 +154,7 @@ export default function DemoChallengeAdminPage() {
                     <CardContent>
                         <div className="flex space-x-2 mt-4">
                             <Input value={campaignLink} readOnly className="bg-background font-mono text-sm" />
-                            <Button onClick={copyToClipboard} variant="secondary">
+                            <Button onClick={copyToClipboard} variant="outline">
                                 <Copy className="h-4 w-4 mr-2" />
                                 คัดลอก
                             </Button>
