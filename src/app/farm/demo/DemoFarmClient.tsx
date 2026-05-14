@@ -50,6 +50,10 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const [leaderboardFilter, setLeaderboardFilter] = useState<'all' | number>('all');
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+    const [periodOffset, setPeriodOffset] = useState<number>(0);
+    const [allHistoryData, setAllHistoryData] = useState<any[]>([]);
+    const [masterPortStatusData, setMasterPortStatusData] = useState<any>(null);
 
     useEffect(() => {
         const getCurrUser = async () => {
@@ -62,11 +66,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const fetchLeaderboard = async () => {
         try {
             setLoadingLeaderboard(true);
-            const { data, error } = await supabase
-                .from('admin_demo_challenges_view')
-                .select('*')
-                .order('current_balance', { ascending: false });
-            if (data) setLeaderboardUsers(data);
+            const [usersRes, histRes, statusRes] = await Promise.all([
+                supabase.from('admin_demo_challenges_view').select('*'),
+                supabase.from('farm_daily_history').select('*').order('date', { ascending: false }),
+                supabase.from('farm_port_status').select('*').eq('port_number', '100000').single()
+            ]);
+            if (usersRes.data) setLeaderboardUsers(usersRes.data);
+            if (histRes.data) setAllHistoryData(histRes.data);
+            if (statusRes.data) setMasterPortStatusData(statusRes.data);
         } catch (e) {
             console.error(e);
         } finally {
@@ -77,6 +84,45 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     useEffect(() => {
         if (showLeaderboard) fetchLeaderboard();
     }, [showLeaderboard]);
+
+    const getPeriodInfo = (tf: 'daily' | 'weekly' | 'monthly', offset: number) => {
+        const today = new Date();
+        if (tf === 'daily') {
+            const d = new Date(today);
+            d.setDate(d.getDate() - offset);
+            const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            let label = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            if (offset === 0) label = `วันนี้ (${label})`;
+            else if (offset === 1) label = `เมื่อวาน (${label})`;
+            return { startStr: dateStr, endStr: dateStr, label };
+        } else if (tf === 'weekly') {
+            const d = new Date(today);
+            d.setDate(d.getDate() - offset * 7);
+            const day = d.getDay();
+            const start = new Date(d);
+            start.setDate(start.getDate() - day);
+            const end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            
+            const startStr = start.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const endStr = end.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const startLabel = start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+            const endLabel = end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            let label = `สัปดาห์ ${startLabel} - ${endLabel}`;
+            if (offset === 0) label = `สัปดาห์นี้ (${startLabel} - ${endLabel})`;
+            else if (offset === 1) label = `สัปดาห์ที่แล้ว (${startLabel} - ${endLabel})`;
+            return { startStr, endStr, label };
+        } else {
+            const d = new Date(today.getFullYear(), today.getMonth() - offset, 1);
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            const startStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const endStr = end.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            let label = d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+            if (offset === 0) label = `เดือนนี้ (${label})`;
+            else if (offset === 1) label = `เดือนที่แล้ว (${label})`;
+            return { startStr, endStr, label };
+        }
+    };
     
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
@@ -832,23 +878,68 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         </div>
 
                         {/* Filter Bar */}
-                        <div className="flex items-center gap-2 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20 overflow-x-auto no-scrollbar">
-                            <span className="text-xs text-amber-200/50 font-bold flex items-center gap-1 min-w-max">
-                                <Filter className="w-3.5 h-3.5" /> ระดับความเสี่ยง:
-                            </span>
-                            {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20 overflow-x-auto no-scrollbar">
+                            {/* Timeframe Mode Buttons */}
+                            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-amber-500/20 w-full sm:w-auto justify-center">
+                                {(['daily', 'weekly', 'monthly'] as const).map((tf) => (
+                                    <button
+                                        key={tf}
+                                        onClick={() => { setLeaderboardTimeframe(tf); setPeriodOffset(0); }}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                                            leaderboardTimeframe === tf
+                                                ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
+                                                : 'hover:bg-white/5 text-amber-200/60'
+                                        }`}
+                                    >
+                                        {tf === 'daily' ? '📅 รายวัน' : tf === 'weekly' ? '🗓️ รายสัปดาห์' : '📊 รายเดือน'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Risk Filter Buttons */}
+                            <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar py-1">
+                                <span className="text-xs text-amber-200/50 font-bold flex items-center gap-1 min-w-max hidden sm:flex">
+                                    <Filter className="w-3.5 h-3.5" />
+                                </span>
+                                {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
+                                    <button
+                                        key={String(filter)}
+                                        onClick={() => setLeaderboardFilter(filter)}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                                            leaderboardFilter === filter
+                                                ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
+                                                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30'
+                                        }`}
+                                    >
+                                        {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ สายเซฟ' : filter === 1.5 ? '🚀 สายเติบโต' : '🔥 สายซิ่ง'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Period Offset Navigation */}
+                            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end font-mono">
                                 <button
-                                    key={String(filter)}
-                                    onClick={() => setLeaderboardFilter(filter)}
-                                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
-                                        leaderboardFilter === filter
-                                            ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
-                                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30'
+                                    onClick={() => setPeriodOffset(o => o + 1)}
+                                    className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
+                                >
+                                    ◀ ย้อนหลัง
+                                </button>
+                                {(() => {
+                                    const info = getPeriodInfo(leaderboardTimeframe, periodOffset);
+                                    return <span className="text-xs font-bold text-[#cfa545] whitespace-nowrap">{info.label}</span>;
+                                })()}
+                                <button
+                                    onClick={() => setPeriodOffset(o => Math.max(0, o - 1))}
+                                    disabled={periodOffset === 0}
+                                    className={`px-2.5 py-1 border rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                                        periodOffset === 0 
+                                            ? 'bg-transparent text-amber-200/20 border-amber-500/10 cursor-not-allowed' 
+                                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border-amber-500/30'
                                     }`}
                                 >
-                                    {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ สายเซฟ (x1.0)' : filter === 1.5 ? '🚀 สายเติบโต (x1.5)' : '🔥 สายซิ่ง (x2.0)'}
+                                    ถัดไป ▶
                                 </button>
-                            ))}
+                            </div>
                         </div>
 
                         {/* User List */}
@@ -858,18 +949,44 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             ) : leaderboardUsers.length === 0 ? (
                                 <div className="py-12 text-center text-amber-200/40">ยังไม่มีผู้เข้าร่วมแคมเปญ</div>
                             ) : (() => {
-                                const filteredUsers = leaderboardFilter === 'all' 
-                                    ? leaderboardUsers 
-                                    : leaderboardUsers.filter(u => {
-                                        const r = Number(u.risk_level);
-                                        if (leaderboardFilter === 1.0) return r <= 1.25;
-                                        if (leaderboardFilter === 1.5) return r > 1.25 && r <= 1.75;
-                                        return r > 1.75;
-                                    });
+                                const { startStr, endStr } = getPeriodInfo(leaderboardTimeframe, periodOffset);
+                                const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 
-                                return filteredUsers.map((user, idx) => {
+                                const usersWithPeriodPnl = leaderboardUsers.map(u => {
+                                    const risk = Number(u.risk_level) || 1.0;
+                                    const joinStr = new Date(u.join_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                                    const actualStartStr = startStr < joinStr ? joinStr : startStr;
+                                    
+                                    const portNum = u.master_port_number || '100000';
+                                    const histRows = allHistoryData.filter(h => h.port_number === portNum && h.date >= actualStartStr && h.date <= endStr);
+                                    let totalMasterPnl = histRows.reduce((sum, h) => sum + Number(h.profit), 0);
+                                    
+                                    if (periodOffset === 0 && todayStr >= actualStartStr && todayStr <= endStr) {
+                                        const hasTodayRow = histRows.some(h => h.date === todayStr);
+                                        if (!hasTodayRow && masterPortStatusData && masterPortStatusData.port_number === portNum) {
+                                            totalMasterPnl += Number(masterPortStatusData.today_pnl || 0);
+                                        }
+                                    }
+
+                                    const periodGrowth = totalMasterPnl * 0.1 * risk;
+                                    return {
+                                        ...u,
+                                        periodGrowth,
+                                        current_balance: 10000 + periodGrowth
+                                    };
+                                }).filter(u => {
+                                    const r = Number(u.risk_level);
+                                    if (leaderboardFilter === 1.0) return r <= 1.25;
+                                    if (leaderboardFilter === 1.5) return r > 1.25 && r <= 1.75;
+                                    if (leaderboardFilter === 2.0) return r > 1.75;
+                                    return true;
+                                }).sort((a, b) => b.periodGrowth - a.periodGrowth);
+
+                                if (usersWithPeriodPnl.length === 0) return <div className="py-12 text-center text-amber-200/40">ไม่มีข้อมูลในสัปดาห์/เดือนนี้</div>;
+
+                                return usersWithPeriodPnl.map((user, idx) => {
                                     const isMe = currentUserId && user.user_id === currentUserId;
-                                    const growth = Number(user.current_balance) - 10000;
+                                    const growth = user.periodGrowth;
                                     
                                     let badge = <span className="text-lg font-mono font-bold text-amber-200/40 w-8 text-center">{idx + 1}</span>;
                                     if (idx === 0) badge = <span className="text-2xl animate-pulse">🏆</span>;
