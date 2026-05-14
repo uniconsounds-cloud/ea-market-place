@@ -970,16 +970,18 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
                                     const risk = Number(u.risk_level) || 1.0;
                                     const portNum = u.master_port_number || portNumber || '100000';
+                                    const joinDateStr = u.join_date ? String(u.join_date).split('T')[0] : '2000-01-01';
                                     
                                     // Strip time 'T00:00:00' from database date strings to match pure YYYY-MM-DD
+                                    // Strictly exclude any trading history before the user's specific join_date
                                     const histRows = sourceHistory.filter(h => {
                                         if (String(h.port_number || portNumber) !== String(portNum)) return false;
                                         const cleanDate = h.date?.split('T')[0];
-                                        return cleanDate >= startStr && cleanDate <= endStr;
+                                        return cleanDate >= startStr && cleanDate <= endStr && cleanDate >= joinDateStr;
                                     });
                                     let totalMasterPnl = histRows.reduce((sum, h) => sum + Number(h.profit), 0);
                                     
-                                    if (periodOffset === 0 && todayStr >= startStr && todayStr <= endStr) {
+                                    if (periodOffset === 0 && todayStr >= startStr && todayStr <= endStr && todayStr >= joinDateStr) {
                                         const hasTodayRow = histRows.some(h => h.date?.split('T')[0] === todayStr);
                                         if (!hasTodayRow && activeStatus && String(activeStatus.port_number || portNumber) === String(portNum)) {
                                             totalMasterPnl += Number(activeStatus.today_pnl || 0);
@@ -990,7 +992,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     return {
                                         ...u,
                                         periodGrowth,
-                                        current_balance: 10000 + periodGrowth
+                                        current_balance: u.current_balance ? Number(u.current_balance) : 10000 + periodGrowth
                                     };
                                 }).filter(u => {
                                     const r = Number(u.risk_level);
