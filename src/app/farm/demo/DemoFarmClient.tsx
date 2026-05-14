@@ -85,12 +85,19 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         if (showLeaderboard) fetchLeaderboard();
     }, [showLeaderboard]);
 
+    const formatGregorian = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const getPeriodInfo = (tf: 'daily' | 'weekly' | 'monthly', offset: number) => {
         const today = new Date();
         if (tf === 'daily') {
             const d = new Date(today);
             d.setDate(d.getDate() - offset);
-            const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const dateStr = formatGregorian(d);
             let label = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
             if (offset === 0) label = `วันนี้ (${label})`;
             else if (offset === 1) label = `เมื่อวาน (${label})`;
@@ -104,8 +111,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             const end = new Date(start);
             end.setDate(end.getDate() + 6);
             
-            const startStr = start.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-            const endStr = end.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const startStr = formatGregorian(start);
+            const endStr = formatGregorian(end);
             const startLabel = start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
             const endLabel = end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
             let label = `สัปดาห์ ${startLabel} - ${endLabel}`;
@@ -115,8 +122,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         } else {
             const d = new Date(today.getFullYear(), today.getMonth() - offset, 1);
             const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-            const startStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-            const endStr = end.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const startStr = formatGregorian(d);
+            const endStr = formatGregorian(end);
             let label = d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
             if (offset === 0) label = `เดือนนี้ (${label})`;
             else if (offset === 1) label = `เดือนที่แล้ว (${label})`;
@@ -878,14 +885,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         </div>
 
                         {/* Filter Bar */}
-                        <div className="flex flex-col gap-3 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20 overflow-x-auto no-scrollbar">
+                        <div className="space-y-3 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20">
                             {/* Row 1: Timeframe Mode Buttons */}
-                            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-amber-500/20 w-full justify-center">
+                            <div className="grid grid-cols-3 gap-2 bg-black/40 p-1.5 rounded-xl border border-amber-500/20 w-full">
                                 {(['daily', 'weekly', 'monthly'] as const).map((tf) => (
                                     <button
                                         key={tf}
                                         onClick={() => { setLeaderboardTimeframe(tf); setPeriodOffset(0); }}
-                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all w-1/3 text-center ${
+                                        className={`py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap ${
                                             leaderboardTimeframe === tf
                                                 ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
                                                 : 'hover:bg-white/5 text-amber-200/60'
@@ -897,7 +904,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             </div>
 
                             {/* Row 2: Risk Filter Buttons */}
-                            <div className="flex items-center justify-center gap-1.5 w-full overflow-x-auto no-scrollbar py-0.5">
+                            <div className="flex items-center justify-center gap-1.5 w-full flex-wrap">
                                 {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
                                     <button
                                         key={String(filter)}
@@ -914,21 +921,21 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             </div>
 
                             {/* Row 3: Period Offset Navigation */}
-                            <div className="flex items-center justify-between w-full font-mono bg-black/30 px-4 py-2 rounded-xl border border-amber-500/10">
+                            <div className="flex items-center justify-between w-full font-mono bg-black/30 px-4 py-2 rounded-xl border border-amber-500/10 text-xs">
                                 <button
                                     onClick={() => setPeriodOffset(o => o + 1)}
-                                    className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
+                                    className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap"
                                 >
                                     ◀ ย้อนหลัง
                                 </button>
                                 {(() => {
                                     const info = getPeriodInfo(leaderboardTimeframe, periodOffset);
-                                    return <span className="text-xs font-bold text-[#cfa545] whitespace-nowrap">{info.label}</span>;
+                                    return <span className="font-bold text-[#cfa545] whitespace-nowrap">{info.label}</span>;
                                 })()}
                                 <button
                                     onClick={() => setPeriodOffset(o => Math.max(0, o - 1))}
                                     disabled={periodOffset === 0}
-                                    className={`px-3 py-1 border rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                                    className={`px-3 py-1 border rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                                         periodOffset === 0 
                                             ? 'bg-transparent text-amber-200/20 border-amber-500/10 cursor-not-allowed' 
                                             : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border-amber-500/30'
@@ -947,7 +954,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 <div className="py-12 text-center text-amber-200/40">ยังไม่มีผู้เข้าร่วมแคมเปญ</div>
                             ) : (() => {
                                 const { startStr, endStr } = getPeriodInfo(leaderboardTimeframe, periodOffset);
-                                const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+                                const todayStr = formatGregorian(new Date());
 
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
                                     const risk = Number(u.risk_level) || 1.0;
