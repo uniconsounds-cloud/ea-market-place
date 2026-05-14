@@ -92,8 +92,16 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         return `${year}-${month}-${day}`;
     };
 
+    // Get current date in Bangkok timezone (UTC+7) to avoid US vs TH date mismatch
+    const getBangkokDate = () => {
+        const bkkStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        const [y, m, d] = bkkStr.split('-').map(Number);
+        const cleanY = y > 2500 ? y - 543 : y;
+        return new Date(cleanY, m - 1, d);
+    };
+
     const getPeriodInfo = (tf: 'daily' | 'weekly' | 'monthly', offset: number) => {
-        const today = new Date();
+        const today = getBangkokDate();
         if (tf === 'daily') {
             const d = new Date(today);
             d.setDate(d.getDate() - offset);
@@ -954,21 +962,26 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 <div className="py-12 text-center text-amber-200/40">ยังไม่มีผู้เข้าร่วมแคมเปญ</div>
                             ) : (() => {
                                 const { startStr, endStr } = getPeriodInfo(leaderboardTimeframe, periodOffset);
-                                const todayStr = formatGregorian(new Date());
+                                const todayStr = formatGregorian(getBangkokDate());
                                 const sourceHistory = allHistoryData.length > 0 ? allHistoryData : history;
+                                const activeStatus = masterPortStatusData || initialPortStatus;
 
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
                                     const risk = Number(u.risk_level) || 1.0;
                                     const portNum = u.master_port_number || '100000';
                                     
-                                    // Use startStr and endStr directly to match historical period performance perfectly
-                                    const histRows = sourceHistory.filter(h => String(h.port_number || '100000') === String(portNum) && h.date >= startStr && h.date <= endStr);
+                                    // Strip time 'T00:00:00' from database date strings to match pure YYYY-MM-DD
+                                    const histRows = sourceHistory.filter(h => {
+                                        if (String(h.port_number || '100000') !== String(portNum)) return false;
+                                        const cleanDate = h.date?.split('T')[0];
+                                        return cleanDate >= startStr && cleanDate <= endStr;
+                                    });
                                     let totalMasterPnl = histRows.reduce((sum, h) => sum + Number(h.profit), 0);
                                     
                                     if (periodOffset === 0 && todayStr >= startStr && todayStr <= endStr) {
-                                        const hasTodayRow = histRows.some(h => h.date === todayStr);
-                                        if (!hasTodayRow && masterPortStatusData && String(masterPortStatusData.port_number || '100000') === String(portNum)) {
-                                            totalMasterPnl += Number(masterPortStatusData.today_pnl || 0);
+                                        const hasTodayRow = histRows.some(h => h.date?.split('T')[0] === todayStr);
+                                        if (!hasTodayRow && activeStatus && String(activeStatus.port_number || '100000') === String(portNum)) {
+                                            totalMasterPnl += Number(activeStatus.today_pnl || 0);
                                         }
                                     }
 
