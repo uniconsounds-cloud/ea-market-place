@@ -395,7 +395,12 @@ export default function DemoChallengeAdminPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {(leaderboardFilter === 'all' ? allUsers : allUsers.filter(u => Number(u.risk_level) === leaderboardFilter)).map((user, idx) => {
+                                        {(leaderboardFilter === 'all' ? allUsers : allUsers.filter(u => {
+                                            const r = Number(u.risk_level);
+                                            if (leaderboardFilter === 1.0) return r <= 1.25;
+                                            if (leaderboardFilter === 1.5) return r > 1.25 && r <= 1.75;
+                                            return r > 1.75;
+                                        })).map((user, idx) => {
                                             const growth = Number(user.current_balance) - 10000;
                                             let badge = <span className="font-bold text-muted-foreground">{idx + 1}</span>;
                                             if (idx === 0) badge = <span className="text-xl">🏆</span>;

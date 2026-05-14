@@ -860,7 +860,12 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             ) : (() => {
                                 const filteredUsers = leaderboardFilter === 'all' 
                                     ? leaderboardUsers 
-                                    : leaderboardUsers.filter(u => Number(u.risk_level) === leaderboardFilter);
+                                    : leaderboardUsers.filter(u => {
+                                        const r = Number(u.risk_level);
+                                        if (leaderboardFilter === 1.0) return r <= 1.25;
+                                        if (leaderboardFilter === 1.5) return r > 1.25 && r <= 1.75;
+                                        return r > 1.75;
+                                    });
 
                                 return filteredUsers.map((user, idx) => {
                                     const isMe = currentUserId && user.user_id === currentUserId;

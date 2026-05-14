@@ -1,4 +1,5 @@
--- Update admin_demo_challenges_view to fallback to referred_by
+-- Update admin_demo_challenges_view to dynamically calculate real-time balance
+-- based on master port profit from farm_daily_history since join date!
 DROP VIEW IF EXISTS admin_demo_challenges_view;
 CREATE OR REPLACE VIEW admin_demo_challenges_view AS
 SELECT 
@@ -10,7 +11,13 @@ SELECT
     rp.email AS referrer_email,
     rp.full_name AS referrer_name,
     dc.risk_level,
-    dc.current_balance,
+    -- Dynamically calculate current balance/equity based on master port cumulative profit
+    10000 + (COALESCE((
+        SELECT SUM(profit) 
+        FROM public.farm_daily_history 
+        WHERE port_number = COALESCE(dc.master_port_number, '100000') 
+          AND date >= dc.join_date::date
+    ), 0) * 0.1 * dc.risk_level) AS current_balance,
     dc.join_date,
     dc.created_at,
     dc.port_name,
