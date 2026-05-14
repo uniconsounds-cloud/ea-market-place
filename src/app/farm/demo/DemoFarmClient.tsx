@@ -68,8 +68,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             setLoadingLeaderboard(true);
             const [usersRes, histRes, statusRes] = await Promise.all([
                 supabase.from('admin_demo_challenges_view').select('*'),
-                supabase.from('farm_daily_history').select('*').eq('port_number', '100000').order('date', { ascending: false }),
-                supabase.from('farm_port_status').select('*').eq('port_number', '100000').single()
+                supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }),
+                supabase.from('farm_port_status').select('*').eq('port_number', portNumber).single()
             ]);
             if (usersRes.data) setLeaderboardUsers(usersRes.data);
             if (histRes.data) setAllHistoryData(histRes.data);
@@ -968,11 +968,11 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
                                     const risk = Number(u.risk_level) || 1.0;
-                                    const portNum = u.master_port_number || '100000';
+                                    const portNum = u.master_port_number || portNumber || '100000';
                                     
                                     // Strip time 'T00:00:00' from database date strings to match pure YYYY-MM-DD
                                     const histRows = sourceHistory.filter(h => {
-                                        if (String(h.port_number || '100000') !== String(portNum)) return false;
+                                        if (String(h.port_number || portNumber) !== String(portNum)) return false;
                                         const cleanDate = h.date?.split('T')[0];
                                         return cleanDate >= startStr && cleanDate <= endStr;
                                     });
@@ -980,7 +980,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     
                                     if (periodOffset === 0 && todayStr >= startStr && todayStr <= endStr) {
                                         const hasTodayRow = histRows.some(h => h.date?.split('T')[0] === todayStr);
-                                        if (!hasTodayRow && activeStatus && String(activeStatus.port_number || '100000') === String(portNum)) {
+                                        if (!hasTodayRow && activeStatus && String(activeStatus.port_number || portNumber) === String(portNum)) {
                                             totalMasterPnl += Number(activeStatus.today_pnl || 0);
                                         }
                                     }
