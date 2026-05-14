@@ -68,7 +68,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             setLoadingLeaderboard(true);
             const [usersRes, histRes, statusRes] = await Promise.all([
                 supabase.from('admin_demo_challenges_view').select('*'),
-                supabase.from('farm_daily_history').select('*').order('date', { ascending: false }),
+                supabase.from('farm_daily_history').select('*').eq('port_number', '100000').order('date', { ascending: false }),
                 supabase.from('farm_port_status').select('*').eq('port_number', '100000').single()
             ]);
             if (usersRes.data) setLeaderboardUsers(usersRes.data);
@@ -955,13 +955,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             ) : (() => {
                                 const { startStr, endStr } = getPeriodInfo(leaderboardTimeframe, periodOffset);
                                 const todayStr = formatGregorian(new Date());
+                                const sourceHistory = allHistoryData.length > 0 ? allHistoryData : history;
 
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
                                     const risk = Number(u.risk_level) || 1.0;
                                     const portNum = u.master_port_number || '100000';
                                     
                                     // Use startStr and endStr directly to match historical period performance perfectly
-                                    const histRows = allHistoryData.filter(h => String(h.port_number || '100000') === String(portNum) && h.date >= startStr && h.date <= endStr);
+                                    const histRows = sourceHistory.filter(h => String(h.port_number || '100000') === String(portNum) && h.date >= startStr && h.date <= endStr);
                                     let totalMasterPnl = histRows.reduce((sum, h) => sum + Number(h.profit), 0);
                                     
                                     if (periodOffset === 0 && todayStr >= startStr && todayStr <= endStr) {
