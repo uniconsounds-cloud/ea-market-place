@@ -6,6 +6,7 @@ import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
 import Link from 'next/link';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
+import { Trophy, X, Filter } from 'lucide-react';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -42,6 +43,40 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const [recentlyClosed, setRecentlyClosed] = useState<any[]>([]);
     const [isShaking, setIsShaking] = useState(false);
     const [hiddenTickets, setHiddenTickets] = useState<number[]>([]);
+    
+    // Leaderboard states
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
+    const [leaderboardFilter, setLeaderboardFilter] = useState<'all' | number>('all');
+    const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const getCurrUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) setCurrentUserId(session.user.id);
+        };
+        getCurrUser();
+    }, []);
+
+    const fetchLeaderboard = async () => {
+        try {
+            setLoadingLeaderboard(true);
+            const { data, error } = await supabase
+                .from('admin_demo_challenges_view')
+                .select('*')
+                .order('current_balance', { ascending: false });
+            if (data) setLeaderboardUsers(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingLeaderboard(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showLeaderboard) fetchLeaderboard();
+    }, [showLeaderboard]);
     
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
@@ -719,13 +754,21 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
                             Demo Harvest History (Scaled x{scaleFactor})
                         </span>
-                        <Link 
-                            href="/dashboard"
-                            className="flex items-center gap-1.5 text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-3.5 py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                            กลับสู่หน้าหลัก Dashboard
-                        </Link>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setShowLeaderboard(true)}
+                                className="flex items-center gap-1.5 text-[10px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 px-3.5 py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_15px_rgba(207,165,69,0.2)] hover:shadow-[0_0_20px_rgba(207,165,69,0.4)]"
+                            >
+                                <Trophy className="w-3.5 h-3.5" />อันดับแคมเปญ
+                            </button>
+                            <Link 
+                                href="/dashboard"
+                                className="flex items-center gap-1.5 text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-3.5 py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                                กลับสู่หน้าหลัก Dashboard
+                            </Link>
+                        </div>
                     </div>
 
                     {/* Crates scroll row (mobile: inline 90D button at END of scroll, desktop: fill remaining space) */}
@@ -747,14 +790,130 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             </div>
                         ))}
 
-                        {/* Mobile-only: Square 90D button at the end, same size as crate */}
+                        {/* Mobile-only: Square Leaderboard button + 90D button at the end */}
+                        <button
+                            onClick={() => setShowLeaderboard(true)}
+                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-gradient-to-b from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/35 hover:to-[#996a22]/35 text-[#cfa545] border border-[#cfa545]/50 rounded-lg transition-colors ml-auto font-bold text-center px-1 shadow-[0_0_15px_rgba(207,165,69,0.2)]"
+                        >
+                            <Trophy className="w-5 h-5 mb-1 animate-pulse" />
+                            <span className="text-[8px] uppercase tracking-tighter">อันดับ</span>
+                        </button>
+
                         <Link 
                             href="/dashboard"
-                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 rounded-lg transition-colors ml-auto font-bold text-center px-1"
+                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 rounded-lg transition-colors font-bold text-center px-1"
                         >
                             <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                             <span className="text-[8px] uppercase tracking-tighter">แดชบอร์ด</span>
                         </Link>
+                    </div>
+                </div>
+            )}
+
+            {/* LEADERBOARD MODAL */}
+            {showLeaderboard && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-auto">
+                    <div className="bg-[#1e140c] border-2 border-[#cfa545] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-[0_0_50px_rgba(207,165,69,0.3)] overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-[#2c1b10] to-[#1e140c] border-b border-[#cfa545]/30">
+                            <div className="flex items-center gap-3">
+                                <Trophy className="w-8 h-8 text-[#cfa545] animate-bounce" />
+                                <div>
+                                    <h2 className="text-2xl font-extrabold text-[#cfa545] tracking-wide">$100 Demo Challenge Leaderboard</h2>
+                                    <p className="text-xs text-amber-200/60">กระดานจัดอันดับผู้ทำกำไรสูงสุดแบบเรียลไทม์</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowLeaderboard(false)}
+                                className="p-2 text-amber-200/60 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Filter Bar */}
+                        <div className="flex items-center gap-2 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20 overflow-x-auto no-scrollbar">
+                            <span className="text-xs text-amber-200/50 font-bold flex items-center gap-1 min-w-max">
+                                <Filter className="w-3.5 h-3.5" /> ระดับความเสี่ยง:
+                            </span>
+                            {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
+                                <button
+                                    key={String(filter)}
+                                    onClick={() => setLeaderboardFilter(filter)}
+                                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                                        leaderboardFilter === filter
+                                            ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
+                                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30'
+                                    }`}
+                                >
+                                    {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ สายเซฟ (x1.0)' : filter === 1.5 ? '🚀 สายเติบโต (x1.5)' : '🔥 สายซิ่ง (x2.0)'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* User List */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                            {loadingLeaderboard ? (
+                                <div className="py-12 text-center text-amber-200/50 animate-pulse font-mono">กำลังโหลดกระดานจัดอันดับ...</div>
+                            ) : leaderboardUsers.length === 0 ? (
+                                <div className="py-12 text-center text-amber-200/40">ยังไม่มีผู้เข้าร่วมแคมเปญ</div>
+                            ) : (() => {
+                                const filteredUsers = leaderboardFilter === 'all' 
+                                    ? leaderboardUsers 
+                                    : leaderboardUsers.filter(u => Number(u.risk_level) === leaderboardFilter);
+
+                                return filteredUsers.map((user, idx) => {
+                                    const isMe = currentUserId && user.user_id === currentUserId;
+                                    const growth = Number(user.current_balance) - 10000;
+                                    
+                                    let badge = <span className="text-lg font-mono font-bold text-amber-200/40 w-8 text-center">{idx + 1}</span>;
+                                    if (idx === 0) badge = <span className="text-2xl animate-pulse">🏆</span>;
+                                    else if (idx === 1) badge = <span className="text-2xl">🥈</span>;
+                                    else if (idx === 2) badge = <span className="text-2xl">🥉</span>;
+
+                                    return (
+                                        <div 
+                                            key={user.id}
+                                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                                                isMe 
+                                                    ? 'bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 border-[#cfa545] shadow-[0_0_20px_rgba(207,165,69,0.3)] scale-[1.02]' 
+                                                    : 'bg-[#170e08] hover:bg-[#21150e] border-amber-900/30'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex items-center justify-center w-10">
+                                                    {badge}
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-white text-sm">
+                                                            {user.user_name || user.user_email?.split('@')[0] || 'Trader'}
+                                                        </span>
+                                                        {isMe && (
+                                                            <span className="bg-[#cfa545] text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                                                                พอร์ตของคุณ
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-amber-200/60 mt-0.5">
+                                                        {Number(user.risk_level) <= 1.2 ? '🛡️ สายเซฟ (x1.0)' : Number(user.risk_level) <= 1.7 ? '🚀 สายเติบโต (x1.5)' : '🔥 สายซิ่ง (x2.0)'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <div className="font-mono font-extrabold text-[#4de180] text-base">
+                                                    ${Number(user.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                                <div className={`font-mono text-xs font-bold ${growth >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                                    {growth >= 0 ? '+' : ''}{growth.toFixed(2)} USC
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
                     </div>
                 </div>
             )}

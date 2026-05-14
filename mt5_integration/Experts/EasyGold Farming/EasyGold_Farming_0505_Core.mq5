@@ -46,12 +46,13 @@
 //|  1.500 - NEW: Multi-Cluster Grid, Dynamic Magic Allocation, BE Anchor Merging.                 |
 //|  1.501 - UI/UX: Grouped inputs with headers, hid internal variables, string time parsing.        |
 //|  1.600 - NEW: Unified State Escape & Dual Engine (Grid & isolated Rebate Scalper).               |
+//|  1.700 - NEW: Peak/Trough Entry Guard, Impulse Throttling, Rejection Confirmations & Micro Stop. |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.600"
+#property version   "1.700"
 
 // At top of file
-#define EA_VERSION "1.600"
+#define EA_VERSION "1.700"
 
 #include "../EAE_MonitorTypes.mqh"
 #include "../EAE_CollectorCore.mqh"
@@ -332,6 +333,38 @@ const double G_GATE_ATR_RATIO_LIMIT  = 3.0;    // ATR Ratio Limit (Candle / ATR1
 const int    G_GATE_SPREAD_LIMIT     = 100;    // Max Spread (Points)
 
 input string InpGateNewsRange        = "";     // News Filter (YYYY.MM.DD HH:MM-HH:MM)
+
+//==================================================================//
+// [190] INPUTS - Peak/Trough Entry Guard                           //
+//==================================================================//
+sinput string InpHeader_PeakGuard          = "--- Peak/Trough Entry Guard ---";
+input bool    InpEnablePeakTroughGuard     = true;     // Enable Peak/Trough Guard
+input int     InpImpulseLookbackCandles    = 5;        // Impulse Lookback Candles (M1)
+input double  InpMaxImpulseMovePoints      = 300.0;    // Max Impulse Move (Points)
+input int     InpImpulseCooldownMinutes    = 7;        // Impulse Cooldown (Min)
+
+input bool    InpRequireRejection          = true;     // Require Rejection/RSI confirm
+input double  InpRSIOverbought             = 70.0;     // RSI Overbought Threshold
+input double  InpRSIOversold               = 30.0;     // RSI Oversold Threshold
+
+input int     InpMaxOrdersDuringImpulse    = 1;        // Max Scout Orders during impulse
+input double  InpMaxLotDuringImpulse       = 0.01;     // Scout Lot Size
+input bool    InpBlockGridUntilPullback    = true;     // Block Grid until pullback
+input double  InpPullbackConfirmPoints     = 120.0;    // Pullback Confirm Distance (Points)
+
+input bool    InpEarlyWrongEntryCut        = true;     // Micro Stop Early Cut
+input int     InpEarlyCutMaxOrders         = 3;        // Early Cut Max Basket Count
+input double  InpEarlyCutLossUSC           = -40.0;    // Early Cut Loss Threshold (USC)
+input int     InpEarlyCutCooldownMin       = 5;        // Cooldown after Early Cut (Min)
+
+//--- Peak/Trough Entry Guard State
+int      g_hRsiGuard = INVALID_HANDLE;
+datetime g_impulseCooldownB = 0;
+datetime g_impulseCooldownS = 0;
+datetime g_earlyCutCooldownB = 0;
+datetime g_earlyCutCooldownS = 0;
+string   g_peakGuardStatusStrB = "OK";
+string   g_peakGuardStatusStrS = "OK";
 
 //--- Dual Engine & State Escape Settings ---
 input double InpCautionLoss        = -100.0; // Caution state floating loss limit (USC)
@@ -2395,6 +2428,194 @@ bool CheckMarketSafety()
 //==================================================================//
 // [1000] CORE - Entry / Rescue / Follow / Basket close               //
 //==================================================================//
+bool PeakTroughGuardCheck(const bool isBuy, const bool isRescue, double &vol, string &cmtTag)
+{
+   if(!InpEnablePeakTroughGuard) return true;
+   
+   datetime now = TimeCurrent();
+   
+   // 1. Check Early Cut Cooldown
+   if(isBuy && now < g_earlyCutCooldownB)
+   {
+      g_peakGuardStatusStrB = "CUT_COOLDOWN";
+      return false;
+   }
+   if(!isBuy && now < g_earlyCutCooldownS)
+   {
+      g_peakGuardStatusStrS = "CUT_COOLDOWN";
+      return false;
+   }
+   
+   // 2. Check Impulse Cooldown
+   if(isBuy && now < g_impulseCooldownB)
+   {
+      g_peakGuardStatusStrB = "IMPULSE_COOLDOWN";
+      return false;
+   }
+   if(!isBuy && now < g_impulseCooldownS)
+   {
+      g_peakGuardStatusStrS = "IMPULSE_COOLDOWN";
+      return false;
+   }
+   
+   // 3. Scan M1 Lookback for Impulse Move
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+   int copied = CopyRates(_Symbol, PERIOD_M1, 0, InpImpulseLookbackCandles + 1, rates);
+   if(copied >= InpImpulseLookbackCandles)
+   {
+      double highest = rates[0].high;
+      double lowest  = rates[0].low;
+      for(int i = 1; i < InpImpulseLookbackCandles; i++)
+      {
+         if(rates[i].high > highest) highest = rates[i].high;
+         if(rates[i].low < lowest)   lowest  = rates[i].low;
+      }
+      
+      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      if(point <= 0.0) point = _Point;
+      
+      if(isBuy)
+      {
+         double dropPts = (highest - rates[0].close) / point;
+         if(dropPts >= InpMaxImpulseMovePoints)
+         {
+            int cnt = CountPositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
+            if(cnt >= InpMaxOrdersDuringImpulse)
+            {
+               g_impulseCooldownB = now + (InpImpulseCooldownMinutes * 60);
+               g_peakGuardStatusStrB = StringFormat("IMPULSE_DOWN (%.0f pts)", dropPts);
+               Print("PeakGuard: Buy blocked due to Impulse Down surge: ", dropPts, " pts");
+               return false;
+            }
+            else
+            {
+               vol = InpMaxLotDuringImpulse;
+               cmtTag = isRescue ? "RTB_SCT" : "ENT_SCT";
+               g_peakGuardStatusStrB = "SCOUT_ALLOWED";
+            }
+         }
+      }
+      else
+      {
+         double surgePts = (rates[0].close - lowest) / point;
+         if(surgePts >= InpMaxImpulseMovePoints)
+         {
+            int cnt = CountPositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
+            if(cnt >= InpMaxOrdersDuringImpulse)
+            {
+               g_impulseCooldownS = now + (InpImpulseCooldownMinutes * 60);
+               g_peakGuardStatusStrS = StringFormat("IMPULSE_UP (%.0f pts)", surgePts);
+               Print("PeakGuard: Sell blocked due to Impulse Up surge: ", surgePts, " pts");
+               return false;
+            }
+            else
+            {
+               vol = InpMaxLotDuringImpulse;
+               cmtTag = isRescue ? "RTS_SCT" : "ENT_SCT";
+               g_peakGuardStatusStrS = "SCOUT_ALLOWED";
+            }
+         }
+      }
+   }
+   
+   // 4. Confirmation Rejection Check
+   if(InpRequireRejection)
+   {
+      bool confirmed = false;
+      if(copied >= 2)
+      {
+         if(isBuy && rates[0].close > rates[1].high) confirmed = true;
+         if(!isBuy && rates[0].close < rates[1].low) confirmed = true;
+      }
+      if(!confirmed && g_hRsiGuard != INVALID_HANDLE)
+      {
+         double rsiBuf[];
+         ArraySetAsSeries(rsiBuf, true);
+         if(CopyBuffer(g_hRsiGuard, 0, 0, 1, rsiBuf) == 1)
+         {
+            if(isBuy && rsiBuf[0] > InpRSIOversold) confirmed = true;
+            if(!isBuy && rsiBuf[0] < InpRSIOverbought) confirmed = true;
+         }
+      }
+      if(!confirmed && g_hEmaSlow != INVALID_HANDLE)
+      {
+         double emaBuf[];
+         ArraySetAsSeries(emaBuf, true);
+         if(CopyBuffer(g_hEmaSlow, 0, 0, 1, emaBuf) == 1)
+         {
+            double dist = MathAbs(iClose(_Symbol, PERIOD_CURRENT, 0) - emaBuf[0]);
+            double maxDist = PipsToPrice(InpPipsDistanceToEma, _Symbol);
+            if(dist <= maxDist) confirmed = true;
+         }
+      }
+      
+      if(!confirmed)
+      {
+         if(isBuy) g_peakGuardStatusStrB = "WAIT_REJ";
+         else      g_peakGuardStatusStrS = "WAIT_REJ";
+         return false;
+      }
+   }
+   
+   // 5. Check Grid Pullback Distance for Rescues
+   if(isRescue && InpBlockGridUntilPullback)
+   {
+      double newestOpen = 0.0;
+      int magic = isBuy ? g_magicBuy : g_magicSell;
+      ENUM_POSITION_TYPE side = isBuy ? POSITION_TYPE_BUY : POSITION_TYPE_SELL;
+      if(GetNewestOpenPrice(magic, side, newestOpen))
+      {
+         double currPrice = isBuy ? SymbolInfoDouble(_Symbol, SYMBOL_BID) : SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+         double diffPts = MathAbs(currPrice - newestOpen) / (SymbolInfoDouble(_Symbol, SYMBOL_POINT) > 0 ? SymbolInfoDouble(_Symbol, SYMBOL_POINT) : _Point);
+         if(diffPts < InpPullbackConfirmPoints)
+         {
+            if(isBuy) g_peakGuardStatusStrB = StringFormat("PULLBACK (%.0f/%.0f)", diffPts, InpPullbackConfirmPoints);
+            else      g_peakGuardStatusStrS = StringFormat("PULLBACK (%.0f/%.0f)", diffPts, InpPullbackConfirmPoints);
+            return false;
+         }
+      }
+   }
+   
+   if(isBuy) g_peakGuardStatusStrB = "OK";
+   else      g_peakGuardStatusStrS = "OK";
+   
+   return true;
+}
+
+void CheckEarlyWrongEntryCut()
+{
+   if(!InpEarlyWrongEntryCut) return;
+   
+   datetime now = TimeCurrent();
+   
+   // Check Buy
+   int cntB = CountPositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
+   if(cntB > 0 && cntB <= InpEarlyCutMaxOrders && now >= g_earlyCutCooldownB)
+   {
+      double profitB = BasketProfitByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
+      if(profitB <= InpEarlyCutLossUSC)
+      {
+         Print("EarlyCut: Triggered for Buy side. Count=", cntB, " Profit=", profitB);
+         CloseAllByMagicSideTagged("CUT_EARLY", g_magicBuy, POSITION_TYPE_BUY);
+         g_earlyCutCooldownB = now + (InpEarlyCutCooldownMin * 60);
+      }
+   }
+   
+   // Check Sell
+   int cntS = CountPositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
+   if(cntS > 0 && cntS <= InpEarlyCutMaxOrders && now >= g_earlyCutCooldownS)
+   {
+      double profitS = BasketProfitByMagicSide(g_magicSell, POSITION_TYPE_SELL);
+      if(profitS <= InpEarlyCutLossUSC)
+      {
+         Print("EarlyCut: Triggered for Sell side. Count=", cntS, " Profit=", profitS);
+         CloseAllByMagicSideTagged("CUT_EARLY", g_magicSell, POSITION_TYPE_SELL);
+         g_earlyCutCooldownS = now + (InpEarlyCutCooldownMin * 60);
+      }
+   }
+}
+
 void TryEntry()
 {
    datetime now = TimeCurrent();
@@ -2420,8 +2641,13 @@ void TryEntry()
       int cntB = CountPositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
       if(cntB == 0 && EntryBuySignal() && OncePerBar(g_lastEntryBuyBar))
       {
-         if(PlaceBuy(InpLots, "ENT"))
-            g_lotsB = InpLots;
+         double vol = InpLots;
+         string tag = "ENT";
+         if(PeakTroughGuardCheck(true, false, vol, tag))
+         {
+            if(PlaceBuy(vol, tag))
+               g_lotsB = vol;
+         }
       }
    }
 
@@ -2430,8 +2656,13 @@ void TryEntry()
       int cntS = CountPositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
       if(cntS == 0 && EntrySellSignal() && OncePerBar(g_lastEntrySellBar))
       {
-         if(PlaceSell(InpLots, "ENT"))
-            g_lotsS = InpLots;
+         double vol = InpLots;
+         string tag = "ENT";
+         if(PeakTroughGuardCheck(false, false, vol, tag))
+         {
+            if(PlaceSell(vol, tag))
+               g_lotsS = vol;
+         }
       }
    }
 }
@@ -2449,8 +2680,6 @@ void TryRescue()
       return;
 
    // 3. Friday Logic Blocks
-   // 1. Soft Mode (4h): Block all rescues
-   // 2. Manage Mode (8h): Block only if DD Growth Limit is exceeded
    if(g_friState >= EZ_STATE_FRI_SOFT || g_friRescueBlocked)
       return;
 
@@ -2474,25 +2703,27 @@ void TryRescue()
 
                   if(!HasNearbyOpenPrice(g_magicBuy, POSITION_TYPE_BUY, gridPips) && OncePerBar(g_lastRescueBuyBar))
                   {
-                     // [ABRG] Check Hibernation/Cluster Permission
                      if(ABRG_IsAllowed(g_eae_buy_state)) 
                      {
-                        // [V1.500] Calculate dynamic cluster magic number
                         int target_magic = ABRG_GetClusterMagicNumber(rescue_cntB, g_magicBuy, InpMaxOrderLoss);
                         
                         if(g_lotsB <= 0.0) g_lotsB = InpLots;
                         double capLotsB = g_escapeManager.GetLotCap(POSITION_TYPE_BUY, InpUpperLimitLotSize);
                         if(g_lotsB > capLotsB) g_lotsB = capLotsB;
                         
-                        if(PlaceBuy(g_lotsB, "RTB", target_magic))
+                        double vol = g_lotsB;
+                        string tag = "RTB";
+                        if(PeakTroughGuardCheck(true, true, vol, tag))
                         {
-                           g_lotsB += InpLotPlusB;
-                           double nextCapB = g_escapeManager.GetLotCap(POSITION_TYPE_BUY, InpUpperLimitLotSize);
-                           if(g_lotsB > nextCapB) g_lotsB = nextCapB;
-                           
-                           // Increment Cluster Count if active
-                           if(g_eae_buy_state.abrg_is_hibernating) 
-                              g_eae_buy_state.abrg_cluster_count++;
+                           if(PlaceBuy(vol, tag, target_magic))
+                           {
+                              if(tag == "RTB") g_lotsB += InpLotPlusB;
+                              double nextCapB = g_escapeManager.GetLotCap(POSITION_TYPE_BUY, InpUpperLimitLotSize);
+                              if(g_lotsB > nextCapB) g_lotsB = nextCapB;
+                              
+                              if(g_eae_buy_state.abrg_is_hibernating) 
+                                 g_eae_buy_state.abrg_cluster_count++;
+                           }
                         }
                      }
                      else 
@@ -2526,25 +2757,27 @@ void TryRescue()
 
                   if(!HasNearbyOpenPrice(g_magicSell, POSITION_TYPE_SELL, gridPips) && OncePerBar(g_lastRescueSellBar))
                   {
-                     // [ABRG] Check Hibernation/Cluster Permission
                      if(ABRG_IsAllowed(g_eae_sell_state))
                      {
-                        // [V1.500] Calculate dynamic cluster magic number
                         int target_magic = ABRG_GetClusterMagicNumber(rescue_cntS, g_magicSell, InpMaxOrderLoss);
                         
                         if(g_lotsS <= 0.0) g_lotsS = InpLots;
                         double capLotsS = g_escapeManager.GetLotCap(POSITION_TYPE_SELL, InpUpperLimitLotSize);
                         if(g_lotsS > capLotsS) g_lotsS = capLotsS;
                         
-                        if(PlaceSell(g_lotsS, "RTS", target_magic))
+                        double vol = g_lotsS;
+                        string tag = "RTS";
+                        if(PeakTroughGuardCheck(false, true, vol, tag))
                         {
-                           g_lotsS += InpLotPlusS;
-                           double nextCapS = g_escapeManager.GetLotCap(POSITION_TYPE_SELL, InpUpperLimitLotSize);
-                           if(g_lotsS > nextCapS) g_lotsS = nextCapS;
-                           
-                           // Increment Cluster Count if active
-                           if(g_eae_sell_state.abrg_is_hibernating) 
-                              g_eae_sell_state.abrg_cluster_count++;
+                           if(PlaceSell(vol, tag, target_magic))
+                           {
+                              if(tag == "RTS") g_lotsS += InpLotPlusS;
+                              double nextCapS = g_escapeManager.GetLotCap(POSITION_TYPE_SELL, InpUpperLimitLotSize);
+                              if(g_lotsS > nextCapS) g_lotsS = nextCapS;
+                              
+                              if(g_eae_sell_state.abrg_is_hibernating) 
+                                 g_eae_sell_state.abrg_cluster_count++;
+                           }
                         }
                      }
                      else
@@ -2704,7 +2937,7 @@ void OnTimer()
 
 int OnInit()
 {
-   Print("==== EASYGOLD FARMING (v1.600) ZERO-LAG ATTACH ====");
+   Print("==== EASYGOLD FARMING (v1.700) ZERO-LAG ATTACH ====");
    
    // [V1.501] Parse Market Time Strings into global integers
    string closeParts[];
@@ -2775,9 +3008,11 @@ void PerformAsyncBootStep()
          g_hEmaSlow = iMA(_Symbol, PERIOD_CURRENT, InpEmaSlowPeriod, 0, MODE_EMA, PRICE_CLOSE);
          g_hAtrGrid = iATR(_Symbol, PERIOD_CURRENT, InpAtrGridPeriod);
          g_hAtrFilt = iATR(_Symbol, PERIOD_CURRENT, InpAtrFilterPeriod);
+         g_hRsiGuard = iRSI(_Symbol, PERIOD_M1, 14, PRICE_CLOSE);
 
          if(g_hEmaFast == INVALID_HANDLE || g_hEmaSlow == INVALID_HANDLE ||
-            g_hAtrGrid  == INVALID_HANDLE || g_hAtrFilt  == INVALID_HANDLE)
+            g_hAtrGrid  == INVALID_HANDLE || g_hAtrFilt  == INVALID_HANDLE ||
+            g_hRsiGuard == INVALID_HANDLE)
          {
             Print("Failed to create indicator handles.");
             ExpertRemove();
@@ -2827,6 +3062,7 @@ void OnDeinit(const int reason)
    if(g_hEmaSlow != INVALID_HANDLE) IndicatorRelease(g_hEmaSlow);
    if(g_hAtrGrid != INVALID_HANDLE) IndicatorRelease(g_hAtrGrid);
    if(g_hAtrFilt != INVALID_HANDLE) IndicatorRelease(g_hAtrFilt);
+   if(g_hRsiGuard != INVALID_HANDLE) IndicatorRelease(g_hRsiGuard);
 }
 
 void OnTick()
@@ -2840,6 +3076,7 @@ void OnTick()
       UpdateCircuitBreaker();
       CheckMarketSafety();
       FridayPlanUpdate();
+      CheckEarlyWrongEntryCut();
       
       // [NEW] ABRG Risk Monitoring (Pulsed every 250ms)
       ABRG_MonitorSide(g_eae_buy_state);
@@ -2851,11 +3088,6 @@ void OnTick()
    // [ZERO-LATENCY CORE] Trading execution remains at full tick speed
    g_escapeManager.Process(g_magicBuy, g_magicSell);
    g_scalperEngine.OnTickProcess(g_escapeManager);
-
-   TryEntry();
-   TryRescue();
-   TryFollow();
-   TryBasketClose();
 
    // [SAFETY] Do not trade until background boot sequence is complete
    if(g_bootState != BOOT_READY)
