@@ -243,7 +243,7 @@ export default function DemoChallengeAdminPage() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">เลขพอร์ตต้นแบบ (Master Port)</label>
                             <div className="flex space-x-2">
-                                Input 
+                                <Input 
                                     value={demoMasterPort} 
                                     onChange={(e) => setDemoMasterPort(e.target.value)}
                                     placeholder="เช่น 100000 (ถ้าเว้นว่างจะใช้พอร์ตหลักของบริษัท)" 
