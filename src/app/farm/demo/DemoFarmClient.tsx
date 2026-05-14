@@ -110,7 +110,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             let label = shortDate;
             if (offset === 0) label = `วันนี้ (${shortDate})`;
             else if (offset === 1) label = `เมื่อวาน (${shortDate})`;
-            return { startStr: dateStr, endStr: dateStr, label };
+            const dayOfWeek = d.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            return { startStr: dateStr, endStr: dateStr, label, isWeekend };
         } else if (tf === 'weekly') {
             const d = new Date(today);
             d.setDate(d.getDate() - offset * 7);
@@ -127,7 +129,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             let label = `${startLabel} - ${endLabel}`;
             if (offset === 0) label = `สัปดาห์นี้ (${label})`;
             else if (offset === 1) label = `สัปดาห์ที่แล้ว (${label})`;
-            return { startStr, endStr, label };
+            return { startStr, endStr, label, isWeekend: false };
         } else {
             const d = new Date(today.getFullYear(), today.getMonth() - offset, 1);
             const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
@@ -136,7 +138,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             let label = d.toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
             if (offset === 0) label = `เดือนนี้ (${label})`;
             else if (offset === 1) label = `เดือนที่แล้ว (${label})`;
-            return { startStr, endStr, label };
+            return { startStr, endStr, label, isWeekend: false };
         }
     };
     
@@ -962,7 +964,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             ) : leaderboardUsers.length === 0 ? (
                                 <div className="py-12 text-center text-amber-200/40">ยังไม่มีผู้เข้าร่วมแคมเปญ</div>
                             ) : (() => {
-                                const { startStr, endStr } = getPeriodInfo(leaderboardTimeframe, periodOffset);
+                                const { startStr, endStr, isWeekend } = getPeriodInfo(leaderboardTimeframe, periodOffset);
                                 const todayStr = formatGregorian(getBangkokDate());
                                 const sourceHistory = allHistoryData.length > 0 ? allHistoryData : history;
                                 const activeStatus = masterPortStatusData || initialPortStatus;
@@ -971,6 +973,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     const risk = Number(u.risk_level) || 1.0;
                                     const portNum = u.master_port_number || portNumber || '100000';
                                     const joinDateStr = u.join_date ? String(u.join_date).split('T')[0] : '2000-01-01';
+                                    const isBeforeJoin = endStr < joinDateStr;
                                     
                                     // Strip time 'T00:00:00' from database date strings to match pure YYYY-MM-DD
                                     // Strictly exclude any trading history before the user's specific join_date
@@ -989,10 +992,28 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     }
 
                                     const periodGrowth = totalMasterPnl * 0.1 * risk;
+
+                                    // Calculate all-time cumulative profit since join_date for true live current balance
+                                    const allTimeHistRows = sourceHistory.filter(h => {
+                                        if (String(h.port_number || portNumber) !== String(portNum)) return false;
+                                        const cleanDate = h.date?.split('T')[0];
+                                        return cleanDate >= joinDateStr;
+                                    });
+                                    let allTimeMasterPnl = allTimeHistRows.reduce((sum, h) => sum + Number(h.profit), 0);
+                                    if (todayStr >= joinDateStr) {
+                                        const hasTodayRow = allTimeHistRows.some(h => h.date?.split('T')[0] === todayStr);
+                                        if (!hasTodayRow && activeStatus && String(activeStatus.port_number || portNumber) === String(portNum)) {
+                                            allTimeMasterPnl += Number(activeStatus.today_pnl || 0);
+                                        }
+                                    }
+                                    const allTimeGrowth = allTimeMasterPnl * 0.1 * risk;
+                                    const liveCurrentBalance = 10000 + allTimeGrowth;
+
                                     return {
                                         ...u,
                                         periodGrowth,
-                                        current_balance: u.current_balance ? Number(u.current_balance) : 10000 + periodGrowth
+                                        isBeforeJoin,
+                                        current_balance: periodOffset === 0 ? liveCurrentBalance : 10000 + periodGrowth
                                     };
                                 }).filter(u => {
                                     const r = Number(u.risk_level);
@@ -1004,60 +1025,78 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
                                 if (usersWithPeriodPnl.length === 0) return <div className="py-12 text-center text-amber-200/40">ไม่มีข้อมูลในสัปดาห์/เดือนนี้</div>;
 
-                                return usersWithPeriodPnl.map((user, idx) => {
-                                    const isMe = currentUserId && user.user_id === currentUserId;
-                                    const growth = user.periodGrowth;
-                                    
-                                    let badge = <span className="text-lg font-mono font-bold text-amber-200/40 w-8 text-center">{idx + 1}</span>;
-                                    if (idx === 0) badge = <span className="text-2xl animate-pulse">🏆</span>;
-                                    else if (idx === 1) badge = <span className="text-2xl">🥈</span>;
-                                    else if (idx === 2) badge = <span className="text-2xl">🥉</span>;
+                                return (
+                                    <>
+                                        {leaderboardTimeframe === 'daily' && isWeekend && (
+                                            <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-center mb-4 flex items-center justify-center gap-2 shadow-inner">
+                                                <span className="text-xl">🏖️</span>
+                                                <span className="text-amber-200 font-bold text-xs">ตลาดปิดทำการ (วันหยุดเสาร์-อาทิตย์)</span>
+                                            </div>
+                                        )}
+                                        {usersWithPeriodPnl.map((user, idx) => {
+                                            const isMe = currentUserId && user.user_id === currentUserId;
+                                            const growth = user.periodGrowth;
+                                            
+                                            let badge = <span className="text-lg font-mono font-bold text-amber-200/40 w-8 text-center">{idx + 1}</span>;
+                                            if (idx === 0) badge = <span className="text-2xl animate-pulse">🏆</span>;
+                                            else if (idx === 1) badge = <span className="text-2xl">🥈</span>;
+                                            else if (idx === 2) badge = <span className="text-2xl">🥉</span>;
 
-                                    return (
-                                        <div 
-                                            key={user.id}
-                                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                                                isMe 
-                                                    ? 'bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 border-[#cfa545] shadow-[0_0_20px_rgba(207,165,69,0.3)] scale-[1.02]' 
-                                                    : 'bg-[#170e08] hover:bg-[#21150e] border-amber-900/30'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center justify-center w-10">
-                                                    {badge}
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-white text-sm">
-                                                            {user.user_name || user.user_email?.split('@')[0] || 'Trader'}
-                                                        </span>
-                                                        {isMe && (
-                                                            <span className="bg-[#cfa545] text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
-                                                                พอร์ตของคุณ
+                                            return (
+                                                <div 
+                                                    key={user.id}
+                                                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                                                        isMe 
+                                                            ? 'bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 border-[#cfa545] shadow-[0_0_20px_rgba(207,165,69,0.3)] scale-[1.02]' 
+                                                            : 'bg-[#170e08] hover:bg-[#21150e] border-amber-900/30'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex items-center justify-center w-10">
+                                                            {badge}
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-white text-sm">
+                                                                    {user.user_name || user.user_email?.split('@')[0] || 'Trader'}
+                                                                </span>
+                                                                {isMe && (
+                                                                    <span className="bg-[#cfa545] text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                                                                        พอร์ตของคุณ
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-xs text-amber-200/60 mt-0.5">
+                                                                {Number(user.risk_level) < 1.5 
+                                                                    ? `🛡️ สายเซฟ (x${Number(user.risk_level).toFixed(1)})` 
+                                                                    : Number(user.risk_level) < 2.0 
+                                                                    ? `🚀 สายเติบโต (x${Number(user.risk_level).toFixed(1)})` 
+                                                                    : `🔥 สายซิ่ง (x${Number(user.risk_level).toFixed(1)})`}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {user.isBeforeJoin ? (
+                                                        <div className="text-right">
+                                                            <span className="bg-amber-500/10 text-amber-200/40 border border-amber-500/20 text-[10px] sm:text-xs px-2.5 py-1 rounded-lg font-mono inline-block">
+                                                                ยังไม่เข้าร่วม
                                                             </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs text-amber-200/60 mt-0.5">
-                                                        {Number(user.risk_level) < 1.5 
-                                                            ? `🛡️ สายเซฟ (x${Number(user.risk_level).toFixed(1)})` 
-                                                            : Number(user.risk_level) < 2.0 
-                                                            ? `🚀 สายเติบโต (x${Number(user.risk_level).toFixed(1)})` 
-                                                            : `🔥 สายซิ่ง (x${Number(user.risk_level).toFixed(1)})`}
-                                                    </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-right">
+                                                            <div className="font-mono font-extrabold text-[#4de180] text-base">
+                                                                ${Number(user.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </div>
+                                                            <div className={`font-mono text-xs font-bold ${growth >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                                                {growth >= 0 ? '+' : ''}{growth.toFixed(2)} USC
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-
-                                            <div className="text-right">
-                                                <div className="font-mono font-extrabold text-[#4de180] text-base">
-                                                    ${Number(user.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </div>
-                                                <div className={`font-mono text-xs font-bold ${growth >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                                    {growth >= 0 ? '+' : ''}{growth.toFixed(2)} USC
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                });
+                                            );
+                                        })}
+                                    </>
+                                );
                             })()}
                         </div>
                     </div>
