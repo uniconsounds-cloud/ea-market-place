@@ -6,7 +6,13 @@
 #ifndef __EG_FARMING_DASHBOARD_MAP_MQH__
 #define __EG_FARMING_DASHBOARD_MAP_MQH__
 
-#include "EAE_MonitorTypes.mqh"
+#include "../EAE_MonitorTypes.mqh"
+
+// Globals updated by CEGEscapeManager
+datetime g_escapeBuyCooldownUntil = 0;
+datetime g_escapeSellCooldownUntil = 0;
+int g_escapeBuyState = 0;
+int g_escapeSellState = 0;
 
 string EG_Farming_GetDashboardTitle()
 {
@@ -22,11 +28,40 @@ string EG_Farming_GetDashboardTitle()
 
    if(g_friRescueBlocked) fri_status += "[FRI: GROWTH STOP] ";
 
+   // --- [NEW] Escape States & Cooldowns ---
+   string b_state_str = "NORMAL";
+   if(g_escapeBuyState == 1) b_state_str = "CAUTION";
+   else if(g_escapeBuyState == 2) b_state_str = "CRISIS";
+   else if(g_escapeBuyState == 3) b_state_str = "ESCAPE";
+   else if(g_escapeBuyState == 4) b_state_str = "LOCKDOWN";
+   
+   string s_state_str = "NORMAL";
+   if(g_escapeSellState == 1) s_state_str = "CAUTION";
+   else if(g_escapeSellState == 2) s_state_str = "CRISIS";
+   else if(g_escapeSellState == 3) s_state_str = "ESCAPE";
+   else if(g_escapeSellState == 4) s_state_str = "LOCKDOWN";
+
+   datetime now = TimeCurrent();
+   string b_cd_str = "";
+   if(now < g_escapeBuyCooldownUntil)
+   {
+      int remain = (int)(g_escapeBuyCooldownUntil - now);
+      b_cd_str = StringFormat(" CD %02d:%02d", remain/60, remain%60);
+   }
+   
+   string s_cd_str = "";
+   if(now < g_escapeSellCooldownUntil)
+   {
+      int remain = (int)(g_escapeSellCooldownUntil - now);
+      s_cd_str = StringFormat(" CD %02d:%02d", remain/60, remain%60);
+   }
+   
+   string esc_status = StringFormat("[B:%s%s] [S:%s%s] ", b_state_str, b_cd_str, s_state_str, s_cd_str);
+
    // --- [NEW] Breaker / Cooldown Status (High Priority) ---
    string brk_status = "";
    if(g_breakerRescueBlocked) brk_status = "[BREAKER: RESCUE STOP] ";
    
-   datetime now = TimeCurrent();
    if(now < g_globalCooldownUntil)
    {
       int remain = (int)(g_globalCooldownUntil - now);
@@ -41,7 +76,7 @@ string EG_Farming_GetDashboardTitle()
    if(g_eae_buy_state.abrg_risk_score >= 2) risk_alert += StringFormat("[RISK-B: %d] ", g_eae_buy_state.abrg_risk_score);
    if(g_eae_sell_state.abrg_risk_score >= 2) risk_alert += StringFormat("[RISK-S: %d] ", g_eae_sell_state.abrg_risk_score);
 
-   return "EASYGOLD Farming V" + EA_VERSION + " " + lic_status + sync_status + brk_status + gate_alert + risk_alert + fri_status;
+   return "EASYGOLD Farming V" + EA_VERSION + " " + lic_status + sync_status + esc_status + brk_status + gate_alert + risk_alert + fri_status;
 }
 
 int EG_Farming_GetBasketColumnCount()

@@ -45,20 +45,21 @@
 //|  1.408 - NEW: Smart Follow System (Decoupled Follow limits, ATR default, separate ABRG count).   |
 //|  1.500 - NEW: Multi-Cluster Grid, Dynamic Magic Allocation, BE Anchor Merging.                 |
 //|  1.501 - UI/UX: Grouped inputs with headers, hid internal variables, string time parsing.        |
+//|  1.600 - NEW: Unified State Escape & Dual Engine (Grid & isolated Rebate Scalper).               |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.501"
+#property version   "1.600"
 
 // At top of file
-#define EA_VERSION "1.501"
+#define EA_VERSION "1.600"
 
-#include "EAE_MonitorTypes.mqh"
-#include "EAE_CollectorCore.mqh"
-#include "EAE_BasketTracker.mqh"
+#include "../EAE_MonitorTypes.mqh"
+#include "../EAE_CollectorCore.mqh"
+#include "../EAE_BasketTracker.mqh"
 #include "EG_Farming_DashboardMap.mqh"
-#include "EAE_DashboardBase.mqh"
-#include "EAE_FileLogger.mqh"
-#include "EAEZE_Licensing.mqh"
+#include "../EAE_DashboardBase.mqh"
+#include "../EAE_FileLogger.mqh"
+#include "../EAEZE_Licensing.mqh"
 
 //==================================================================//
 // [LICENSE] Runtime restrictions (EDIT HERE)                        //
@@ -332,6 +333,36 @@ const int    G_GATE_SPREAD_LIMIT     = 100;    // Max Spread (Points)
 
 input string InpGateNewsRange        = "";     // News Filter (YYYY.MM.DD HH:MM-HH:MM)
 
+//--- Dual Engine & State Escape Settings ---
+input double InpCautionLoss        = -100.0; // Caution state floating loss limit (USC)
+input double InpCrisisLoss         = -200.0; // Crisis state floating loss limit (USC)
+input double InpLockdownLoss       = -600.0; // Lockdown state floating loss limit (USC)
+input int    InpCautionOrders      = 9;      // Caution state order count
+input int    InpCrisisOrders       = 12;     // Crisis state order count
+input int    InpLockdownOrders     = 18;     // Lockdown state order count
+
+input int    InpNearBEStartOrders  = 12;     // Near-BE Escape starting order count
+input int    InpNearBEDistance     = 120;    // Distance from BE in points to trigger escape
+input double InpAllowedEscapeLoss  = -80.0;  // Maximum loss allowed for Near-BE escape (USC)
+input double InpPartialRecoveryPct = 30.0;   // Recovery percentage from peak loss to partial close
+
+input double InpMaxLotNormal       = 0.05;   // Lot size cap in Caution state
+input double InpMaxLotCrisis       = 0.03;   // Lot size cap in Crisis state
+
+input bool   InpEnableScalper      = true;   // Enable Rebate Scalper Engine
+input int    InpScalperMagicOffset = 100;    // Magic number offset for Scalper
+input double InpScalperLot         = 0.01;   // Constant lot size for Scalper
+input int    InpScalperTP          = 100;    // TakeProfit points for Scalper
+input int    InpScalperSL          = 150;    // StopLoss points for Scalper
+input int    InpMaxScalperOrders   = 8;      // Max Scalper positions open simultaneously
+input int    InpLossStreakStop     = 3;      // Max losses in a row before cooldown
+input int    InpScalperCooldownMin = 20;     // Cooldown after loss streak (minutes)
+
+#include "EG_Farming_DualEngine_Escape.mqh"
+
+CEGEscapeManager g_escapeManager;
+CEGDualEngineScalper g_scalperEngine;
+
 //==================================================================//
 // [200] GLOBALS - State / Handles                                   //
 //==================================================================//
@@ -367,7 +398,7 @@ bool     g_marketGateBlocked = false;
 ulong    g_lastPulse64 = 0; // Milliseconds (GetTickCount64)
 
 #include "EG_Farming_MonitorAdapter.mqh"
-#include "EAE_DashboardBase.mqh"
+#include "../EAE_DashboardBase.mqh"
 
 
 
@@ -463,7 +494,7 @@ input int      InpABRG_GapPoints    = 4000;     // Cluster Gap (Points)
 input int      InpABRG_ClusterSize  = 20;       // Max Orders per Cluster
 double   InpABRG_BE_ExitBuffer = 100.0;   // [HIDDEN] Soft Exit BE Buffer (Points)
 
-#include "EAE_AdaptiveRiskGuard.mqh" // [NEW] V1.407
+#include "../EAE_AdaptiveRiskGuard.mqh" // [NEW] V1.407
 
 enum EZ_FRIDAY_STATE
 {
@@ -2424,7 +2455,7 @@ void TryRescue()
       return;
 
    // BUY rescue
-   if(InpModeBuy && !IsSideInCooldown(true) && CanOpenNewOrdersNow())
+   if(InpModeBuy && !IsSideInCooldown(true) && CanOpenNewOrdersNow() && !g_escapeManager.IsGridBlocked(POSITION_TYPE_BUY))
    {
       int rescue_cntB = CountRescuePositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
       if(rescue_cntB > 0 && rescue_cntB < InpMaxOrderLoss && VolatilityFilterOK())
@@ -2439,7 +2470,7 @@ void TryRescue()
                if(GetBufferValue(g_hAtrGrid, 0, atr))
                {
                   double atrPips  = AtrBufferToPips(atr, _Symbol, InpAtrGridUnitIsPrice);
-                  double gridPips = atrPips * InpRTB_AtrMultiplier;
+                  double gridPips = atrPips * InpRTB_AtrMultiplier * g_escapeManager.GetSpacingMultiplier(POSITION_TYPE_BUY);
 
                   if(!HasNearbyOpenPrice(g_magicBuy, POSITION_TYPE_BUY, gridPips) && OncePerBar(g_lastRescueBuyBar))
                   {
@@ -2450,10 +2481,14 @@ void TryRescue()
                         int target_magic = ABRG_GetClusterMagicNumber(rescue_cntB, g_magicBuy, InpMaxOrderLoss);
                         
                         if(g_lotsB <= 0.0) g_lotsB = InpLots;
+                        double capLotsB = g_escapeManager.GetLotCap(POSITION_TYPE_BUY, InpUpperLimitLotSize);
+                        if(g_lotsB > capLotsB) g_lotsB = capLotsB;
+                        
                         if(PlaceBuy(g_lotsB, "RTB", target_magic))
                         {
                            g_lotsB += InpLotPlusB;
-                           if(g_lotsB > InpUpperLimitLotSize) g_lotsB = InpUpperLimitLotSize;
+                           double nextCapB = g_escapeManager.GetLotCap(POSITION_TYPE_BUY, InpUpperLimitLotSize);
+                           if(g_lotsB > nextCapB) g_lotsB = nextCapB;
                            
                            // Increment Cluster Count if active
                            if(g_eae_buy_state.abrg_is_hibernating) 
@@ -2472,7 +2507,7 @@ void TryRescue()
    }
 
    // SELL rescue
-   if(InpModeSell && !IsSideInCooldown(false) && CanOpenNewOrdersNow())
+   if(InpModeSell && !IsSideInCooldown(false) && CanOpenNewOrdersNow() && !g_escapeManager.IsGridBlocked(POSITION_TYPE_SELL))
    {
       int rescue_cntS = CountRescuePositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
       if(rescue_cntS > 0 && rescue_cntS < InpMaxOrderLoss && VolatilityFilterOK())
@@ -2487,7 +2522,7 @@ void TryRescue()
                if(GetBufferValue(g_hAtrGrid, 0, atr))
                {
                   double atrPips  = AtrBufferToPips(atr, _Symbol, InpAtrGridUnitIsPrice);
-                  double gridPips = atrPips * InpRTS_AtrMultiplier;
+                  double gridPips = atrPips * InpRTS_AtrMultiplier * g_escapeManager.GetSpacingMultiplier(POSITION_TYPE_SELL);
 
                   if(!HasNearbyOpenPrice(g_magicSell, POSITION_TYPE_SELL, gridPips) && OncePerBar(g_lastRescueSellBar))
                   {
@@ -2498,10 +2533,14 @@ void TryRescue()
                         int target_magic = ABRG_GetClusterMagicNumber(rescue_cntS, g_magicSell, InpMaxOrderLoss);
                         
                         if(g_lotsS <= 0.0) g_lotsS = InpLots;
+                        double capLotsS = g_escapeManager.GetLotCap(POSITION_TYPE_SELL, InpUpperLimitLotSize);
+                        if(g_lotsS > capLotsS) g_lotsS = capLotsS;
+                        
                         if(PlaceSell(g_lotsS, "RTS", target_magic))
                         {
                            g_lotsS += InpLotPlusS;
-                           if(g_lotsS > InpUpperLimitLotSize) g_lotsS = InpUpperLimitLotSize;
+                           double nextCapS = g_escapeManager.GetLotCap(POSITION_TYPE_SELL, InpUpperLimitLotSize);
+                           if(g_lotsS > nextCapS) g_lotsS = nextCapS;
                            
                            // Increment Cluster Count if active
                            if(g_eae_sell_state.abrg_is_hibernating) 
@@ -2665,7 +2704,7 @@ void OnTimer()
 
 int OnInit()
 {
-   Print("==== EASYGOLD FARMING (v1.501) ZERO-LAG ATTACH ====");
+   Print("==== EASYGOLD FARMING (v1.600) ZERO-LAG ATTACH ====");
    
    // [V1.501] Parse Market Time Strings into global integers
    string closeParts[];
@@ -2680,6 +2719,9 @@ int OnInit()
       g_marketOpenHour = (int)StringToInteger(openParts[0]);
       g_marketOpenMin  = (int)StringToInteger(openParts[1]);
    }
+   
+   // Initialize Scalper Engine
+   g_scalperEngine.Init(InpMagicStart);
    
    // [INSTANT RETURN] 
    // We only setup the background boot sequence here.
@@ -2807,6 +2849,9 @@ void OnTick()
    }
    
    // [ZERO-LATENCY CORE] Trading execution remains at full tick speed
+   g_escapeManager.Process(g_magicBuy, g_magicSell);
+   g_scalperEngine.OnTickProcess(g_escapeManager);
+
    TryEntry();
    TryRescue();
    TryFollow();

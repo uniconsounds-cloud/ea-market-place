@@ -5,11 +5,11 @@
 #ifndef __EG_FARMING_MONITOR_ADAPTER_MQH__
 #define __EG_FARMING_MONITOR_ADAPTER_MQH__
 
-#include "EAE_MonitorTypes.mqh"
-#include "EAE_CollectorCore.mqh"
-#include "EAE_BasketTracker.mqh"
-#include "EAE_DashboardBase.mqh"
-#include "EAE_WebSync.mqh" // Unified web synchronization module
+#include "../EAE_MonitorTypes.mqh"
+#include "../EAE_CollectorCore.mqh"
+#include "../EAE_BasketTracker.mqh"
+#include "../EAE_DashboardBase.mqh"
+#include "../EAE_WebSync.mqh" // Unified web synchronization module
 
 //-------------------------------------------------------------------
 // External values from EA main file
@@ -66,7 +66,10 @@ void EG_Farming_BuildIdentity(EAE_SystemIdentity &id)
    id.family_code    = "EG";
    id.strategy_name  = "Farming";
    id.system_code    = "EasyGold Farming";
-   id.asset_class    = EAE_AutoDetectAssetType(_Symbol);
+   string assetType = EAE_AutoDetectAssetType(_Symbol);
+   if(assetType == "GOLD") id.asset_class = EAE_ASSET_METAL;
+   else if(assetType == "CRYPTO") id.asset_class = EAE_ASSET_CRYPTO;
+   else id.asset_class = EAE_ASSET_FOREX;
 
    id.ea_name        = "EasyGold Farming";
    id.ea_version     = "V1";

@@ -19,20 +19,28 @@ DECLARE
     v_should_sync_full BOOLEAN := false;
     v_last_viewed TIMESTAMPTZ;
 BEGIN
-    -- 1. validate API Key
+    -- 2. Extract basic info
+    v_port_number  := p_payload->>'port_number';
+    v_today_profit := (p_payload->>'today_profit')::NUMERIC;
+    v_server_time  := (p_payload->>'server_time')::BIGINT;
+
+    -- 1. validate API Key OR fallback to Active License for Zero-Friction Plug-and-Play
     SELECT EXISTS(
         SELECT 1 FROM public.api_keys 
         WHERE key_value = p_api_key AND status = 'active'
     ) INTO v_key_valid;
 
-    IF NOT v_key_valid THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Invalid or inactive API Key');
+    IF NOT v_key_valid AND v_port_number IS NOT NULL THEN
+        -- Fallback: Check if this port number is registered with an active license!
+        SELECT EXISTS(
+            SELECT 1 FROM public.licenses
+            WHERE account_number = v_port_number AND is_active = true
+        ) INTO v_key_valid;
     END IF;
 
-    -- 2. Extract basic info
-    v_port_number  := p_payload->>'port_number';
-    v_today_profit := (p_payload->>'today_profit')::NUMERIC;
-    v_server_time  := (p_payload->>'server_time')::BIGINT;
+    IF NOT v_key_valid AND v_port_number IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Invalid payload: missing port number');
+    END IF;
 
     -- 3. Calculate date from Broker Time
     IF v_server_time IS NOT NULL AND v_server_time > 0 THEN
@@ -48,6 +56,15 @@ BEGIN
 
     IF v_last_viewed IS NOT NULL AND (NOW() - v_last_viewed) < INTERVAL '2 minutes' THEN
         v_should_sync_full := true;
+    END IF;
+
+    -- If ping only is requested, return early without inserting/updating any tables!
+    IF (p_payload->>'ping_only') = 'true' THEN
+        RETURN jsonb_build_object(
+            'success', true,
+            'sync_date', v_sync_date,
+            'should_sync_full', v_should_sync_full
+        );
     END IF;
 
     -- 4. Upsert farm_port_status

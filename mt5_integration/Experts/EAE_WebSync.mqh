@@ -31,8 +31,10 @@ string   g_eae_api_key        = "EZE-123456";
 // --- Smart Sync State ---
 string   g_eae_last_sync_hash = "";
 string   g_eae_sync_status    = "IDLE"; // Shared status for UI: IDLE, SYNCING, OK, ERR
+string   g_eae_sync_message   = "Connecting...";
 datetime g_eae_last_heartbeat = 0;
 const int g_eae_heartbeat_interval = 300; // Force full sync every 5 minutes even if no change
+bool     g_eae_history_checked = false;
 
 //+------------------------------------------------------------------+
 //| Initialize the WebSync module with custom settings               |
@@ -42,6 +44,7 @@ void EAE_WebSyncInit(string api_url, string api_key, int interval_sec)
    g_eae_api_url       = api_url;
    g_eae_api_key       = api_key;
    g_eae_sync_interval = (interval_sec < 5 ? 5 : interval_sec); // Min 5s
+   g_eae_history_checked = false; // Reset history check on EA Init
    Print("EAE WebSync: Initialized. API Key ending ...", StringSubstr(api_key, StringLen(api_key)-4));
 }
 
@@ -136,11 +139,6 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
       ulong ticket = HistoryDealGetTicket(i);
       if(ticket <= 0) continue;
       
-      long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
-      if(magicB != 0 && magicS != 0) {
-         if(magic != magicB && magic != magicS) continue;
-      }
-      
       long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
       if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
       {
@@ -149,14 +147,12 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
          out_sum.total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
          
-         // In Farming, an 'OUT' deal usually signifies a layer close. 
-         // For 'Cycles', we look for specific comments or just count outcomes.
-         // A more accurate cycle count would require looking for 'BASKET_CLOSE' tags.
+         long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
          string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
          if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
          {
             if(magic == magicB) out_sum.buy_cycles++;
-            else                out_sum.sell_cycles++;
+            else if(magic == magicS) out_sum.sell_cycles++;
          }
       }
    }
@@ -217,91 +213,73 @@ string EAE_CalculateDataHash(const EAE_RealtimeSnapshot &snap)
 //+------------------------------------------------------------------+
 bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
 {
-   // Check if it's time to sync (Throttling)
    datetime now = TimeCurrent();
-   if(!force_now && (now - g_eae_last_sync_time < g_eae_sync_interval))
-      return false;
-      
-   // Smart Delta Sync Check
-   string current_hash = EAE_CalculateDataHash(snap);
-   bool is_heartbeat = (now - g_eae_last_heartbeat >= g_eae_heartbeat_interval);
+   datetime today_start = (now / 86400) * 86400;
    
-   if(!force_now && !is_heartbeat && current_hash == g_eae_last_sync_hash)
+   // 1. Throttling / Sleep-Wake Check
+   if(g_eae_last_sync_time > 0)
    {
-      g_eae_sync_status = "IDLE";
-      return false; // Skip redundant sync
+      int current_interval = g_eae_sync_interval;
+      if(!g_eae_full_sync_mode) {
+         current_interval = g_eae_sync_interval * 2; // Sleep mode: ping less frequently
+      }
+      
+      if(!force_now && (int)(now - g_eae_last_sync_time) < current_interval) {
+         return true; 
+      }
    }
-
-   g_eae_sync_status = "SYNCING";
+   
    g_eae_last_sync_time = now;
-   if(is_heartbeat) g_eae_last_heartbeat = now;
-
-   // 1. Construct Snapshot Data JSON manually (to avoid external JSON libs)
-   string snapshot_json = "{";
-   snapshot_json += "\"identity\":{";
-   snapshot_json += "\"product_family\":\"" + snap.identity.product_family + "\",";
-   snapshot_json += "\"system_code\":\"" + snap.identity.system_code + "\",";
-   snapshot_json += "\"ea_version\":\"" + snap.identity.ea_version + "\"";
-   snapshot_json += "},";
    
-   snapshot_json += "\"account\":{";
-   snapshot_json += "\"balance\":" + DoubleToString(snap.account.balance, 2) + ",";
-   snapshot_json += "\"equity\":" + DoubleToString(snap.account.equity, 2) + ",";
-   snapshot_json += "\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",";
-   snapshot_json += "\"currency\":\"" + snap.account.currency + "\"";
-   snapshot_json += "},";
+   // 2. Build Payload
+   string orders_json = (g_eae_full_sync_mode ? EAE_BuildOrdersJson() : "[]");
+   string payload = "{ \"p_payload\": {";
+   payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+   payload += "\"server_time\":" + IntegerToString(now) + ",";
+   payload += "\"ping_only\":" + (g_eae_full_sync_mode ? "false" : "true") + ",";
    
-   snapshot_json += "\"buy_state\":{";
-   snapshot_json += "\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",";
-   snapshot_json += "\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",";
-   snapshot_json += "\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2);
-   snapshot_json += "},";
-   
-   snapshot_json += "\"sell_state\":{";
-   snapshot_json += "\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",";
-   snapshot_json += "\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",";
-   snapshot_json += "\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2);
-   snapshot_json += "}";
-   snapshot_json += "}";
-
-   // 2. Build Full Payload for Supabase RPC
-   string payload = "{";
-   payload += "\"p_payload\": {";
-   payload += "\"is_heartbeat\":" + (g_eae_full_sync_mode ? "false" : "true") + ",";
-   payload += "\"snapshot\":" + snapshot_json + ",";
-   if(g_eae_full_sync_mode) {
-      payload += "\"orders\":"       + EAE_BuildOrdersJson() + ",";
-   }
-   
-   // --- Daily Performance (V1.406 Optimization) ---
+   // Daily stats
    EAE_DailySummary today;
-   EAE_ScanHistoryDailySummary(TimeCurrent(), snap.identity.magic_buy, snap.identity.magic_sell, today);
-   
-   payload += "\"today_profit\":"     + DoubleToString(today.total_profit, 2) + ",";
+   EAE_ScanHistoryDailySummary(now, snap.identity.magic_buy, snap.identity.magic_sell, today);
+   payload += "\"today_profit\":" + DoubleToString(today.total_profit, 2) + ",";
    payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
    payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
-   payload += "\"server_time\":"      + IntegerToString(TimeCurrent()) + ",";
-   payload += "\"port_number\":\""    + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\"";
-   payload += "},";
-   payload += "\"p_api_key\":\""      + g_eae_api_key + "\"";
-   payload += "}";
-
-   // --- [NEW] Daily Summary Persistence / Day-Change Trigger ---
-   datetime today_start = (TimeCurrent() / 86400) * 86400;
-   string gv_last_sync_date = "EAE_LastDailySync_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    
+   // Snapshot
+   payload += "\"snapshot\":{";
+   payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
+   payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
+   payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
+   payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + snap.identity.system_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
+   payload += "},";
+   
+   payload += "\"orders\":" + orders_json;
+   payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
+
+   // Hash Check for Throttling
+   string current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2);
+   if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now - g_eae_last_heartbeat) < g_eae_heartbeat_interval)
+   {
+      return true; // Skip redundant upload if nothing changed
+   }
+   
+   g_eae_last_heartbeat = now;
+   
+   // Check Daily Summary
+   string gv_last_sync_date = "EAE_LastSyncDate_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    if(GlobalVariableCheck(gv_last_sync_date))
    {
       datetime last_date = (datetime)GlobalVariableGet(gv_last_sync_date);
-      if(today_start > last_date)
+      if(last_date < today_start)
       {
-         // Day has changed! Send summary for the PREVIOUS day.
-         EAE_DailySummary prev;
-         if(EAE_ScanHistoryDailySummary(last_date, snap.identity.magic_buy, snap.identity.magic_sell, prev))
+         datetime scan_day = today_start - 86400; // Yesterday
+         EAE_DailySummary sum;
+         if(EAE_ScanHistoryDailySummary(scan_day, snap.identity.magic_buy, snap.identity.magic_sell, sum))
          {
-            EAE_WebSyncPushDailySummary(prev);
-            GlobalVariableSet(gv_last_sync_date, (double)today_start);
+            Print("EAE WebSync: Uploading Daily Summary for ", TimeToString(scan_day, TIME_DATE), " PnL: ", sum.total_profit);
+            EAE_WebSyncPushDailySummary(sum);
          }
+         GlobalVariableSet(gv_last_sync_date, (double)today_start);
       }
    }
    else
@@ -309,13 +287,10 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
       GlobalVariableSet(gv_last_sync_date, (double)today_start);
    }
 
-   // 3. Dispatch WebRequest (Async-style with short timeout)
-   char data[];
-   char result[];
-   string result_headers;
+   // 3. Dispatch WebRequest
+   char data[]; char result[]; string result_headers;
    StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
-   ArrayResize(data, ArraySize(data) - 1); // Remove null terminator
-
+   ArrayResize(data, ArraySize(data) - 1);
    string headers = "Content-Type: application/json\r\n" + 
                     "apikey: " + g_eae_system_key + "\r\n" +
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
@@ -325,6 +300,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    
    if(res == -1) {
       g_eae_sync_status = "ERR: CONN";
+      g_eae_sync_message = "Connection Failed (" + IntegerToString(GetLastError()) + ")";
       Print("EAE Sync Error (WebRequest failed): ", GetLastError());
       return false;
    }
@@ -332,24 +308,51 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    if(res != 200) {
       g_eae_sync_status = "ERR: " + IntegerToString(res);
       string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+      g_eae_sync_message = "HTTP " + IntegerToString(res);
       Print("EAE Sync Server Error (", res, "): ", err_resp);
+      return false;
+   }
+   
+   string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   if(StringFind(response, "\"success\":false") >= 0 || StringFind(response, "\"success\": false") >= 0) {
+      g_eae_sync_status = "UNAUTHORIZED";
+      int msg_pos = StringFind(response, "\"message\":\"");
+      if(msg_pos >= 0) {
+         int msg_end = StringFind(response, "\"", msg_pos + 11);
+         if(msg_end >= 0) g_eae_sync_message = StringSubstr(response, msg_pos + 11, msg_end - (msg_pos + 11));
+      } else {
+         g_eae_sync_message = "Invalid API Key / No Active License";
+      }
+      Print("EAE WebSync: Failed Auth: ", g_eae_sync_message);
       return false;
    }
    
    // Update last hash on successful sync
    g_eae_last_sync_hash = current_hash;
-   g_eae_sync_status = "OK";
+   g_eae_sync_status = "OK (ONLINE)";
+   g_eae_sync_message = "Connected to Farm 2.5D";
    
    // --- [NEW] Update Last Online Time for Self-Healing ---
    string gv_last_online = "EAE_LastOnline_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    GlobalVariableSet(gv_last_online, (double)now);
    
    // 4. Parse response for on-demand sync control
-   string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
-   if(StringFind(response, "\"should_sync_full\":true") >= 0) {
+   bool was_full = g_eae_full_sync_mode;
+   
+   if(StringFind(response, "\"should_sync_full\":true") >= 0 || StringFind(response, "\"should_sync_full\": true") >= 0) {
+      if(!g_eae_full_sync_mode) {
+         g_eae_last_sync_time = 0; // Trigger instant full sync on the very next tick!
+         Print("EAE WebSync: >> WAKING UP << (Viewer active, initiating full sync...)");
+      }
       g_eae_full_sync_mode = true;
    } else {
       g_eae_full_sync_mode = false;
+   }
+   
+   if(g_eae_full_sync_mode) {
+      Print("EAE WebSync: WAKE MODE (Full push successful). Response: ", response);
+   } else {
+      Print("EAE WebSync: SLEEP MODE (Lightweight ping sent). Response: ", response);
    }
    
    return true;
@@ -413,8 +416,8 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
    int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
    string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
    
-   if(res == 200 && StringFind(response, "\"success\":false") < 0) {
-      Print("EAE WebSync: Successfully pushed " + IntegerToString(days_to_sync) + " days of history.");
+   if(res == 200 && StringFind(response, "\"success\":false") < 0 && StringFind(response, "\"success\": false") < 0) {
+      Print("EAE WebSync: Successfully pushed " + IntegerToString(days_to_sync) + " days of history. Resp: " + response);
       return true;
    } else {
       Print("EAE WebSync: Failed to push history batch. Res: ", res, " Resp: ", response);
@@ -427,17 +430,16 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
 //+------------------------------------------------------------------+
 void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
 {
-   static bool checked = false;
-   if(checked) return;
+   if(g_eae_history_checked) return;
    
-   string gv_last_online = "EAE_LastOnline_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    int days_to_sync = 30; // Default if no GV exists
    
-   if(GlobalVariableCheck(gv_last_online))
+   if(GlobalVariableCheck(gv_last_history))
    {
-      datetime last_online = (datetime)GlobalVariableGet(gv_last_online);
+      datetime last_sync = (datetime)GlobalVariableGet(gv_last_history);
       datetime now = TimeCurrent();
-      int diff_sec = (int)(now - last_online);
+      int diff_sec = (int)(now - last_sync);
       
       if(diff_sec > 0) {
          days_to_sync = (diff_sec / 86400) + 1; // Round up to cover the missing gap
@@ -450,14 +452,17 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
    {
       if(days_to_sync > 30) days_to_sync = 30;
       Print("EAE WebSync: Self-Healing Triggered. Missing days: ", days_to_sync);
-      EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS);
+      if(EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS))
+      {
+         GlobalVariableSet(gv_last_history, (double)TimeCurrent());
+      }
    }
    else
    {
       Print("EAE WebSync: History is up to date.");
    }
    
-   checked = true; // Only check once per EA Boot
+   g_eae_history_checked = true; // Only check once per EA Boot
 }
 
 //+------------------------------------------------------------------+

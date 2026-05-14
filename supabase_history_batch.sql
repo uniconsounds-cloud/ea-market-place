@@ -16,13 +16,21 @@ DECLARE
     v_is_valid BOOLEAN;
     v_item JSONB;
 BEGIN
-    -- 1. Validate API Key
+    -- 1. Validate API Key OR Fallback to Active License
     SELECT EXISTS (
-        SELECT 1 FROM public.api_keys WHERE key_value = p_api_key
+        SELECT 1 FROM public.api_keys WHERE key_value = p_api_key AND status = 'active'
     ) INTO v_is_valid;
 
-    IF NOT v_is_valid THEN
-        RAISE EXCEPTION 'Invalid API Key';
+    IF NOT v_is_valid AND p_port_number IS NOT NULL THEN
+        -- Fallback: Check if this port number is registered with an active license!
+        SELECT EXISTS(
+            SELECT 1 FROM public.licenses
+            WHERE account_number = p_port_number AND is_active = true
+        ) INTO v_is_valid;
+    END IF;
+
+    IF NOT v_is_valid AND p_port_number IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Missing port number for history sync');
     END IF;
 
     -- 2. Process the JSON array

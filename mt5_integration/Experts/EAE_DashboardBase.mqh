@@ -9,7 +9,7 @@
 #define __EAE_DASHBOARD_BASE_MQH__
 
 #include "EAE_MonitorTypes.mqh"
-#include "EG_Farming_DashboardMap.mqh"
+#include "EasyGold Farming/EG_Farming_DashboardMap.mqh"
 
 // -----------------------------
 // Layout tuning (base values)

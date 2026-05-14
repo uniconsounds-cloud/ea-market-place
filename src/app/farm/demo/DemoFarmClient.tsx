@@ -435,11 +435,11 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 .from('farm_daily_history')
                 .select('*')
                 .eq('port_number', portNumber)
-                .order('date', { ascending: true })
+                .order('date', { ascending: false })
                 .limit(30);
 
             if (data) {
-                setHistory(data);
+                setHistory(data.reverse());
             }
         };
 
@@ -448,7 +448,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         // Listen for history updates
         const historyChannel = supabase
             .channel('history_updates')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'farm_daily_history', filter: `port_number=eq.${portNumber}` }, fetchHistory)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_daily_history', filter: `port_number=eq.${portNumber}` }, fetchHistory)
             .subscribe();
 
         return () => { supabase.removeChannel(historyChannel); };
