@@ -993,9 +993,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     };
                                 }).filter(u => {
                                     const r = Number(u.risk_level);
-                                    if (leaderboardFilter === 1.0) return r <= 1.25;
-                                    if (leaderboardFilter === 1.5) return r > 1.25 && r <= 1.75;
-                                    if (leaderboardFilter === 2.0) return r > 1.75;
+                                    if (leaderboardFilter === 1.0) return r < 1.5;
+                                    if (leaderboardFilter === 1.5) return r >= 1.5 && r < 2.0;
+                                    if (leaderboardFilter === 2.0) return r >= 2.0;
                                     return true;
                                 }).sort((a, b) => b.periodGrowth - a.periodGrowth);
 
@@ -1035,7 +1035,11 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-amber-200/60 mt-0.5">
-                                                        {Number(user.risk_level) <= 1.2 ? '🛡️ สายเซฟ (x1.0)' : Number(user.risk_level) <= 1.7 ? '🚀 สายเติบโต (x1.5)' : '🔥 สายซิ่ง (x2.0)'}
+                                                        {Number(user.risk_level) < 1.5 
+                                                            ? `🛡️ สายเซฟ (x${Number(user.risk_level).toFixed(1)})` 
+                                                            : Number(user.risk_level) < 2.0 
+                                                            ? `🚀 สายเติบโต (x${Number(user.risk_level).toFixed(1)})` 
+                                                            : `🔥 สายซิ่ง (x${Number(user.risk_level).toFixed(1)})`}
                                                     </div>
                                                 </div>
                                             </div>
