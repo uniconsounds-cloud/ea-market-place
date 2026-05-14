@@ -106,9 +106,10 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             const d = new Date(today);
             d.setDate(d.getDate() - offset);
             const dateStr = formatGregorian(d);
-            let label = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-            if (offset === 0) label = `วันนี้ (${label})`;
-            else if (offset === 1) label = `เมื่อวาน (${label})`;
+            const shortDate = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+            let label = shortDate;
+            if (offset === 0) label = `วันนี้ (${shortDate})`;
+            else if (offset === 1) label = `เมื่อวาน (${shortDate})`;
             return { startStr: dateStr, endStr: dateStr, label };
         } else if (tf === 'weekly') {
             const d = new Date(today);
@@ -122,17 +123,17 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             const startStr = formatGregorian(start);
             const endStr = formatGregorian(end);
             const startLabel = start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-            const endLabel = end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-            let label = `สัปดาห์ ${startLabel} - ${endLabel}`;
-            if (offset === 0) label = `สัปดาห์นี้ (${startLabel} - ${endLabel})`;
-            else if (offset === 1) label = `สัปดาห์ที่แล้ว (${startLabel} - ${endLabel})`;
+            const endLabel = end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+            let label = `${startLabel} - ${endLabel}`;
+            if (offset === 0) label = `สัปดาห์นี้ (${label})`;
+            else if (offset === 1) label = `สัปดาห์ที่แล้ว (${label})`;
             return { startStr, endStr, label };
         } else {
             const d = new Date(today.getFullYear(), today.getMonth() - offset, 1);
             const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
             const startStr = formatGregorian(d);
             const endStr = formatGregorian(end);
-            let label = d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+            let label = d.toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
             if (offset === 0) label = `เดือนนี้ (${label})`;
             else if (offset === 1) label = `เดือนที่แล้ว (${label})`;
             return { startStr, endStr, label };
@@ -876,80 +877,80 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-auto">
                     <div className="bg-[#1e140c] border-2 border-[#cfa545] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-[0_0_50px_rgba(207,165,69,0.3)] overflow-hidden">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-[#2c1b10] to-[#1e140c] border-b border-[#cfa545]/30">
-                            <div className="flex items-center gap-3">
-                                <Trophy className="w-8 h-8 text-[#cfa545] animate-bounce" />
-                                <div>
-                                    <h2 className="text-2xl font-extrabold text-[#cfa545] tracking-wide">$100 Demo Challenge Leaderboard</h2>
-                                    <p className="text-xs text-amber-200/60">กระดานจัดอันดับผู้ทำกำไรสูงสุดแบบเรียลไทม์</p>
+                        <div className="flex items-center justify-between p-4 sm:p-6 bg-gradient-to-r from-[#2c1b10] to-[#1e140c] border-b border-[#cfa545]/30">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                                <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-[#cfa545] flex-shrink-0 animate-bounce" />
+                                <div className="min-w-0 flex-1">
+                                    <h2 className="text-base sm:text-2xl font-extrabold text-[#cfa545] tracking-wide truncate">$100 Demo Challenge Leaderboard</h2>
+                                    <p className="text-[10px] sm:text-xs text-amber-200/60 truncate">กระดานจัดอันดับผู้ทำกำไรสูงสุดแบบเรียลไทม์</p>
                                 </div>
                             </div>
                             <button 
                                 onClick={() => setShowLeaderboard(false)}
-                                className="p-2 text-amber-200/60 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                                className="p-1 sm:p-2 text-amber-200/60 hover:text-white hover:bg-white/10 rounded-full transition-colors flex-shrink-0 ml-2"
                             >
-                                <X className="w-6 h-6" />
+                                <X className="w-5 h-5 sm:w-6 sm:h-6" />
                             </button>
                         </div>
 
                         {/* Filter Bar */}
-                        <div className="space-y-3 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20">
+                        <div className="space-y-2 p-3 sm:p-4 bg-[#170e08] border-b border-[#cfa545]/20">
                             {/* Row 1: Timeframe Mode Buttons */}
-                            <div className="grid grid-cols-3 gap-2 bg-black/40 p-1.5 rounded-xl border border-amber-500/20 w-full">
+                            <div className="grid grid-cols-3 gap-1 bg-black/40 p-1 rounded-xl border border-amber-500/20 w-full">
                                 {(['daily', 'weekly', 'monthly'] as const).map((tf) => (
                                     <button
                                         key={tf}
                                         onClick={() => { setLeaderboardTimeframe(tf); setPeriodOffset(0); }}
-                                        className={`py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap ${
+                                        className={`py-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center truncate ${
                                             leaderboardTimeframe === tf
                                                 ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
                                                 : 'hover:bg-white/5 text-amber-200/60'
                                         }`}
                                     >
-                                        {tf === 'daily' ? '📅 รายวัน' : tf === 'weekly' ? '🗓️ รายสัปดาห์' : '📊 รายเดือน'}
+                                        {tf === 'daily' ? '📅 รายวัน' : tf === 'weekly' ? '🗓️ สัปดาห์' : '📊 เดือน'}
                                     </button>
                                 ))}
                             </div>
 
                             {/* Row 2: Risk Filter Buttons */}
-                            <div className="flex items-center justify-center gap-1.5 w-full flex-wrap">
+                            <div className="grid grid-cols-4 gap-1 bg-black/30 p-1 rounded-xl border border-amber-500/10 w-full">
                                 {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
                                     <button
                                         key={String(filter)}
                                         onClick={() => setLeaderboardFilter(filter)}
-                                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                                        className={`py-1 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
                                             leaderboardFilter === filter
                                                 ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
-                                                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30'
+                                                : 'hover:bg-white/5 text-amber-200/70'
                                         }`}
                                     >
-                                        {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ สายเซฟ' : filter === 1.5 ? '🚀 สายเติบโต' : '🔥 สายซิ่ง'}
+                                        {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ เซฟ' : filter === 1.5 ? '🚀 เติบโต' : '🔥 ซิ่ง'}
                                     </button>
                                 ))}
                             </div>
 
                             {/* Row 3: Period Offset Navigation */}
-                            <div className="flex items-center justify-between w-full font-mono bg-black/30 px-4 py-2 rounded-xl border border-amber-500/10 text-xs">
+                            <div className="flex items-center justify-between w-full font-mono bg-black/30 px-3 py-1.5 rounded-xl border border-amber-500/10 text-[11px] sm:text-xs">
                                 <button
                                     onClick={() => setPeriodOffset(o => o + 1)}
-                                    className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap"
+                                    className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg font-bold transition-all flex items-center gap-1 flex-shrink-0"
                                 >
-                                    ◀ ย้อนหลัง
+                                    ◀<span className="hidden sm:inline"> อดีต</span>
                                 </button>
                                 {(() => {
                                     const info = getPeriodInfo(leaderboardTimeframe, periodOffset);
-                                    return <span className="font-bold text-[#cfa545] whitespace-nowrap">{info.label}</span>;
+                                    return <span className="font-bold text-[#cfa545] truncate px-1 text-center">{info.label}</span>;
                                 })()}
                                 <button
                                     onClick={() => setPeriodOffset(o => Math.max(0, o - 1))}
                                     disabled={periodOffset === 0}
-                                    className={`px-3 py-1 border rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                                    className={`px-2 py-1 border rounded-lg font-bold transition-all flex items-center gap-1 flex-shrink-0 ${
                                         periodOffset === 0 
                                             ? 'bg-transparent text-amber-200/20 border-amber-500/10 cursor-not-allowed' 
                                             : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border-amber-500/30'
                                     }`}
                                 >
-                                    ถัดไป ▶
+                                    <span className="hidden sm:inline">ล่าสุด </span>▶
                                 </button>
                             </div>
                         </div>
