@@ -878,14 +878,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         </div>
 
                         {/* Filter Bar */}
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20 overflow-x-auto no-scrollbar">
-                            {/* Timeframe Mode Buttons */}
-                            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-amber-500/20 w-full sm:w-auto justify-center">
+                        <div className="flex flex-col gap-3 px-6 py-4 bg-[#170e08] border-b border-[#cfa545]/20 overflow-x-auto no-scrollbar">
+                            {/* Row 1: Timeframe Mode Buttons */}
+                            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-amber-500/20 w-full justify-center">
                                 {(['daily', 'weekly', 'monthly'] as const).map((tf) => (
                                     <button
                                         key={tf}
                                         onClick={() => { setLeaderboardTimeframe(tf); setPeriodOffset(0); }}
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all w-1/3 text-center ${
                                             leaderboardTimeframe === tf
                                                 ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
                                                 : 'hover:bg-white/5 text-amber-200/60'
@@ -896,11 +896,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 ))}
                             </div>
 
-                            {/* Risk Filter Buttons */}
-                            <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar py-1">
-                                <span className="text-xs text-amber-200/50 font-bold flex items-center gap-1 min-w-max hidden sm:flex">
-                                    <Filter className="w-3.5 h-3.5" />
-                                </span>
+                            {/* Row 2: Risk Filter Buttons */}
+                            <div className="flex items-center justify-center gap-1.5 w-full overflow-x-auto no-scrollbar py-0.5">
                                 {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
                                     <button
                                         key={String(filter)}
@@ -916,11 +913,11 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 ))}
                             </div>
 
-                            {/* Period Offset Navigation */}
-                            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end font-mono">
+                            {/* Row 3: Period Offset Navigation */}
+                            <div className="flex items-center justify-between w-full font-mono bg-black/30 px-4 py-2 rounded-xl border border-amber-500/10">
                                 <button
                                     onClick={() => setPeriodOffset(o => o + 1)}
-                                    className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
+                                    className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
                                 >
                                     ◀ ย้อนหลัง
                                 </button>
@@ -931,7 +928,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 <button
                                     onClick={() => setPeriodOffset(o => Math.max(0, o - 1))}
                                     disabled={periodOffset === 0}
-                                    className={`px-2.5 py-1 border rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                                    className={`px-3 py-1 border rounded-lg text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                                         periodOffset === 0 
                                             ? 'bg-transparent text-amber-200/20 border-amber-500/10 cursor-not-allowed' 
                                             : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border-amber-500/30'
@@ -954,16 +951,15 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
                                     const risk = Number(u.risk_level) || 1.0;
-                                    const joinStr = new Date(u.join_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-                                    const actualStartStr = startStr < joinStr ? joinStr : startStr;
-                                    
                                     const portNum = u.master_port_number || '100000';
-                                    const histRows = allHistoryData.filter(h => h.port_number === portNum && h.date >= actualStartStr && h.date <= endStr);
+                                    
+                                    // Use startStr and endStr directly to match historical period performance perfectly
+                                    const histRows = allHistoryData.filter(h => String(h.port_number || '100000') === String(portNum) && h.date >= startStr && h.date <= endStr);
                                     let totalMasterPnl = histRows.reduce((sum, h) => sum + Number(h.profit), 0);
                                     
-                                    if (periodOffset === 0 && todayStr >= actualStartStr && todayStr <= endStr) {
+                                    if (periodOffset === 0 && todayStr >= startStr && todayStr <= endStr) {
                                         const hasTodayRow = histRows.some(h => h.date === todayStr);
-                                        if (!hasTodayRow && masterPortStatusData && masterPortStatusData.port_number === portNum) {
+                                        if (!hasTodayRow && masterPortStatusData && String(masterPortStatusData.port_number || '100000') === String(portNum)) {
                                             totalMasterPnl += Number(masterPortStatusData.today_pnl || 0);
                                         }
                                     }
