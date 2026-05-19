@@ -231,8 +231,38 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+// Helper to get the start of the current trading day in Bangkok time (05:00:00 AM)
+// Gold market starts at 05:00 AM Thai Time (ICT, UTC+7) Monday-Friday
+// and ends at 04:00 AM Thai Time (ICT, UTC+7) Tuesday-Saturday.
+const getTradingDayStart = (): Date => {
+  const now = new Date();
+  // Thai time is UTC + 7 hours
+  const thaiTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  
+  const tradingStartThai = new Date(thaiTime);
+  tradingStartThai.setUTCHours(5, 0, 0, 0);
+  
+  // If current Thai time is before 05:00 AM, the trading day started at 05:00 AM yesterday
+  if (thaiTime.getUTCHours() < 5) {
+    tradingStartThai.setUTCDate(tradingStartThai.getUTCDate() - 1);
+  }
+  
+  // Adjust for weekends:
+  // Saturday 05:00 AM or Sunday 05:00 AM belongs to Friday's trading session start
+  const dayOfWeek = tradingStartThai.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  if (dayOfWeek === 6) { // Saturday
+    tradingStartThai.setUTCDate(tradingStartThai.getUTCDate() - 1); // Friday
+  } else if (dayOfWeek === 0) { // Sunday
+    tradingStartThai.setUTCDate(tradingStartThai.getUTCDate() - 2); // Friday
+  }
+  
+  // Convert back to UTC date object
+  return new Date(tradingStartThai.getTime() - (7 * 60 * 60 * 1000));
+};
+
 export function GameDashboardClient() {
   const [strategies, setStrategies] = useState<Strategy[]>(initialStrategies);
+  const lastPurgedRef = useRef<string>("");
   const [history, setHistory] = useState<Record<number, VirtualRound[]>>({
     1: [],
     2: [],
@@ -260,15 +290,7 @@ export function GameDashboardClient() {
 
 
 
-  useEffect(() => {
-    // Generate mock history only on the client on mount to avoid SSR hydration mismatches!
-    setHistory({
-      1: generateMockHistory(1),
-      2: generateMockHistory(2),
-      3: generateMockHistory(3),
-      4: generateMockHistory(4)
-    });
-  }, []);
+  // Removed mock history generation to strictly display real-time database data from MT5
 
   useEffect(() => {
     // Live XAUUSD (Gold Spot) feed via free public CORS-enabled Gold-API
@@ -399,13 +421,28 @@ export function GameDashboardClient() {
 
     const syncSupabaseData = async () => {
       try {
-        // 1. Fetch Strategies
+        const tradingStart = getTradingDayStart();
+        const tradingStartStr = tradingStart.toISOString();
+
+        // 1. Auto-purge old days data when the market opens / shifts day
+        if (lastPurgedRef.current !== tradingStartStr) {
+          lastPurgedRef.current = tradingStartStr;
+          try {
+            await supabase.from("tg_virtual_rounds").delete().lt("open_time", tradingStartStr);
+            await supabase.from("tg_signals").delete().lt("created_at", tradingStartStr);
+            console.log("Automatically purged old day data. New session start (UTC):", tradingStartStr);
+          } catch (e) {
+            console.error("Failed to purge old day data:", e);
+          }
+        }
+
+        // 2. Fetch Strategies
         const { data: stratData } = await supabase.from("tg_strategies").select("*").order("id");
         if (stratData && stratData.length > 0) {
           setStrategies(stratData);
         }
 
-        // 2. Fetch Closed History (Take the last 100 per strategy to allow robust close-round grouping)
+        // 3. Fetch Closed History (Take only closed rounds in the current trading session)
         const histMap: Record<number, VirtualRound[]> = { 1: [], 2: [], 3: [], 4: [] };
         await Promise.all([1, 2, 3, 4].map(async (stratId) => {
           const { data: stratHist } = await supabase
@@ -413,16 +450,38 @@ export function GameDashboardClient() {
             .select("*")
             .eq("strategy_id", stratId)
             .eq("status", "CLOSED")
+            .gte("close_time", tradingStartStr)
             .order("close_time", { ascending: false })
             .limit(100);
           
           if (stratHist) {
-            histMap[stratId] = [...stratHist].sort((a, b) => new Date(a.close_time).getTime() - new Date(b.close_time).getTime());
+            // Deduplicate by ticket and round_id
+            const seenTickets = new Set();
+            const seenRoundIds = new Set();
+            const uniqueHist = [];
+            
+            // Process descending (latest first) to keep the newest duplicate
+            const sortedDesc = [...stratHist].sort((a, b) => new Date(b.close_time || 0).getTime() - new Date(a.close_time || 0).getTime());
+            for (const r of sortedDesc) {
+              if (r.ticket && seenTickets.has(r.ticket)) continue;
+              if (r.round_id && seenRoundIds.has(r.round_id)) continue;
+              if (r.ticket) seenTickets.add(r.ticket);
+              if (r.round_id) seenRoundIds.add(r.round_id);
+              uniqueHist.push(r);
+            }
+            
+            histMap[stratId] = uniqueHist.sort((a, b) => new Date(a.close_time || 0).getTime() - new Date(b.close_time || 0).getTime());
           }
         }));
         setHistory(histMap);
 
-        const { data: activeData, error: activeErr } = await supabase.from("tg_virtual_rounds").select("*").eq("status", "OPEN");
+        // 4. Fetch Active Rounds for current trading session
+        const { data: activeData, error: activeErr } = await supabase
+          .from("tg_virtual_rounds")
+          .select("*")
+          .eq("status", "OPEN")
+          .gte("open_time", tradingStartStr);
+
         if (activeErr) {
           console.error("Error fetching active rounds:", activeErr);
         } else if (activeData) {
@@ -430,7 +489,6 @@ export function GameDashboardClient() {
           activeData.forEach(r => { activeMap[r.strategy_id] = r; });
           setActiveRounds(activeMap);
         }
-
 
       } catch (err) {
         console.error("Error syncing Supabase data:", err);
@@ -465,8 +523,14 @@ export function GameDashboardClient() {
 
     const roundsChannel = supabase.channel("schema-rounds-all")
       .on("postgres_changes", { event: "*", schema: "public", table: "tg_virtual_rounds" }, (payload) => {
+          const tradingStart = getTradingDayStart();
+
           if (payload.eventType === 'INSERT') {
             const round = payload.new as VirtualRound;
+            // Ignore insert if from an older trading day session
+            if (round.open_time && new Date(round.open_time).getTime() < tradingStart.getTime()) {
+              return;
+            }
             if (round.status === 'OPEN') {
               setActiveRounds(prev => ({ ...prev, [round.strategy_id]: round }));
             }
@@ -479,28 +543,29 @@ export function GameDashboardClient() {
               }
             });
             const round = cleanNew as VirtualRound;
+
+            // Ignore update if from an older trading day session
+            const eventTime = round.close_time || round.open_time;
+            if (eventTime && new Date(eventTime).getTime() < tradingStart.getTime()) {
+              return;
+            }
+
             let targetStratId = round.strategy_id;
             
-            // If strategy_id was omitted in PATCH, find it using ticket
+            // Match strategy using round_id PK from current activeRounds
+            if (!targetStratId && round.round_id) {
+              const foundPair = Object.entries(activeRoundsRef.current).find(([_, r]) => r.round_id === round.round_id);
+              if (foundPair) {
+                targetStratId = parseInt(foundPair[0]);
+              }
+            }
+            
+            // Fallback match using ticket from current activeRounds
             if (!targetStratId && round.ticket) {
-              setActiveRounds(prev => {
-                const found = Object.values(prev).find(r => r.ticket === round.ticket);
-                if (found) targetStratId = found.strategy_id;
-                
-                if (targetStratId) {
-                  const copy = { ...prev };
-                  const existing = copy[targetStratId];
-                  const merged = { ...existing, ...round } as VirtualRound;
-                  if (merged.status === 'CLOSED') {
-                    delete copy[targetStratId];
-                  } else {
-                    copy[targetStratId] = merged;
-                  }
-                  return copy;
-                }
-                return prev;
-              });
-              return;
+              const foundPair = Object.entries(activeRoundsRef.current).find(([_, r]) => r.ticket === round.ticket);
+              if (foundPair) {
+                targetStratId = parseInt(foundPair[0]);
+              }
             }
             
             if (targetStratId) {
@@ -514,20 +579,32 @@ export function GameDashboardClient() {
                 if (merged.status === 'CLOSED') {
                   delete copy[targetStratId];
                   
-                  // Also add to history and update today profit map!
+                  // Also add to history and update today profit map
                   setHistory(prevHist => {
                     let stratHist = [...(prevHist[targetStratId] || [])];
                     // Remove existing ticket or round_id duplicates to prevent collisions in real-time
                     stratHist = stratHist.filter(r => r.round_id !== merged.round_id && r.ticket !== merged.ticket);
                     stratHist.push(merged);
-                    stratHist.sort((a, b) => new Date(a.close_time || 0).getTime() - new Date(b.close_time || 0).getTime());
-                    if (stratHist.length > 100) stratHist.shift();
-                    return { ...prevHist, [targetStratId]: stratHist };
+                    
+                    // Deduplicate
+                    const seenTickets = new Set();
+                    const seenRoundIds = new Set();
+                    const uniqueHist = [];
+                    // Process descending to keep the newest duplicate
+                    const sortedDesc = [...stratHist].sort((a, b) => new Date(b.close_time || 0).getTime() - new Date(a.close_time || 0).getTime());
+                    for (const r of sortedDesc) {
+                      if (r.ticket && seenTickets.has(r.ticket)) continue;
+                      if (r.round_id && seenRoundIds.has(r.round_id)) continue;
+                      if (r.ticket) seenTickets.add(r.ticket);
+                      if (r.round_id) seenRoundIds.add(r.round_id);
+                      uniqueHist.push(r);
+                    }
+                    
+                    const finalHist = uniqueHist.sort((a, b) => new Date(a.close_time || 0).getTime() - new Date(b.close_time || 0).getTime());
+                    if (finalHist.length > 100) finalHist.shift();
+                    return { ...prevHist, [targetStratId]: finalHist };
                   });
-                  
-
                 } else {
-                  // Keep it open
                   copy[targetStratId] = merged;
                 }
                 return copy;
@@ -574,19 +651,8 @@ export function GameDashboardClient() {
 
   const getTodayProfit = (stratId: number) => {
     const hist = history[stratId] || [];
-    
-    // Get current date string in Thai Time timezone (YYYY-MM-DD)
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const todayStr = formatter.format(new Date()); 
-    
-    // Filter rounds closed today in Thai timezone and sum
-    const todayRounds = hist.filter(r => {
-      if (!r.close_time) return false;
-      const roundDateStr = formatter.format(new Date(r.close_time));
-      return roundDateStr === todayStr;
-    });
-    
-    const sum = todayRounds.reduce((acc, r) => acc + (parseFloat(String(r.profit)) || 0), 0);
+    // Since history is already filtered to only contain current trading session rounds, we sum everything directly
+    const sum = hist.reduce((acc, r) => acc + (parseFloat(String(r.profit)) || 0), 0);
     return parseFloat(sum.toFixed(2));
   };
 
