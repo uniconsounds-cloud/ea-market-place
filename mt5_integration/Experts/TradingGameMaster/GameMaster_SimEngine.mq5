@@ -19,7 +19,10 @@
 #include "Strategy_3_RangeBounce.mqh"
 #include "Strategy_4_SpikeFade.mqh"
 
-input double InpInitialBalance = 100.0; // Virtual Starting Balance ($100 USD)
+input double InpInitialBalance_1 = 100.0; // Strat 1 Starting Balance ($100 USD)
+input double InpInitialBalance_2 = 100.0; // Strat 2 Starting Balance ($100 USD)
+input double InpInitialBalance_3 = 100.0; // Strat 3 Starting Balance ($100 USD)
+input double InpInitialBalance_4 = 100.0; // Strat 4 Starting Balance ($100 USD)
 
 CVirtualAccount g_acc1;
 CVirtualAccount g_acc2;
@@ -90,11 +93,11 @@ int OnInit()
 {
    g_webSync.Init(InpSupabaseUrl, InpSupabaseKey);
    
-   // Initialize Virtual Accounts
-   g_acc1.Init(1, InpInitialBalance, &g_webSync);
-   g_acc2.Init(2, InpInitialBalance, &g_webSync);
-   g_acc3.Init(3, InpInitialBalance, &g_webSync);
-   g_acc4.Init(4, InpInitialBalance, &g_webSync);
+   // Initialize Virtual Accounts with independent balances
+   g_acc1.Init(1, InpInitialBalance_1, &g_webSync);
+   g_acc2.Init(2, InpInitialBalance_2, &g_webSync);
+   g_acc3.Init(3, InpInitialBalance_3, &g_webSync);
+   g_acc4.Init(4, InpInitialBalance_4, &g_webSync);
    
    // Initialize Strategies
    g_strat1.Init(1, &g_acc1);
