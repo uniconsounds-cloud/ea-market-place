@@ -46,8 +46,8 @@ public:
       {
          if(rates[1].low < ema20[1] && rates[1].close > ema20[1] && rates[0].close > rates[1].high) 
          {
-            double sl = ask - (500 * point);
-            double tp = ask + (150 * point); // Adjusted for higher win rate
+            double sl = ask - (300 * point);
+            double tp = ask + (200 * point);
             m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "PULL_BUY");
          }
       }
@@ -57,8 +57,8 @@ public:
       {
          if(rates[1].high > ema20[1] && rates[1].close < ema20[1] && rates[0].close < rates[1].low) 
          {
-            double sl = bid + (500 * point);
-            double tp = bid - (150 * point); // Adjusted for higher win rate
+            double sl = bid + (300 * point);
+            double tp = bid - (200 * point);
             m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "PULL_SELL");
          }
       }

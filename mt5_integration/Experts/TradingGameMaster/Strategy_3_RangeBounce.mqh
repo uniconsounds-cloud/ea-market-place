@@ -37,16 +37,16 @@ public:
       // Buy logic: RSI dipped below 30 and crossed back up
       if(rsi[1] < 30 && rsi[0] >= 30)
       {
-         double sl = ask - (500 * point);
-         double tp = ask + (150 * point); // Adjusted for higher win rate
+         double sl = ask - (200 * point); // Balanced SL (20 gold pips)
+         double tp = ask + (150 * point); // Balanced TP (15 gold pips)
          m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "BOUNCE_BUY");
       }
       
       // Sell logic: RSI spiked above 70 and crossed back down
       if(rsi[1] > 70 && rsi[0] <= 70)
       {
-         double sl = bid + (500 * point);
-         double tp = bid - (150 * point); // Adjusted for higher win rate
+         double sl = bid + (200 * point); // Balanced SL (20 gold pips)
+         double tp = bid - (150 * point); // Balanced TP (15 gold pips)
          m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "BOUNCE_SELL");
       }
    }

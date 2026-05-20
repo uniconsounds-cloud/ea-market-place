@@ -49,15 +49,15 @@ public:
          // Spike UP -> Fade SELL
          if(rates[1].close > rates[1].open)
          {
-            double sl = bid + (600 * point);
-            double tp = bid - (150 * point); // Fixed TP for quick close
+            double sl = bid + (300 * point); // Balanced SL (30 gold pips)
+            double tp = bid - (200 * point); // Balanced TP (20 gold pips)
             m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "SPIKE_SELL");
          }
          // Spike DOWN -> Fade BUY
          else
          {
-            double sl = ask - (600 * point);
-            double tp = ask + (150 * point); // Fixed TP for quick close
+            double sl = ask - (300 * point); // Balanced SL (30 gold pips)
+            double tp = ask + (200 * point); // Balanced TP (20 gold pips)
             m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "SPIKE_BUY");
          }
       }

@@ -48,8 +48,8 @@ public:
          for(int i=1; i<=5; i++) { if(rates[i].high > highest) highest = rates[i].high; }
          if(rates[0].close > highest && rates[1].close <= highest) // Just crossed
          {
-            double sl = ask - (500 * point);
-            double tp = ask + (150 * point); // Adjusted for higher win rate
+            double sl = ask - (250 * point); // Balanced SL (25 gold pips)
+            double tp = ask + (200 * point); // Balanced TP (20 gold pips)
             m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "MOM_BUY");
          }
       }
@@ -61,8 +61,8 @@ public:
          for(int i=1; i<=5; i++) { if(rates[i].low < lowest) lowest = rates[i].low; }
          if(rates[0].close < lowest && rates[1].close >= lowest) // Just crossed
          {
-            double sl = bid + (500 * point);
-            double tp = bid - (150 * point); // Adjusted for higher win rate
+            double sl = bid + (250 * point); // Balanced SL (25 gold pips)
+            double tp = bid - (200 * point); // Balanced TP (20 gold pips)
             m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "MOM_SELL");
          }
       }
