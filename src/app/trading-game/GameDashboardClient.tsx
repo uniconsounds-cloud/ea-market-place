@@ -108,6 +108,16 @@ interface AggregatedRound {
   order_count: number;
 }
 
+// Helper to parse date string sent by MT5 (which is MT5 chart time in GMT+3, but stored/parsed as UTC by default)
+// Subtracting 3 hours adjusts it to correct UTC time
+const parseMt5Date = (dateStr: string | null | undefined): Date | null => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  // Subtract 3 hours (3 * 60 * 60 * 1000 ms) to get true UTC
+  return new Date(d.getTime() - (3 * 60 * 60 * 1000));
+};
+
 const aggregateRoundsByCloseTime = (rounds: VirtualRound[]): AggregatedRound[] => {
   if (!rounds || rounds.length === 0) return [];
   
@@ -116,7 +126,9 @@ const aggregateRoundsByCloseTime = (rounds: VirtualRound[]): AggregatedRound[] =
   
   rounds.forEach(r => {
     if (!r.close_time) return;
-    const timeMs = new Date(r.close_time).getTime();
+    const parsedClose = parseMt5Date(r.close_time);
+    if (!parsedClose) return;
+    const timeMs = parsedClose.getTime();
     const roundedTime = Math.round(timeMs / 2000) * 2000;
     const key = `${r.strategy_id}-${roundedTime}`;
     
@@ -155,7 +167,7 @@ const aggregateRoundsByCloseTime = (rounds: VirtualRound[]): AggregatedRound[] =
     });
   });
   
-  return aggregated.sort((a, b) => new Date(a.close_time).getTime() - new Date(b.close_time).getTime());
+  return aggregated.sort((a, b) => (parseMt5Date(a.close_time)?.getTime() || 0) - (parseMt5Date(b.close_time)?.getTime() || 0));
 };
 
 const CustomizedDot = (props: any) => {
@@ -231,33 +243,32 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-// Helper to get the start of the current trading day in Bangkok time (05:00:00 AM)
-// Gold market starts at 05:00 AM Thai Time (ICT, UTC+7) Monday-Friday
-// and ends at 04:00 AM Thai Time (ICT, UTC+7) Tuesday-Saturday.
+// Helper to get the start of the current trading day in MT5 chart time (GMT+3 / Broker Time)
+// Since MT5 timestamps are stored directly as UTC in the database, we treat MT5 chart time as UTC for DB queries.
+// The Gold market opens at 01:00 AM MT5 time (which is 05:00 AM Thai Time)
 const getTradingDayStart = (): Date => {
   const now = new Date();
-  // Thai time is UTC + 7 hours
-  const thaiTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  // MT5 time is GMT+3. We calculate current MT5 chart time by adding 3 hours to UTC.
+  const mt5Time = new Date(now.getTime() + (3 * 60 * 60 * 1000));
   
-  const tradingStartThai = new Date(thaiTime);
-  tradingStartThai.setUTCHours(5, 0, 0, 0);
+  const tradingStartMT5 = new Date(mt5Time);
+  tradingStartMT5.setUTCHours(1, 0, 0, 0); // 01:00:00 AM MT5 time
   
-  // If current Thai time is before 05:00 AM, the trading day started at 05:00 AM yesterday
-  if (thaiTime.getUTCHours() < 5) {
-    tradingStartThai.setUTCDate(tradingStartThai.getUTCDate() - 1);
+  // If current MT5 time is before 01:00 AM, the trading day started at 01:00 AM yesterday
+  if (mt5Time.getUTCHours() < 1) {
+    tradingStartMT5.setUTCDate(tradingStartMT5.getUTCDate() - 1);
   }
   
   // Adjust for weekends:
-  // Saturday 05:00 AM or Sunday 05:00 AM belongs to Friday's trading session start
-  const dayOfWeek = tradingStartThai.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  // Saturday 01:00 AM or Sunday 01:00 AM belongs to Friday's trading session start
+  const dayOfWeek = tradingStartMT5.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   if (dayOfWeek === 6) { // Saturday
-    tradingStartThai.setUTCDate(tradingStartThai.getUTCDate() - 1); // Friday
+    tradingStartMT5.setUTCDate(tradingStartMT5.getUTCDate() - 1); // Friday
   } else if (dayOfWeek === 0) { // Sunday
-    tradingStartThai.setUTCDate(tradingStartThai.getUTCDate() - 2); // Friday
+    tradingStartMT5.setUTCDate(tradingStartMT5.getUTCDate() - 2); // Friday
   }
   
-  // Convert back to UTC date object
-  return new Date(tradingStartThai.getTime() - (7 * 60 * 60 * 1000));
+  return tradingStartMT5;
 };
 
 export function GameDashboardClient() {
@@ -461,7 +472,7 @@ export function GameDashboardClient() {
             const uniqueHist = [];
             
             // Process descending (latest first) to keep the newest duplicate
-            const sortedDesc = [...stratHist].sort((a, b) => new Date(b.close_time || 0).getTime() - new Date(a.close_time || 0).getTime());
+            const sortedDesc = [...stratHist].sort((a, b) => (parseMt5Date(b.close_time)?.getTime() || 0) - (parseMt5Date(a.close_time)?.getTime() || 0));
             for (const r of sortedDesc) {
               if (r.ticket && seenTickets.has(r.ticket)) continue;
               if (r.round_id && seenRoundIds.has(r.round_id)) continue;
@@ -470,7 +481,7 @@ export function GameDashboardClient() {
               uniqueHist.push(r);
             }
             
-            histMap[stratId] = uniqueHist.sort((a, b) => new Date(a.close_time || 0).getTime() - new Date(b.close_time || 0).getTime());
+            histMap[stratId] = uniqueHist.sort((a, b) => (parseMt5Date(a.close_time)?.getTime() || 0) - (parseMt5Date(b.close_time)?.getTime() || 0));
           }
         }));
         setHistory(histMap);
@@ -591,7 +602,7 @@ export function GameDashboardClient() {
                     const seenRoundIds = new Set();
                     const uniqueHist = [];
                     // Process descending to keep the newest duplicate
-                    const sortedDesc = [...stratHist].sort((a, b) => new Date(b.close_time || 0).getTime() - new Date(a.close_time || 0).getTime());
+                    const sortedDesc = [...stratHist].sort((a, b) => (parseMt5Date(b.close_time)?.getTime() || 0) - (parseMt5Date(a.close_time)?.getTime() || 0));
                     for (const r of sortedDesc) {
                       if (r.ticket && seenTickets.has(r.ticket)) continue;
                       if (r.round_id && seenRoundIds.has(r.round_id)) continue;
@@ -600,7 +611,7 @@ export function GameDashboardClient() {
                       uniqueHist.push(r);
                     }
                     
-                    const finalHist = uniqueHist.sort((a, b) => new Date(a.close_time || 0).getTime() - new Date(b.close_time || 0).getTime());
+                    const finalHist = uniqueHist.sort((a, b) => (parseMt5Date(a.close_time)?.getTime() || 0) - (parseMt5Date(b.close_time)?.getTime() || 0));
                     if (finalHist.length > 100) finalHist.shift();
                     return { ...prevHist, [targetStratId]: finalHist };
                   });
@@ -633,7 +644,9 @@ export function GameDashboardClient() {
   };
 
   const getLiveDuration = (openTime: string) => {
-    const diffMs = now - new Date(openTime).getTime();
+    const parsedOpen = parseMt5Date(openTime);
+    if (!parsedOpen) return "0s";
+    const diffMs = now - parsedOpen.getTime();
     if(diffMs < 0) return "0s";
     const diffMins = Math.floor(diffMs / 60000);
     const diffSecs = Math.floor((diffMs % 60000) / 1000);
@@ -641,8 +654,10 @@ export function GameDashboardClient() {
   };
 
   const getRoundDuration = (openTime: string, closeTime: string) => {
-    if (!openTime || !closeTime) return "N/A";
-    const diffMs = new Date(closeTime).getTime() - new Date(openTime).getTime();
+    const parsedOpen = parseMt5Date(openTime);
+    const parsedClose = parseMt5Date(closeTime);
+    if (!parsedOpen || !parsedClose) return "N/A";
+    const diffMs = parsedClose.getTime() - parsedOpen.getTime();
     if(diffMs < 0) return "0s";
     const diffMins = Math.floor(diffMs / 60000);
     const diffSecs = Math.floor((diffMs % 60000) / 1000);
@@ -1004,7 +1019,7 @@ export function GameDashboardClient() {
                           return (
                             <div 
                               key={round.round_id || idx}
-                              title={`PROFIT/LOSS: ${isWin ? '+' : ''}$${profitVal.toFixed(2)}\nAGE: ${getRoundDuration(round.open_time, round.close_time)}\nCLOSE TIME (TH): ${round.close_time ? new Date(round.close_time).toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false }) : 'N/A'}\nMAX DD: -$${Math.abs(round.max_dd ?? 0).toFixed(2)}`}
+                              title={`PROFIT/LOSS: ${isWin ? '+' : ''}$${profitVal.toFixed(2)}\nAGE: ${getRoundDuration(round.open_time, round.close_time)}\nCLOSE TIME (TH): ${round.close_time ? parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false }) : 'N/A'}\nMAX DD: -$${Math.abs(round.max_dd ?? 0).toFixed(2)}`}
                               onMouseEnter={() => setHoveredRounds(prev => ({ ...prev, [strat.id]: round }))}
                               onMouseLeave={() => setHoveredRounds(prev => ({ ...prev, [strat.id]: null }))}
                               className={`w-9 h-7 rounded border-t-2 shrink-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-slate-800/90 relative group cursor-pointer ${
@@ -1027,7 +1042,7 @@ export function GameDashboardClient() {
                                   <span className="text-cyan-400">AGGREGATED: {round.order_count} trades</span>
                                 )}
                                 {round.close_time && (
-                                  <span>TIME (TH): {new Date(round.close_time).toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}</span>
+                                  <span>TIME (TH): {parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}</span>
                                 )}
                                 <span>MAX DD: -${Math.abs(round.max_dd ?? 0).toFixed(2)}</span>
                               </div>
