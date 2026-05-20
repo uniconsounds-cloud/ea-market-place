@@ -467,7 +467,7 @@ public:
        if(buyState == EG_STATE_LOCKDOWN || sellState == EG_STATE_LOCKDOWN) return;
        
        // Filter out high spread or missing data
-       double spread = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+       double spread = (double)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
        if(spread > 100) return; // Spread Filter (Points)
  
        // Get short EMA values for trend/momentum (M5)

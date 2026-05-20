@@ -47,12 +47,15 @@
 //|  1.501 - UI/UX: Grouped inputs with headers, hid internal variables, string time parsing.        |
 //|  1.600 - NEW: Unified State Escape & Dual Engine (Grid & isolated Rebate Scalper).               |
 //|  1.700 - NEW: Peak/Trough Entry Guard, Impulse Throttling, Rejection Confirmations & Micro Stop. |
+//|  1.710 - NEW: Symmetrical Trend Lock, Hardened FOL limits, AI Parameter tuning.                  |
+//|  1.720 - NEW: Scout Time Stop (20m), Scout Tight SL (150pts), Disable FOL Against Trend.         |
+//|  1.800 - NEW: Stateless Follow SL limits & cooldown, First Entry Protection for ENT (seq 1).     |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.700"
+#property version   "1.800"
 
 // At top of file
-#define EA_VERSION "1.700"
+#define EA_VERSION "1.800"
 
 #include "../EAE_MonitorTypes.mqh"
 #include "../EAE_CollectorCore.mqh"
@@ -182,7 +185,7 @@ CTrade g_trade;
 sinput string InpHeader_Basic     = "--- Basic Trading Settings ---";
 input double InpUpperLimitLotSize = 0.1;  // Upper_limit_lot_size
 input double InpLots              = 0.01;  // Lots (initial)
-input double InpCloseMoney        = 10.0;  // Close_Money (USC)
+input double InpCloseMoney        = 15.0;  // Close_Money (USC)
 input double InpLotPlusB          = 0.01;  // Lot_plus_B
 input double InpLotPlusS          = 0.01;  // Lot_plus_S
 input int    InpMaxOrderLoss      = 100;   // Max_Order_Loss
@@ -223,9 +226,23 @@ double InpRTS_AtrMultiplier = 0.2;
 //==================================================================//
 double InpFollowGridPips    = 0.0;  // If >0 => fixed pips range in NoNearby check
 double InpFollowAtrMult     = 0.5;  // [UPDATED] V1.408: Default to ATR-based grid (0.5x)
-int    InpMaxFollowOrders   = 20;   // [HIDDEN] Max Follow Orders allowed
+input int    InpMaxFollowOrders   = 1;      // Max Follow Orders per basket
+input double InpFollowLot         = 0.01;   // Constant lot size for Follow
+input bool   InpDisableFOLInCaution = true; // Block Follow in Caution/Crisis
+input double InpMaxFOLLossLimit   = -50.0;  // Block Follow if float < limit
+input bool   InpDisableFOLAgainstTrend = true; // Block Follow if against EMA trend
 bool   InpFollowUseSL       = true;
-int    InpFollowSL_Pips     = 300;  // [UPDATED] V1.501: Default to 300 pips
+int    InpFollowSL_Pips     = 120;  // [UPDATED] V1.501: Default to 120 pips
+input int    InpFollowSlCooldownMin = 15;   // Cooldown after Follow SL (minutes)
+input int    InpMaxFollowSlPerBasket = 1;   // Max Follow SL per basket
+
+//--- Scout Guard System
+sinput string InpHeader_ScoutGuard         = "--- Scout Order Guard ---";
+input int     InpScoutMaxHoldMinutes       = 15;       // Max minutes to hold Scout order
+input int     InpScoutSLPoints             = 120;      // Tight Stop Loss for Scout (Points)
+
+input bool    InpAllowCounterRTBOnlyAfterReversal = true;
+input int     InpReversalConfirmCandles    = 3;
 
 //==================================================================//
 // [140] INPUTS - Basket profit                                      //
@@ -315,11 +332,11 @@ input string InpEarlyCloseDate = "2026.12.24"; // Early Close Date
 // [180] INPUTS - Circuit Breaker (High Priority)                   //
 //==================================================================//
 sinput string InpHeader_Breaker       = "--- Circuit Breaker ---";
-input bool   InpEnableBreaker        = false;  // Enable Circuit Breaker
-input double InpBreakerLevel1_Pct    = 18.0;   // Level 1: Stop Rescue (%)
-input double InpBreakerLevel2_Pct    = 28.0;   // Level 2: Hard Close (%)
+input bool   InpEnableBreaker        = true;   // Enable Circuit Breaker
+input double InpBreakerLevel1_Pct    = 10.0;   // Level 1: Stop Rescue (%)
+input double InpBreakerLevel2_Pct    = 15.0;   // Level 2: Hard Close (%)
 int    InpBreakerVerify_Sec    = 5;      // [HIDDEN] Level 2 Verify (Sec)
-input int    InpBreakerCooldown_Min  = 30;     // Cooldown after Close (Min)
+input int    InpBreakerCooldown_Min  = 60;     // Cooldown after Close (Min)
 
 //==================================================================//
 // [185] INPUTS - Market Safety Gates                               //
@@ -340,8 +357,8 @@ input string InpGateNewsRange        = "";     // News Filter (YYYY.MM.DD HH:MM-
 sinput string InpHeader_PeakGuard          = "--- Peak/Trough Entry Guard ---";
 input bool    InpEnablePeakTroughGuard     = true;     // Enable Peak/Trough Guard
 input int     InpImpulseLookbackCandles    = 5;        // Impulse Lookback Candles (M1)
-input double  InpMaxImpulseMovePoints      = 300.0;    // Max Impulse Move (Points)
-input int     InpImpulseCooldownMinutes    = 7;        // Impulse Cooldown (Min)
+input double  InpMaxImpulseMovePoints      = 200.0;    // Max Impulse Move (Points)
+input int     InpImpulseCooldownMinutes    = 15;       // Impulse Cooldown (Min)
 
 input bool    InpRequireRejection          = true;     // Require Rejection/RSI confirm
 input double  InpRSIOverbought             = 70.0;     // RSI Overbought Threshold
@@ -350,7 +367,15 @@ input double  InpRSIOversold               = 30.0;     // RSI Oversold Threshold
 input int     InpMaxOrdersDuringImpulse    = 1;        // Max Scout Orders during impulse
 input double  InpMaxLotDuringImpulse       = 0.01;     // Scout Lot Size
 input bool    InpBlockGridUntilPullback    = true;     // Block Grid until pullback
-input double  InpPullbackConfirmPoints     = 120.0;    // Pullback Confirm Distance (Points)
+input double  InpPullbackConfirmPoints     = 250.0;    // Pullback Confirm Distance (Points)
+input bool    InpDisableGridDuringImpulse  = true;     // Strictly block main grid in impulse
+
+//--- Trend Lock System
+sinput string InpHeader_TrendLock          = "--- Symmetrical Trend Lock ---";
+input bool    InpEnableTrendLock           = true;     // Enable Trend Lock
+input int     InpTrendLockEmaFast          = 20;       // Fast EMA Period
+input int     InpTrendLockEmaSlow          = 50;       // Slow EMA Period
+input int     InpTrendLockMaxOrders        = 12;       // Block orders above this if trend locked
 
 input bool    InpEarlyWrongEntryCut        = true;     // Micro Stop Early Cut
 input int     InpEarlyCutMaxOrders         = 3;        // Early Cut Max Basket Count
@@ -367,29 +392,29 @@ string   g_peakGuardStatusStrB = "OK";
 string   g_peakGuardStatusStrS = "OK";
 
 //--- Dual Engine & State Escape Settings ---
-input double InpCautionLoss        = -100.0; // Caution state floating loss limit (USC)
-input double InpCrisisLoss         = -200.0; // Crisis state floating loss limit (USC)
-input double InpLockdownLoss       = -600.0; // Lockdown state floating loss limit (USC)
-input int    InpCautionOrders      = 9;      // Caution state order count
-input int    InpCrisisOrders       = 12;     // Crisis state order count
-input int    InpLockdownOrders     = 18;     // Lockdown state order count
+input double InpCautionLoss        = -250.0; // Caution state floating loss limit (USC)
+input double InpCrisisLoss         = -450.0; // Crisis state floating loss limit (USC)
+input double InpLockdownLoss       = -650.0; // Lockdown state floating loss limit (USC)
+input int    InpCautionOrders      = 10;     // Caution state order count
+input int    InpCrisisOrders       = 14;     // Crisis state order count
+input int    InpLockdownOrders     = 20;     // Lockdown state order count
 
-input int    InpNearBEStartOrders  = 12;     // Near-BE Escape starting order count
-input int    InpNearBEDistance     = 120;    // Distance from BE in points to trigger escape
-input double InpAllowedEscapeLoss  = -80.0;  // Maximum loss allowed for Near-BE escape (USC)
+input int    InpNearBEStartOrders  = 14;     // Near-BE Escape starting order count
+input int    InpNearBEDistance     = 180;    // Distance from BE in points to trigger escape
+input double InpAllowedEscapeLoss  = -60.0;  // Maximum loss allowed for Near-BE escape (USC)
 input double InpPartialRecoveryPct = 30.0;   // Recovery percentage from peak loss to partial close
 
-input double InpMaxLotNormal       = 0.05;   // Lot size cap in Caution state
+input double InpMaxLotNormal       = 0.04;   // Lot size cap in Caution state
 input double InpMaxLotCrisis       = 0.03;   // Lot size cap in Crisis state
 
 input bool   InpEnableScalper      = true;   // Enable Rebate Scalper Engine
 input int    InpScalperMagicOffset = 100;    // Magic number offset for Scalper
 input double InpScalperLot         = 0.01;   // Constant lot size for Scalper
-input int    InpScalperTP          = 100;    // TakeProfit points for Scalper
-input int    InpScalperSL          = 150;    // StopLoss points for Scalper
-input int    InpMaxScalperOrders   = 8;      // Max Scalper positions open simultaneously
-input int    InpLossStreakStop     = 3;      // Max losses in a row before cooldown
-input int    InpScalperCooldownMin = 20;     // Cooldown after loss streak (minutes)
+input int    InpScalperTP          = 120;    // TakeProfit points for Scalper
+input int    InpScalperSL          = 100;    // StopLoss points for Scalper
+input int    InpMaxScalperOrders   = 4;      // Max Scalper positions open simultaneously
+input int    InpLossStreakStop     = 2;      // Max losses in a row before cooldown
+input int    InpScalperCooldownMin = 30;     // Cooldown after loss streak (minutes)
 
 #include "EG_Farming_DualEngine_Escape.mqh"
 
@@ -469,6 +494,8 @@ int g_hEmaFast = INVALID_HANDLE;
 int g_hEmaSlow = INVALID_HANDLE;
 int g_hAtrGrid = INVALID_HANDLE;
 int g_hAtrFilt = INVALID_HANDLE;
+int g_hTrendEmaFast = INVALID_HANDLE;
+int g_hTrendEmaSlow = INVALID_HANDLE;
 
 // Basket stats (per side)
 int      g_prevCntBuy  = 0;
@@ -1325,8 +1352,22 @@ bool PlaceBuy(double vol, const string comment, const int target_magic = 0)
    g_trade.SetDeviationInPoints(InpSlippagePoints);
 
    double sl = 0.0;
-   // [PATCH 006] CHANGE: Counter-trend SL uses fixed POINTS distance (InpCounterTrendSL_Points).
-   sl = CalcSLPriceFromFixedPoints(true);
+   if(StringFind(comment, "_SCT") >= 0 && InpScoutSLPoints > 0)
+   {
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      sl = NormalizeDouble(ask - (InpScoutSLPoints * _Point), _Digits);
+   }
+   else if(comment == "ENT" && CountPositionsByMagicSide(magic, POSITION_TYPE_BUY) == 0)
+   {
+      // First Entry ENT Protection: Enforce Stop Loss (default 120 pips/1200 points, or matching Scout SL)
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      double slPoints = (InpScoutSLPoints > 0) ? InpScoutSLPoints : 120;
+      sl = NormalizeDouble(ask - (slPoints * _Point), _Digits);
+   }
+   else
+   {
+      sl = CalcSLPriceFromFixedPoints(true);
+   }
 
    string cmt = SeqBuildComment(true, comment);
    bool ok = g_trade.Buy(vol, _Symbol, 0.0, sl, 0.0, cmt);
@@ -1344,8 +1385,22 @@ bool PlaceSell(double vol, const string comment, const int target_magic = 0)
    g_trade.SetDeviationInPoints(InpSlippagePoints);
 
    double sl = 0.0;
-   // [PATCH 006] CHANGE: Counter-trend SL uses fixed POINTS distance (InpCounterTrendSL_Points).
-   sl = CalcSLPriceFromFixedPoints(false);
+   if(StringFind(comment, "_SCT") >= 0 && InpScoutSLPoints > 0)
+   {
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      sl = NormalizeDouble(bid + (InpScoutSLPoints * _Point), _Digits);
+   }
+   else if(comment == "ENT" && CountPositionsByMagicSide(magic, POSITION_TYPE_SELL) == 0)
+   {
+      // First Entry ENT Protection: Enforce Stop Loss
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double slPoints = (InpScoutSLPoints > 0) ? InpScoutSLPoints : 120;
+      sl = NormalizeDouble(bid + (slPoints * _Point), _Digits);
+   }
+   else
+   {
+      sl = CalcSLPriceFromFixedPoints(false);
+   }
 
    string cmt = SeqBuildComment(false, comment);
    bool ok = g_trade.Sell(vol, _Symbol, 0.0, sl, 0.0, cmt);
@@ -1357,7 +1412,7 @@ bool PlaceFollowBuy()
 {
    if(!CanOpenNewOrdersNow()) return false;
 
-   double vol = NormalizeVolume(_Symbol, InpLots);
+   double vol = NormalizeVolume(_Symbol, InpFollowLot);
    g_trade.SetExpertMagicNumber(g_magicBuy);
    g_trade.SetDeviationInPoints(InpSlippagePoints);
 
@@ -1379,7 +1434,7 @@ bool PlaceFollowSell()
 {
    if(!CanOpenNewOrdersNow()) return false;
 
-   double vol = NormalizeVolume(_Symbol, InpLots);
+   double vol = NormalizeVolume(_Symbol, InpFollowLot);
    g_trade.SetExpertMagicNumber(g_magicSell);
    g_trade.SetDeviationInPoints(InpSlippagePoints);
 
@@ -2434,6 +2489,47 @@ bool PeakTroughGuardCheck(const bool isBuy, const bool isRescue, double &vol, st
    
    datetime now = TimeCurrent();
    
+   // 0. Symmetrical Trend Lock Check
+   if(InpEnableTrendLock && isRescue)
+   {
+      int cntB = CountPositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
+      int cntS = CountPositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
+      
+      if((isBuy && cntB >= InpTrendLockMaxOrders) || (!isBuy && cntS >= InpTrendLockMaxOrders))
+      {
+         double emaF[], emaS[];
+         if(g_hTrendEmaFast != INVALID_HANDLE && g_hTrendEmaSlow != INVALID_HANDLE)
+         {
+            if(CopyBuffer(g_hTrendEmaFast, 0, 0, 2, emaF) == 2 && CopyBuffer(g_hTrendEmaSlow, 0, 0, 2, emaS) == 2)
+            {
+               ArraySetAsSeries(emaF, true);
+               ArraySetAsSeries(emaS, true);
+               
+               if(isBuy)
+               {
+                  double price = iClose(_Symbol, PERIOD_CURRENT, 0);
+                  if(emaF[0] < emaS[0] && emaF[0] < emaF[1] && price < emaF[0]) // EMA20 < EMA50 AND EMA20 slope down AND price below EMA
+                  {
+                     g_peakGuardStatusStrB = "TREND_LOCKED (BUY)";
+                     Print("TrendLock: Buy rescue blocked due to strong downtrend.");
+                     return false;
+                  }
+               }
+               else
+               {
+                  double price = iClose(_Symbol, PERIOD_CURRENT, 0);
+                  if(emaF[0] > emaS[0] && emaF[0] > emaF[1] && price > emaF[0]) // EMA20 > EMA50 AND EMA20 slope up AND price above EMA
+                  {
+                     g_peakGuardStatusStrS = "TREND_LOCKED (SELL)";
+                     Print("TrendLock: Sell rescue blocked due to strong uptrend.");
+                     return false;
+                  }
+               }
+            }
+         }
+      }
+   }
+   
    // 1. Check Early Cut Cooldown
    if(isBuy && now < g_earlyCutCooldownB)
    {
@@ -2520,13 +2616,24 @@ bool PeakTroughGuardCheck(const bool isBuy, const bool isRescue, double &vol, st
    }
    
    // 4. Confirmation Rejection Check
-   if(InpRequireRejection)
+   if(InpRequireRejection || InpAllowCounterRTBOnlyAfterReversal)
    {
       bool confirmed = false;
-      if(copied >= 2)
+      int reqCandles = InpAllowCounterRTBOnlyAfterReversal ? InpReversalConfirmCandles : 1;
+      
+      if(copied > reqCandles)
       {
-         if(isBuy && rates[0].close > rates[1].high) confirmed = true;
-         if(!isBuy && rates[0].close < rates[1].low) confirmed = true;
+         bool buyReversal = true;
+         bool sellReversal = true;
+         
+         for(int c = 0; c < reqCandles; c++)
+         {
+            if(rates[c].close <= rates[c+1].close) buyReversal = false; // Need consecutive green
+            if(rates[c].close >= rates[c+1].close) sellReversal = false; // Need consecutive red
+         }
+         
+         if(isBuy && buyReversal) confirmed = true;
+         if(!isBuy && sellReversal) confirmed = true;
       }
       if(!confirmed && g_hRsiGuard != INVALID_HANDLE)
       {
@@ -2791,6 +2898,151 @@ void TryRescue()
       }
    }
 }
+//==================================================================//
+// [NEW] Stateless History-based Follow Protection checks            //
+//==================================================================//
+int CountFollowSlDeals(const long magic, const datetime startTime)
+{
+   if(startTime <= 0) return 0;
+   int slCount = 0;
+   
+   if(HistorySelect(startTime, TimeCurrent()))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket == 0) continue;
+         
+         long posMagic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+         if(posMagic != magic) continue;
+         
+         long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+         if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT) continue; // Out close deal
+         
+         string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+         if(StringFind(comment, "FOL") < 0) continue; // Only Follow orders
+         
+         double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
+         if(profit < 0.0)
+         {
+            slCount++;
+         }
+      }
+   }
+   return slCount;
+}
+
+bool IsFollowInSlCooldown(const long magic, const int cooldownMinutes)
+{
+   if(cooldownMinutes <= 0) return false;
+   datetime startTime = TimeCurrent() - (cooldownMinutes * 60);
+   
+   if(HistorySelect(startTime, TimeCurrent()))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = total - 1; i >= 0; i--) // scan from newest for speed
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket == 0) continue;
+         
+         long posMagic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+         if(posMagic != magic) continue;
+         
+         long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+         if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT) continue;
+         
+         string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+         if(StringFind(comment, "FOL") < 0) continue;
+         
+         double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
+         if(profit < 0.0)
+         {
+            return true; // Found a Follow SL in cooldown window
+         }
+      }
+   }
+   return false;
+}
+
+//==================================================================//
+// [NEW] First Entry Protection for ENT (seq == 1)                  //
+//==================================================================//
+void CheckFirstEntryProtection()
+{
+   int total = PositionsTotal();
+   datetime now = TimeCurrent();
+   
+   for(int i = total - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      
+      if(PositionSelectByTicket(ticket))
+      {
+         string sym = PositionGetString(POSITION_SYMBOL);
+         if(sym != _Symbol) continue;
+         
+         long magic = PositionGetInteger(POSITION_MAGIC);
+         if(magic != g_magicBuy && magic != g_magicSell) continue;
+         
+         string cmt = PositionGetString(POSITION_COMMENT);
+         // Enforce only for First Entry (ENT with sequence tag 001)
+         if(StringFind(cmt, "ENT") >= 0 && StringFind(cmt, "001") >= 0)
+         {
+            datetime openTime = (datetime)PositionGetInteger(POSITION_TIME);
+            int holdTimeSec = (int)(now - openTime);
+            double profit = PositionGetDouble(POSITION_PROFIT); // cents (USC)
+            
+            bool shouldClose = false;
+            string reason = "";
+            
+            // 1. Max Hold Time (20 minutes)
+            if(holdTimeSec >= 20 * 60)
+            {
+               shouldClose = true;
+               reason = StringFormat("Max Hold 20m (%ds)", holdTimeSec);
+            }
+            
+            // 2. Max Loss Limit (-10 USC)
+            if(!shouldClose && profit <= -10.0)
+            {
+               shouldClose = true;
+               reason = StringFormat("Max Loss limit exceeded (%.2f USC)", profit);
+            }
+            
+            // 3. Trend Flip Cut
+            if(!shouldClose && g_hTrendEmaFast != INVALID_HANDLE && g_hTrendEmaSlow != INVALID_HANDLE)
+            {
+               double emaF[], emaS[];
+               ArraySetAsSeries(emaF, true);
+               ArraySetAsSeries(emaS, true);
+               if(CopyBuffer(g_hTrendEmaFast, 0, 0, 2, emaF) == 2 && CopyBuffer(g_hTrendEmaSlow, 0, 0, 2, emaS) == 2)
+               {
+                  long posType = PositionGetInteger(POSITION_TYPE);
+                  if(posType == POSITION_TYPE_BUY && emaF[0] < emaS[0])
+                  {
+                     shouldClose = true;
+                     reason = "Trend flipped to Down";
+                  }
+                  else if(posType == POSITION_TYPE_SELL && emaF[0] > emaS[0])
+                  {
+                     shouldClose = true;
+                     reason = "Trend flipped to Up";
+                  }
+               }
+            }
+            
+            if(shouldClose)
+            {
+               PrintFormat("FirstEntryProtection: Closing ticket %I64u. Reason: %s", ticket, reason);
+               g_trade.SetDeviationInPoints(InpSlippagePoints);
+               g_trade.PositionClose(ticket);
+            }
+         }
+      }
+   }
+}
 
 double ResolveFollowGridPips()
 {
@@ -2817,12 +3069,34 @@ void TryFollow()
       int totalB = CountPositionsByMagicSide(g_magicBuy, POSITION_TYPE_BUY);
       if(totalB > 0 && g_eae_buy_state.follow_count < InpMaxFollowOrders)
       {
-         double newestOpen = 0.0;
-         if(GetNewestOpenPrice(g_magicBuy, POSITION_TYPE_BUY, newestOpen))
+         bool allowFolB = true;
+         if(InpDisableFOLInCaution && g_escapeManager.GetBuyState() >= EG_STATE_CAUTION) allowFolB = false;
+         if(g_eae_buy_state.floating_pnl < InpMaxFOLLossLimit) allowFolB = false;
+         
+         // [NEW] Stateless History-based Follow Protection checks
+         if(allowFolB && IsFollowInSlCooldown(g_magicBuy, InpFollowSlCooldownMin)) allowFolB = false;
+         if(allowFolB && CountFollowSlDeals(g_magicBuy, g_basketStartBuy) >= InpMaxFollowSlPerBasket) allowFolB = false;
+         
+         if(allowFolB && InpDisableFOLAgainstTrend && g_hTrendEmaFast != INVALID_HANDLE && g_hTrendEmaSlow != INVALID_HANDLE)
          {
-            double price = iClose(_Symbol, PERIOD_CURRENT, 0);
-            if(price > newestOpen && !HasNearbyOpenPrice(g_magicBuy, POSITION_TYPE_BUY, followGridPips) && OncePerBar(g_lastFollowBuyBar))
-               PlaceFollowBuy();
+            double emaF[], emaS[];
+            ArraySetAsSeries(emaF, true);
+            ArraySetAsSeries(emaS, true);
+            if(CopyBuffer(g_hTrendEmaFast, 0, 0, 2, emaF) == 2 && CopyBuffer(g_hTrendEmaSlow, 0, 0, 2, emaS) == 2)
+            {
+               if(emaF[0] < emaS[0]) allowFolB = false; // Down trend -> Block Buy FOL
+            }
+         }
+         
+         if(allowFolB)
+         {
+            double newestOpen = 0.0;
+            if(GetNewestOpenPrice(g_magicBuy, POSITION_TYPE_BUY, newestOpen))
+            {
+               double price = iClose(_Symbol, PERIOD_CURRENT, 0);
+               if(price > newestOpen && !HasNearbyOpenPrice(g_magicBuy, POSITION_TYPE_BUY, followGridPips) && OncePerBar(g_lastFollowBuyBar))
+                  PlaceFollowBuy();
+            }
          }
       }
    }
@@ -2832,12 +3106,34 @@ void TryFollow()
       int totalS = CountPositionsByMagicSide(g_magicSell, POSITION_TYPE_SELL);
       if(totalS > 0 && g_eae_sell_state.follow_count < InpMaxFollowOrders)
       {
-         double newestOpen = 0.0;
-         if(GetNewestOpenPrice(g_magicSell, POSITION_TYPE_SELL, newestOpen))
+         bool allowFolS = true;
+         if(InpDisableFOLInCaution && g_escapeManager.GetSellState() >= EG_STATE_CAUTION) allowFolS = false;
+         if(g_eae_sell_state.floating_pnl < InpMaxFOLLossLimit) allowFolS = false;
+         
+         // [NEW] Stateless History-based Follow Protection checks
+         if(allowFolS && IsFollowInSlCooldown(g_magicSell, InpFollowSlCooldownMin)) allowFolS = false;
+         if(allowFolS && CountFollowSlDeals(g_magicSell, g_basketStartSell) >= InpMaxFollowSlPerBasket) allowFolS = false;
+         
+         if(allowFolS && InpDisableFOLAgainstTrend && g_hTrendEmaFast != INVALID_HANDLE && g_hTrendEmaSlow != INVALID_HANDLE)
          {
-            double price = iClose(_Symbol, PERIOD_CURRENT, 0);
-            if(price < newestOpen && !HasNearbyOpenPrice(g_magicSell, POSITION_TYPE_SELL, followGridPips) && OncePerBar(g_lastFollowSellBar))
-               PlaceFollowSell();
+            double emaF[], emaS[];
+            ArraySetAsSeries(emaF, true);
+            ArraySetAsSeries(emaS, true);
+            if(CopyBuffer(g_hTrendEmaFast, 0, 0, 2, emaF) == 2 && CopyBuffer(g_hTrendEmaSlow, 0, 0, 2, emaS) == 2)
+            {
+               if(emaF[0] > emaS[0]) allowFolS = false; // Up trend -> Block Sell FOL
+            }
+         }
+         
+         if(allowFolS)
+         {
+            double newestOpen = 0.0;
+            if(GetNewestOpenPrice(g_magicSell, POSITION_TYPE_SELL, newestOpen))
+            {
+               double price = iClose(_Symbol, PERIOD_CURRENT, 0);
+               if(price < newestOpen && !HasNearbyOpenPrice(g_magicSell, POSITION_TYPE_SELL, followGridPips) && OncePerBar(g_lastFollowSellBar))
+                  PlaceFollowSell();
+            }
          }
       }
    }
@@ -3009,10 +3305,12 @@ void PerformAsyncBootStep()
          g_hAtrGrid = iATR(_Symbol, PERIOD_CURRENT, InpAtrGridPeriod);
          g_hAtrFilt = iATR(_Symbol, PERIOD_CURRENT, InpAtrFilterPeriod);
          g_hRsiGuard = iRSI(_Symbol, PERIOD_M1, 14, PRICE_CLOSE);
+         g_hTrendEmaFast = iMA(_Symbol, PERIOD_CURRENT, InpTrendLockEmaFast, 0, MODE_EMA, PRICE_CLOSE);
+         g_hTrendEmaSlow = iMA(_Symbol, PERIOD_CURRENT, InpTrendLockEmaSlow, 0, MODE_EMA, PRICE_CLOSE);
 
          if(g_hEmaFast == INVALID_HANDLE || g_hEmaSlow == INVALID_HANDLE ||
             g_hAtrGrid  == INVALID_HANDLE || g_hAtrFilt  == INVALID_HANDLE ||
-            g_hRsiGuard == INVALID_HANDLE)
+            g_hRsiGuard == INVALID_HANDLE || g_hTrendEmaFast == INVALID_HANDLE || g_hTrendEmaSlow == INVALID_HANDLE)
          {
             Print("Failed to create indicator handles.");
             ExpertRemove();
@@ -3063,10 +3361,55 @@ void OnDeinit(const int reason)
    if(g_hAtrGrid != INVALID_HANDLE) IndicatorRelease(g_hAtrGrid);
    if(g_hAtrFilt != INVALID_HANDLE) IndicatorRelease(g_hAtrFilt);
    if(g_hRsiGuard != INVALID_HANDLE) IndicatorRelease(g_hRsiGuard);
+   if(g_hTrendEmaFast != INVALID_HANDLE) IndicatorRelease(g_hTrendEmaFast);
+   if(g_hTrendEmaSlow != INVALID_HANDLE) IndicatorRelease(g_hTrendEmaSlow);
+}
+
+void ManageScoutOrders()
+{
+   if(InpScoutMaxHoldMinutes <= 0) return;
+   
+   int total = PositionsTotal();
+   datetime now = TimeCurrent();
+   
+   for(int i = total - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      if(PositionSelectByTicket(ticket))
+      {
+         string sym = PositionGetString(POSITION_SYMBOL);
+         if(sym != _Symbol) continue;
+         
+         long magic = PositionGetInteger(POSITION_MAGIC);
+         bool isCoreMagic = (magic >= g_magicBuy && magic <= g_magicBuy + 20) || (magic >= g_magicSell && magic <= g_magicSell + 20);
+         if(!isCoreMagic) continue;
+         
+         string cmt = PositionGetString(POSITION_COMMENT);
+         if(StringFind(cmt, "_SCT") >= 0)
+         {
+            datetime openTime = (datetime)PositionGetInteger(POSITION_TIME);
+            int holdTimeSec = (int)(now - openTime);
+            
+            if(holdTimeSec >= (InpScoutMaxHoldMinutes * 60))
+            {
+               double lot = PositionGetDouble(POSITION_VOLUME);
+               double profit = PositionGetDouble(POSITION_PROFIT);
+               PrintFormat("Scout Time Stop: Closing ticket %I64u held for %d seconds. Profit: %.2f", ticket, holdTimeSec, profit);
+               g_trade.SetDeviationInPoints(InpSlippagePoints);
+               g_trade.PositionClose(ticket);
+            }
+         }
+      }
+   }
 }
 
 void OnTick()
 {
+   // [CRITICAL] Refresh real-time position states at the start of OnTick to prevent stale/duplicate trades
+   EAE_CollectSideRuntimeState(_Symbol, g_magicBuy, EAE_SIDE_BUY, g_eae_buy_state);
+   EAE_CollectSideRuntimeState(_Symbol, g_magicSell, EAE_SIDE_SELL, g_eae_sell_state);
+
    ulong now64 = GetTickCount64();
    
    // [PULSED SAFETY] Run heavy math checks only every 250ms (4 times per second)
@@ -3081,6 +3424,9 @@ void OnTick()
       // [NEW] ABRG Risk Monitoring (Pulsed every 250ms)
       ABRG_MonitorSide(g_eae_buy_state);
       ABRG_MonitorSide(g_eae_sell_state);
+      
+      ManageScoutOrders(); // [NEW] Scout Time Stop
+      CheckFirstEntryProtection(); // [NEW] First Entry Protection for ENT
       
       g_lastPulse64 = now64;
    }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Activity, Crosshair, TrendingUp, Zap, Clock, ShieldAlert, AlertTriangle } from "lucide-react";
+import { Activity, Crosshair, TrendingUp, Zap, Clock, ShieldAlert, AlertTriangle, RefreshCw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, BarChart, Bar, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -340,6 +340,8 @@ export function GameDashboardClient() {
   const historyRef = useRef(history);
   const [marketData, setMarketData] = useState<{timestamp?: number, time: string, price: number, signals: number[]}[]>([]);
   const latestPriceRef = useRef<number>(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string>('');
   const activeRoundsRef = useRef<Record<number, VirtualRound>>({});
   const lastSignalCycle = useRef<Record<number, number>>({});
 
@@ -481,90 +483,93 @@ export function GameDashboardClient() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
+  const syncSupabaseData = async () => {
     if (!supabase) return;
+    setIsSyncing(true);
+    try {
+      const tradingStart = getTradingDayStart();
+      const tradingStartStr = tradingStart.toISOString();
 
-    const syncSupabaseData = async () => {
-      try {
-        const tradingStart = getTradingDayStart();
-        const tradingStartStr = tradingStart.toISOString();
-
-        // 1. Auto-purge old days data when the market opens / shifts day
-        if (lastPurgedRef.current !== tradingStartStr) {
-          lastPurgedRef.current = tradingStartStr;
-          try {
-            await supabase.from("tg_virtual_rounds").delete().lt("open_time", tradingStartStr);
-            await supabase.from("tg_signals").delete().lt("created_at", tradingStartStr);
-            console.log("Automatically purged old day data. New session start (UTC):", tradingStartStr);
-          } catch (e) {
-            console.error("Failed to purge old day data:", e);
-          }
+      // 1. Auto-purge old days data when the market opens / shifts day
+      if (lastPurgedRef.current !== tradingStartStr) {
+        lastPurgedRef.current = tradingStartStr;
+        try {
+          await supabase.from("tg_virtual_rounds").delete().lt("open_time", tradingStartStr);
+          await supabase.from("tg_signals").delete().lt("created_at", tradingStartStr);
+          console.log("Automatically purged old day data. New session start (UTC):", tradingStartStr);
+        } catch (e) {
+          console.error("Failed to purge old day data:", e);
         }
+      }
 
-        // 2. Fetch Strategies
-        const { data: stratData } = await supabase.from("tg_strategies").select("*").order("id");
-        if (stratData && stratData.length > 0) {
-          setStrategies(stratData);
-        }
+      // 2. Fetch Strategies
+      const { data: stratData } = await supabase.from("tg_strategies").select("*").order("id");
+      if (stratData && stratData.length > 0) {
+        setStrategies(stratData);
+      }
 
-        // 3. Fetch Closed History (Take only closed rounds in the current trading session)
-        const histMap: Record<number, VirtualRound[]> = { 1: [], 2: [], 3: [], 4: [] };
-        await Promise.all([1, 2, 3, 4].map(async (stratId) => {
-          const { data: stratHist } = await supabase
-            .from("tg_virtual_rounds")
-            .select("*")
-            .eq("strategy_id", stratId)
-            .eq("status", "CLOSED")
-            .gte("close_time", tradingStartStr)
-            .order("close_time", { ascending: false })
-            .limit(100);
-          
-          if (stratHist) {
-            // Deduplicate by ticket and round_id
-            const seenTickets = new Set();
-            const seenRoundIds = new Set();
-            const uniqueHist = [];
-            
-            // Process descending (latest first) to keep the newest duplicate
-            const sortedDesc = [...stratHist].sort((a, b) => (parseMt5Date(b.close_time)?.getTime() || 0) - (parseMt5Date(a.close_time)?.getTime() || 0));
-            for (const r of sortedDesc) {
-              if (r.ticket && seenTickets.has(r.ticket)) continue;
-              if (r.round_id && seenRoundIds.has(r.round_id)) continue;
-              if (r.ticket) seenTickets.add(r.ticket);
-              if (r.round_id) seenRoundIds.add(r.round_id);
-              uniqueHist.push(r);
-            }
-            
-            histMap[stratId] = uniqueHist.sort((a, b) => (parseMt5Date(a.close_time)?.getTime() || 0) - (parseMt5Date(b.close_time)?.getTime() || 0));
-          }
-        }));
-        setHistory(histMap);
-
-        // 4. Fetch Active Rounds for current trading session
-        const { data: activeData, error: activeErr } = await supabase
+      // 3. Fetch Closed History (Take only closed rounds in the current trading session)
+      const histMap: Record<number, VirtualRound[]> = { 1: [], 2: [], 3: [], 4: [] };
+      await Promise.all([1, 2, 3, 4].map(async (stratId) => {
+        const { data: stratHist } = await supabase
           .from("tg_virtual_rounds")
           .select("*")
-          .eq("status", "OPEN")
-          .gte("open_time", tradingStartStr);
-
-        if (activeErr) {
-          console.error("Error fetching active rounds:", activeErr);
-        } else if (activeData) {
-          const activeMap: Record<number, VirtualRound> = {};
-          activeData.forEach(r => { activeMap[r.strategy_id] = r; });
-          setActiveRounds(activeMap);
+          .eq("strategy_id", stratId)
+          .eq("status", "CLOSED")
+          .gte("close_time", tradingStartStr)
+          .order("close_time", { ascending: false })
+          .limit(100);
+        
+        if (stratHist) {
+          const seenTickets = new Set();
+          const seenRoundIds = new Set();
+          const uniqueHist = [];
+          
+          const sortedDesc = [...stratHist].sort((a, b) => (parseMt5Date(b.close_time)?.getTime() || 0) - (parseMt5Date(a.close_time)?.getTime() || 0));
+          for (const r of sortedDesc) {
+            if (r.ticket && seenTickets.has(r.ticket)) continue;
+            if (r.round_id && seenRoundIds.has(r.round_id)) continue;
+            if (r.ticket) seenTickets.add(r.ticket);
+            if (r.round_id) seenRoundIds.add(r.round_id);
+            uniqueHist.push(r);
+          }
+          
+          histMap[stratId] = uniqueHist.sort((a, b) => (parseMt5Date(a.close_time)?.getTime() || 0) - (parseMt5Date(b.close_time)?.getTime() || 0));
         }
+      }));
+      setHistory(histMap);
 
-      } catch (err) {
-        console.error("Error syncing Supabase data:", err);
+      // 4. Fetch Active Rounds for current trading session
+      const { data: activeData, error: activeErr } = await supabase
+        .from("tg_virtual_rounds")
+        .select("*")
+        .eq("status", "OPEN")
+        .gte("open_time", tradingStartStr);
+
+      if (activeErr) {
+        console.error("Error fetching active rounds:", activeErr);
+      } else if (activeData) {
+        const activeMap: Record<number, VirtualRound> = {};
+        activeData.forEach(r => { activeMap[r.strategy_id] = r; });
+        setActiveRounds(activeMap);
       }
-    };
+
+      setLastSynced(new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.error("Error syncing Supabase data:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!supabase) return;
 
     // Initial sync
     syncSupabaseData();
 
-    // Fallback Polling every 4 seconds to guarantee absolute sync under any network condition
-    const syncInterval = setInterval(syncSupabaseData, 4000);
+    // Fallback Polling every 45 seconds to guarantee absolute sync under any network condition
+    const syncInterval = setInterval(syncSupabaseData, 45000);
 
     const stratChannel = supabase.channel("schema-strat-changes")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tg_strategies" }, (payload) => {
@@ -882,6 +887,16 @@ export function GameDashboardClient() {
             <Badge variant="outline" className="bg-slate-900/60 text-slate-300 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-xs flex items-center gap-1.5 select-none shrink-0">
               <span className="text-[14px] leading-none">🇹🇭</span>
               <span>THAI TIME (GMT+7)</span>
+            </Badge>
+            <Badge 
+              variant="outline" 
+              onClick={!isSyncing ? syncSupabaseData : undefined}
+              className={`bg-slate-900/60 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-xs flex items-center gap-1.5 select-none shrink-0 transition-all duration-300 ${!isSyncing ? 'hover:bg-slate-800/80 hover:border-slate-700/80 cursor-pointer text-cyan-400' : 'cursor-wait text-slate-500'}`}
+            >
+              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-cyan-400' : 'text-slate-400'}`} />
+              <span>
+                {isSyncing ? 'Syncing...' : lastSynced ? `Synced ${lastSynced}` : 'Sync DB'}
+              </span>
             </Badge>
           </div>
           <p className="text-slate-500 font-medium text-sm sm:text-base max-w-xl leading-relaxed">
