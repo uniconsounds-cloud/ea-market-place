@@ -1124,7 +1124,7 @@ export function GameDashboardClient() {
                             ? "text-emerald-400 bg-emerald-950/20 border border-emerald-900/20 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" 
                             : "text-rose-400 bg-rose-955 border border-rose-900/15 drop-shadow-[0_0_6px_rgba(244,63,94,0.2)]"
                         }`}>
-                          AGE: {getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | P/L: ${(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(2)} | DD: -${Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} {hoveredRounds[strat.id]?.order_count > 1 ? `(${hoveredRounds[strat.id]?.order_count} orders)` : ''}
+                          AGE: {getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | P/L: ${(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(2)} | DD: -${Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} | TRADES: {hoveredRounds[strat.id]?.order_count ?? 1}
                         </span>
                       ) : (
                         <span className="text-slate-600 font-black tracking-wider text-[8px] uppercase">HOVER CUBE FOR DETAILS</span>
@@ -1144,7 +1144,7 @@ export function GameDashboardClient() {
                           return (
                             <div 
                               key={round.round_id || idx}
-                              title={`PROFIT/LOSS: ${isWin ? '+' : ''}$${profitVal.toFixed(2)}\nAGE: ${getRoundDuration(round.open_time, round.close_time)}\nCLOSE TIME (TH): ${round.close_time ? parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false }) : 'N/A'}\nMAX DD: -$${Math.abs(round.max_dd ?? 0).toFixed(2)}`}
+                              title={`PROFIT/LOSS: ${isWin ? '+' : ''}$${profitVal.toFixed(2)}\nTRADES: ${round.order_count ?? 1}\nAGE: ${getRoundDuration(round.open_time, round.close_time)}\nCLOSE TIME (TH): ${round.close_time ? parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false }) : 'N/A'}\nMAX DD: -$${Math.abs(round.max_dd ?? 0).toFixed(2)}`}
                               onMouseEnter={() => setHoveredRounds(prev => ({ ...prev, [strat.id]: round }))}
                               onMouseLeave={() => setHoveredRounds(prev => ({ ...prev, [strat.id]: null }))}
                               className={`w-9 h-7 rounded border-t-2 shrink-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-slate-800/90 relative group cursor-pointer ${
@@ -1163,9 +1163,7 @@ export function GameDashboardClient() {
                                   {isWin ? 'PROFIT' : 'LOSS'}: ${profitVal.toFixed(2)}
                                 </span>
                                 <span>AGE: {getRoundDuration(round.open_time, round.close_time)}</span>
-                                {round.order_count && round.order_count > 1 && (
-                                  <span className="text-cyan-400">AGGREGATED: {round.order_count} trades</span>
-                                )}
+                                <span className="text-cyan-400">TRADES: {round.order_count ?? 1}</span>
                                 {round.close_time && (
                                   <span>TIME (TH): {parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}</span>
                                 )}

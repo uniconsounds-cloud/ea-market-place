@@ -78,8 +78,11 @@ public:
    
    void BroadcastRoundOpen(int strategyId, ulong ticket, string type, double vol, double openPrice, double sl, double tp)
    {
-      string payload = StringFormat("{\"strategy_id\":%d, \"ticket\":%I64u, \"type\":\"%s\", \"volume\":%.2f, \"open_price\":%.3f, \"sl\":%.3f, \"tp\":%.3f, \"status\":\"OPEN\"}", 
-                                     strategyId, ticket, type, vol, openPrice, sl, tp);
+      string openTimeStr = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
+      StringReplace(openTimeStr, ".", "-"); // Convert MT5 "YYYY.MM.DD" to "YYYY-MM-DD"
+      
+      string payload = StringFormat("{\"strategy_id\":%d, \"ticket\":%I64u, \"type\":\"%s\", \"volume\":%.2f, \"open_price\":%.3f, \"sl\":%.3f, \"tp\":%.3f, \"status\":\"OPEN\", \"open_time\":\"%s\"}", 
+                                     strategyId, ticket, type, vol, openPrice, sl, tp, openTimeStr);
       SendPostRequest("tg_virtual_rounds", payload);
    }
    
