@@ -172,23 +172,75 @@ const aggregateRoundsByCloseTime = (rounds: VirtualRound[]): AggregatedRound[] =
 
 const CustomizedDot = (props: any) => {
   const { cx, cy, payload } = props;
-  if (payload.signals && payload.signals.length > 0) {
-     return (
-       <g>
-         <circle cx={cx} cy={cy} r={5} fill="rgba(34, 211, 238, 0.3)" className="animate-ping" style={{ transformOrigin: `${cx}px ${cy}px` }} />
-         <circle cx={cx} cy={cy} r={2} fill="#22d3ee" />
-         {payload.signals.map((sId: number, i: number) => {
-            const icon = sId === 1 ? '⚡' : sId === 2 ? '📈' : sId === 3 ? '🌊' : '🎯';
-            return (
-              <text key={sId} x={cx} y={cy - 10 - (i*14)} fontSize={11} textAnchor="middle" className="fill-cyan-300 font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] select-none">
-                 {icon}
-              </text>
-            )
-         })}
-       </g>
-     )
+  const markers = payload.markers || [];
+  
+  if (markers.length === 0) {
+    if (payload.signals && payload.signals.length > 0) {
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={5} fill="rgba(34, 211, 238, 0.3)" className="animate-ping" style={{ transformOrigin: `${cx}px ${cy}px` }} />
+          <circle cx={cx} cy={cy} r={2} fill="#22d3ee" />
+        </g>
+      );
+    }
+    return null;
   }
-  return null;
+  
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={4} fill="#06b6d4" stroke="#ffffff" strokeWidth={1.5} className="animate-pulse" />
+      {markers.map((m: any, i: number) => {
+        const icon = m.strategyId === 1 ? '⚡' : m.strategyId === 2 ? '📈' : m.strategyId === 3 ? '🌊' : '🎯';
+        const isEntry = m.type === 'OPEN';
+        
+        const yOffset = i * 26;
+        const badgeY = cy - 20 - yOffset;
+        const textY = badgeY + 10;
+        
+        const strokeColor = isEntry ? '#10b981' : '#ef4444';
+        
+        return (
+          <g key={`${m.strategyId}-${m.type}`} className="select-none pointer-events-none">
+            <line x1={cx} y1={cy} x2={cx} y2={badgeY + 8} stroke={strokeColor} strokeWidth={1} strokeDasharray="2 2" opacity={0.6} />
+            
+            <rect 
+              x={cx - 24} 
+              y={badgeY - 2} 
+              width={48} 
+              height={15} 
+              rx={3} 
+              fill="rgba(15, 23, 42, 0.95)" 
+              stroke={strokeColor} 
+              strokeWidth={1} 
+              className="drop-shadow-lg"
+            />
+            
+            <text x={cx - 10} y={textY} fontSize={8} textAnchor="middle">
+              {icon}
+            </text>
+            
+            <text x={cx + 10} y={textY} fontSize={7} fontWeight="black" fill={isEntry ? '#34d399' : '#f87171'} textAnchor="middle">
+              {isEntry ? 'IN' : 'OUT'}
+            </text>
+            
+            <rect 
+              x={cx - 20} 
+              y={badgeY - 11} 
+              width={40} 
+              height={8} 
+              rx={1.5} 
+              fill="rgba(15, 23, 42, 0.9)" 
+              stroke="rgba(255, 255, 255, 0.15)"
+              strokeWidth={0.5}
+            />
+            <text x={cx} y={badgeY - 5} fontSize={5.5} fontWeight="bold" fill="#94a3b8" textAnchor="middle">
+              ${m.price.toFixed(1)}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
 }
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -286,7 +338,7 @@ export function GameDashboardClient() {
   const [hoveredRounds, setHoveredRounds] = useState<Record<number, any | null>>({ 1: null, 2: null, 3: null, 4: null });
   const [now, setNow] = useState(0);
   const historyRef = useRef(history);
-  const [marketData, setMarketData] = useState<{time: string, price: number, signals: number[]}[]>([]);
+  const [marketData, setMarketData] = useState<{timestamp?: number, time: string, price: number, signals: number[]}[]>([]);
   const latestPriceRef = useRef<number>(0);
   const activeRoundsRef = useRef<Record<number, VirtualRound>>({});
   const lastSignalCycle = useRef<Record<number, number>>({});
@@ -335,7 +387,7 @@ export function GameDashboardClient() {
               let tempPrice = price;
               
               for (let i = 79; i >= 0; i--) {
-                const tickTime = new Date(nowTime - i * 5000);
+                const tickTime = new Date(nowTime - i * 1000);
                 const timeStr = tickTime.toLocaleTimeString('en-US', { 
                   timeZone: 'Asia/Bangkok',
                   hour12: false, 
@@ -345,9 +397,10 @@ export function GameDashboardClient() {
                 });
                 
                 // Random walk back in time
-                const change = (Math.random() - 0.5) * 0.4;
+                const change = (Math.random() - 0.5) * 0.1;
                 tempPrice = tempPrice - change;
                 initialTicks.push({
+                  timestamp: tickTime.getTime(),
                   time: timeStr,
                   price: parseFloat(tempPrice.toFixed(2)),
                   signals: []
@@ -413,7 +466,8 @@ export function GameDashboardClient() {
            });
            
            const newTick = { 
-             time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' }), 
+             timestamp: nowTimestamp,
+             time: new Date(nowTimestamp).toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' }), 
              price: latestPriceRef.current, 
              signals: newSignals 
            };
@@ -749,6 +803,62 @@ export function GameDashboardClient() {
     return { text: "SCANNING MARKET", color: "text-slate-500", pulse: false, Icon: Crosshair };
   };
 
+  const getMarketDataWithMarkers = () => {
+    if (marketData.length === 0) return [];
+    
+    const dataWithMarkers = marketData.map(tick => ({
+      ...tick,
+      markers: [] as { type: 'OPEN' | 'CLOSE', strategyId: number, price: number }[]
+    }));
+    
+    const addMarkerIfClose = (eventTimeMs: number | undefined | null, marker: { type: 'OPEN' | 'CLOSE', strategyId: number, price: number }) => {
+      if (!eventTimeMs) return;
+      
+      let closestTickIdx = -1;
+      let minDiff = Infinity;
+      
+      for (let i = 0; i < dataWithMarkers.length; i++) {
+        const tick = dataWithMarkers[i];
+        if (tick.timestamp) {
+          const diff = Math.abs(tick.timestamp - eventTimeMs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestTickIdx = i;
+          }
+        }
+      }
+      
+      if (closestTickIdx !== -1 && minDiff <= 5000) {
+        const exists = dataWithMarkers[closestTickIdx].markers.some(m => m.type === marker.type && m.strategyId === marker.strategyId);
+        if (!exists) {
+          dataWithMarkers[closestTickIdx].markers.push(marker);
+        }
+      }
+    };
+    
+    Object.values(activeRounds).forEach(round => {
+      if (round && round.open_time) {
+        const openTimeMs = parseMt5Date(round.open_time)?.getTime();
+        addMarkerIfClose(openTimeMs, { type: 'OPEN', strategyId: round.strategy_id, price: round.open_price });
+      }
+    });
+    
+    Object.values(history).forEach(stratHist => {
+      stratHist.forEach(round => {
+        if (round.open_time) {
+          const openTimeMs = parseMt5Date(round.open_time)?.getTime();
+          addMarkerIfClose(openTimeMs, { type: 'OPEN', strategyId: round.strategy_id, price: round.open_price });
+        }
+        if (round.close_time) {
+          const closeTimeMs = parseMt5Date(round.close_time)?.getTime();
+          addMarkerIfClose(closeTimeMs, { type: 'CLOSE', strategyId: round.strategy_id, price: round.close_price });
+        }
+      });
+    });
+    
+    return dataWithMarkers;
+  };
+
   const globalBalance = strategies.reduce((sum, s) => sum + (Number(s.virtual_balance) || 0), 0);
   const globalFloating = strategies.reduce((sum, s) => sum + (Number(s.floating_pl) || 0), 0);
   const globalEquity = globalBalance + globalFloating;
@@ -842,7 +952,7 @@ export function GameDashboardClient() {
         <div className="flex-1 w-full p-3 relative z-0">
           {marketData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-               <LineChart data={marketData}>
+               <LineChart data={getMarketDataWithMarkers()}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(30, 41, 59, 0.15)" vertical={false} />
                   <XAxis dataKey="time" hide />
                   <YAxis domain={['auto', 'auto']} hide />
