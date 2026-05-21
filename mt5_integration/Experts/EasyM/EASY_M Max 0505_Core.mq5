@@ -8,8 +8,9 @@
 //|      edit 7.  dashboard 3Mode+Worst-Symbol Throttle
 //|      edit 8.2  dashboard above any graph + Tahoma Font
 //|      edit 9.  new input design + Port and min balance Lock
-//|      edit 0122. expire date time
+//|      edit 0122. expire date time ภาษาไทยได้แล้ว
 //|      edit e1.1   add to 10 pair 20 symbol
+//|      edit 0521_LicensingV2: Upgrade to Licensing V2 (Cache & Grace Period)
 //|  Core idea: 1 Symbol = 1 Engine (Magic per symbol)                |
 //|  ***0304_Licenses disable inside Port,Min Balance,Expire Check    |
 //|     1.GUARD_ENABLE = false
@@ -23,12 +24,12 @@
 //|  - DashboardUpdate skips disabled symbols                          |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.12"
-#property description "EASY_M Max0324 (10Pairs)"
+#property version   "1.12.8.L2"
+#property description "EASY_M Max0324 (10Pairs) - Licensing V2"
 
 #include <Trade/Trade.mqh>
 #include <Trade/PositionInfo.mqh>
-#define EA_PRODUCT_ID "EZM-MAX-V1"
+#define EA_PRODUCT_ID "EZM-MAX-TEST"
 #include <EAEZE_Licensing.mqh>
 #include "EM_MonitorAdapter.mqh"
 

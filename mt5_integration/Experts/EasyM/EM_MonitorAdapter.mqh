@@ -9,7 +9,6 @@
 #include "../EAE_CollectorCore.mqh"
 #include "../EAE_BasketTracker.mqh"
 #include "../EAE_WebSync.mqh" 
-#include <EAEZE_Licensing.mqh> // For InpPartnerApiKey
 
 //-------------------------------------------------------------------
 // Adapter state
@@ -97,7 +96,7 @@ void EM_MonitorInit(long magicBase)
    EAE_InitSideState(g_em_buy_state,  EAE_SIDE_BUY);
    EAE_InitSideState(g_em_sell_state, EAE_SIDE_SELL);
 
-   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", InpPartnerApiKey, 20);
+   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", 20);
    
    g_em_initialized = true;
    g_em_data_loaded = false; 

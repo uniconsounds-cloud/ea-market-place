@@ -108,7 +108,7 @@ bool EG_Farming_BuildRealtimeSnapshot(EAE_RealtimeSnapshot &out_snap)
 }
 
 // Init monitoring module (Instant Phase)
-void EG_Farming_MonitorInit(string api_key)
+void EG_Farming_MonitorInit()
 {
    EG_Farming_BuildIdentity(g_eae_identity);
    EG_Farming_BuildFileNames();
@@ -122,7 +122,7 @@ void EG_Farming_MonitorInit(string api_key)
    // [FAST] Only initialize the UI shell shell here
    EAE_DashboardInit(ChartID(), g_eae_dashboard_prefix);
 
-   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", api_key, 20);
+   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", 20);
    
    g_eae_initialized = true;
    g_eae_data_loaded = false; // Trigger heavy load in first Timer cycle

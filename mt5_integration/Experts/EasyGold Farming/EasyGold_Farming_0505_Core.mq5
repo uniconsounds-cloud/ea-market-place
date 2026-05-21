@@ -63,6 +63,7 @@
 #include "EG_Farming_DashboardMap.mqh"
 #include "../EAE_DashboardBase.mqh"
 #include "../EAE_FileLogger.mqh"
+#define EA_PRODUCT_ID "EZG-FARMING-V1.4"
 #include "../EAEZE_Licensing.mqh"
 
 //==================================================================//
@@ -3274,7 +3275,7 @@ void PerformAsyncBootStep()
          
          // [OPTIMIZED] Skip manual delete here. 
          // MonitorInit will now handle instant takeover by name.
-         EG_Farming_MonitorInit(InpPartnerApiKey);
+         EG_Farming_MonitorInit();
          
          ChartRedraw(0);
          g_bootState = BOOT_LICENSE;

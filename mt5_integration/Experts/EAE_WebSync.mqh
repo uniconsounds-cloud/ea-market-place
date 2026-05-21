@@ -39,13 +39,13 @@ bool     g_eae_history_checked = false;
 //+------------------------------------------------------------------+
 //| Initialize the WebSync module with custom settings               |
 //+------------------------------------------------------------------+
-void EAE_WebSyncInit(string api_url, string api_key, int interval_sec)
+void EAE_WebSyncInit(string api_url, int interval_sec)
 {
    g_eae_api_url       = api_url;
-   g_eae_api_key       = api_key;
+   g_eae_api_key       = "LICENSE_AUTO"; // Auto-license mapping based on account number
    g_eae_sync_interval = (interval_sec < 5 ? 5 : interval_sec); // Min 5s
    g_eae_history_checked = false; // Reset history check on EA Init
-   Print("EAE WebSync: Initialized. API Key ending ...", StringSubstr(api_key, StringLen(api_key)-4));
+   Print("EAE WebSync: Initialized (Auto-license mode).");
 }
 
 //+------------------------------------------------------------------+

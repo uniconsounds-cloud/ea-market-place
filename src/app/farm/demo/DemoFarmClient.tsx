@@ -153,6 +153,44 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     // Sync ref with state for use in subscription cleanup
     useEffect(() => { ordersRef.current = orders; }, [orders]);
 
+    const [isTabVisible, setIsTabVisible] = useState(true);
+    const [isIdle, setIsIdle] = useState(false);
+
+    // Track user activity & window visibility
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleVisibilityChange = () => {
+            setIsTabVisible(document.visibilityState === 'visible');
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        let activityTimeout: NodeJS.Timeout;
+        const resetActivityTimer = () => {
+            setIsIdle(false);
+            clearTimeout(activityTimeout);
+            // 15 minutes inactivity timeout
+            activityTimeout = setTimeout(() => {
+                setIsIdle(true);
+            }, 15 * 60 * 1000);
+        };
+
+        const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+        events.forEach(event => {
+            window.addEventListener(event, resetActivityTimer);
+        });
+
+        resetActivityTimer();
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            events.forEach(event => {
+                window.removeEventListener(event, resetActivityTimer);
+            });
+            clearTimeout(activityTimeout);
+        };
+    }, []);
+
     useEffect(() => {
         setIsClient(true);
         setTime(new Date());
@@ -194,9 +232,10 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
     // --- Real-time Subscription ---
     useEffect(() => {
+        if (!isTabVisible || isIdle) return;
+
         const channel = supabase
             .channel(`farm_updates_${portNumber}`)
-            // Existing subscription logic...
             // Real-time updates
             .on(
                 'postgres_changes',
@@ -278,7 +317,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             supabase.removeChannel(channel); 
             clearInterval(pingInterval);
         };
-    }, [portNumber]);
+    }, [portNumber, isTabVisible, isIdle, scaleFactor, demoBalance]);
 
     // --- Dynamic Theming ---
     const rawAsset = portStatus?.asset_type || 'GOLD';
@@ -529,6 +568,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     // --- Fetch Real History ---
     const [history, setHistory] = useState<any[]>([]);
     useEffect(() => {
+        if (!isTabVisible || isIdle) return;
+
         const fetchHistory = async () => {
             const { data, error } = await supabase
                 .from('farm_daily_history')
@@ -551,7 +592,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             .subscribe();
 
         return () => { supabase.removeChannel(historyChannel); };
-    }, [portNumber]);
+    }, [portNumber, isTabVisible, isIdle]);
 
     const brokerDateStr = useMemo(() => {
         const d = stats.serverTime;
@@ -1099,6 +1140,36 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 );
                             })()}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Glassmorphic Inactivity Overlay */}
+            {isIdle && (
+                <div className="fixed inset-0 bg-[#0f0b08]/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 transition-all duration-500">
+                    <div className="bg-[#1f1815]/95 border border-[#cfa545]/30 rounded-2xl max-w-sm w-full p-8 text-center shadow-[0_0_50px_rgba(207,165,69,0.15)] flex flex-col items-center animate-fade-in-up">
+                        {/* Golden pulsing ring/radar connection icon */}
+                        <div className="w-20 h-20 bg-[#cfa545]/10 rounded-full flex items-center justify-center mb-6 border border-[#cfa545]/20 relative">
+                            <span className="absolute inline-flex h-full w-full rounded-full bg-[#cfa545]/20 opacity-75 animate-ping"></span>
+                            <svg className="w-10 h-10 text-[#cfa545]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        
+                        <h3 className="text-xl font-black text-[#cfa545] tracking-widest mb-3 uppercase">
+                            หยุดการเชื่อมต่อชั่วคราว
+                        </h3>
+                        
+                        <p className="text-xs text-amber-100/60 leading-relaxed mb-8 max-w-[280px]">
+                            ระบบเข้าสู่โหมดประหยัดพลังงานเนื่องจากคุณไม่มีการใช้งานนานเกิน 15 นาที คลิกปุ่มด้านล่างเพื่อเชื่อมต่อและรับข้อมูลปัจจุบันอีกครั้ง
+                        </p>
+                        
+                        <button
+                            onClick={() => setIsIdle(false)}
+                            className="w-full bg-gradient-to-r from-[#dcae4d] to-[#b88c32] hover:from-[#e8ba5a] hover:to-[#c6973c] text-[#1a110a] font-extrabold uppercase py-3.5 px-6 rounded-lg transition-all duration-300 shadow-[0_4px_20px_rgba(207,165,69,0.3)] hover:scale-[1.02] active:scale-[0.98] tracking-widest text-xs border border-[#ffe092]/30 cursor-pointer"
+                        >
+                            เชื่อมต่อต่อ
+                        </button>
                     </div>
                 </div>
             )}

@@ -10,6 +10,7 @@
 //|      edit 9.  new input design + Port and min balance Lock
 //|      edit 0122. expire date time
 //|      copy from (1.12.8.m9)
+//|      edit 0521_LicensingV2: Upgrade to Licensing V2 (Cache & Grace Period)
 //|  Core idea: 1 Symbol = 1 Engine (Magic per symbol)                |
 //|  ***0304_Licenses disable inside Port,Min Balance,Expire Check    |
 //|     1.GUARD_ENABLE = false
@@ -23,12 +24,12 @@
 //|  - DashboardUpdate skips disabled symbols                          |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.12"
-#property description "EASY_M mini0324 (5Pairs)"
+#property version   "1.12.8.L2"
+#property description "EASY_M mini0324 (5Pairs) - Licensing V2"
 
 #include <Trade/Trade.mqh>
 #include <Trade/PositionInfo.mqh>
-#define EA_PRODUCT_ID "EZM-MINI-V1"
+#define EA_PRODUCT_ID "EZM-MIN-V1"
 #include <EAEZE_Licensing.mqh>
 #include "EM_MonitorAdapter.mqh"
 
