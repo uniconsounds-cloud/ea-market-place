@@ -84,7 +84,7 @@ export default function DemoChallengeAdminPage() {
         }
     };
 
-    const campaignLink = adminId ? `${originUrl}/demo-challenge?ref=${adminId}` : '';
+    const campaignLink = adminId ? `${originUrl}/demo-challenge?ref=${adminId}&openExternalBrowser=1` : '';
 
     const copyToClipboard = async () => {
         try {
