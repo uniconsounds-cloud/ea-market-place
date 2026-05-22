@@ -55,6 +55,8 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
 
     const [isTabVisible, setIsTabVisible] = useState(true);
     const [isIdle, setIsIdle] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const isFirstRender = useRef(true);
 
     // Track user activity & window visibility
     useEffect(() => {
@@ -90,6 +92,44 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
             clearTimeout(activityTimeout);
         };
     }, []);
+
+    // Sync latest data when tab becomes visible and user is not idle
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+        if (isTabVisible && !isIdle) {
+            const syncData = async () => {
+                setIsSyncing(true);
+                try {
+                    // Send ping immediately
+                    await supabase.rpc('ping_farm_view', { p_port_number: portNumber });
+                    
+                    // Fetch latest data
+                    const [statusRes, ordersRes] = await Promise.all([
+                        supabase.from('farm_port_status').select('*').eq('port_number', portNumber).maybeSingle(),
+                        supabase.from('farm_active_orders').select('*').eq('port_number', portNumber)
+                    ]);
+                    
+                    if (statusRes.data) {
+                        setPortStatus(statusRes.data);
+                    }
+                    if (ordersRes.data) {
+                        setOrders(ordersRes.data);
+                    }
+                } catch (error) {
+                    console.error("Error syncing on visibility change:", error);
+                } finally {
+                    setTimeout(() => {
+                        setIsSyncing(false);
+                    }, 1200);
+                }
+            };
+            
+            syncData();
+        }
+    }, [isTabVisible, isIdle, portNumber]);
 
     useEffect(() => {
         setIsClient(true);
@@ -780,6 +820,30 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                         >
                             เชื่อมต่อต่อ
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Premium Syncing Loader Overlay */}
+            {isSyncing && (
+                <div className="fixed inset-0 bg-[#0f0b08]/75 backdrop-blur-md z-[150] flex items-center justify-center p-4 transition-all duration-500 animate-fade-in">
+                    <div className="bg-[#1f1815]/95 border border-[#cfa545]/20 rounded-2xl p-8 max-w-xs w-full text-center shadow-[0_0_40px_rgba(207,165,69,0.15)] flex flex-col items-center animate-fade-in-up">
+                        <div className="relative w-16 h-16 mb-6">
+                            {/* Outer spinning ring */}
+                            <div className="absolute inset-0 border-4 border-amber-500/10 border-t-[#cfa545] rounded-full animate-spin"></div>
+                            {/* Inner pulsing core with sync icon */}
+                            <div className="absolute inset-3 bg-gradient-to-br from-[#dcae4d] to-[#b88c32] rounded-full opacity-90 flex items-center justify-center shadow-[0_0_15px_rgba(207,165,69,0.4)]">
+                                <svg className="w-5 h-5 text-[#1a110a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 className="text-sm font-black text-amber-200/90 tracking-widest uppercase mb-1 font-sans">
+                            กำลังอัปเดตข้อมูลฟาร์ม
+                        </h3>
+                        <p className="text-xs text-amber-100/50 leading-relaxed font-sans">
+                            กรุณารอสักครู่ ระบบกำลังดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์...
+                        </p>
                     </div>
                 </div>
             )}
