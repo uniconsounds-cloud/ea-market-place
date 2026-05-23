@@ -1,12 +1,50 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import FarmClient from './FarmClient';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 export default async function FarmPage({ params }: { params: { id: string } }) {
     const supabase = await createSupabaseServerClient();
     // Await params as required by Next.js 15+ in app directory structure
     const unwrappedParams = await params;
     const portNumber = unwrappedParams.id;
+
+    // 1. Check Authentication
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        redirect('/login?redirectTo=' + encodeURIComponent(`/farm/${portNumber}`));
+    }
+
+    // 2. Fetch User Profile (Role)
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+    const isAdmin = profile?.role === 'admin';
+
+    // 3. Fetch License Owner & registration date
+    const { data: license } = await supabase
+        .from('licenses')
+        .select('user_id, created_at')
+        .eq('account_number', portNumber)
+        .single();
+
+    // 4. Access Control Check (Only owner or admin)
+    if (!isAdmin && (!license || license.user_id !== session.user.id)) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#1c1917] text-white p-4">
+                <div className="bg-red-950/30 border border-red-500/30 rounded-2xl p-8 max-w-md text-center shadow-2xl">
+                    <h1 className="text-2xl font-bold text-red-400 mb-3">เข้าถึงไม่ได้ (Access Denied)</h1>
+                    <p className="text-gray-300 text-sm mb-6">
+                        ขออภัย คุณไม่มีสิทธิ์เข้าดูหน้าฟาร์มของบัญชีนี้ เฉพาะเจ้าของบัญชีและผู้ดูแลระบบเท่านั้นที่มีสิทธิ์เข้าถึง
+                    </p>
+                    <a href="/dashboard" className="inline-block bg-amber-600 hover:bg-amber-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors">
+                        กลับไปยังหน้าแดชบอร์ด
+                    </a>
+                </div>
+            </div>
+        );
+    }
 
     // Fetch initial active orders
     const { data: initialOrders } = await supabase
@@ -27,6 +65,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 portNumber={portNumber}
                 initialOrders={initialOrders || []}
                 initialPortStatus={portStatus || null}
+                licenseCreatedAt={license?.created_at || null}
             />
         </div>
     );

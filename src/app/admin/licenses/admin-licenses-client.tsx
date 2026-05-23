@@ -33,6 +33,7 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
     const [editingLicense, setEditingLicense] = useState<any>(null);
     const [editExpiryDate, setEditExpiryDate] = useState('');
     const [editIsActive, setEditIsActive] = useState(true);
+    const [editShowFarm, setEditShowFarm] = useState(false);
 
     // License specific UI logic
     const [expiryOption, setExpiryOption] = useState<string>("custom");
@@ -146,6 +147,7 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
             setEditExpiryDate('');
         }
         setEditIsActive(license.is_active);
+        setEditShowFarm(license.show_farm || false);
         setExpiryOption("custom"); // Changed default to custom
 
         const date = new Date();
@@ -214,6 +216,7 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
         try {
             const updates: any = {
                 is_active: editIsActive,
+                show_farm: editShowFarm,
             };
 
             if (editingLicense.is_ib) {
@@ -399,12 +402,23 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                                             <td className="px-4 py-3">
                                                 <div className="font-semibold">{license.profiles?.full_name || 'ผู้ใช้ทั่วไป'}</div>
                                                 <div className="text-xs text-muted-foreground">{license.profiles?.email}</div>
-                                                {isIB && (
-                                                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 text-[9px] bg-blue-500/10 text-blue-600 rounded-full font-bold border border-blue-200 uppercase tracking-tighter">
-                                                        <Zap className="w-2.5 h-2.5" /> IB {license.ib_broker_name || 'Account'}
-                                                    </span>
-                                                )}
-                                                {license.profiles?.is_tester && <span className="inline-block mt-1 ml-1 px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-800 font-bold uppercase rounded">Tester</span>}
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {isIB && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] bg-blue-500/10 text-blue-600 rounded-full font-bold border border-blue-200 uppercase tracking-tighter">
+                                                            <Zap className="w-2.5 h-2.5" /> IB {license.ib_broker_name || 'Account'}
+                                                        </span>
+                                                    )}
+                                                    {license.profiles?.is_tester && (
+                                                        <span className="inline-block px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-800 font-bold uppercase rounded">
+                                                            Tester
+                                                        </span>
+                                                    )}
+                                                    {license.show_farm && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] bg-emerald-500/10 text-emerald-600 rounded-full font-bold border border-emerald-200 uppercase tracking-tighter">
+                                                            Farm Visible
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium">{license.products?.name}</div>
@@ -494,6 +508,14 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                                         <p className="text-xs text-muted-foreground">เปิด/ปิด สิทธิ์การใช้ EA พอร์ตนี้</p>
                                     </div>
                                     <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
+                                </div>
+
+                                <div className="flex items-center justify-between border rounded-lg p-3">
+                                    <div className="space-y-0.5">
+                                        <Label>แสดงปุ่มดูฟาร์ม (Show Farm Button)</Label>
+                                        <p className="text-xs text-muted-foreground">อนุญาตให้ลูกค้าเปิดดูหน้าฟาร์มได้</p>
+                                    </div>
+                                    <Switch checked={editShowFarm} onCheckedChange={setEditShowFarm} />
                                 </div>
 
                                 {editingLicense.is_ib ? (

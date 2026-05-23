@@ -31,7 +31,17 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     z: i
 }));
 
-export default function FarmClient({ portNumber, initialOrders, initialPortStatus }: { portNumber: string, initialOrders: any[], initialPortStatus?: any }) {
+export default function FarmClient({ 
+    portNumber, 
+    initialOrders, 
+    initialPortStatus,
+    licenseCreatedAt 
+}: { 
+    portNumber: string;
+    initialOrders: any[];
+    initialPortStatus?: any;
+    licenseCreatedAt: string | null;
+}) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
     const [time, setTime] = useState<Date | null>(null);
@@ -501,11 +511,27 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
         return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // 'en-CA' gives YYYY-MM-DD
     }, [stats.serverTime]);
 
+    const licenseCreatedDateStr = useMemo(() => {
+        if (!licenseCreatedAt) return null;
+        try {
+            const d = new Date(licenseCreatedAt);
+            return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        } catch (e) {
+            console.error("Error parsing licenseCreatedAt:", e);
+            return null;
+        }
+    }, [licenseCreatedAt]);
+
     const dailyHistory = useMemo(() => {
         if (!history.length) return [];
         
         // Filter out the broker's "today" using Thailand timezone reference
-        const filteredData = history.filter(item => item.date !== brokerDateStr);
+        let filteredData = history.filter(item => item.date !== brokerDateStr);
+        
+        // Filter out dates before the license creation date
+        if (licenseCreatedDateStr) {
+            filteredData = filteredData.filter(item => item.date >= licenseCreatedDateStr);
+        }
         
         const accountType = portStatus?.account_type || 'USC';
 
@@ -529,7 +555,7 @@ export default function FarmClient({ portNumber, initialOrders, initialPortStatu
                 asset
             };
         });
-    }, [history, brokerDateStr, portStatus?.account_type]);
+    }, [history, brokerDateStr, licenseCreatedDateStr, portStatus?.account_type]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
