@@ -51,7 +51,7 @@ const int license_check_interval = 900;       // Kept for backward compatibility
 
 const int LICENSE_REFRESH_INTERVAL = 43200;   // 12 hours (43200 seconds)
 const int LICENSE_GRACE_PERIOD     = 172800;  // 48 hours (172800 seconds)
-const int RETRY_COOLDOWN           = 3600;    // 1 hour (3600 seconds) before retrying failed WebRequest
+const int RETRY_COOLDOWN           = 120;     // 2 minutes (120 seconds) before retrying failed WebRequest
 
 // --- 3. LICENSE CHECK LOGIC ---
 
@@ -93,7 +93,7 @@ bool CheckEaezeLicense(bool force_check = false) {
                     }
                 }
             }
-            Print("EAEZE: WebRequest rate-limited (last attempt ", now - last_attempt, "s ago). Failing check.");
+            Print("EAEZE: WebRequest rate-limited (last attempt ", (int)(now - last_attempt), "s ago). Failing check.");
             return false;
         }
     }
