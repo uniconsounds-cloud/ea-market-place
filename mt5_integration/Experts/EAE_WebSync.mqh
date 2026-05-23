@@ -49,9 +49,21 @@ void EAE_WebSyncInit(string api_url, int interval_sec)
 }
 
 //+------------------------------------------------------------------+
+//| Initialize the WebSync module with custom settings (compatibility overload)|
+//+------------------------------------------------------------------+
+void EAE_WebSyncInit(string api_url, string api_key, int interval_sec)
+{
+   g_eae_api_url       = api_url;
+   g_eae_api_key       = api_key;
+   g_eae_sync_interval = (interval_sec < 5 ? 5 : interval_sec); // Min 5s
+   g_eae_history_checked = false; // Reset history check on EA Init
+   Print("EAE WebSync: Initialized (Custom API key mode: " + api_key + ").");
+}
+
+//+------------------------------------------------------------------+
 //| Internal helper to build an Order JSON list for the Farm UI      |
 //+------------------------------------------------------------------+
-string EAE_BuildOrdersJson()
+string EAE_BuildOrdersJson(long magicB = 0, long magicS = 0)
 {
    string json = "[";
    bool first = true;
@@ -62,10 +74,19 @@ string EAE_BuildOrdersJson()
       ulong ticket = PositionGetTicket(i);
       if(ticket > 0 && PositionSelectByTicket(ticket))
       {
-         // We only sync orders that belong to this EA/System (optional filtering can be added)
+         long type = PositionGetInteger(POSITION_TYPE);
+         long magic = PositionGetInteger(POSITION_MAGIC);
+         
+         if(type == POSITION_TYPE_BUY) {
+            if(magicB != 0 && magic != magicB) continue;
+         }
+         else if(type == POSITION_TYPE_SELL) {
+            if(magicS != 0 && magic != magicS) continue;
+         }
+         
          if(!first) json += ",";
          
-         string pos_type = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY ? "BUY" : "SELL";
+         string pos_type = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
          
          json += "{";
          json += "\"ticket_id\":" + IntegerToString(ticket) + ",";
@@ -142,12 +163,23 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
       long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
       if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
       {
+         long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+         long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+         bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
+         bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
+         
+         if(is_buy_side) {
+            if(magicB != 0 && magic != magicB) continue;
+         }
+         else if(is_sell_side) {
+            if(magicS != 0 && magic != magicS) continue;
+         }
+         
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
          out_sum.total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
          
-         long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
          string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
          if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
          {
@@ -232,7 +264,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    g_eae_last_sync_time = now;
    
    // 2. Build Payload
-   string orders_json = (g_eae_full_sync_mode ? EAE_BuildOrdersJson() : "[]");
+   string orders_json = (g_eae_full_sync_mode ? EAE_BuildOrdersJson(snap.identity.magic_buy, snap.identity.magic_sell) : "[]");
    string payload = "{ \"p_payload\": {";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
    payload += "\"server_time\":" + IntegerToString(now) + ",";

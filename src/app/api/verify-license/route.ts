@@ -64,7 +64,7 @@ export async function POST(req: Request) {
             }
         }
 
-        const { data: license, error } = await supabase
+        let { data: license, error } = await supabase
             .from('licenses')
             .select('*')
             .eq('account_number', account_number)
@@ -72,14 +72,35 @@ export async function POST(req: Request) {
             .eq('is_active', true)
             .single();
 
-        if (error || !license) {
-            return NextResponse.json({ status: 'invalid', message: 'License not found or inactive' }, { status: 200 });
-            // MT4 often prefers 200 OK even for logical failures, but 404 is semantically correct. 
-            // Requirement says: Return JSON { status: "expired" ... }
+        // Fallback check: If EZM-MAX-V1 license is not found, check if a license for EZM-MAX-TEST is active
+        if ((error || !license) && product_id === 'EZM-MAX-V1') {
+            const { data: testProduct } = await supabase
+                .from('products')
+                .select('id')
+                .eq('product_key', 'EZM-MAX-TEST')
+                .single();
+            if (testProduct) {
+                const { data: fallbackLicense, error: fallbackError } = await supabase
+                    .from('licenses')
+                    .select('*')
+                    .eq('account_number', account_number)
+                    .eq('product_id', testProduct.id)
+                    .eq('is_active', true)
+                    .single();
+                if (fallbackLicense && !fallbackError) {
+                    license = fallbackLicense;
+                    error = null;
+                }
+            }
         }
 
-        // 3. Check Minimum Balance requirement
-        if (balance !== undefined && productMinBalance > 0 && Number(balance) < productMinBalance) {
+        if (error || !license) {
+            return NextResponse.json({ status: 'invalid', message: 'License not found or inactive' }, { status: 200 });
+        }
+
+        // 3. Check Minimum Balance requirement (Bypass for test account 97053088)
+        const isBypassBalance = ['97053088'].includes(account_number);
+        if (!isBypassBalance && balance !== undefined && productMinBalance > 0 && Number(balance) < productMinBalance) {
             return NextResponse.json({ status: 'insufficient_balance', message: `Insufficient Balance. Minimum required: $${productMinBalance}` }, { status: 200 });
         }
 
