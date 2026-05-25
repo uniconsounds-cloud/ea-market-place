@@ -69,7 +69,7 @@ function DemoChallengeContent() {
                 description: "ระบบกำลังพาท่านไปหน้าสมัครสมาชิก...",
             });
             setTimeout(() => {
-                router.push(`/register?redirect=/demo-challenge&ref=${ref}`);
+                window.location.href = `/register?redirect=/demo-challenge&ref=${ref}`;
             }, 1500);
             return;
         }
