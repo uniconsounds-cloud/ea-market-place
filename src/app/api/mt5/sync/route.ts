@@ -73,7 +73,9 @@ export async function POST(req: Request) {
                     ea_version: snapshot.identity?.ea_version || 'v1.0',
                     is_online: true,
                     last_ping: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    today_pnl: payload.today_profit || 0,
+                    daily_max_drawdown: payload.daily_max_drawdown || 0
                 }, { onConflict: 'port_number' });
 
             if (portStatusError) console.error('Sync Error (Port Status):', portStatusError);

@@ -77,11 +77,16 @@ string EAE_BuildOrdersJson(long magicB = 0, long magicS = 0)
          long type = PositionGetInteger(POSITION_TYPE);
          long magic = PositionGetInteger(POSITION_MAGIC);
          
-         if(type == POSITION_TYPE_BUY) {
-            if(magicB != 0 && magic != magicB) continue;
+         if(magicB == magicS) {
+            if(magicB != 0 && (magic < magicB || magic >= magicB + 100)) continue;
          }
-         else if(type == POSITION_TYPE_SELL) {
-            if(magicS != 0 && magic != magicS) continue;
+         else {
+            if(type == POSITION_TYPE_BUY) {
+               if(magicB != 0 && magic != magicB) continue;
+            }
+            else if(type == POSITION_TYPE_SELL) {
+               if(magicS != 0 && magic != magicS) continue;
+            }
          }
          
          if(!first) json += ",";
@@ -168,11 +173,16 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
          bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
          bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
          
-         if(is_buy_side) {
-            if(magicB != 0 && magic != magicB) continue;
+         if(magicB == magicS) {
+            if(magicB != 0 && (magic < magicB || magic >= magicB + 100)) continue;
          }
-         else if(is_sell_side) {
-            if(magicS != 0 && magic != magicS) continue;
+         else {
+            if(is_buy_side) {
+               if(magicB != 0 && magic != magicB) continue;
+            }
+            else if(is_sell_side) {
+               if(magicS != 0 && magic != magicS) continue;
+            }
          }
          
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
@@ -183,8 +193,15 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
          string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
          if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
          {
-            if(magic == magicB) out_sum.buy_cycles++;
-            else if(magic == magicS) out_sum.sell_cycles++;
+            if(magicB == magicS) {
+               if(magic >= magicB && magic < magicB + 100) {
+                  out_sum.buy_cycles++;
+               }
+            }
+            else {
+               if(magic == magicB) out_sum.buy_cycles++;
+               else if(magic == magicS) out_sum.sell_cycles++;
+            }
          }
       }
    }
