@@ -37,11 +37,7 @@ export function AffiliateTracker() {
       
       console.log('Affiliate reference saved:', ref);
 
-      // If user landed on /register with a ref, redirect to home page 
-      // (Preserve requested behavior if this was part of the original design)
-      if (pathname === '/register') {
-        router.push('/');
-      }
+      // Removed redirect to home page to allow users to land directly on the register page with a ref param.
     }
   }, [searchParams, pathname, router]);
 
