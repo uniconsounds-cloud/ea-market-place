@@ -26,6 +26,11 @@ function RegisterContent() {
     const refParam = searchParams.get('ref');
     const redirectParam = searchParams.get('redirect');
 
+    const queryParams = new URLSearchParams();
+    if (redirectParam) queryParams.set('redirect', redirectParam);
+    if (refParam) queryParams.set('ref', refParam);
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
     useEffect(() => {
         const fetchReferrerAndAdmins = async () => {
             // 1. Check for existing referral code
@@ -124,12 +129,6 @@ function RegisterContent() {
 
             // Check if email confirmation is required (default in Supabase)
             alert("สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชีของคุณ");
-            
-            // Build redirect URL to login page preserving params
-            const queryParams = new URLSearchParams();
-            if (redirectParam) queryParams.set('redirect', redirectParam);
-            if (refParam) queryParams.set('ref', refParam);
-            const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
             
             router.push(`/login${queryString}`);
         } catch (err: any) {
@@ -323,7 +322,7 @@ function RegisterContent() {
 
                     <div className="mt-6 text-center text-sm">
                         <span className="text-muted-foreground">มีบัญชีอยู่แล้ว? </span>
-                        <Link href="/login" className="text-primary hover:underline font-medium">
+                        <Link href={`/login${queryString}`} className="text-primary hover:underline font-medium">
                             เข้าสู่ระบบ
                         </Link>
                     </div>

@@ -65,11 +65,11 @@ function DemoChallengeContent() {
         // If not logged in, redirect to login with ref
         if (!user) {
             const ref = searchParams.get('ref') || '';
-            toast("กรุณาเข้าสู่ระบบก่อน", {
-                description: "ระบบกำลังพาท่านไปหน้าเข้าสู่ระบบ...",
+            toast("กรุณาสมัครสมาชิกก่อน", {
+                description: "ระบบกำลังพาท่านไปหน้าสมัครสมาชิก...",
             });
             setTimeout(() => {
-                router.push(`/login?redirect=/demo-challenge&ref=${ref}`);
+                router.push(`/register?redirect=/demo-challenge&ref=${ref}`);
             }, 1500);
             return;
         }
@@ -241,7 +241,7 @@ function DemoChallengeContent() {
                                     "กำลังเข้าร่วม..."
                                 ) : !user ? (
                                     <>
-                                        <LogIn className="mr-2 h-6 w-6" /> เข้าสู่ระบบเพื่อเข้าร่วม
+                                        <LogIn className="mr-2 h-6 w-6" /> สมัครสมาชิก / เข้าสู่ระบบเพื่อเข้าร่วม
                                     </>
                                 ) : (
                                     "เริ่ม $100 Demo Challenge เลย!"
