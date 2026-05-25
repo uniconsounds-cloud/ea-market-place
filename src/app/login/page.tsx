@@ -59,7 +59,13 @@ function LoginContent() {
             router.refresh();
             router.push(finalRedirectUrl);
         } catch (err: any) {
-            setError(err.message);
+            let msg = err.message;
+            if (msg === 'Email not confirmed') {
+                msg = 'อีเมลนี้ยังไม่ได้ยืนยันตัวตน! กรุณาตรวจสอบกล่องข้อความในอีเมลของคุณแล้วกดลิงก์ยืนยันตัวตนก่อนเข้าสู่ระบบ หรือแจ้งผู้แนะนำ (แอดมิน) เพื่อให้กดยืนยันบัญชีให้ครับ';
+            } else if (msg === 'Invalid login credentials') {
+                msg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบข้อมูลอีกครั้ง';
+            }
+            setError(msg);
             setLoading(false);
         }
     };
