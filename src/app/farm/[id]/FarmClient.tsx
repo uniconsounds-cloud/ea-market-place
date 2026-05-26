@@ -688,7 +688,7 @@ export default function FarmClient({
                 isShaking={isShaking}
             />
 
-            <div ref={containerRef} className="flex-1 w-full relative h-full flex items-center justify-center mt-36 sm:mt-44">
+            <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
                 <div
                     className="relative transition-all duration-500 ease-out origin-center"
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
