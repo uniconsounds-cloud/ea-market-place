@@ -65,7 +65,7 @@ export default async function DemoFarmPage() {
         }
     }
 
-    const finalAdminMessage = adminMessage || "💬 ADMIN: ยินดีต้อนรับสู่แคมเปญ Demo Challenge! 🚀";
+    const finalAdminMessage = adminMessage || "💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀";
     const masterPortNumber = customMasterPort || challenge.master_port_number || '100000';
 
     // Fetch initial active orders from master port

@@ -72,7 +72,7 @@ export default function DemoChallengeAdminPage() {
                 .single();
             if (profile) {
                 if (profile.demo_broadcast_message) setBroadcastMessage(profile.demo_broadcast_message);
-                else setBroadcastMessage("💬 ADMIN: ยินดีต้อนรับสู่แคมเปญ Demo Challenge! 🚀");
+                else setBroadcastMessage("💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀");
                 
                 if (profile.demo_master_port) setDemoMasterPort(profile.demo_master_port);
             }
@@ -124,7 +124,7 @@ export default function DemoChallengeAdminPage() {
     };
 
     const handleDeleteParticipant = async (challengeId: string) => {
-        if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้ารายนี้ออกจากแคมเปญเดโม? (ลูกค้าจะสามารถสมัครใหม่ได้)')) {
+        if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้ารายนี้ออกจากโครงการ EasyM Live Tracker? (ลูกค้าจะสามารถสมัครใหม่ได้)')) {
             return;
         }
 
@@ -166,9 +166,9 @@ export default function DemoChallengeAdminPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-orange-500">🎮 Demo Challenge</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-orange-500">🎮 EasyM Live Tracker</h1>
                 <p className="text-muted-foreground mt-2">
-                    จัดการแคมเปญการตลาดสำหรับดึงดูดลูกค้าใหม่ด้วยพอร์ตจำลอง
+                    จัดการโครงการสำหรับดึงดูดลูกค้าใหม่ด้วยระบบติดตามพอร์ตจริงเรียลไทม์
                 </p>
             </div>
 
@@ -180,7 +180,7 @@ export default function DemoChallengeAdminPage() {
                             ลิ้งก์ชวนลูกค้าของคุณ (Affiliate Link)
                         </CardTitle>
                         <CardDescription>
-                            คัดลอกลิ้งก์นี้ไปให้ลูกค้าสมัคร เมื่อลูกค้าเข้าร่วมแคมเปญจะถูกนับเป็นสายงานของคุณทันที
+                            คัดลอกลิ้งก์นี้ไปให้ลูกค้าสมัคร เมื่อลูกค้าเข้าร่วมโครงการจะถูกนับเป็นสายงานของคุณทันที
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -204,7 +204,7 @@ export default function DemoChallengeAdminPage() {
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4 mt-4">
                             <div className="flex flex-col">
-                                <span className="text-sm text-muted-foreground">ลูกทีมในแคมเปญ</span>
+                                <span className="text-sm text-muted-foreground">ลูกทีมในโครงการ</span>
                                 <span className="text-3xl font-bold text-foreground">{users.length} <span className="text-lg font-normal text-muted-foreground">คน</span></span>
                             </div>
                             <div className="flex flex-col">
@@ -280,7 +280,7 @@ export default function DemoChallengeAdminPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Users className="h-5 w-5" />
-                            รายชื่อลูกทีมที่เข้าร่วมแคมเปญ
+                            รายชื่อลูกทีมที่เข้าร่วมโครงการ
                         </CardTitle>
                         <CardDescription>
                             แสดงรายการลูกค้าที่สมัครผ่านลิ้งก์ของคุณ และระดับความเสี่ยงที่พวกเขาเลือก
@@ -292,9 +292,9 @@ export default function DemoChallengeAdminPage() {
                         ) : users.length === 0 ? (
                             <div className="py-12 text-center border rounded-lg border-dashed">
                                 <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-3 opacity-50" />
-                                <h3 className="text-lg font-medium text-foreground">ยังไม่มีลูกทีมในแคมเปญ</h3>
+                                <h3 className="text-lg font-medium text-foreground">ยังไม่มีลูกทีมในโครงการ</h3>
                                 <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-                                    ก็อปปี้ลิ้งก์ด้านบนส่งให้ลูกค้าเพื่อชวนพวกเขามาร่วมสัมผัสประสบการณ์เทรดแบบ Demo Challenge
+                                    ก็อปปี้ลิ้งก์ด้านบนส่งให้ลูกค้าเพื่อชวนพวกเขามาร่วมสัมผัสประสบการณ์ EasyM Live Tracker
                                 </p>
                             </div>
                         ) : (
@@ -357,7 +357,7 @@ export default function DemoChallengeAdminPage() {
                                 Global Challenge Leaderboard
                             </CardTitle>
                             <CardDescription>
-                                กระดานจัดอันดับผู้ทำกำไรสูงสุดในแคมเปญทั้งหมดของบริษัท
+                                กระดานจัดอันดับผู้ทำกำไรสูงสุดในโครงการทั้งหมดของบริษัท
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">

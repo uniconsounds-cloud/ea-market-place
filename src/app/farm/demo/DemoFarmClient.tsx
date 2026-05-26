@@ -772,7 +772,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
-                    title="EASYM DEMO CHALLENGE"
+                    title="EASYM LIVE TRACKER"
                     customName={customName}
                     adminMessage={adminMessage}
                     portNumber={portNumber}
@@ -922,7 +922,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     <div className="flex justify-between items-center px-4 sm:px-6 pt-1.5 sm:pt-2 mb-1">
                         <div className="flex items-center gap-2 sm:gap-4">
                             <span className="text-[8px] sm:text-[10px] text-amber-200/50 uppercase tracking-[0.1em] sm:tracking-[0.2em] font-bold">
-                                {historyTab === 'my' ? 'พอร์ตจำลองของฉัน' : 'พอร์ตต้นแบบ 60 วัน'}
+                                {historyTab === 'my' ? 'พอร์ตติดตามของฉัน' : 'พอร์ตต้นแบบ 60 วัน'}
                             </span>
                             <div className="flex gap-1 bg-black/40 p-0.5 rounded border border-amber-900/30">
                                 <button
@@ -988,7 +988,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                                 <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-[#cfa545] flex-shrink-0 animate-bounce" />
                                 <div className="min-w-0 flex-1">
-                                    <h2 className="text-base sm:text-2xl font-extrabold text-[#cfa545] tracking-wide truncate">$100 Demo Challenge Leaderboard</h2>
+                                    <h2 className="text-base sm:text-2xl font-extrabold text-[#cfa545] tracking-wide truncate">EasyM Live Tracker Leaderboard</h2>
                                     <p className="text-[10px] sm:text-xs text-amber-200/60 truncate">กระดานจัดอันดับผู้ทำกำไรสูงสุดแบบเรียลไทม์</p>
                                 </div>
                             </div>

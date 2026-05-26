@@ -79,8 +79,8 @@ function DemoChallengeContent() {
 
             if (error) {
                 if (error.code === '23505') { // Unique violation
-                    toast("คุณได้เข้าร่วมแคมเปญไปแล้ว", {
-                        description: "กำลังพาท่านไปหน้าฟาร์มจำลอง...",
+                    toast("คุณได้เข้าร่วมโครงการไปแล้ว", {
+                        description: "กำลังพาท่านไปหน้าฟาร์มติดตาม...",
                     });
                     setTimeout(() => router.push('/farm/demo'), 1000);
                     return;
@@ -112,10 +112,10 @@ function DemoChallengeContent() {
                 
                 <div className="space-y-4">
                     <h1 className="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-600">
-                        EAEZE Demo Challenge
+                        EasyM Live Tracker
                     </h1>
                     <p className="text-lg md:text-xl text-amber-200/60 max-w-2xl mx-auto">
-                        โครงการติดตามพอร์ตหลักจำลองด้วยระบบ Copy Trade ประสิทธิภาพสูง
+                        โครงการติดตามพอร์ตจริงแบบเรียลไทม์ (Copy Trade) ประสิทธิภาพสูง
                     </p>
                 </div>
 
@@ -125,7 +125,7 @@ function DemoChallengeContent() {
                             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                             <CardTitle className="text-2xl text-center">คุณเข้าร่วมติดตามพอร์ตแล้ว!</CardTitle>
                             <CardDescription className="text-center">
-                                บัญชีจำลองของคุณเริ่มต้นที่ 100,000 USC และกำลังติดตามพอร์ตต้นแบบแบบเรียลไทม์
+                                พอร์ตติดตามของคุณเริ่มต้นที่ 100,000 USC และกำลังติดตามพอร์ตจริงแบบเรียลไทม์
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex justify-center">
@@ -134,7 +134,7 @@ function DemoChallengeContent() {
                                 className="w-full text-lg bg-orange-600 hover:bg-orange-700"
                                 onClick={() => router.push('/farm/demo')}
                             >
-                                เข้าดูฟาร์มจำลองของฉันตอนนี้
+                                เข้าดูฟาร์มติดตามของฉันตอนนี้
                             </Button>
                         </CardContent>
                     </Card>
@@ -160,7 +160,7 @@ function DemoChallengeContent() {
                                 <div className="flex items-start gap-3">
                                     <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                                     <p>
-                                        <strong className="text-white">ดูข้อมูลเรียลไทม์ 1:1:</strong> เห็นข้อมูลออเดอร์ ล็อต และผลการรันพอร์ตจริงแบบเรียลไทม์ผ่านกราฟิกหน้าฟาร์มจำลอง
+                                        <strong className="text-white">ดูข้อมูลเรียลไทม์ 1:1:</strong> เห็นข้อมูลออเดอร์ ล็อต และผลการรันพอร์ตจริงแบบเรียลไทม์ผ่านกราฟิกหน้าฟาร์มติดตาม
                                     </p>
                                 </div>
                                 <div className="flex items-start gap-3">

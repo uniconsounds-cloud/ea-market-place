@@ -186,7 +186,7 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="portName">ชื่อพอร์ตจำลอง (Demo Port Name)</Label>
+                        <Label htmlFor="portName">ชื่อพอร์ตติดตาม (Tracking Port Name)</Label>
                         <Input
                             id="portName"
                             value={portName}
@@ -195,7 +195,7 @@ export default function SettingsPage() {
                             maxLength={30}
                             className="bg-background/50 text-amber-200 border-amber-900/50"
                         />
-                        <p className="text-xs text-muted-foreground">ชื่อนี้จะไปปรากฏในหน้า Farm HUD ของแคมเปญ Demo Challenge</p>
+                        <p className="text-xs text-muted-foreground">ชื่อนี้จะไปปรากฏในหน้า Farm HUD ของโครงการ EasyM Live Tracker</p>
                     </div>
 
                     <Button type="submit" disabled={savingProfile} className="w-full sm:w-auto">

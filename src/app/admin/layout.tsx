@@ -76,7 +76,7 @@ const SidebarContent = ({
             <Link href="/admin/demo-challenge" onClick={onClose}>
                 <Button variant="ghost" className="w-full justify-start text-orange-400">
                     <Gamepad2 className="mr-2 h-4 w-4" />
-                    แคมเปญ Demo Challenge
+                    โครงการ EasyM Live Tracker
                 </Button>
             </Link>
             <Link href="/admin/partners" onClick={onClose}>

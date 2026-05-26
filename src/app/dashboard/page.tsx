@@ -302,7 +302,7 @@ export default function DashboardPage() {
                     <Link href="/farm/demo" className="shrink-0 w-full md:w-auto">
                         <Button className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-extrabold shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 border-0 flex items-center justify-center gap-2 h-10 px-5">
                             <Activity className="w-4 h-4 animate-pulse" />
-                            ดูพอร์ตเดโมจำลอง ($100 Challenge)
+                            ดูระบบติดตามพอร์ตจริง (EasyM Live Tracker)
                         </Button>
                     </Link>
                 )}
