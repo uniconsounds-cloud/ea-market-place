@@ -980,41 +980,57 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     <div className="w-[1px] h-14 sm:h-24 bg-amber-900/30 flex-shrink-0" />
 
                     {/* Controls row (Right side, flex-shrink-0) */}
-                    <div className="flex-shrink-0 flex flex-col items-end gap-1.5 sm:gap-2.5 pr-0.5 sm:pr-2">
-                        {/* Header and Tab switcher */}
-                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-3">
-                            <span className="text-[7px] sm:text-[9px] text-amber-200/50 uppercase tracking-[0.1em] font-black text-right whitespace-nowrap">
-                                {historyTab === 'my' ? 'พอร์ตติดตาม' : 'พอร์ตต้นแบบ'}
-                            </span>
-                            <div className="flex gap-0.5 bg-black/40 p-0.5 rounded border border-amber-900/30">
-                                <button
-                                    onClick={() => setHistoryTab('my')}
-                                    className={`text-[7px] sm:text-[8px] px-1.5 sm:px-2 py-0.5 rounded transition-all font-bold whitespace-nowrap ${historyTab === 'my' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
-                                >
-                                    ของฉัน
-                                </button>
-                                <button
-                                    onClick={() => setHistoryTab('master')}
-                                    className={`text-[7px] sm:text-[8px] px-1.5 sm:px-2 py-0.5 rounded transition-all font-bold whitespace-nowrap ${historyTab === 'master' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
-                                >
-                                    พอร์ตหลัก
-                                </button>
-                            </div>
-                        </div>
+                    <div className="flex-shrink-0 flex flex-col items-end justify-center gap-1 sm:gap-1.5 pr-0.5 sm:pr-2 w-[150px] sm:w-[220px]">
+                        {/* Header showing single line of text with lookback days */}
+                        <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black tracking-wide whitespace-nowrap mb-0.5">
+                            {historyTab === 'my' 
+                                ? `พอร์ตติดตาม (ย้อนหลัง ${dailyHistory.length} วัน)` 
+                                : `พอร์ตต้นแบบ (ย้อนหลัง ${dailyHistory.length} วัน)`}
+                        </span>
 
-                        {/* Leaderboard and Back to dashboard buttons */}
-                        <div className="flex gap-1 sm:gap-2">
+                        {/* 2x2 Grid of equal buttons */}
+                        <div className="grid grid-cols-2 gap-1 w-full">
+                            {/* ของฉัน Button */}
+                            <button
+                                onClick={() => setHistoryTab('my')}
+                                className={`text-[7px] sm:text-[9px] py-1 sm:py-1.5 rounded transition-all font-black text-center whitespace-nowrap border flex items-center justify-center ${
+                                    historyTab === 'my' 
+                                        ? 'bg-[#cfa545] text-black border-[#cfa545] shadow-[0_0_10px_rgba(207,165,69,0.3)]' 
+                                        : 'bg-black/40 text-amber-200/60 border-amber-900/30 hover:text-white hover:bg-black/60'
+                                }`}
+                            >
+                                ของฉัน
+                            </button>
+
+                            {/* พอร์ตหลัก Button */}
+                            <button
+                                onClick={() => setHistoryTab('master')}
+                                className={`text-[7px] sm:text-[9px] py-1 sm:py-1.5 rounded transition-all font-black text-center whitespace-nowrap border flex items-center justify-center ${
+                                    historyTab === 'master' 
+                                        ? 'bg-[#cfa545] text-black border-[#cfa545] shadow-[0_0_10px_rgba(207,165,69,0.3)]' 
+                                        : 'bg-black/40 text-amber-200/60 border-amber-900/30 hover:text-white hover:bg-black/60'
+                                }`}
+                            >
+                                พอร์ตหลัก
+                            </button>
+
+                            {/* อันดับ Button */}
                             <button
                                 onClick={() => setShowLeaderboard(true)}
-                                className="flex items-center gap-1 text-[7px] sm:text-[9px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 px-1.5 sm:px-3 py-0.5 sm:py-1 rounded transition-all uppercase font-bold shadow-[0_0_15px_rgba(207,165,69,0.2)] hover:shadow-[0_0_20px_rgba(207,165,69,0.4)] whitespace-nowrap"
+                                className="flex items-center justify-center gap-1 text-[7px] sm:text-[9px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 py-1 sm:py-1.5 rounded transition-all font-black uppercase whitespace-nowrap shadow-[0_0_10px_rgba(207,165,69,0.1)] hover:shadow-[0_0_15px_rgba(207,165,69,0.3)]"
                             >
-                                <Trophy className="w-2 h-2 sm:w-3 sm:h-3 animate-pulse" />อันดับ
+                                <Trophy className="w-2 h-2 sm:w-3 sm:h-3 animate-pulse" />
+                                <span>อันดับ</span>
                             </button>
+
+                            {/* แดชบอร์ด Link Button */}
                             <Link 
                                 href="/dashboard"
-                                className="flex items-center gap-1 text-[7px] sm:text-[9px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-1.5 sm:px-3 py-0.5 sm:py-1 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)] whitespace-nowrap"
+                                className="flex items-center justify-center gap-1 text-[7px] sm:text-[9px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 py-1 sm:py-1.5 rounded transition-all font-black uppercase whitespace-nowrap shadow-[0_0_8px_rgba(245,158,11,0.05)] hover:shadow-[0_0_12px_rgba(245,158,11,0.2)]"
                             >
-                                <svg className="w-2 h-2 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                                <svg className="w-2 h-2 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
                                 <span>แดชบอร์ด</span>
                             </Link>
                         </div>
