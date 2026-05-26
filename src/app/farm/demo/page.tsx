@@ -28,8 +28,7 @@ export default async function DemoFarmPage() {
 
     // Determine custom port name with emoji
     const rawPortName = challenge.port_name || user.email || 'My Demo Port';
-    const riskEmoji = '🛡️';
-    const customName = `${riskEmoji} x1.00 PORT: ${rawPortName}`;
+    const customName = rawPortName;
 
     // Fallback: Check if user has an upline in profiles if they don't have a referrer_id
     let finalReferrerId = challenge.referrer_id;
