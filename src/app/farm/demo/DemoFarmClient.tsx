@@ -519,9 +519,70 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         }
     };
 
+    // --- Fetch Real History ---
+    const [history, setHistory] = useState<any[]>([]);
+    useEffect(() => {
+        if (!isTabVisible || isIdle) return;
+
+        const fetchHistory = async () => {
+            const { data, error } = await supabase
+                .from('farm_daily_history')
+                .select('*')
+                .eq('port_number', portNumber)
+                .order('date', { ascending: false })
+                .limit(60);
+
+            if (data) {
+                setHistory(data.reverse());
+            }
+        };
+
+        fetchHistory();
+        
+        // Listen for history updates
+        const historyChannel = supabase
+            .channel('history_updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_daily_history', filter: `port_number=eq.${portNumber}` }, fetchHistory)
+            .subscribe();
+
+        return () => { supabase.removeChannel(historyChannel); };
+    }, [portNumber, isTabVisible, isIdle]);
+
+    const liveUserBalance = useMemo(() => {
+        if (!challengeStartDate) return 100000;
+        
+        const startD = new Date(challengeStartDate);
+        const startStr = startD.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        
+        // Sum history profits that occurred on or after startStr
+        const validHistoryRows = history.filter(item => {
+            const cleanDate = item.date?.split('T')[0];
+            return cleanDate >= startStr;
+        });
+        
+        let sumProfit = validHistoryRows.reduce((sum, item) => sum + Number(item.profit || 0), 0);
+        
+        // Also check if we should add today's closed profit if it hasn't been saved to history yet
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        if (todayStr >= startStr && portStatus) {
+            const hasTodayRow = validHistoryRows.some(item => {
+                const cleanDate = item.date?.split('T')[0];
+                return cleanDate === todayStr;
+            });
+            if (!hasTodayRow) {
+                sumProfit += Number(portStatus.today_pnl || 0);
+            }
+        }
+        
+        return 100000 + sumProfit;
+    }, [history, challengeStartDate, portStatus?.today_pnl]);
+
     const stats = useMemo(() => {
         // If EA is sending data to farm_port_status, use that directly
         if (portStatus?.floating_pnl !== undefined) {
+            const currentBalanceValue = liveUserBalance;
+            const currentEquityValue = liveUserBalance + Number(portStatus.floating_pnl);
+            
             return {
                 openOrdersCount: orders.length,
                 floatingPnl: Number(portStatus.floating_pnl),
@@ -530,9 +591,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 sellCount: Number(portStatus.sell_count),
                 buyPnl: Number(portStatus.buy_pnl),
                 sellPnl: Number(portStatus.sell_pnl),
-                balance: Number(portStatus.balance),
-                equity: Number(portStatus.equity),
-                maxDrawdown: Number(portStatus.max_drawdown || 0),
+                balance: currentBalanceValue,
+                equity: currentEquityValue,
+                maxDrawdown: currentBalanceValue > 0 ? (Number(portStatus.max_drawdown || 0) * Number(portStatus.master_balance || portStatus.balance || 10000) / currentBalanceValue) : 0,
                 todayProfit: Number(portStatus.today_pnl || 0),
                 serverTime: portStatus.server_time ? new Date(Number(portStatus.server_time) * 1000) : new Date(),
                 // Correct broker day progress: use modulo to extract HH:MM from raw broker timestamp
@@ -555,6 +616,10 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         const buyPnl = buyOrders.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
         const sellPnl = sellOrders.reduce((sum, o) => sum + (Number(o.current_pnl) || 0), 0);
 
+        const currentBalanceValue = liveUserBalance;
+        const currentEquityValue = liveUserBalance + floatingPnl;
+        const maxDrawdownValue = Math.max(0, Math.floor(((currentBalanceValue - currentEquityValue) / currentBalanceValue) * 100));
+
         return {
             openOrdersCount: openOrders.length,
             floatingPnl,
@@ -563,14 +628,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             sellCount: sellOrders.length,
             buyPnl,
             sellPnl,
-            balance: Number(portStatus?.balance) || 51540.20,
-            equity: Number(portStatus?.equity) || (51540.20 + floatingPnl),
-            maxDrawdown: Math.max(0, Math.floor(((Number(portStatus?.balance || 51540.20) - Number(portStatus?.equity || 51540.20)) / Number(portStatus?.balance || 51540.20)) * 100)),
+            balance: currentBalanceValue,
+            equity: currentEquityValue,
+            maxDrawdown: maxDrawdownValue,
             todayProfit: Number(portStatus?.today_pnl || 0),
             serverTime: new Date(),
             brokerDayPercent: null
         };
-    }, [displayOrders, portStatus, orders]);
+    }, [displayOrders, portStatus, orders, liveUserBalance]);
 
     const treePriority = useMemo(() => {
         const order = Array.from({ length: 25 }).map((_, i) => ({ index: i, c: i % 5, r: Math.floor(i / 5) }));
@@ -586,8 +651,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     }, []);
 
     const plot = useMemo(() => {
-        const balance = Number(portStatus?.balance) || 51540.20;
-        const equity = Number(portStatus?.equity) || balance;
+        const balance = stats.balance;
+        const equity = stats.equity;
         const drawdown = Math.max(0, Math.floor(((balance - equity) / balance) * 100));
 
         const treeLevels = new Array(25).fill(4);
@@ -629,34 +694,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         return { pnl: stats.floatingPnl, trees };
     }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority]);
 
-    // --- Fetch Real History ---
-    const [history, setHistory] = useState<any[]>([]);
-    useEffect(() => {
-        if (!isTabVisible || isIdle) return;
-
-        const fetchHistory = async () => {
-            const { data, error } = await supabase
-                .from('farm_daily_history')
-                .select('*')
-                .eq('port_number', portNumber)
-                .order('date', { ascending: false })
-                .limit(60);
-
-            if (data) {
-                setHistory(data.reverse());
-            }
-        };
-
-        fetchHistory();
-        
-        // Listen for history updates
-        const historyChannel = supabase
-            .channel('history_updates')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_daily_history', filter: `port_number=eq.${portNumber}` }, fetchHistory)
-            .subscribe();
-
-        return () => { supabase.removeChannel(historyChannel); };
-    }, [portNumber, isTabVisible, isIdle]);
+    // History block moved to top
 
     const brokerDateStr = useMemo(() => {
         const d = stats.serverTime;
@@ -776,8 +814,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     customName={customName}
                     adminMessage={adminMessage}
                     portNumber={portNumber}
-                    balance={Number(portStatus?.balance) || 0}
-                    equity={Number(portStatus?.equity) || 0}
+                    balance={stats.balance}
+                    equity={stats.equity}
                     floatingPnl={stats.floatingPnl}
                     totalStandardLots={stats.totalLots}
                     accountType={portStatus?.account_type || 'USC'}
@@ -828,7 +866,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 sellCount={stats.sellCount}
                 buyPnl={stats.buyPnl}
                 sellPnl={stats.sellPnl}
-                balance={Number(portStatus?.balance) || 0}
+                balance={stats.balance}
                 todayProfit={smoothedTodayProfit}
                 accountType={portStatus?.account_type || 'USC'}
                 todayClosedLots={Number(portStatus?.today_closed_lots) || 0}

@@ -152,7 +152,7 @@ export default function DemoChallengeAdminPage() {
         }
         const text = top3.map((u, i) => {
             const growth = Number(u.current_balance) - 100000;
-            return `🏆 อันดับ ${i + 1}: ${u.user_name || u.user_email?.split('@')[0]} (${Number(u.risk_level) <= 1.2 ? 'สายเซฟ' : Number(u.risk_level) <= 1.7 ? 'สายเติบโต' : 'สายซิ่ง'}) ยอดรวม $${Number(u.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (+${growth.toFixed(2)} USC)`;
+            return `🏆 อันดับ ${i + 1}: ${u.user_name || u.user_email?.split('@')[0]} ยอดรวม $${Number(u.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (+${growth.toFixed(2)} USC)`;
         }).join('\n');
 
         try {
@@ -303,7 +303,6 @@ export default function DemoChallengeAdminPage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>อีเมลลูกค้า</TableHead>
-                                            <TableHead>ระดับความเสี่ยง</TableHead>
                                             <TableHead className="text-right">พอร์ตจำลอง (USC)</TableHead>
                                             <TableHead className="text-right">เข้าร่วมเมื่อ</TableHead>
                                             <TableHead className="text-right">จัดการ</TableHead>
@@ -318,7 +317,6 @@ export default function DemoChallengeAdminPage() {
                                                         <div className="font-medium">{user.user_name || 'ลูกค้า'}</div>
                                                         <div className="text-xs text-muted-foreground">{user.user_email}</div>
                                                     </TableCell>
-                                                    <TableCell>{getRiskLabel(user.risk_level)}</TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="font-bold">{Number(user.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                                         <div className={`text-xs ${growth >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -361,17 +359,6 @@ export default function DemoChallengeAdminPage() {
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
-                                <Button
-                                    key={String(filter)}
-                                    size="sm"
-                                    variant={leaderboardFilter === filter ? 'default' : 'outline'}
-                                    onClick={() => setLeaderboardFilter(filter)}
-                                    className={`text-xs ${leaderboardFilter === filter ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
-                                >
-                                    {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ สายเซฟ' : filter === 1.5 ? '🚀 สายเติบโต' : '🔥 สายซิ่ง'}
-                                </Button>
-                            ))}
                             <Button size="sm" variant="outline" className="border-orange-500 text-orange-500 hover:bg-orange-500/10" onClick={copyTop3}>
                                 <Copy className="h-4 w-4 mr-1" /> คัดลอก Top 3
                             </Button>
@@ -389,7 +376,6 @@ export default function DemoChallengeAdminPage() {
                                         <TableRow>
                                             <TableHead className="w-16 text-center">อันดับ</TableHead>
                                             <TableHead>นักลงทุน</TableHead>
-                                            <TableHead>ความเสี่ยง</TableHead>
                                             <TableHead className="text-right">พอร์ตจำลอง (USC)</TableHead>
                                             <TableHead className="text-right">กำไรสุทธิ</TableHead>
                                         </TableRow>
@@ -414,7 +400,6 @@ export default function DemoChallengeAdminPage() {
                                                         <div className="font-bold text-foreground">{user.user_name || 'Trader'}</div>
                                                         <div className="text-xs text-muted-foreground">{user.user_email}</div>
                                                     </TableCell>
-                                                    <TableCell>{getRiskLabel(user.risk_level)}</TableCell>
                                                     <TableCell className="text-right font-mono font-bold text-base text-foreground">
                                                         ${Number(user.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </TableCell>
