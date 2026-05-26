@@ -16,17 +16,17 @@ SELECT
     100000 + COALESCE((
         SELECT SUM(profit) 
         FROM public.farm_daily_history 
-        WHERE port_number = COALESCE(dc.master_port_number, '100000') 
+        WHERE port_number = COALESCE(rp.demo_master_port, dc.master_port_number, '100000') 
           AND date >= dc.join_date::date
     ), 0) + 
     COALESCE((
         SELECT today_pnl 
         FROM public.farm_port_status 
-        WHERE port_number = COALESCE(dc.master_port_number, '100000')
+        WHERE port_number = COALESCE(rp.demo_master_port, dc.master_port_number, '100000')
           AND NOT EXISTS (
               SELECT 1 
               FROM public.farm_daily_history 
-              WHERE port_number = COALESCE(dc.master_port_number, '100000') 
+              WHERE port_number = COALESCE(rp.demo_master_port, dc.master_port_number, '100000') 
                 AND date = (timezone('Asia/Bangkok', now())::date)
           )
     ), 0) AS current_balance,
@@ -43,4 +43,5 @@ LEFT JOIN
 
 -- Ensure admins can query the view
 GRANT SELECT ON admin_demo_challenges_view TO authenticated;
+
 
