@@ -994,16 +994,18 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 </div>
                             </div>
                         ))}
+                        {/* Mobile spacer to prevent crates from being hidden behind absolute controls */}
+                        <div className="hidden max-sm:block w-[155px] flex-shrink-0" />
                     </div>
 
                     {/* Divider line */}
-                    <div className={`w-[1px] h-14 sm:h-24 bg-amber-900/30 flex-shrink-0 transition-all duration-300 ${
-                        isScrolledLeft ? 'max-sm:scale-x-0 max-sm:w-0 max-sm:opacity-0' : ''
-                    }`} />
+                    <div className="hidden sm:block w-[1px] h-14 sm:h-24 bg-amber-900/30 flex-shrink-0" />
 
                     {/* Controls row (Right side, flex-shrink-0) */}
-                    <div className={`flex-shrink-0 flex flex-col items-end justify-start gap-0.5 sm:gap-1 w-[155px] sm:w-[235px] h-full py-0.5 sm:py-1.5 transition-all duration-300 ease-in-out ${
-                        isScrolledLeft ? 'max-sm:translate-x-full max-sm:opacity-0 max-sm:w-0 max-sm:pr-0 max-sm:pointer-events-none' : ''
+                    <div className={`flex-shrink-0 flex flex-col items-end justify-start gap-0.5 sm:gap-1 w-[155px] sm:w-[235px] h-full py-0.5 sm:py-1.5 transition-all duration-300 ease-in-out max-sm:absolute max-sm:right-1.5 max-sm:top-[4px] max-sm:bottom-[4px] max-sm:z-10 max-sm:bg-[#110c08]/95 max-sm:border max-sm:border-amber-900/30 max-sm:rounded-lg max-sm:px-2 max-sm:shadow-xl ${
+                        isScrolledLeft 
+                            ? 'max-sm:translate-x-[170px] max-sm:opacity-0 max-sm:pointer-events-none' 
+                            : 'max-sm:translate-x-0 max-sm:opacity-100'
                     }`}>
                         {/* Header showing single line of text with lookback days */}
                         <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black tracking-wide whitespace-nowrap leading-none select-none self-end mt-0">
