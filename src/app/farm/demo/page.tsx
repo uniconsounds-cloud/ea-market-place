@@ -23,17 +23,13 @@ export default async function DemoFarmPage() {
         redirect('/demo-challenge');
     }
 
-    const scaleFactor = Number(challenge.risk_level) || 0.1;
-    let currentBalance = Number(challenge.current_balance) || 10000;
+    const scaleFactor = 1.0;
+    let currentBalance = Number(challenge.current_balance) || 100000;
 
-    // Determine custom port name with emoji and multiplier
+    // Determine custom port name with emoji
     const rawPortName = challenge.port_name || user.email || 'My Demo Port';
-    
-    let riskEmoji = '🛡️';
-    if (scaleFactor >= 2.0) riskEmoji = '🔥';
-    else if (scaleFactor >= 1.5) riskEmoji = '🚀';
-    
-    const customName = `${riskEmoji} x${scaleFactor.toFixed(2)} PORT: ${rawPortName}`;
+    const riskEmoji = '🛡️';
+    const customName = `${riskEmoji} x1.00 PORT: ${rawPortName}`;
 
     // Fallback: Check if user has an upline in profiles if they don't have a referrer_id
     let finalReferrerId = challenge.referrer_id;
@@ -85,34 +81,29 @@ export default async function DemoFarmPage() {
         .eq('port_number', masterPortNumber)
         .single();
 
-    // Calculate Proportional Scaling based on Fixed 1/10 Ratio
-    // Demo balance is $10k, Master balance is roughly $100k
-    // scaleFactor is now the exact leverage multiplier (e.g. 1.5x)
-    const proportionalRatio = 0.1 * scaleFactor;
-
-    // Use actual master balance ONLY for rendering HUD stats correctly if needed,
-    // but scaling relies purely on proportionalRatio
+    // 1:1 Replication with Master Port
+    const proportionalRatio = 1.0;
     const masterBalance = Number(portStatus?.balance) || 100000;
 
-    // Scale initial orders
+    // Scale initial orders (1:1)
     const scaledOrders = (initialOrders || []).map(order => ({
         ...order,
         current_pnl: Number(order.current_pnl) * proportionalRatio,
         raw_lot_size: Number(order.raw_lot_size) * proportionalRatio
     }));
 
-    // Scale port status
+    // Scale port status (1:1 except balance starting at 100,000 USC)
     const floatingPnl = Number(portStatus?.floating_pnl || 0) * proportionalRatio;
     const scaledPortStatus = portStatus ? {
         ...portStatus,
-        master_balance: masterBalance, // Keep reference to original balance for real-time order updates
+        master_balance: masterBalance, // Keep reference to original balance
         floating_pnl: floatingPnl,
         total_lots: Number(portStatus.total_lots) * proportionalRatio,
         buy_pnl: Number(portStatus.buy_pnl) * proportionalRatio,
         sell_pnl: Number(portStatus.sell_pnl) * proportionalRatio,
         today_pnl: Number(portStatus.today_pnl) * proportionalRatio,
         today_closed_lots: Number(portStatus.today_closed_lots) * proportionalRatio,
-        daily_max_drawdown: Number(portStatus.daily_max_drawdown) * scaleFactor,
+        daily_max_drawdown: Number(portStatus.daily_max_drawdown),
         balance: currentBalance,
         equity: currentBalance + floatingPnl
     } : {

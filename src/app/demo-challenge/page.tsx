@@ -12,32 +12,11 @@ function DemoChallengeContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const [selectedRisk, setSelectedRisk] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [hasJoined, setHasJoined] = useState(false);
 
-    // Intelligent rotation for recommended risk based on today's signups
     useEffect(() => {
-        const getRecommendation = async () => {
-            try {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                const { count } = await supabase
-                    .from('demo_challenges')
-                    .select('*', { count: 'exact', head: true })
-                    .gte('created_at', today.toISOString());
-                
-                const num = count || 0;
-                const risks = [1.0, 1.5, 2.0];
-                setSelectedRisk(risks[num % 3]);
-            } catch (e) {
-                setSelectedRisk(1.0);
-            }
-        };
-
-        getRecommendation();
         checkAuthAndStatus();
     }, []);
 
@@ -48,20 +27,17 @@ function DemoChallengeContent() {
             // Check if they already joined
             const { data } = await supabase
                 .from('demo_challenges')
-                .select('id, risk_level')
+                .select('id')
                 .eq('user_id', session.user.id)
                 .single();
                 
             if (data) {
                 setHasJoined(true);
-                setSelectedRisk(Number(data.risk_level));
             }
         }
     };
 
     const handleJoin = async () => {
-        if (!selectedRisk) return;
-
         // If not logged in, redirect to login with ref
         if (!user) {
             const ref = searchParams.get('ref') || '';
@@ -78,11 +54,6 @@ function DemoChallengeContent() {
             setLoading(true);
             const ref = searchParams.get('ref');
             
-            // Sub-randomize the risk level (e.g. 1.0 -> 1.00, 1.05, 1.10, 1.15, 1.20)
-            const offsets = [0, 0.05, 0.10, 0.15, 0.20];
-            const randomOffset = offsets[Math.floor(Math.random() * offsets.length)];
-            const finalRisk = parseFloat((selectedRisk + randomOffset).toFixed(2));
-            
             let finalReferrerId = ref || null;
             if (!finalReferrerId) {
                 const { data: profile } = await supabase
@@ -97,8 +68,8 @@ function DemoChallengeContent() {
 
             const payload = {
                 user_id: user.id,
-                risk_level: finalRisk,
-                current_balance: 10000, // 10,000 USC = $100
+                risk_level: 1.0,
+                current_balance: 100000, // 100,000 USC
                 referrer_id: finalReferrerId
             };
 
@@ -117,8 +88,8 @@ function DemoChallengeContent() {
                 throw error;
             }
 
-            toast.success("เข้าร่วมแคมเปญสำเร็จ! 🎉", {
-                description: "ยินดีต้อนรับสู่ $100 Demo Challenge ระบบกำลังพาท่านไปดูฟาร์ม...",
+            toast.success("เข้าร่วมติดตามพอร์ตสำเร็จ! 🎉", {
+                description: "ยินดีต้อนรับสู่ระบบติดตามพอร์ตหลัก ระบบกำลังพาท่านไปดูฟาร์ม...",
             });
             
             setHasJoined(true);
@@ -135,47 +106,16 @@ function DemoChallengeContent() {
         }
     };
 
-    const riskOptions = [
-        {
-            value: 1.0,
-            title: "สายเซฟ (Safe)",
-            desc: "เน้นความปลอดภัย โตเรื่อยๆ ไม่เสียวมาก",
-            icon: <Shield className="w-8 h-8 text-green-500 mb-2" />,
-            color: "border-green-500",
-            bg: "bg-green-500/10",
-            multiplierText: "x1.0 - 1.2"
-        },
-        {
-            value: 1.5,
-            title: "สายเติบโต (Growth)",
-            desc: "สายปานกลาง กำไรกำลังดี เหมาะสำหรับนักลงทุนทั่วไป",
-            icon: <TrendingUp className="w-8 h-8 text-yellow-500 mb-2" />,
-            color: "border-yellow-500",
-            bg: "bg-yellow-500/10",
-            multiplierText: "x1.5 - 1.7"
-        },
-        {
-            value: 2.0,
-            title: "สายซิ่ง (Risky)",
-            desc: "กำไรมาไว โตเร็วที่สุด แต่ถ้าเจอกราฟลากก็ต้องใจแข็ง!",
-            icon: <Zap className="w-8 h-8 text-red-500 mb-2" />,
-            color: "border-red-500",
-            bg: "bg-red-500/10",
-            multiplierText: "x2.0 - 2.2"
-        }
-    ];
-
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center py-16 px-4">
             <div className="max-w-4xl w-full space-y-8 text-center">
                 
                 <div className="space-y-4">
                     <h1 className="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-600">
-                        $100 Demo Challenge
+                        EAEZE Demo Challenge
                     </h1>
-                    <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-                        จำลองการมีทุน 100 เหรียญและดูมันเติบโตไปพร้อมกับ Master Port ของเรา! 
-                        เลือกระดับความเสี่ยงของคุณแล้วมาดูกันว่าสัปดาห์หน้าคุณจะปั้นได้เท่าไหร่
+                    <p className="text-lg md:text-xl text-amber-200/60 max-w-2xl mx-auto">
+                        โครงการติดตามพอร์ตหลักจำลองด้วยระบบ Copy Trade ประสิทธิภาพสูง
                     </p>
                 </div>
 
@@ -183,9 +123,9 @@ function DemoChallengeContent() {
                     <Card className="max-w-md mx-auto border-orange-500/50 bg-slate-900">
                         <CardHeader>
                             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                            <CardTitle className="text-2xl text-center">คุณเข้าร่วมแคมเปญแล้ว!</CardTitle>
+                            <CardTitle className="text-2xl text-center">คุณเข้าร่วมติดตามพอร์ตแล้ว!</CardTitle>
                             <CardDescription className="text-center">
-                                คุณเลือกระดับความเสี่ยง {selectedRisk === 1.0 ? 'สายเซฟ' : selectedRisk === 1.5 ? 'สายเติบโต' : 'สายซิ่ง'}
+                                บัญชีจำลองของคุณเริ่มต้นที่ 100,000 USC และกำลังติดตามพอร์ตต้นแบบแบบเรียลไทม์
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex justify-center">
@@ -194,48 +134,56 @@ function DemoChallengeContent() {
                                 className="w-full text-lg bg-orange-600 hover:bg-orange-700"
                                 onClick={() => router.push('/farm/demo')}
                             >
-                                เข้าดูฟาร์มของฉันตอนนี้
+                                เข้าดูฟาร์มจำลองของฉันตอนนี้
                             </Button>
                         </CardContent>
                     </Card>
                 ) : (
                     <>
-                        <div className="grid md:grid-cols-3 gap-6 pt-8">
-                            {riskOptions.map((option) => (
-                                <Card 
-                                    key={option.value}
-                                    className={`relative cursor-pointer transition-all hover:-translate-y-1 ${
-                                        selectedRisk === option.value 
-                                            ? `${option.color} ${option.bg} border-2 shadow-[0_0_20px_rgba(249,115,22,0.3)]` 
-                                            : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
-                                    }`}
-                                    onClick={() => setSelectedRisk(option.value)}
-                                >
-                                    {selectedRisk === option.value && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                                            ระบบแนะนำ
-                                        </div>
-                                    )}
-                                    <CardHeader className="text-center pb-2">
-                                        <div className="flex justify-center">{option.icon}</div>
-                                        <CardTitle className="text-xl">{option.title}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="text-center text-sm text-muted-foreground">
-                                        <p>{option.desc}</p>
-                                        <div className="mt-4 font-mono text-lg font-bold text-foreground">
-                                            ตัวคูณ {option.multiplierText}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                        <div className="max-w-2xl mx-auto bg-slate-900/50 border border-slate-800 rounded-2xl p-8 text-left space-y-6">
+                            <h2 className="text-2xl font-bold text-orange-400 text-center border-b border-slate-800 pb-4">
+                                เงื่อนไขและข้อมูลการติดตามพอร์ตหลัก
+                            </h2>
+                            <div className="space-y-4 text-slate-300 text-sm md:text-base">
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                    <p>
+                                        <strong className="text-white">ทุนตั้งต้นสมมติ 100,000 USC:</strong> ทุกคนจะได้รับยอดเงินเริ่มต้นเท่ากัน ณ วันที่กดเข้าร่วมแคมเปญ
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                    <p>
+                                        <strong className="text-white">ระบบกำไร 1:1 สะสมรายวัน:</strong> กำไรจริงรายวันจากพอร์ตต้นแบบ (Master Port) จะถูกบวกทบเข้าบัญชีของคุณโดยตรง เสมือนว่าคุณเปิดรัน EA ตั้งแต่วันสมัคร
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                    <p>
+                                        <strong className="text-white">ดูข้อมูลเรียลไทม์ 1:1:</strong> เห็นข้อมูลออเดอร์ ล็อต และผลการรันพอร์ตจริงแบบเรียลไทม์ผ่านกราฟิกหน้าฟาร์มจำลอง
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                    <p>
+                                        <strong className="text-white">ศึกษาผลงานย้อนหลัง 60 วัน:</strong> มีฟังก์ชันแยกสำหรับตรวจสอบสถิติผลงานพอร์ตต้นแบบย้อนหลัง 60 วัน เพื่อการเรียนรู้เชิงลึก
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                    <p>
+                                        <strong className="text-white">ตารางจัดอันดับความเก๋า (Leaderboard):</strong> จัดอันดับนักลงทุนที่มีกำไรสะสมสูงสุดนับจากวันที่เริ่มเข้าร่วมโครงการ
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="pt-12 flex justify-center">
+                        <div className="pt-8 flex justify-center">
                             <Button 
                                 size="lg" 
                                 className="px-12 py-6 text-xl rounded-full bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 shadow-xl shadow-orange-500/20"
                                 onClick={handleJoin}
-                                disabled={loading || !selectedRisk}
+                                disabled={loading}
                             >
                                 {loading ? (
                                     "กำลังเข้าร่วม..."
@@ -244,7 +192,7 @@ function DemoChallengeContent() {
                                         <LogIn className="mr-2 h-6 w-6" /> สมัครสมาชิก / เข้าสู่ระบบเพื่อเข้าร่วม
                                     </>
                                 ) : (
-                                    "เริ่ม $100 Demo Challenge เลย!"
+                                    "เริ่มเข้าร่วมโครงการติดตามพอร์ตหลัก!"
                                 )}
                             </Button>
                         </div>

@@ -151,7 +151,7 @@ export default function DemoChallengeAdminPage() {
             return;
         }
         const text = top3.map((u, i) => {
-            const growth = Number(u.current_balance) - 10000;
+            const growth = Number(u.current_balance) - 100000;
             return `🏆 อันดับ ${i + 1}: ${u.user_name || u.user_email?.split('@')[0]} (${Number(u.risk_level) <= 1.2 ? 'สายเซฟ' : Number(u.risk_level) <= 1.7 ? 'สายเติบโต' : 'สายซิ่ง'}) ยอดรวม $${Number(u.current_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (+${growth.toFixed(2)} USC)`;
         }).join('\n');
 
@@ -166,7 +166,7 @@ export default function DemoChallengeAdminPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-orange-500">🎮 $100 Demo Challenge</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-orange-500">🎮 Demo Challenge</h1>
                 <p className="text-muted-foreground mt-2">
                     จัดการแคมเปญการตลาดสำหรับดึงดูดลูกค้าใหม่ด้วยพอร์ตจำลอง
                 </p>
@@ -294,7 +294,7 @@ export default function DemoChallengeAdminPage() {
                                 <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-3 opacity-50" />
                                 <h3 className="text-lg font-medium text-foreground">ยังไม่มีลูกทีมในแคมเปญ</h3>
                                 <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-                                    ก็อปปี้ลิ้งก์ด้านบนส่งให้ลูกค้าเพื่อชวนพวกเขามาร่วมสัมผัสประสบการณ์เทรดแบบ $100 Demo Challenge
+                                    ก็อปปี้ลิ้งก์ด้านบนส่งให้ลูกค้าเพื่อชวนพวกเขามาร่วมสัมผัสประสบการณ์เทรดแบบ Demo Challenge
                                 </p>
                             </div>
                         ) : (
@@ -311,7 +311,7 @@ export default function DemoChallengeAdminPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {users.map((user) => {
-                                            const growth = Number(user.current_balance) - 10000;
+                                            const growth = Number(user.current_balance) - 100000;
                                             return (
                                                 <TableRow key={user.id}>
                                                     <TableCell>
@@ -401,7 +401,7 @@ export default function DemoChallengeAdminPage() {
                                             if (leaderboardFilter === 1.5) return r > 1.25 && r <= 1.75;
                                             return r > 1.75;
                                         })).map((user, idx) => {
-                                            const growth = Number(user.current_balance) - 10000;
+                                            const growth = Number(user.current_balance) - 100000;
                                             let badge = <span className="font-bold text-muted-foreground">{idx + 1}</span>;
                                             if (idx === 0) badge = <span className="text-xl">🏆</span>;
                                             else if (idx === 1) badge = <span className="text-xl">🥈</span>;

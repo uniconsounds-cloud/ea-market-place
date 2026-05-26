@@ -33,9 +33,12 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     z: i
 }));
 
-export default function DemoFarmClient({ portNumber, initialOrders, initialPortStatus, scaleFactor = 0.1, demoBalance = 10000, customName, adminMessage, challengeStartDate }: { portNumber: string, initialOrders: any[], initialPortStatus?: any, scaleFactor: number, demoBalance: number, customName?: string, adminMessage?: string | null, challengeStartDate?: string }) {
+export default function DemoFarmClient({ portNumber, initialOrders, initialPortStatus, scaleFactor = 1.0, demoBalance = 100000, customName, adminMessage, challengeStartDate }: { portNumber: string, initialOrders: any[], initialPortStatus?: any, scaleFactor: number, demoBalance: number, customName?: string, adminMessage?: string | null, challengeStartDate?: string }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
-    const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
+    const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '100000.00', equity: '100000.00', account_type: 'USC' });
+    
+    // History states
+    const [historyTab, setHistoryTab] = useState<'my' | 'master'>('my');
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
     const [scale, setScale] = useState(1);
@@ -212,7 +215,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         supabase.from('farm_active_orders').select('*').eq('port_number', portNumber)
                     ]);
                     
-                    const proportionalRatio = 0.1 * scaleFactor;
+                    const proportionalRatio = 1.0;
                     if (statusRes.data) {
                         const newStatus = statusRes.data;
                         const masterBalance = Number(newStatus.balance) || 100000;
@@ -226,7 +229,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             sell_pnl: Number(newStatus.sell_pnl || 0) * proportionalRatio,
                             today_pnl: Number(newStatus.today_pnl || 0) * proportionalRatio,
                             today_closed_lots: Number(newStatus.today_closed_lots || 0) * proportionalRatio,
-                            daily_max_drawdown: Number(newStatus.daily_max_drawdown || 0) * scaleFactor,
+                            daily_max_drawdown: Number(newStatus.daily_max_drawdown || 0),
                             balance: demoBalance,
                             equity: demoBalance + floatingPnl
                         });
@@ -305,7 +308,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     if (payload.new) {
                         const newStatus = payload.new as any;
                         const masterBalance = Number(newStatus.balance) || 100000;
-                        const proportionalRatio = 0.1 * scaleFactor;
+                        const proportionalRatio = 1.0;
                         
                         const floatingPnl = Number(newStatus.floating_pnl || 0) * proportionalRatio;
                         setPortStatus({
@@ -317,7 +320,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             sell_pnl: Number(newStatus.sell_pnl || 0) * proportionalRatio,
                             today_pnl: Number(newStatus.today_pnl || 0) * proportionalRatio,
                             today_closed_lots: Number(newStatus.today_closed_lots || 0) * proportionalRatio,
-                            daily_max_drawdown: Number(newStatus.daily_max_drawdown || 0) * scaleFactor,
+                            daily_max_drawdown: Number(newStatus.daily_max_drawdown || 0),
                             balance: demoBalance,
                             equity: demoBalance + floatingPnl
                         });
@@ -329,7 +332,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 { event: '*', schema: 'public', table: 'farm_active_orders', filter: `port_number=eq.${portNumber}` },
                 (payload) => {
                     setPortStatus((currentStatus: any) => {
-                        const proportionalRatio = 0.1 * scaleFactor;
+                        const proportionalRatio = 1.0;
 
                         if (payload.eventType === 'INSERT') {
                             const newOrder = payload.new as any;
@@ -637,7 +640,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 .select('*')
                 .eq('port_number', portNumber)
                 .order('date', { ascending: false })
-                .limit(30);
+                .limit(60);
 
             if (data) {
                 setHistory(data.reverse());
@@ -667,8 +670,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         // Filter out the broker's "today" using Thailand timezone reference
         let filteredData = history.filter(item => item.date !== brokerDateStr);
         
-        // Filter out history before the user joined the challenge
-        if (challengeStartDate) {
+        // Filter out history before the user joined the challenge if viewing 'my' tab
+        if (historyTab === 'my' && challengeStartDate) {
             const startD = new Date(challengeStartDate);
             // Convert to YYYY-MM-DD in BKK timezone for accurate comparison
             const startStr = startD.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -678,7 +681,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         const accountType = portStatus?.account_type || 'USC';
 
         return filteredData.map(item => {
-            const proportionalRatio = 0.1 * scaleFactor;
+            const proportionalRatio = 1.0;
             const pnl = Number(item.profit) * proportionalRatio;
             const isUSD = accountType.toUpperCase().trim() === 'USD' || accountType.toUpperCase().trim() === 'STANDARD';
             const cents = isUSD ? pnl * 100 : pnl;
@@ -698,7 +701,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 asset
             };
         });
-    }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate]);
+    }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -915,29 +918,46 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
             {isClient && (
                 <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
-                    {/* Desktop header row */}
-                    <div className="hidden sm:flex justify-between px-6 pt-2 mb-1">
-                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
-                            Demo Harvest History (Scaled x{scaleFactor})
-                        </span>
-                        <div className="flex items-center gap-3">
+                    {/* Header row for both Mobile and Desktop */}
+                    <div className="flex justify-between items-center px-4 sm:px-6 pt-1.5 sm:pt-2 mb-1">
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            <span className="text-[8px] sm:text-[10px] text-amber-200/50 uppercase tracking-[0.1em] sm:tracking-[0.2em] font-bold">
+                                {historyTab === 'my' ? 'พอร์ตจำลองของฉัน' : 'พอร์ตต้นแบบ 60 วัน'}
+                            </span>
+                            <div className="flex gap-1 bg-black/40 p-0.5 rounded border border-amber-900/30">
+                                <button
+                                    onClick={() => setHistoryTab('my')}
+                                    className={`text-[8px] sm:text-[9px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded transition-all font-bold ${historyTab === 'my' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
+                                >
+                                    ของฉัน
+                                </button>
+                                <button
+                                    onClick={() => setHistoryTab('master')}
+                                    className={`text-[8px] sm:text-[9px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded transition-all font-bold ${historyTab === 'master' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
+                                >
+                                    พอร์ตหลัก
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
                             <button
                                 onClick={() => setShowLeaderboard(true)}
-                                className="flex items-center gap-1.5 text-[10px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 px-3.5 py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_15px_rgba(207,165,69,0.2)] hover:shadow-[0_0_20px_rgba(207,165,69,0.4)]"
+                                className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_15px_rgba(207,165,69,0.2)] hover:shadow-[0_0_20px_rgba(207,165,69,0.4)]"
                             >
-                                <Trophy className="w-3.5 h-3.5" />อันดับแคมเปญ
+                                <Trophy className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 animate-pulse" />อันดับ
                             </button>
                             <Link 
                                 href="/dashboard"
-                                className="flex items-center gap-1.5 text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-3.5 py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                                className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
                             >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                                กลับสู่หน้าหลัก Dashboard
+                                <svg className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                                <span className="hidden sm:inline">กลับแดชบอร์ด</span>
+                                <span className="sm:hidden">แดชบอร์ด</span>
                             </Link>
                         </div>
                     </div>
 
-                    {/* Crates scroll row (mobile: inline 90D button at END of scroll, desktop: fill remaining space) */}
+                    {/* Crates scroll row */}
                     <div
                         ref={historyScrollRef}
                         className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar"
@@ -955,23 +975,6 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 </div>
                             </div>
                         ))}
-
-                        {/* Mobile-only: Square Leaderboard button + 90D button at the end */}
-                        <button
-                            onClick={() => setShowLeaderboard(true)}
-                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-gradient-to-b from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/35 hover:to-[#996a22]/35 text-[#cfa545] border border-[#cfa545]/50 rounded-lg transition-colors ml-auto font-bold text-center px-1 shadow-[0_0_15px_rgba(207,165,69,0.2)]"
-                        >
-                            <Trophy className="w-5 h-5 mb-1 animate-pulse" />
-                            <span className="text-[8px] uppercase tracking-tighter">อันดับ</span>
-                        </button>
-
-                        <Link 
-                            href="/dashboard"
-                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 rounded-lg transition-colors font-bold text-center px-1"
-                        >
-                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                            <span className="text-[8px] uppercase tracking-tighter">แดชบอร์ด</span>
-                        </Link>
                     </div>
                 </div>
             )}
@@ -1016,22 +1019,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 ))}
                             </div>
 
-                            {/* Row 2: Risk Filter Buttons */}
-                            <div className="grid grid-cols-4 gap-1 bg-black/30 p-1 rounded-xl border border-amber-500/10 w-full">
-                                {(['all', 1.0, 1.5, 2.0] as const).map((filter) => (
-                                    <button
-                                        key={String(filter)}
-                                        onClick={() => setLeaderboardFilter(filter)}
-                                        className={`py-1 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
-                                            leaderboardFilter === filter
-                                                ? 'bg-[#cfa545] text-black shadow-[0_0_15px_rgba(207,165,69,0.5)]'
-                                                : 'hover:bg-white/5 text-amber-200/70'
-                                        }`}
-                                    >
-                                        {filter === 'all' ? '🌟 ทั้งหมด' : filter === 1.0 ? '🛡️ เซฟ' : filter === 1.5 ? '🚀 เติบโต' : '🔥 ซิ่ง'}
-                                    </button>
-                                ))}
-                            </div>
+                            {/* Row 2: Risk Filter Buttons Removed since risk multiplier is fixed to 1.0x */}
 
                             {/* Row 3: Period Offset Navigation */}
                             <div className="flex items-center justify-between w-full font-mono bg-black/30 px-3 py-1.5 rounded-xl border border-amber-500/10 text-[11px] sm:text-xs">
@@ -1072,7 +1060,6 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 const activeStatus = masterPortStatusData || initialPortStatus;
 
                                 const usersWithPeriodPnl = leaderboardUsers.map(u => {
-                                    const risk = Number(u.risk_level) || 1.0;
                                     const portNum = u.master_port_number || portNumber || '100000';
                                     const joinDateStr = u.join_date ? String(u.join_date).split('T')[0] : '2000-01-01';
                                     const isBeforeJoin = endStr < joinDateStr;
@@ -1093,7 +1080,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                         }
                                     }
 
-                                    const periodGrowth = totalMasterPnl * 0.1 * risk;
+                                    const periodGrowth = totalMasterPnl; // 1:1 replication
 
                                     // Calculate all-time cumulative profit since join_date for true live current balance
                                     const allTimeHistRows = sourceHistory.filter(h => {
@@ -1108,14 +1095,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                             allTimeMasterPnl += Number(activeStatus.today_pnl || 0);
                                         }
                                     }
-                                    const allTimeGrowth = allTimeMasterPnl * 0.1 * risk;
-                                    const liveCurrentBalance = 10000 + allTimeGrowth;
+                                    const allTimeGrowth = allTimeMasterPnl; // 1:1 replication
+                                    const liveCurrentBalance = 100000 + allTimeGrowth; // starting balance 100,000 USC
 
                                     return {
                                         ...u,
                                         periodGrowth,
                                         isBeforeJoin,
-                                        current_balance: periodOffset === 0 ? liveCurrentBalance : 10000 + periodGrowth
+                                        current_balance: periodOffset === 0 ? liveCurrentBalance : 100000 + periodGrowth
                                     };
                                 }).filter(u => {
                                     const r = Number(u.risk_level);
@@ -1169,11 +1156,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                                                 )}
                                                             </div>
                                                             <div className="text-xs text-amber-200/60 mt-0.5">
-                                                                {Number(user.risk_level) < 1.5 
-                                                                    ? `🛡️ สายเซฟ (x${Number(user.risk_level).toFixed(1)})` 
-                                                                    : Number(user.risk_level) < 2.0 
-                                                                    ? `🚀 สายเติบโต (x${Number(user.risk_level).toFixed(1)})` 
-                                                                    : `🔥 สายซิ่ง (x${Number(user.risk_level).toFixed(1)})`}
+                                                                🛡️ ติดตามพอร์ตต้นแบบ (x1.00)
                                                             </div>
                                                         </div>
                                                     </div>
