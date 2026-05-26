@@ -437,6 +437,16 @@ export function FarmMobileStatsOverlay({
     customName?: string;
     adminMessage?: string | null;
 }) {
+    const [messageIndex, setMessageIndex] = useState(0);
+
+    useEffect(() => {
+        if (!adminMessage) return;
+        const msgTimer = setInterval(() => {
+            setMessageIndex(prev => (prev === 0 ? 1 : 0));
+        }, 6000);
+        return () => clearInterval(msgTimer);
+    }, [adminMessage]);
+
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
 
@@ -510,15 +520,19 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Center Welcome/Port Name Section (The Red Area) */}
-            <div className="flex-1 mx-2 flex flex-col justify-start items-center h-[80px] pt-1">
-                {/* Port Name */}
-                <div className="text-[10px] font-black text-amber-200 text-center tracking-widest line-clamp-1 leading-tight mt-0.5 uppercase">
-                    {customName ? customName : `PORT: ${portNumber}`}
+            <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
+                <div className={`absolute inset-0 flex flex-col justify-center items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+                    <span className="text-[8px] text-white/30 tracking-widest uppercase leading-none mb-1">Port Name</span>
+                    <div className="text-[10px] font-black text-amber-200 text-center tracking-widest line-clamp-2 leading-tight uppercase">
+                        {customName ? customName : `PORT: ${portNumber}`}
+                    </div>
                 </div>
-                {/* Welcome Message / Admin Ticker */}
                 {adminMessage && (
-                    <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide mt-1 leading-tight px-1 max-h-[48px] overflow-y-auto no-scrollbar">
-                        {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
+                    <div className={`absolute inset-0 flex flex-col justify-center items-center w-full px-1 transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+                        <span className="text-[8px] text-white/30 tracking-widest uppercase leading-none mb-1">Message</span>
+                        <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-tight line-clamp-3">
+                            {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
+                        </div>
                     </div>
                 )}
             </div>

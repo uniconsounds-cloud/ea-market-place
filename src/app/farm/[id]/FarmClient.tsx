@@ -35,12 +35,14 @@ export default function FarmClient({
     portNumber, 
     initialOrders, 
     initialPortStatus,
-    licenseCreatedAt 
+    licenseCreatedAt,
+    customName
 }: { 
     portNumber: string;
     initialOrders: any[];
     initialPortStatus?: any;
     licenseCreatedAt: string | null;
+    customName?: string | null;
 }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
@@ -626,6 +628,7 @@ export default function FarmClient({
             {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
+                    title={customName ? `${customName.toUpperCase()} (${portNumber})` : undefined}
                     portNumber={portNumber}
                     balance={Number(portStatus?.balance) || 0}
                     equity={Number(portStatus?.equity) || 0}
@@ -686,6 +689,7 @@ export default function FarmClient({
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
+                customName={customName || undefined}
             />
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">

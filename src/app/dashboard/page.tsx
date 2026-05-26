@@ -29,6 +29,7 @@ interface ProductItem {
     is_ib?: boolean;
     ib_broker_name?: string;
     show_farm?: boolean;
+    port_name?: string;
 }
 
 interface GroupedProduct {
@@ -50,6 +51,35 @@ export default function DashboardPage() {
     const [rejectedIbRequests, setRejectedIbRequests] = useState<any[]>([]);
     const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
     const [hasDemoChallenge, setHasDemoChallenge] = useState<boolean>(false);
+    const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
+    const [tempPortName, setTempPortName] = useState<string>('');
+    const [savingPortName, setSavingPortName] = useState<boolean>(false);
+
+    const handleSavePortName = async (licenseId: string) => {
+        setSavingPortName(true);
+        try {
+            const { error } = await supabase
+                .from('licenses')
+                .update({ port_name: tempPortName })
+                .eq('id', licenseId);
+
+            if (error) throw error;
+
+            // Update state locally
+            setGroupedProducts(prev => prev.map(group => ({
+                ...group,
+                items: group.items.map(item => 
+                    item.id === licenseId ? { ...item, port_name: tempPortName } : item
+                )
+            })));
+
+            setEditingLicenseId(null);
+        } catch (error: any) {
+            alert('เกิดข้อผิดพลาดในการบันทึกชื่อพอร์ต: ' + error.message);
+        } finally {
+            setSavingPortName(false);
+        }
+    };
 
     const handleDeleteItem = async (id: string, source: 'license' | 'order') => {
         const confirmMsg = source === 'license' 
@@ -121,7 +151,7 @@ export default function DashboardPage() {
             const { data: licensesData } = await supabase
                 .from('licenses')
                 .select(`
-                    id, product_id, type, expiry_date, is_active, account_number, created_at, show_farm,
+                    id, product_id, type, expiry_date, is_active, account_number, created_at, show_farm, port_name,
                     products ( id, name, image_url, file_url, product_key )
                 `)
                 .eq('user_id', user.id);
@@ -475,6 +505,49 @@ export default function DashboardPage() {
                                                                                     'สิทธิ์ใช้งานตลอดชีพ (Lifetime)'}
                                                                     </div>
                                                                 </div>
+                                                                {!isOrder && item.account_number && (
+                                                                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                                        <span className="text-[10px] text-amber-500/80 uppercase tracking-wider font-bold">ชื่อพอร์ต:</span>
+                                                                        {editingLicenseId === item.id ? (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <input 
+                                                                                    type="text" 
+                                                                                    value={tempPortName}
+                                                                                    onChange={(e) => setTempPortName(e.target.value)}
+                                                                                    className="bg-stone-900 border border-amber-900/30 px-1.5 py-0.5 rounded text-xs text-amber-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 w-36 h-6"
+                                                                                    placeholder="ตั้งชื่อพอร์ต..."
+                                                                                    maxLength={24}
+                                                                                />
+                                                                                <button 
+                                                                                    onClick={() => handleSavePortName(item.id)}
+                                                                                    disabled={savingPortName}
+                                                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded h-6 disabled:opacity-50 transition-colors"
+                                                                                >
+                                                                                    {savingPortName ? '...' : 'บันทึก'}
+                                                                                </button>
+                                                                                <button 
+                                                                                    onClick={() => setEditingLicenseId(null)}
+                                                                                    className="bg-stone-700 hover:bg-stone-600 text-white text-[10px] font-bold px-2 py-0.5 rounded h-6 transition-colors"
+                                                                                >
+                                                                                    ยกเลิก
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="font-semibold text-stone-200">{item.port_name || 'ยังไม่ได้ตั้งชื่อ'}</span>
+                                                                                <button 
+                                                                                    onClick={() => {
+                                                                                        setEditingLicenseId(item.id);
+                                                                                        setTempPortName(item.port_name || '');
+                                                                                    }}
+                                                                                    className="text-amber-500 hover:text-amber-400 text-[10px] font-bold hover:underline transition-colors flex items-center gap-0.5"
+                                                                                >
+                                                                                    ✏️ แก้ไขชื่อ
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
 

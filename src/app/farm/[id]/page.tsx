@@ -25,7 +25,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     // 3. Fetch License Owner & registration date
     const { data: license } = await supabase
         .from('licenses')
-        .select('user_id, created_at')
+        .select('user_id, created_at, port_name')
         .eq('account_number', portNumber)
         .single();
 
@@ -78,6 +78,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 initialOrders={initialOrders || []}
                 initialPortStatus={portStatus || null}
                 licenseCreatedAt={license?.created_at || null}
+                customName={license?.port_name || null}
             />
         </div>
     );
