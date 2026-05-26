@@ -369,19 +369,6 @@ export default function FarmHud({
                            />
                         </div>
 
-                        {/* Broadcast / Custom Name Ticker */}
-                        {isClient && (customName || adminMessage) && (
-                            <div className="relative h-4 sm:h-5 mt-1 sm:mt-1.5 overflow-hidden w-full bg-black/20 rounded-sm">
-                                <div className={`absolute inset-0 flex justify-center items-center w-full px-2 text-[9px] sm:text-[10px] font-bold tracking-widest transition-all duration-700 ease-in-out ${messageIndex === 0 ? 'translate-y-0 opacity-100 text-amber-200' : '-translate-y-full opacity-0'}`}>
-                                    {customName ? customName : '🎯 MY DEMO PORT'}
-                                </div>
-                                {adminMessage && (
-                                    <div className={`absolute inset-0 flex justify-center items-center w-full px-2 text-[9px] sm:text-[10px] font-bold tracking-widest transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100 text-[#4de180]' : 'translate-y-full opacity-0'}`}>
-                                        {adminMessage}
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -432,6 +419,8 @@ export function FarmMobileStatsOverlay({
     accountType,
     totalStandardLots,
     isShaking,
+    customName,
+    adminMessage,
 }: {
     portNumber: string;
     buyCount: number;
@@ -445,6 +434,8 @@ export function FarmMobileStatsOverlay({
     accountType: string;
     totalStandardLots: number;
     isShaking?: boolean;
+    customName?: string;
+    adminMessage?: string | null;
 }) {
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
@@ -516,6 +507,20 @@ export function FarmMobileStatsOverlay({
                         <AnimatedNumber value={sellPnl} formatter={v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`} colorClass={sellPnl >= 0 ? 'text-orange-400/80' : 'text-red-400/80'} />
                     </div>
                 </div>
+            </div>
+
+            {/* Center Welcome/Port Name Section (The Red Area) */}
+            <div className="flex-1 mx-2 flex flex-col justify-start items-center h-[80px] pt-1">
+                {/* Port Name */}
+                <div className="text-[10px] font-black text-amber-200 text-center tracking-widest line-clamp-1 leading-tight mt-0.5 uppercase">
+                    {customName ? customName : `PORT: ${portNumber}`}
+                </div>
+                {/* Welcome Message / Admin Ticker */}
+                {adminMessage && (
+                    <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide mt-1 leading-tight px-1 max-h-[48px] overflow-y-auto no-scrollbar">
+                        {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
+                    </div>
+                )}
             </div>
 
             {/* Right side Today Result Box */}
