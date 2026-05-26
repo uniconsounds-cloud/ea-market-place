@@ -742,11 +742,31 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
+    const [isScrolledLeft, setIsScrolledLeft] = useState(false);
+
     useEffect(() => {
         if (historyScrollRef.current) {
             historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth;
         }
     }, [isClient, dailyHistory]);
+
+    useEffect(() => {
+        const el = historyScrollRef.current;
+        if (!el) return;
+
+        const handleScroll = () => {
+            const isAtEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 15;
+            setIsScrolledLeft(!isAtEnd);
+        };
+
+        el.addEventListener('scroll', handleScroll);
+        const timer = setTimeout(handleScroll, 200);
+
+        return () => {
+            el.removeEventListener('scroll', handleScroll);
+            clearTimeout(timer);
+        };
+    }, [dailyHistory, isClient]);
 
     const handleSecretToggle = () => {
         if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
@@ -955,7 +975,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             </div>
 
             {isClient && (
-                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-row items-center justify-between px-3 sm:px-6 py-1 sm:py-2 gap-3 sm:gap-6">
+                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-row items-center justify-between px-1.5 sm:px-4 py-0.5 sm:py-1.5 gap-1.5 sm:gap-4">
                     {/* Crates scroll row (Left side, flex-1) */}
                     <div
                         ref={historyScrollRef}
@@ -977,23 +997,27 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     </div>
 
                     {/* Divider line */}
-                    <div className="w-[1px] h-14 sm:h-24 bg-amber-900/30 flex-shrink-0" />
+                    <div className={`w-[1px] h-14 sm:h-24 bg-amber-900/30 flex-shrink-0 transition-all duration-300 ${
+                        isScrolledLeft ? 'max-sm:scale-x-0 max-sm:w-0 max-sm:opacity-0' : ''
+                    }`} />
 
                     {/* Controls row (Right side, flex-shrink-0) */}
-                    <div className="flex-shrink-0 flex flex-col items-end justify-center gap-1 sm:gap-1.5 pr-0.5 sm:pr-2 w-[150px] sm:w-[220px]">
+                    <div className={`flex-shrink-0 flex flex-col items-end justify-start gap-0.5 sm:gap-1 w-[155px] sm:w-[235px] h-full py-0.5 sm:py-1.5 transition-all duration-300 ease-in-out ${
+                        isScrolledLeft ? 'max-sm:translate-x-full max-sm:opacity-0 max-sm:w-0 max-sm:pr-0 max-sm:pointer-events-none' : ''
+                    }`}>
                         {/* Header showing single line of text with lookback days */}
-                        <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black tracking-wide whitespace-nowrap mb-0.5">
+                        <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black tracking-wide whitespace-nowrap leading-none select-none self-end mt-0">
                             {historyTab === 'my' 
                                 ? `พอร์ตติดตาม (ย้อนหลัง ${dailyHistory.length} วัน)` 
                                 : `พอร์ตต้นแบบ (ย้อนหลัง ${dailyHistory.length} วัน)`}
                         </span>
 
                         {/* 2x2 Grid of equal buttons */}
-                        <div className="grid grid-cols-2 gap-1 w-full">
+                        <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full flex-1">
                             {/* ของฉัน Button */}
                             <button
                                 onClick={() => setHistoryTab('my')}
-                                className={`text-[7px] sm:text-[9px] py-1 sm:py-1.5 rounded transition-all font-black text-center whitespace-nowrap border flex items-center justify-center ${
+                                className={`text-[9px] sm:text-[11px] w-full h-full rounded transition-all font-black text-center whitespace-nowrap border flex items-center justify-center ${
                                     historyTab === 'my' 
                                         ? 'bg-[#cfa545] text-black border-[#cfa545] shadow-[0_0_10px_rgba(207,165,69,0.3)]' 
                                         : 'bg-black/40 text-amber-200/60 border-amber-900/30 hover:text-white hover:bg-black/60'
@@ -1005,7 +1029,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             {/* พอร์ตหลัก Button */}
                             <button
                                 onClick={() => setHistoryTab('master')}
-                                className={`text-[7px] sm:text-[9px] py-1 sm:py-1.5 rounded transition-all font-black text-center whitespace-nowrap border flex items-center justify-center ${
+                                className={`text-[9px] sm:text-[11px] w-full h-full rounded transition-all font-black text-center whitespace-nowrap border flex items-center justify-center ${
                                     historyTab === 'master' 
                                         ? 'bg-[#cfa545] text-black border-[#cfa545] shadow-[0_0_10px_rgba(207,165,69,0.3)]' 
                                         : 'bg-black/40 text-amber-200/60 border-amber-900/30 hover:text-white hover:bg-black/60'
@@ -1017,18 +1041,18 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             {/* อันดับ Button */}
                             <button
                                 onClick={() => setShowLeaderboard(true)}
-                                className="flex items-center justify-center gap-1 text-[7px] sm:text-[9px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 py-1 sm:py-1.5 rounded transition-all font-black uppercase whitespace-nowrap shadow-[0_0_10px_rgba(207,165,69,0.1)] hover:shadow-[0_0_15px_rgba(207,165,69,0.3)]"
+                                className="flex items-center justify-center gap-1 text-[9px] sm:text-[11px] w-full h-full bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 rounded transition-all font-black uppercase whitespace-nowrap shadow-[0_0_10px_rgba(207,165,69,0.1)] hover:shadow-[0_0_15px_rgba(207,165,69,0.3)]"
                             >
-                                <Trophy className="w-2 h-2 sm:w-3 sm:h-3 animate-pulse" />
+                                <Trophy className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 animate-pulse" />
                                 <span>อันดับ</span>
                             </button>
 
                             {/* แดชบอร์ด Link Button */}
                             <Link 
                                 href="/dashboard"
-                                className="flex items-center justify-center gap-1 text-[7px] sm:text-[9px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 py-1 sm:py-1.5 rounded transition-all font-black uppercase whitespace-nowrap shadow-[0_0_8px_rgba(245,158,11,0.05)] hover:shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                                className="flex items-center justify-center gap-1 text-[9px] sm:text-[11px] w-full h-full bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 rounded transition-all font-black uppercase whitespace-nowrap shadow-[0_0_8px_rgba(245,158,11,0.05)] hover:shadow-[0_0_12px_rgba(245,158,11,0.2)]"
                             >
-                                <svg className="w-2 h-2 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                 </svg>
                                 <span>แดชบอร์ด</span>
