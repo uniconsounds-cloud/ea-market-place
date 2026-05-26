@@ -57,7 +57,7 @@ export default async function DemoFarmPage() {
             .single();
         if (referrer) {
             if (referrer.demo_broadcast_message) {
-                adminMessage = referrer.demo_broadcast_message;
+                adminMessage = referrer.demo_broadcast_message.replaceAll('$100 Demo Challenge', 'EasyM Live Tracker');
             }
             if (referrer.demo_master_port) {
                 customMasterPort = referrer.demo_master_port;

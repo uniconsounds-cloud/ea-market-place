@@ -71,7 +71,7 @@ export default function DemoChallengeAdminPage() {
                 .eq('id', user.id)
                 .single();
             if (profile) {
-                if (profile.demo_broadcast_message) setBroadcastMessage(profile.demo_broadcast_message);
+                if (profile.demo_broadcast_message) setBroadcastMessage(profile.demo_broadcast_message.replaceAll('$100 Demo Challenge', 'EasyM Live Tracker'));
                 else setBroadcastMessage("💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀");
                 
                 if (profile.demo_master_port) setDemoMasterPort(profile.demo_master_port);
@@ -208,7 +208,7 @@ export default function DemoChallengeAdminPage() {
                                 <span className="text-3xl font-bold text-foreground">{users.length} <span className="text-lg font-normal text-muted-foreground">คน</span></span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-sm text-muted-foreground">รวมยอดพอร์ตจำลอง</span>
+                                <span className="text-sm text-muted-foreground">รวมยอดพอร์ต EasyM Live Tracker</span>
                                 <span className="text-3xl font-bold text-foreground">
                                     {users.reduce((sum, u) => sum + Number(u.current_balance), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     <span className="text-lg font-normal text-muted-foreground"> USC</span>
@@ -283,7 +283,7 @@ export default function DemoChallengeAdminPage() {
                             รายชื่อลูกทีมที่เข้าร่วมโครงการ
                         </CardTitle>
                         <CardDescription>
-                            แสดงรายการลูกค้าที่สมัครผ่านลิ้งก์ของคุณ และระดับความเสี่ยงที่พวกเขาเลือก
+                            แสดงรายการลูกค้าที่สมัครผ่านลิ้งก์ของคุณ
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -303,7 +303,7 @@ export default function DemoChallengeAdminPage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>อีเมลลูกค้า</TableHead>
-                                            <TableHead className="text-right">พอร์ตจำลอง (USC)</TableHead>
+                                            <TableHead className="text-right">พอร์ต EasyM Live Tracker (USC)</TableHead>
                                             <TableHead className="text-right">เข้าร่วมเมื่อ</TableHead>
                                             <TableHead className="text-right">จัดการ</TableHead>
                                         </TableRow>
@@ -376,7 +376,7 @@ export default function DemoChallengeAdminPage() {
                                         <TableRow>
                                             <TableHead className="w-16 text-center">อันดับ</TableHead>
                                             <TableHead>นักลงทุน</TableHead>
-                                            <TableHead className="text-right">พอร์ตจำลอง (USC)</TableHead>
+                                            <TableHead className="text-right">พอร์ต EasyM Live Tracker (USC)</TableHead>
                                             <TableHead className="text-right">กำไรสุทธิ</TableHead>
                                         </TableRow>
                                     </TableHeader>
