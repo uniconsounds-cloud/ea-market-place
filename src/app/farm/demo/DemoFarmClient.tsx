@@ -955,50 +955,11 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             </div>
 
             {isClient && (
-                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
-                    {/* Header row for both Mobile and Desktop */}
-                    <div className="flex justify-between items-center px-4 sm:px-6 pt-1.5 sm:pt-2 mb-1">
-                        <div className="flex items-center gap-2 sm:gap-4">
-                            <span className="text-[8px] sm:text-[10px] text-amber-200/50 uppercase tracking-[0.1em] sm:tracking-[0.2em] font-bold">
-                                {historyTab === 'my' ? 'พอร์ตติดตามของฉัน' : 'พอร์ตต้นแบบ 60 วัน'}
-                            </span>
-                            <div className="flex gap-1 bg-black/40 p-0.5 rounded border border-amber-900/30">
-                                <button
-                                    onClick={() => setHistoryTab('my')}
-                                    className={`text-[8px] sm:text-[9px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded transition-all font-bold ${historyTab === 'my' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
-                                >
-                                    ของฉัน
-                                </button>
-                                <button
-                                    onClick={() => setHistoryTab('master')}
-                                    className={`text-[8px] sm:text-[9px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded transition-all font-bold ${historyTab === 'master' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
-                                >
-                                    พอร์ตหลัก
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <button
-                                onClick={() => setShowLeaderboard(true)}
-                                className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_15px_rgba(207,165,69,0.2)] hover:shadow-[0_0_20px_rgba(207,165,69,0.4)]"
-                            >
-                                <Trophy className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 animate-pulse" />อันดับ
-                            </button>
-                            <Link 
-                                href="/dashboard"
-                                className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
-                            >
-                                <svg className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                                <span className="hidden sm:inline">กลับแดชบอร์ด</span>
-                                <span className="sm:hidden">แดชบอร์ด</span>
-                            </Link>
-                        </div>
-                    </div>
-
-                    {/* Crates scroll row */}
+                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-row items-center justify-between px-3 sm:px-6 py-1 sm:py-2 gap-3 sm:gap-6">
+                    {/* Crates scroll row (Left side, flex-1) */}
                     <div
                         ref={historyScrollRef}
-                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar"
+                        className="flex-1 overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 py-1 sm:py-2 no-scrollbar"
                     >
                         {dailyHistory.map((item) => (
                             <div key={item.id} className="flex-shrink-0 flex flex-col items-center group">
@@ -1013,6 +974,50 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Divider line */}
+                    <div className="w-[1px] h-14 sm:h-24 bg-amber-900/30 flex-shrink-0" />
+
+                    {/* Controls row (Right side, flex-shrink-0) */}
+                    <div className="flex-shrink-0 flex flex-col items-end gap-1.5 sm:gap-2.5 pr-0.5 sm:pr-2">
+                        {/* Header and Tab switcher */}
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-3">
+                            <span className="text-[7px] sm:text-[9px] text-amber-200/50 uppercase tracking-[0.1em] font-black text-right whitespace-nowrap">
+                                {historyTab === 'my' ? 'พอร์ตติดตาม' : 'พอร์ตต้นแบบ'}
+                            </span>
+                            <div className="flex gap-0.5 bg-black/40 p-0.5 rounded border border-amber-900/30">
+                                <button
+                                    onClick={() => setHistoryTab('my')}
+                                    className={`text-[7px] sm:text-[8px] px-1.5 sm:px-2 py-0.5 rounded transition-all font-bold whitespace-nowrap ${historyTab === 'my' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
+                                >
+                                    ของฉัน
+                                </button>
+                                <button
+                                    onClick={() => setHistoryTab('master')}
+                                    className={`text-[7px] sm:text-[8px] px-1.5 sm:px-2 py-0.5 rounded transition-all font-bold whitespace-nowrap ${historyTab === 'master' ? 'bg-[#cfa545] text-black' : 'text-amber-200/60 hover:text-white'}`}
+                                >
+                                    พอร์ตหลัก
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Leaderboard and Back to dashboard buttons */}
+                        <div className="flex gap-1 sm:gap-2">
+                            <button
+                                onClick={() => setShowLeaderboard(true)}
+                                className="flex items-center gap-1 text-[7px] sm:text-[9px] bg-gradient-to-r from-[#cfa545]/20 to-[#996a22]/20 hover:from-[#cfa545]/40 hover:to-[#996a22]/40 text-[#cfa545] border border-[#cfa545]/50 px-1.5 sm:px-3 py-0.5 sm:py-1 rounded transition-all uppercase font-bold shadow-[0_0_15px_rgba(207,165,69,0.2)] hover:shadow-[0_0_20px_rgba(207,165,69,0.4)] whitespace-nowrap"
+                            >
+                                <Trophy className="w-2 h-2 sm:w-3 sm:h-3 animate-pulse" />อันดับ
+                            </button>
+                            <Link 
+                                href="/dashboard"
+                                className="flex items-center gap-1 text-[7px] sm:text-[9px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 px-1.5 sm:px-3 py-0.5 sm:py-1 rounded transition-all uppercase font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)] whitespace-nowrap"
+                            >
+                                <svg className="w-2 h-2 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                                <span>แดชบอร์ด</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             )}
