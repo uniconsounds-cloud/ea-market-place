@@ -122,6 +122,8 @@ export default async function DemoFarmPage() {
                 customName={customName}
                 adminMessage={finalAdminMessage}
                 challengeStartDate={challenge.created_at}
+                userId={user.id}
+                referrerId={referrerIdToCheck}
             />
         </div>
     );

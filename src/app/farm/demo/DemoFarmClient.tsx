@@ -33,10 +33,20 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     z: i
 }));
 
-export default function DemoFarmClient({ portNumber, initialOrders, initialPortStatus, scaleFactor = 1.0, demoBalance = 100000, customName, adminMessage, challengeStartDate }: { portNumber: string, initialOrders: any[], initialPortStatus?: any, scaleFactor: number, demoBalance: number, customName?: string, adminMessage?: string | null, challengeStartDate?: string }) {
+export default function DemoFarmClient({ portNumber, initialOrders, initialPortStatus, scaleFactor = 1.0, demoBalance = 100000, customName, adminMessage, challengeStartDate, userId, referrerId }: { portNumber: string, initialOrders: any[], initialPortStatus?: any, scaleFactor: number, demoBalance: number, customName?: string, adminMessage?: string | null, challengeStartDate?: string, userId?: string, referrerId?: string }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '100000.00', equity: '100000.00', account_type: 'USC' });
+    const [currentCustomName, setCurrentCustomName] = useState(customName || '');
+    const [currentAdminMessage, setCurrentAdminMessage] = useState(adminMessage || '');
     
+    useEffect(() => {
+        if (customName) setCurrentCustomName(customName);
+    }, [customName]);
+
+    useEffect(() => {
+        if (adminMessage) setCurrentAdminMessage(adminMessage);
+    }, [adminMessage]);
+
     // History states
     const [historyTab, setHistoryTab] = useState<'my' | 'master'>('my');
     const [time, setTime] = useState<Date | null>(null);
@@ -366,8 +376,38 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         return currentStatus; // Return unmodified to avoid state update loops
                     });
                 }
-            )
-            .subscribe();
+            );
+
+        if (userId) {
+            channel.on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'demo_challenges', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    if (payload.new && (payload.new as any).port_name) {
+                        setCurrentCustomName((payload.new as any).port_name);
+                    }
+                }
+            );
+        }
+
+        if (referrerId) {
+            channel.on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${referrerId}` },
+                (payload) => {
+                    if (payload.new) {
+                        const newMsg = (payload.new as any).demo_broadcast_message;
+                        if (newMsg) {
+                            setCurrentAdminMessage(newMsg.replaceAll('$100 Demo Challenge', 'EasyM Live Tracker'));
+                        } else {
+                            setCurrentAdminMessage("💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀");
+                        }
+                    }
+                }
+            );
+        }
+
+        channel.subscribe();
 
         // [ON-DEMAND SYNC] Signal to the server that we are actively viewing this port
         const pingInterval = setInterval(async () => {
@@ -381,7 +421,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             supabase.removeChannel(channel); 
             clearInterval(pingInterval);
         };
-    }, [portNumber, isTabVisible, isIdle, scaleFactor, demoBalance]);
+    }, [portNumber, isTabVisible, isIdle, scaleFactor, demoBalance, userId, referrerId]);
 
     // --- Dynamic Theming ---
     const rawAsset = portStatus?.asset_type || 'GOLD';
@@ -831,8 +871,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
                     title="EASYM LIVE TRACKER"
-                    customName={customName}
-                    adminMessage={adminMessage}
+                    customName={currentCustomName}
+                    adminMessage={currentAdminMessage}
                     portNumber={portNumber}
                     balance={stats.balance}
                     equity={stats.equity}
@@ -893,8 +933,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
-                customName={customName}
-                adminMessage={adminMessage}
+                customName={currentCustomName}
+                adminMessage={currentAdminMessage}
             />
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">

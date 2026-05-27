@@ -46,6 +46,12 @@ export default function FarmClient({
 }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
+    const [currentCustomName, setCurrentCustomName] = useState(customName || '');
+    
+    useEffect(() => {
+        if (customName) setCurrentCustomName(customName);
+    }, [customName]);
+
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
     const [scale, setScale] = useState(1);
@@ -213,6 +219,17 @@ export default function FarmClient({
                             });
                         }
                         setOrders(prev => prev.filter(o => o.ticket_id !== payload.old.ticket_id));
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'licenses', filter: `account_number=eq.${portNumber}` },
+                (payload) => {
+                    if (payload.new && (payload.new as any).port_name) {
+                        setCurrentCustomName((payload.new as any).port_name);
+                    } else {
+                        setCurrentCustomName('');
                     }
                 }
             )
@@ -628,7 +645,7 @@ export default function FarmClient({
             {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
-                    title={customName ? `${customName.toUpperCase()} (${portNumber})` : undefined}
+                    title={currentCustomName ? `${currentCustomName.toUpperCase()} (${portNumber})` : undefined}
                     portNumber={portNumber}
                     balance={Number(portStatus?.balance) || 0}
                     equity={Number(portStatus?.equity) || 0}
@@ -689,7 +706,7 @@ export default function FarmClient({
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
-                customName={customName || undefined}
+                customName={currentCustomName || undefined}
             />
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
