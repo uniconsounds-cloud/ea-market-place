@@ -75,7 +75,8 @@ export async function POST(req: Request) {
                     last_ping: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                     today_pnl: payload.today_profit || 0,
-                    daily_max_drawdown: payload.daily_max_drawdown || 0
+                    daily_max_drawdown: payload.daily_max_drawdown || 0,
+                    today_closed_lots: payload.today_closed_lots || 0
                 }, { onConflict: 'port_number' });
 
             if (portStatusError) console.error('Sync Error (Port Status):', portStatusError);
