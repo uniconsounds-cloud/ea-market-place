@@ -893,6 +893,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
+                customName={customName}
+                adminMessage={adminMessage}
             />
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
