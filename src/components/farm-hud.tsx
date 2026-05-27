@@ -521,16 +521,14 @@ export function FarmMobileStatsOverlay({
 
             {/* Center Welcome/Port Name Section (The Red Area) */}
             <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
-                <div className={`absolute inset-0 flex flex-col justify-center items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
-                    <span className="text-[8px] text-white/30 tracking-widest uppercase leading-none mb-1">Port Name</span>
-                    <div className="text-[10px] font-black text-amber-200 text-center tracking-widest line-clamp-2 leading-tight uppercase">
+                <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+                    <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none">
                         {customName ? customName : `PORT: ${portNumber}`}
                     </div>
                 </div>
                 {adminMessage && (
-                    <div className={`absolute inset-0 flex flex-col justify-center items-center w-full px-1 transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
-                        <span className="text-[8px] text-white/30 tracking-widest uppercase leading-none mb-1">Message</span>
-                        <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-tight line-clamp-3">
+                    <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+                        <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-none truncate w-full">
                             {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
                         </div>
                     </div>
