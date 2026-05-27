@@ -415,36 +415,109 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
    if(days_to_sync <= 0) return false;
    if(days_to_sync > 30) days_to_sync = 30;
    
-   string json_array = "[";
-   bool first = true;
-   
    datetime now = TimeCurrent();
    datetime today_start = (now / 86400) * 86400;
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
    
+   // Pre-allocate daily summary array
+   EAE_DailySummary summaries[];
+   ArrayResize(summaries, days_to_sync);
    for(int i = 0; i < days_to_sync; i++)
    {
-      datetime target_day = today_start - (i * 86400);
-      EAE_DailySummary sum;
-      if(EAE_ScanHistoryDailySummary(target_day, magicB, magicS, sum))
+      ZeroMemory(summaries[i]);
+      summaries[i].date          = today_start - (i * 86400);
+      summaries[i].account_login = login;
+      // For the current day (i == 0), retrieve max drawdown from global variables
+      if(i == 0)
       {
-         if(!first) json_array += ",";
-         
-         string date_str = TimeToString(sum.date, TIME_DATE);
-         StringReplace(date_str, ".", "-"); // Convert YYYY.MM.DD to YYYY-MM-DD
-         
-         json_array += "{";
-         json_array += "\"date\":\"" + date_str + "\",";
-         json_array += "\"profit\":" + DoubleToString(sum.total_profit, 2) + ",";
-         json_array += "\"lots\":" + DoubleToString(sum.total_lots, 2) + ",";
-         json_array += "\"max_dd\":" + DoubleToString(sum.max_dd_pct, 2);
-         json_array += "}";
-         first = false;
+         summaries[i].max_dd_pct = EAE_GetDailyMaxDrawdownPct();
+      }
+      else
+      {
+         summaries[i].max_dd_pct = 0.0;
       }
    }
-   json_array += "]";
    
-   if(first) return true; // No data found, but count it as success
+   // Select history once for the entire range (from start of the oldest day in the batch to now)
+   datetime start_time = today_start - (days_to_sync * 86400);
+   if(HistorySelect(start_time, now))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket <= 0) continue;
+         
+         long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+         {
+            datetime deal_time = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
+            datetime deal_day_start = (deal_time / 86400) * 86400;
+            long diff_sec = today_start - deal_day_start;
+            if(diff_sec < 0) continue; // Deal in the future
+            
+            int idx = (int)(diff_sec / 86400);
+            if(idx < 0 || idx >= days_to_sync) continue; // Deal outside the batch window
+            
+            long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+            long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+            bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
+            bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
+            
+            if(magicB == magicS) {
+               if(magicB != 0 && (magic < magicB || magic >= magicB + 100)) continue;
+            }
+            else {
+               if(is_buy_side) {
+                  if(magicB != 0 && magic != magicB) continue;
+               }
+               else if(is_sell_side) {
+                  if(magicS != 0 && magic != magicS) continue;
+               }
+            }
+            
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+            summaries[idx].total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+            
+            string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+            if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
+            {
+               if(magicB == magicS) {
+                  if(magic >= magicB && magic < magicB + 100) {
+                     summaries[idx].buy_cycles++;
+                  }
+               }
+               else {
+                  if(magic == magicB) summaries[idx].buy_cycles++;
+                  else if(magic == magicS) summaries[idx].sell_cycles++;
+               }
+            }
+         }
+      }
+   }
+   else
+   {
+      Print("EAE WebSync: HistorySelect failed for range from ", TimeToString(start_time), " to ", TimeToString(now));
+   }
+   
+   string json_array = "[";
+   for(int i = 0; i < days_to_sync; i++)
+   {
+      if(i > 0) json_array += ",";
+      
+      string date_str = TimeToString(summaries[i].date, TIME_DATE);
+      StringReplace(date_str, ".", "-"); // Convert YYYY.MM.DD to YYYY-MM-DD
+      
+      json_array += "{";
+      json_array += "\"date\":\"" + date_str + "\",";
+      json_array += "\"profit\":" + DoubleToString(summaries[i].total_profit, 2) + ",";
+      json_array += "\"lots\":" + DoubleToString(summaries[i].total_lots, 2) + ",";
+      json_array += "\"max_dd\":" + DoubleToString(summaries[i].max_dd_pct, 2);
+      json_array += "}";
+   }
+   json_array += "]";
    
    string payload = "{";
    payload += "\"p_port_number\":\"" + IntegerToString(login) + "\",";
