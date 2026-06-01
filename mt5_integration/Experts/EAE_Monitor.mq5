@@ -25,6 +25,15 @@ int OnInit()
 {
    Print("EAE Universal Monitor: Starting (Unified Library Mode).");
    
+   // Collision prevention check
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   string gvName = "EAE_Universal_Active_" + IntegerToString(login);
+   if(GlobalVariableCheck(gvName))
+   {
+      Alert("EAE_Monitor: ตรวจพบ EASY_M Universal กำลังรันอยู่แล้วในบัญชีนี้! ปิดการทำงาน EAE_Monitor อัตโนมัติเพื่อป้องกันข้อมูลชนกัน");
+      return(INIT_FAILED);
+   }
+   
    // Verify account status
    if(!EaezeCheckLicense("EAE-MONITOR"))
    {

@@ -98,12 +98,20 @@ void EM_MonitorInit(long magicBase)
 
    EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", 20);
    
+   // Set a Global Variable to signal that Universal EA monitor is active
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   string gvName = "EAE_Universal_Active_" + IntegerToString(login);
+   GlobalVariableSet(gvName, (double)TimeCurrent());
+   
    g_em_initialized = true;
    g_em_data_loaded = false; 
 }
 
 void EM_MonitorDeinit()
 {
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   string gvName = "EAE_Universal_Active_" + IntegerToString(login);
+   if(GlobalVariableCheck(gvName)) GlobalVariableDel(gvName);
    g_em_initialized = false;
 }
 
