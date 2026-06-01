@@ -430,6 +430,16 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    double margin  = AccountInfoDouble(ACCOUNT_MARGIN_LEVEL);
    string currency = AccountInfoString(ACCOUNT_CURRENCY);
    
+   // Auto-detect asset family (product_family / asset_type) based on symbol
+   string chart_sym = _Symbol;
+   StringToUpper(chart_sym);
+   string prod_fam = "FOREX";
+   if(StringFind(chart_sym, "XAU") >= 0 || StringFind(chart_sym, "GOLD") >= 0 || StringFind(chart_sym, "XAG") >= 0 || StringFind(chart_sym, "SILVER") >= 0) {
+      prod_fam = "GOLD";
+   } else if(StringFind(chart_sym, "BTC") >= 0 || StringFind(chart_sym, "ETH") >= 0 || StringFind(chart_sym, "XRP") >= 0 || StringFind(chart_sym, "LTC") >= 0 || StringFind(chart_sym, "CRYPTO") >= 0) {
+      prod_fam = "CRYPTO";
+   }
+
    // Build Simple Payload
    string payload = "{ \"p_payload\": {";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
@@ -443,7 +453,7 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    payload += "\"account\":{\"balance\":" + DoubleToString(balance, 2) + ",\"equity\":" + DoubleToString(equity, 2) + ",\"margin_level\":" + DoubleToString(margin, 2) + ",\"currency\":\"" + currency + "\"},";
    payload += "\"buy_state\":{\"open_count\":" + IntegerToString(buy_count) + ",\"open_lots\":" + DoubleToString(buy_lots, 2) + ",\"floating_pnl\":" + DoubleToString(buy_pnl, 2) + "},";
    payload += "\"sell_state\":{\"open_count\":" + IntegerToString(sell_count) + ",\"open_lots\":" + DoubleToString(sell_lots, 2) + ",\"floating_pnl\":" + DoubleToString(sell_pnl, 2) + "},";
-   payload += "\"identity\":{\"product_family\":\"UNIVERSAL\",\"system_code\":\"" + system_code + "\",\"ea_version\":\"" + ea_version + "\"}";
+   payload += "\"identity\":{\"product_family\":\"" + prod_fam + "\",\"system_code\":\"" + system_code + "\",\"ea_version\":\"" + ea_version + "\"}";
    payload += "},";
    
    payload += "\"orders\":[]"; // Keep order logs empty for simple light sync
