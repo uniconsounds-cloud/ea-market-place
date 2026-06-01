@@ -35,7 +35,7 @@ void EM_BuildIdentity(EAE_SystemIdentity &id, long magicBase)
    id.product_family = "EasyM";
    
    // Check which EA is running based on the EA_PRODUCT_ID macro
-   if(StringFind(InpProductID, "MAX") >= 0) {
+   if(StringFind(EA_PRODUCT_ID, "MAX") >= 0) {
        id.system_code = "EasyM MAX";
        id.ea_name     = "EasyM MAX";
    } else {

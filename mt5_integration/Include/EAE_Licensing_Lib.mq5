@@ -592,8 +592,8 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
 // --- Self-healing history sync check ---
 void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
 {
-   static bool g_eae_history_checked = false;
-   if(g_eae_history_checked) return;
+   static bool local_history_checked = false;
+   if(local_history_checked) return;
    
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
    string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
@@ -626,7 +626,7 @@ void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
       Print("EAEZE History Sync: History is up to date.");
    }
    
-   g_eae_history_checked = true;
+   local_history_checked = true;
 }
 
 // --- Exported: Unified check and sync ---

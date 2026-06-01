@@ -2317,7 +2317,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     if(reason != REASON_INITFAILED) {
-        RemoveLicenseAlert();
+        EaezeRemoveLicenseAlert();
     }
     EM_MonitorDeinit();
 
