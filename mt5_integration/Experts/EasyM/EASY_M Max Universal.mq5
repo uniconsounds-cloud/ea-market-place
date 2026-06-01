@@ -254,9 +254,29 @@ bool SymbolExistsAndSelect(const string sym)
 // Function to dynamically detect suffix based on the current chart symbol
 string DetectAutoSuffix()
 {
+   // 1. Try to detect from current chart symbol first if its length is > 6
    if(StringLen(_Symbol) > 6)
    {
       return StringSubstr(_Symbol, 6);
+   }
+   
+   // 2. Fallback: Check common forex symbols with various suffixes in Market Watch / Broker database
+   string commonSymbols[4] = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD"};
+   string suffixes[12] = {"", ".v", ".m", ".ecn", ".pro", ".raw", "+", "i", "x", "z", ".std", ".micro"};
+   
+   for(int s=0; s<4; s++)
+   {
+      for(int i=0; i<12; i++)
+      {
+         string candidate = commonSymbols[s] + suffixes[i];
+         // Reset last error
+         ResetLastError();
+         // Check if symbol exists and can be selected
+         if(SymbolSelect(candidate, true))
+         {
+            return suffixes[i];
+         }
+      }
    }
    return "";
 }
