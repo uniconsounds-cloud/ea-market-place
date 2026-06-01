@@ -81,6 +81,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 customName={license?.port_name || null}
                 licenseTier={license?.license_tier || 'free'}
                 dashboardSkin={license?.dashboard_skin || 'avatar_scifi'}
+                isAdmin={isAdmin}
             />
         </div>
     );

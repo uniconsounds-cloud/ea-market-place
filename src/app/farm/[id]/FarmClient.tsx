@@ -39,7 +39,8 @@ export default function FarmClient({
     licenseCreatedAt,
     customName,
     licenseTier = 'free',
-    dashboardSkin = 'avatar_scifi'
+    dashboardSkin = 'avatar_scifi',
+    isAdmin = false
 }: { 
     portNumber: string;
     initialOrders: any[];
@@ -48,6 +49,7 @@ export default function FarmClient({
     customName?: string | null;
     licenseTier?: string;
     dashboardSkin?: string;
+    isAdmin?: boolean;
 }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
@@ -598,7 +600,7 @@ export default function FarmClient({
             console.log(`[EAEZE] Secret Click Count: ${nextCount}/5`);
             
             if (nextCount >= 5) {
-                if (licenseTier === 'free') {
+                if (licenseTier === 'free' && !isAdmin) {
                     toast.info("กรุณาอัปเกรดเป็นสิทธิ์ Pro หรือ Max เพื่อเปิดใช้งานระบบฟาร์ม 2.5D");
                     return 0;
                 }
