@@ -22,10 +22,10 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .single();
     const isAdmin = profile?.role === 'admin';
 
-    // 3. Fetch License Owner & registration date
+    // 3. Fetch License Owner, registration date, and tier details
     const { data: license } = await supabase
         .from('licenses')
-        .select('user_id, created_at, port_name')
+        .select('user_id, created_at, port_name, license_tier, dashboard_skin')
         .eq('account_number', portNumber)
         .single();
 
@@ -79,6 +79,8 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 initialPortStatus={portStatus || null}
                 licenseCreatedAt={license?.created_at || null}
                 customName={license?.port_name || null}
+                licenseTier={license?.license_tier || 'free'}
+                dashboardSkin={license?.dashboard_skin || 'avatar_scifi'}
             />
         </div>
     );

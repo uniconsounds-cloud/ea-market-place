@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
+import { toast } from 'sonner';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -36,13 +37,17 @@ export default function FarmClient({
     initialOrders, 
     initialPortStatus,
     licenseCreatedAt,
-    customName
+    customName,
+    licenseTier = 'free',
+    dashboardSkin = 'avatar_scifi'
 }: { 
     portNumber: string;
     initialOrders: any[];
     initialPortStatus?: any;
     licenseCreatedAt: string | null;
     customName?: string | null;
+    licenseTier?: string;
+    dashboardSkin?: string;
 }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
@@ -63,7 +68,9 @@ export default function FarmClient({
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
     const lastDayRef = useRef('');
-    const [viewMode, setViewMode] = useState<'farm' | 'spaceship'>('farm');
+    const [viewMode, setViewMode] = useState<'farm' | 'spaceship'>(
+        licenseTier === 'free' ? 'spaceship' : 'farm'
+    );
     const [clickCount, setClickCount] = useState(0);
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const ordersRef = useRef<any[]>(initialOrders);
@@ -591,6 +598,10 @@ export default function FarmClient({
             console.log(`[EAEZE] Secret Click Count: ${nextCount}/5`);
             
             if (nextCount >= 5) {
+                if (licenseTier === 'free') {
+                    toast.info("กรุณาอัปเกรดเป็นสิทธิ์ Pro หรือ Max เพื่อเปิดใช้งานระบบฟาร์ม 2.5D");
+                    return 0;
+                }
                 console.log("[EAEZE] Toggle View Mode from:", viewMode);
                 const nextMode = viewMode === 'farm' ? 'spaceship' : 'farm';
                 setViewMode(nextMode);
