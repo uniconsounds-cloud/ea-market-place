@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>EAEZE MQL5 Licensing Integration Guide</title>
+    <title>EAEZE MQL5 Licensing & Sync Integration Guide</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -78,92 +78,70 @@
     </style>
 </head>
 <body>
-    <h1>EAEZE Systems: MQL5 License Verification Library Integration Guide</h1>
+    <h1>EAEZE Systems: MQL5 License & Sci-Fi Sync Integration Guide</h1>
 
-<p>คู่มือการใช้งานระบบลิขสิทธิ์เทรดเรียลไทม์ผ่านไฟล์ห้องสมุด (Library) เพื่อป้องกันความปลอดภัยของซอร์สโค้ดและข้อมูลระบบหลังบ้าน 100%</p>
-<ul><li>--</li>
+<p>คู่มือการใช้งานระบบลิขสิทธิ์และการซิงก์ข้อมูลพอร์ตเทรดเรียลไทม์ขึ้นแดชบอร์ด (Simple Sci-Fi Dashboard) ผ่านไฟล์ห้องสมุดส่วนกลาง เพื่อความมั่นคงปลอดภัยและความรวดเร็ว</p>
 
 <h2>1. การเตรียมไฟล์สำหรับนักพัฒนา EA (Setup Files)</h2>
 
-<p>ทาง EAEZE จะส่งไฟล์ให้นักพัฒนาภายนอกนำไปติดตั้งในเครื่อง MetaEditor 2 ไฟล์ดังนี้:</p>
+<p>นำไฟล์ต่อไปนี้ไปวางติดตั้งใน MetaEditor ของท่าน:</p>
 
-<p>1. <strong><code>EAEZE_Licensing_Lib.ex5</code></strong> (ไฟล์ห้องสมุดที่คอมไพล์แล้ว)</p>
+<p>1. <strong><code>EAE_Licensing_Lib.ex5</code></strong> (ไฟล์ห้องสมุดไลบรารีที่คอมไพล์แล้ว)</p>
 <li>📂 นำไปวางในโฟลเดอร์: <code>MQL5/Libraries/</code></li>
-<p>2. <strong><code>EAEZE_Licensing_Imports.mqh</code></strong> (ไฟล์นำเข้าฟังก์ชัน)</p>
+<p>2. <strong><code>EAE_Licensing.mqh</code></strong> (ไฟล์ส่วนหัวสำหรับใช้เรียกนำเข้าฟังก์ชัน)</p>
 <li>📂 นำไปวางในโฟลเดอร์: <code>MQL5/Include/</code></li>
 
-<div class="alert alert-important"><strong>IMPORTANT:</strong> ห้ามแจกจ่ายซอร์สโค้ด <code>.mq5</code> ของไลบรารีให้ผู้อื่นเด็ดขาด เพื่อป้องกันคีย์ฐานข้อมูลและ URL หลังบ้านรั่วไหล</div>
-<li>--</li>
+<div class="alert alert-important"><strong>IMPORTANT:</strong> ห้ามนำไฟล์ซอร์สโค้ดต้นฉบับ <code>.mq5</code> ของไลบรารีไปแจกจ่ายให้ผู้อื่นเด็ดขาดเพื่อความปลอดภัยของคีย์และฐานข้อมูลหลังบ้าน</div>
 
 <h2>2. ขั้นตอนการติดตั้งเข้าสู่ตัว EA (Integration Steps)</h2>
 
 <p>ให้นักพัฒนาเปิดโค้ด EA ที่ต้องการเช็คสิทธิ์ใน MetaEditor และเขียนโค้ดเพิ่ม 4 ขั้นตอนสั้นๆ ดังต่อไปนี้:</p>
 
 <h3>ขั้นตอนที่ 1: แนบไฟล์นำเข้าห้องสมุด (Top of code)</h3>
-<p>ให้เขียนโค้ดนี้ไว้ที่บรรทัดบนสุดของไฟล์ EA ของท่าน:</p>
+<pre><code class="language-mql5">// 1. นำเข้าไฟล์ไลบรารีส่วนกลาง EAE_
+#include &lt;EAE_Licensing.mqh&gt;
 
-<pre><code class="language-mql5">// 1. นำเข้าไลบรารีเช็คลิขสิทธิ์ EAEZE
-<p>#include &lt;EAEZE_Licensing_Imports.mqh&gt;</p>
-
-<p>// กำหนดรหัสสินค้า EA ของท่านในระบบเว็บ (Product Key เช่น EZM-MAX-V1)</p>
-<p>#define EA_PRODUCT_ID "EZM-MAX-V1"</code></pre></p>
-<li>--</li>
+// กำหนดรหัสสินค้า EA ของท่านในระบบเว็บ
+#define EA_PRODUCT_ID "EZM-MIN-V1"</code></pre>
 
 <h3>ขั้นตอนที่ 2: เพิ่มการตรวจสอบตอนเริ่มทำงาน (OnInit)</h3>
-<p>ให้เขียนบล็อกโค้ดนี้ไว้ในฟังก์ชัน <code>OnInit()</code> ก่อนเริ่มรันระบบคำนวณอื่นๆ:</p>
-
 <pre><code class="language-mql5">int OnInit()
-<p>{</p>
-<p>   // 2. เรียกใช้งานระบบเช็คสิทธิ์ทันทีตอนติดตั้ง EA</p>
-<p>   if(!EaezeCheckLicense(EA_PRODUCT_ID))</p>
-<p>   {</p>
-<p>      Print("EAEZE: License Check Failed. Stopping EA.");</p>
-<p>      return(INIT_FAILED); // สิทธิ์ใช้งานไม่ถูกต้อง บังคับหยุดการทำงาน</p>
-<p>   }</p>
-<p>   </p>
-<p>   // ... เขียนโค้ดของท่านต่อจากบรรทัดนี้ ...</p>
-<p>   return(INIT_SUCCEEDED);</p>
-<p>}</code></pre></p>
-<li>--</li>
+{
+   // 2. เรียกใช้งานระบบเช็คสิทธิ์ช่วงเริ่มทำงาน
+   if(!EaezeCheckLicense(EA_PRODUCT_ID))
+   {
+      Print("EAE_SYSTEM: License Check Failed. Stopping EA.");
+      return(INIT_FAILED); // ปิดตัวลงทันทีหากสิทธิ์ไม่ถูกต้อง
+   }
+   
+   EaezeRemoveLicenseAlert();
+   
+   // ... เขียนโค้ดเริ่มต้นอื่นๆ ของท่านต่อจากนี้ ...
+   return(INIT_SUCCEEDED);
+}</code></pre>
 
-<h3>ขั้นตอนที่ 3: เพิ่มตัวเช็คสิทธิ์ระหว่างทำงาน (OnTick / OnTimer)</h3>
-<p>ให้ใส่ฟังก์ชันนี้ไว้ที่ <strong>บรรทัดแรก</strong> ของฟังก์ชัน <code>OnTick()</code> เพื่อให้ระบบเช็คสิทธิ์ตามรอบอย่างสม่ำเสมอ (เช็คเรียลไทม์ผ่านระบบจำในเครื่อง ไม่ทำให้บอทสะดุด):</p>
-
+<h3>ขั้นตอนที่ 3: เพิ่มตัวเช็คสิทธิ์และซิงก์ข้อมูลระหว่างทำงาน (OnTick / OnTimer)</h3>
 <pre><code class="language-mql5">void OnTick()
-<p>{</p>
-<p>   // 3. ตรวจสอบสิทธิ์ระหว่างรันเทรด (ระบบจะดีดบอทออกทันทีถ้าหมดอายุหรือทุนไม่ถึง)</p>
-<p>   EaezeCheckLicensePeriodic(EA_PRODUCT_ID);</p>
-<p>   </p>
-<p>   // ... เขียนโค้ดของท่านต่อจากบรรทัดนี้ ...</p>
-<p>}</code></pre></p>
-<p>*หมายเหตุ: หาก EA ของท่านทำงานเป็นรอบเวลา สามารถเอาไปใส่ในฟังก์ชัน <code>OnTimer()</code> แทนได้เช่นกัน*</p>
-<li>--</li>
+{
+   // 3. ตรวจสอบสิทธิ์และส่งข้อมูลขึ้นแดชบอร์ดไซไฟอัตโนมัติ (Smart Sleep/Wake Sync)
+   // พารามิเตอร์: Product ID, System Code, EA Version, Sync Interval (วินาที), Magic Buy (0=สแกนทั้งหมด), Magic Sell (0=สแกนทั้งหมด)
+   EaezeCheckLicenseAndSync(EA_PRODUCT_ID, "EASYM", "1.12", 20, 0, 0);
+   
+   // ... เขียนโค้ดเทรดปกติของ EA ของท่านต่อจากนี้ ...
+}</code></pre>
 
-<h3>ขั้นตอนที่ 4: ล้างป้ายเตือนความปลอดภัยเมื่อหยุดใช้งาน (OnDeinit)</h3>
-<p>ให้เขียนโค้ดนี้ไว้ในฟังก์ชัน <code>OnDeinit()</code> เพื่อลบกล่องแจ้งเตือนสีแดงเวลากดลบ EA ออกจากกราฟ:</p>
-
+<h3>ขั้นตอนที่ 4: ล้างป้ายเตือนความปลอดภัยเวลากดลบ EA (OnDeinit)</h3>
 <pre><code class="language-mql5">void OnDeinit(const int reason)
-<p>{</p>
-<p>   // 4. ลบป้ายแจ้งเตือนออกจากกราฟกรณีปิดใช้งานหรือปิดกราฟ</p>
-<p>   if(reason != REASON_INITFAILED)</p>
-<p>   {</p>
-<p>      EaezeRemoveLicenseAlert();</p>
-<p>   }</p>
-<p>   </p>
-<p>   // ... เขียนโค้ดของท่านต่อจากบรรทัดนี้ ...</p>
-<p>}</code></pre></p>
-<li>--</li>
+{
+   // 4. ล้างกล่องข้อความเตือนความปลอดภัยเมื่อหยุดใช้งาน
+   if(reason != REASON_INITFAILED)
+   {
+      EaezeRemoveLicenseAlert();
+   }
+}</code></pre>
 
-<h2>3. คู่มือการตั้งค่าสำหรับลูกค้าผู้ใช้งาน (User Settings)</h2>
-
-<p>เพื่อให้ระบบเช็คสิทธิ์ทำงานได้ ลูกค้าที่นำ EA ไปติดตั้งจะต้องตั้งค่าในโปรแกรม MT5 ดังนี้:</p>
-
-<p>1. ไปที่เมนู <strong>Tools &gt; Options</strong> (หรือกดปุ่ม <code>Ctrl + O</code>)</p>
-<p>2. เลือกแท็บ <strong>Expert Advisors</strong></p>
-<p>3. ติ๊กเครื่องหมายถูกที่ช่อง <strong>[✓] Allow WebRequest for listed URL</strong></p>
-<p>4. กดปุ่ม <strong>Add new URL</strong> (เครื่องหมายบวก) แล้วพิมพ์ URL ต่อไปนี้ลงไป:</p>
-<li><code>https://eaeze.com</code></li></ul>
-<p>5. กดปุ่ม <strong>OK</strong></p>
+<h2>3. ความปลอดภัยของระบบตัวแปรเครื่อง (F3 Protection)</h2>
+<p>ระบบไลบรารีส่วนกลางนี้จะเก็บค่าผลการเช็คสิทธิ์ไว้ในตัวแปรพอร์ตเครื่องพร้อมแนบลายเซ็นดิจิทัลเฉพาะ (Digital Checksum) หากผู้ใช้พยายามแก้ไขสเตตัสใน Global Variables ด้วยคีย์ F3 ระบบความปลอดภัยของไลบรารีจะรับรู้การเปลี่ยนแบบไม่ถูกต้องและสั่งถอดถอน EA ออกจากกราฟทันทีเพื่อความปลอดภัยสูงสุด</p>
 
 </body>
 </html>

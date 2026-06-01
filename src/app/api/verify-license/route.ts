@@ -22,6 +22,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', message: 'Missing parameters' }, { status: 400 });
         }
 
+        // Check if it is a Super Test Port for the main admin
+        const { data: testPort } = await supabase
+            .from('admin_test_ports')
+            .select('*')
+            .eq('account_number', account_number)
+            .eq('owner_email', 'juntarasate@gmail.com')
+            .single();
+
+        if (testPort) {
+            return NextResponse.json({
+                status: 'active',
+                message: 'License Verified (Admin Test Port)',
+                expiry_date: 'Lifetime'
+            });
+        }
+
         // 2. Query Supabase
         // We look for a license that matches product (by UUID OR Key) + account_number
 

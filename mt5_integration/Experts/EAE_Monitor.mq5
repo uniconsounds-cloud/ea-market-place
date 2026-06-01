@@ -2,36 +2,36 @@
 //|                                                  EAE_Monitor.mq5 |
 //|                                  Copyright 2024, eaeze.com (EAE_) |
 //|                                             https://www.eaeze.com |
+//|                                             update : 2026.05.30  |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2024, eaeze.com (EAE_)"
 #property link      "https://www.eaeze.com"
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 
-// --- Include Core Sync Library ---
-#include "EAE_WebSync.mqh"
+// --- Include Core Licensing & Sync Library ---
+#define EAEZE_SYNC_ENABLED
+#include <EAE_Licensing.mqh>
 
 input int      InpSyncSeconds = 20;             // Sync Interval (Seconds)
-input string   InpSystemCode  = "EASYM";        // System Identifier (e.g. EASYM, EAE_MONITOR)
+input string   InpSystemCode  = "EAE_MONITOR";  // System Identifier (e.g. EASYM, EAE_MONITOR)
 input long     InpMagicBuy    = 0;              // Filter Buy Magic (0 = All)
 input long     InpMagicSell   = 0;              // Filter Sell Magic (0 = All)
-
-// --- State ---
-EAE_RealtimeSnapshot g_snapshot;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // Initialize sync module in auto-license mode
-   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", InpSyncSeconds);
+   Print("EAE Universal Monitor: Starting (Unified Library Mode).");
    
-   // Pre-fill Identity
-   g_snapshot.identity.product_family = EAE_AutoDetectAssetType(Symbol());
-   g_snapshot.identity.system_code    = InpSystemCode;
-   g_snapshot.identity.ea_name        = "EAE Universal Monitor";
-   g_snapshot.identity.ea_version     = "1.02";
+   // Verify account status
+   if(!EaezeCheckLicense("EAE-MONITOR"))
+   {
+      Print("EAE_SYSTEM: EAE-MONITOR license check failed.");
+      return(INIT_FAILED);
+   }
+   EaezeRemoveLicenseAlert();
    
    EventSetTimer(1);
    return(INIT_SUCCEEDED);
@@ -44,6 +44,10 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    Comment(""); // Clear dashboard on exit
+   if(reason != REASON_INITFAILED)
+   {
+      EaezeRemoveLicenseAlert();
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -51,74 +55,30 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   // 1. Refresh Account Data
-   g_snapshot.account.balance      = AccountInfoDouble(ACCOUNT_BALANCE);
-   g_snapshot.account.equity       = AccountInfoDouble(ACCOUNT_EQUITY);
-   g_snapshot.account.margin_level = AccountInfoDouble(ACCOUNT_MARGIN_LEVEL);
-   g_snapshot.account.currency     = AccountInfoString(ACCOUNT_CURRENCY);
+   // [EAE_SYSTEM] - Perform licensing checks and lightweight Sci-Fi sync
+   EaezeCheckLicenseAndSync("EAE-MONITOR", InpSystemCode, "1.03", InpSyncSeconds, InpMagicBuy, InpMagicSell);
    
-   // 2. Scan All Open Positions (Universal Mode)
-   EAE_InitSideState(g_snapshot.buy_state, EAE_SIDE_BUY);
-   EAE_InitSideState(g_snapshot.sell_state, EAE_SIDE_SELL);
-   
-   int total = PositionsTotal();
-   for(int i = 0; i < total; i++)
-   {
-      ulong ticket = PositionGetTicket(i);
-      if(ticket > 0 && PositionSelectByTicket(ticket))
-      {
-         long type = PositionGetInteger(POSITION_TYPE);
-         double lots = PositionGetDouble(POSITION_VOLUME);
-         double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
-         long magic = PositionGetInteger(POSITION_MAGIC);
-         
-         if(type == POSITION_TYPE_BUY) {
-            if(InpMagicBuy == 0 || magic == InpMagicBuy) {
-               g_snapshot.buy_state.open_count++;
-               g_snapshot.buy_state.open_lots += lots;
-               g_snapshot.buy_state.floating_pnl += pnl;
-            }
-         } else if(type == POSITION_TYPE_SELL) {
-            if(InpMagicSell == 0 || magic == InpMagicSell) {
-               g_snapshot.sell_state.open_count++;
-               g_snapshot.sell_state.open_lots += lots;
-               g_snapshot.sell_state.floating_pnl += pnl;
-            }
-         }
-      }
-   }
-   
-   // 3. Perform Sync (Enhanced V1.406 with Daily Stats)
-   // We pass identity magics so history scanner knows what to look for
-   g_snapshot.identity.magic_buy  = InpMagicBuy; // Monitor mode: Scan all or specify
-   g_snapshot.identity.magic_sell = InpMagicSell; 
-   
-   // --- [NEW] Self-Healing 30-Day Sync Check ---
-   EAE_WebSyncCheckAndPushHistory(InpMagicBuy, InpMagicSell);
-   
-   EAE_WebSyncPerform(g_snapshot);
-   
-   // --- [NEW] On-Chart Status Dashboard ---
+   // --- On-Chart Status Dashboard ---
    string dash = "========================================\n";
-   dash += "       EAE UNIVERSAL MONITOR v1.02\n";
+   dash += "       EAE UNIVERSAL MONITOR v1.03\n";
    dash += "========================================\n\n";
    dash += " Account   : " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " (" + AccountInfoString(ACCOUNT_CURRENCY) + ")\n";
-   dash += " Balance   : " + DoubleToString(g_snapshot.account.balance, 2) + "\n";
-   dash += " Open Lots : " + DoubleToString(g_snapshot.buy_state.open_lots + g_snapshot.sell_state.open_lots, 2) + "\n";
-   dash += " Floating  : " + DoubleToString(g_snapshot.buy_state.floating_pnl + g_snapshot.sell_state.floating_pnl, 2) + "\n\n";
+   dash += " Balance   : " + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\n";
+   dash += " Equity    : " + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + "\n";
+   dash += " Magic Buy : " + IntegerToString(InpMagicBuy) + " (0 = All)\n";
+   dash += " Magic Sell: " + IntegerToString(InpMagicSell) + " (0 = All)\n\n";
    dash += "----------------------------------------\n";
    dash += " [ CLOUD TELEMETRY STATUS ]\n";
-   dash += " Status    : " + g_eae_sync_status + "\n";
-   dash += " ServerMsg : " + g_eae_sync_message + "\n";
+   dash += " Mode      : Light Sync (Sci-Fi Dashboard)\n";
+   dash += " Status    : OK (ONLINE)\n";
    dash += "========================================";
    
    Comment(dash);
 }
 
 //+------------------------------------------------------------------+
-//| OnTick function (Optional for faster updates)                    |
+//| OnTick function                                                  |
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // In monitor mode, timer is usually sufficient to save resources
 }

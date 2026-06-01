@@ -43,3 +43,5 @@ next-env.d.ts
 # scratch and temporary tools
 scratch/
 *.mjs
+*.bak
+

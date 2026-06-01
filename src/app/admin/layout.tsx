@@ -11,10 +11,12 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 // Sidebar Component extracted to avoid re-creation on every render
 const SidebarContent = ({
     mobile = false,
-    onClose
+    onClose,
+    userEmail
 }: {
     mobile?: boolean;
     onClose?: () => void;
+    userEmail?: string;
 }) => (
     <div className="flex flex-col h-full bg-card">
         <div className="h-16 flex items-center px-6 border-b border-border">
@@ -85,6 +87,14 @@ const SidebarContent = ({
                     พาร์ทเนอร์ (API Keys)
                 </Button>
             </Link>
+            {userEmail === 'juntarasate@gmail.com' && (
+                <Link href="/admin/test-ports" onClick={onClose}>
+                    <Button variant="ghost" className="w-full justify-start">
+                        <Key className="mr-2 h-4 w-4" />
+                        พอร์ตทดสอบพิเศษ
+                    </Button>
+                </Link>
+            )}
             <Link href="/admin/settings" onClick={onClose}>
                 <Button variant="ghost" className="w-full justify-start">
                     <Settings className="mr-2 h-4 w-4" />
@@ -106,6 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
     const router = useRouter();
 
     useEffect(() => {
@@ -116,6 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 router.push('/login');
                 return;
             }
+            setUserEmail(user.email);
 
             const { data: profile, error } = await supabase
                 .from('profiles')
@@ -150,7 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex min-h-screen bg-background">
             {/* Desktop Sidebar */}
             <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col fixed h-full z-50">
-                <SidebarContent />
+                <SidebarContent userEmail={userEmail} />
             </aside>
 
             {/* Mobile Header */}
@@ -167,7 +179,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-64">
                         <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
-                        <SidebarContent mobile onClose={() => setIsSheetOpen(false)} />
+                        <SidebarContent mobile onClose={() => setIsSheetOpen(false)} userEmail={userEmail} />
                     </SheetContent>
                 </Sheet>
             </div>
