@@ -406,11 +406,248 @@ double EaezeScanTodayProfit(long magic_buy, long magic_sell, double &out_lots)
    return profit;
 }
 
+// --- Structure for Daily History summaries ---
+struct EaezeDailySummary
+{
+   datetime date;
+   long     account_login;
+   double   max_dd_pct;
+   double   total_profit;
+   double   total_lots;
+   int      buy_cycles;
+   int      sell_cycles;
+};
+
+// --- Helper to scan history daily summary ---
+bool EaezeScanHistoryDailySummary(datetime targetDay, long magic_buy, long magic_sell, EaezeDailySummary &out_sum)
+{
+   datetime start = (targetDay / 86400) * 86400;
+   datetime end   = start + 86399;
+   
+   ZeroMemory(out_sum);
+   out_sum.date          = start;
+   out_sum.account_login = AccountInfoInteger(ACCOUNT_LOGIN);
+   
+   if(!HistorySelect(start, end)) return false;
+   
+   int total = HistoryDealsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket <= 0) continue;
+      
+      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+      if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+      {
+         long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+         long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+         bool is_buy = (deal_type == DEAL_TYPE_SELL);
+         bool is_sell = (deal_type == DEAL_TYPE_BUY);
+         
+         if(magic_buy == magic_sell) {
+            if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
+         }
+         else {
+            if(is_buy) {
+               if(magic_buy != 0 && magic != magic_buy) continue;
+            }
+            else if(is_sell) {
+               if(magic_sell != 0 && magic != magic_sell) continue;
+            }
+         }
+         
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+         out_sum.total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+         
+         string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+         if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
+         {
+            if(magic_buy == magic_sell) {
+               if(magic >= magic_buy && magic < magic_buy + 100) {
+                  out_sum.buy_cycles++;
+               }
+            }
+            else {
+               if(magic == magic_buy) out_sum.buy_cycles++;
+               else if(magic == magic_sell) out_sum.sell_cycles++;
+            }
+         }
+      }
+   }
+   
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(balance <= 0) balance = 1.0;
+   string gv_max_dd = "EAE_MaxDDPct_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   out_sum.max_dd_pct = GlobalVariableCheck(gv_max_dd) ? GlobalVariableGet(gv_max_dd) : 0.0;
+   
+   return true;
+}
+
+// --- Push history batch to database ---
+bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_sell)
+{
+   if(days_to_sync <= 0) return false;
+   if(days_to_sync > 30) days_to_sync = 30;
+   
+   datetime now = TimeCurrent();
+   datetime today_start = (now / 86400) * 86400;
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   
+   EaezeDailySummary summaries[];
+   ArrayResize(summaries, days_to_sync);
+   for(int i = 0; i < days_to_sync; i++)
+   {
+      ZeroMemory(summaries[i]);
+      summaries[i].date          = today_start - (i * 86400);
+      summaries[i].account_login = login;
+      if(i == 0)
+      {
+         string gv_max_dd = "EAE_MaxDDPct_" + IntegerToString(login);
+         summaries[i].max_dd_pct = GlobalVariableCheck(gv_max_dd) ? GlobalVariableGet(gv_max_dd) : 0.0;
+      }
+   }
+   
+   datetime start_time = today_start - (days_to_sync * 86400);
+   if(HistorySelect(start_time, now))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket <= 0) continue;
+         
+         long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+         {
+            datetime deal_time = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
+            datetime deal_day_start = (deal_time / 86400) * 86400;
+            long diff_sec = today_start - deal_day_start;
+            if(diff_sec < 0) continue;
+            
+            int idx = (int)(diff_sec / 86400);
+            if(idx < 0 || idx >= days_to_sync) continue;
+            
+            long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+            long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+            bool is_buy = (deal_type == DEAL_TYPE_SELL);
+            bool is_sell = (deal_type == DEAL_TYPE_BUY);
+            
+            if(magic_buy == magic_sell) {
+               if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
+            }
+            else {
+               if(is_buy) {
+                  if(magic_buy != 0 && magic != magic_buy) continue;
+               }
+               else if(is_sell) {
+                  if(magic_sell != 0 && magic != magic_sell) continue;
+               }
+            }
+            
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+            summaries[idx].total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+         }
+      }
+   }
+   
+   string json_array = "[";
+   for(int i = 0; i < days_to_sync; i++)
+   {
+      if(i > 0) json_array += ",";
+      
+      string date_str = TimeToString(summaries[i].date, TIME_DATE);
+      StringReplace(date_str, ".", "-"); // Convert YYYY.MM.DD to YYYY-MM-DD
+      
+      json_array += "{";
+      json_array += "\"date\":\"" + date_str + "\",";
+      json_array += "\"profit\":" + DoubleToString(summaries[i].total_profit, 2) + ",";
+      json_array += "\"lots\":" + DoubleToString(summaries[i].total_lots, 2) + ",";
+      json_array += "\"max_dd\":" + DoubleToString(summaries[i].max_dd_pct, 2);
+      json_array += "}";
+   }
+   json_array += "]";
+   
+   string payload = "{";
+   payload += "\"p_port_number\":\"" + IntegerToString(login) + "\",";
+   payload += "\"p_history_array\":" + json_array + ",";
+   payload += "\"p_api_key\":\"LICENSE_AUTO\"";
+   payload += "}";
+
+   char data[]; char result[]; string result_headers;
+   StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, ArraySize(data) - 1);
+   
+   string url = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_history_batch";
+   string headers = "Content-Type: application/json\r\n" + 
+                    "apikey: " + EAE_SYSTEM_KEY + "\r\n" +
+                    "Authorization: Bearer " + EAE_SYSTEM_KEY + "\r\n";
+                    
+   ResetLastError();
+   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   
+   if(res == 200) {
+      string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+      if(StringFind(response, "\"success\":false") < 0 && StringFind(response, "\"success\": false") < 0) {
+         Print("EAEZE History Sync: Successfully pushed ", days_to_sync, " days of history. Response: ", response);
+         return true;
+      }
+   }
+   Print("EAEZE History Sync: Failed to push batch history. Code: ", res);
+   return false;
+}
+
+// --- Self-healing history sync check ---
+void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
+{
+   static bool g_eae_history_checked = false;
+   if(g_eae_history_checked) return;
+   
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
+   int days_to_sync = 30; // Default: Sync last 30 days on new boot
+   
+   if(GlobalVariableCheck(gv_last_history))
+   {
+      datetime last_sync = (datetime)GlobalVariableGet(gv_last_history);
+      datetime now = TimeCurrent();
+      int diff_sec = (int)(now - last_sync);
+      
+      if(diff_sec > 0) {
+         days_to_sync = (diff_sec / 86400) + 1; // Round up
+      } else {
+         days_to_sync = 0;
+      }
+   }
+   
+   if(days_to_sync > 0)
+   {
+      if(days_to_sync > 30) days_to_sync = 30;
+      Print("EAEZE History Sync: Boot-up Self-Healing triggered. Checking missing days: ", days_to_sync);
+      if(EaezeWebSyncPushHistoryBatch(days_to_sync, magic_buy, magic_sell))
+      {
+         GlobalVariableSet(gv_last_history, (double)TimeCurrent());
+      }
+   }
+   else
+   {
+      Print("EAEZE History Sync: History is up to date.");
+   }
+   
+   g_eae_history_checked = true;
+}
+
 // Unified licensing check + smart sync
 void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_version, int sync_interval_sec, long magic_buy = 0, long magic_sell = 0)
 {
    // 1. Check license status first
    EaezeCheckLicensePeriodic(product_id, "KHUCHAI_SUPHAKORN");
+   
+   // --- [NEW] Self-Healing 30-Day Sync Check ---
+   EaezeWebSyncCheckAndPushHistory(magic_buy, magic_sell);
    
    // 2. Perform the WebRequest sync
    static datetime last_sync_time = 0;
