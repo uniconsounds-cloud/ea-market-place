@@ -589,8 +589,8 @@ export default function DashboardPage() {
 
                                                         {/* Right Action Menu */}
                                                         <div className="flex justify-end items-center gap-2 min-w-[150px]">
-                                                            {/* View Farm Button (Only for EasyM MAX ports when show_farm is enabled) */}
-                                                            {!isOrder && item.account_number && (group.productKey === 'EZM-MAX-V1' || group.productKey === 'EZM-MAX-TEST') && item.show_farm && (
+                                                            {/* View Farm Button (For any product port when show_farm is enabled) */}
+                                                            {!isOrder && item.account_number && item.show_farm && (
                                                                 <Link href={`/farm/${item.account_number}`} target="_blank">
                                                                     <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20">
                                                                         <Activity className="w-3 h-3" />
