@@ -19,6 +19,7 @@
 // Default to direct Supabase integration for new EAs
 datetime g_eae_last_sync_time = 0;
 int      g_eae_sync_interval  = 20; // Default: Sync every 20 seconds
+int      g_eae_active_sync_interval = 0; // Dynamic server override (0 = use g_eae_sync_interval)
 bool     g_eae_full_sync_mode = true; // Start with true to ensure initial data
 string   g_eae_api_url        = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data";
 
@@ -269,8 +270,11 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    if(g_eae_last_sync_time > 0)
    {
       int current_interval = g_eae_sync_interval;
+      if(g_eae_active_sync_interval > 0) {
+         current_interval = g_eae_active_sync_interval;
+      }
       if(!g_eae_full_sync_mode) {
-         current_interval = g_eae_sync_interval * 2; // Sleep mode: ping less frequently
+         current_interval = 10; // Sleep mode: ping to check for active viewer every 10 seconds
       }
       
       if(!force_now && (int)(now - g_eae_last_sync_time) < current_interval) {
@@ -305,11 +309,14 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    payload += "\"orders\":" + orders_json;
    payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
 
-   // Hash Check for Throttling
-   string current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2);
-   if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now - g_eae_last_heartbeat) < g_eae_heartbeat_interval)
+   // Hash Check for Throttling (only applies in full sync mode)
+   if(g_eae_full_sync_mode)
    {
-      return true; // Skip redundant upload if nothing changed
+      string current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2);
+      if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now - g_eae_last_heartbeat) < g_eae_heartbeat_interval)
+      {
+         return true; // Skip redundant upload if nothing changed
+      }
    }
    
    g_eae_last_heartbeat = now;
@@ -391,11 +398,26 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    if(StringFind(response, "\"should_sync_full\":true") >= 0 || StringFind(response, "\"should_sync_full\": true") >= 0) {
       if(!g_eae_full_sync_mode) {
          g_eae_last_sync_time = 0; // Trigger instant full sync on the very next tick!
+         g_eae_last_sync_hash = ""; // Clear hash to force a full update!
+         g_eae_last_heartbeat = 0;  // Reset heartbeat timer!
          Print("EAE WebSync: >> WAKING UP << (Viewer active, initiating full sync...)");
       }
       g_eae_full_sync_mode = true;
    } else {
       g_eae_full_sync_mode = false;
+   }
+   
+   // Dynamic sync interval parsing
+   int pos = StringFind(response, "\"sync_interval\":");
+   if(pos >= 0) {
+      int start = pos + StringLen("\"sync_interval\":");
+      int end = start;
+      while(end < StringLen(response) && response[end] >= '0' && response[end] <= '9') {
+         end++;
+      }
+      if(end > start) {
+         g_eae_active_sync_interval = (int)StringToInteger(StringSubstr(response, start, end - start));
+      }
    }
    
    if(g_eae_full_sync_mode) {

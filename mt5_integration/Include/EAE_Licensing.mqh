@@ -652,12 +652,16 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    // 2. Perform the WebRequest sync
    static datetime last_sync_time = 0;
    static bool full_sync_mode = true;
+   static int active_sync_interval = 0;
+   if(active_sync_interval <= 0) {
+      active_sync_interval = sync_interval_sec;
+   }
    
    datetime now = TimeCurrent();
    
-   int current_interval = sync_interval_sec;
+   int current_interval = active_sync_interval;
    if(!full_sync_mode) {
-      current_interval = 7200; // Sleep mode: sync once every 2 hours
+      current_interval = 10; // Sleep mode: check for active viewer every 10 seconds
    }
    
    if(last_sync_time > 0 && (int)(now - last_sync_time) < current_interval) {
@@ -746,6 +750,19 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
          full_sync_mode = true;
       } else {
          full_sync_mode = false;
+      }
+      
+      // Dynamic sync interval parsing
+      int pos = StringFind(response, "\"sync_interval\":");
+      if(pos >= 0) {
+         int start = pos + StringLen("\"sync_interval\":");
+         int end = start;
+         while(end < StringLen(response) && response[end] >= '0' && response[end] <= '9') {
+            end++;
+         }
+         if(end > start) {
+            active_sync_interval = (int)StringToInteger(StringSubstr(response, start, end - start));
+         }
       }
    }
 }

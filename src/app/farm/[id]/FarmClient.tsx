@@ -83,7 +83,6 @@ export default function FarmClient({
     const [isTabVisible, setIsTabVisible] = useState(true);
     const [isIdle, setIsIdle] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
-    const isFirstRender = useRef(true);
 
     // Track user activity & window visibility
     useEffect(() => {
@@ -122,10 +121,6 @@ export default function FarmClient({
 
     // Sync latest data when tab becomes visible and user is not idle
     useEffect(() => {
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            return;
-        }
         if (isTabVisible && !isIdle) {
             const syncData = async () => {
                 setIsSyncing(true);

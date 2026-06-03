@@ -31,6 +31,8 @@ DECLARE
     v_key_valid BOOLEAN := false;
     v_should_sync_full BOOLEAN := false;
     v_last_viewed TIMESTAMPTZ;
+    v_license_tier VARCHAR(20) := 'free';
+    v_sync_interval INT := 30; -- Default active sync interval for free is 30 seconds
 BEGIN
     -- Extract info from payload
     v_port_number        := p_payload->>'port_number';
@@ -72,12 +74,34 @@ BEGIN
         v_should_sync_full := true;
     END IF;
 
+    -- Get license tier and map to sync interval
+    IF v_port_number IS NOT NULL THEN
+        SELECT COALESCE(license_tier, 'free') INTO v_license_tier
+        FROM public.licenses
+        WHERE account_number = v_port_number AND is_active = true
+        LIMIT 1;
+        
+        IF v_license_tier IS NULL THEN
+            v_license_tier := 'free';
+        END IF;
+    END IF;
+
+    IF v_license_tier = 'max' THEN
+        v_sync_interval := 10;
+    ELSIF v_license_tier = 'pro' THEN
+        v_sync_interval := 20;
+    ELSE
+        v_sync_interval := 30;
+    END IF;
+
     -- If ping only, return early
     IF (p_payload->>'ping_only') = 'true' THEN
         RETURN jsonb_build_object(
             'success', true,
             'sync_date', v_sync_date,
-            'should_sync_full', v_should_sync_full
+            'should_sync_full', v_should_sync_full,
+            'sync_interval', v_sync_interval,
+            'license_tier', v_license_tier
         );
     END IF;
 
@@ -185,7 +209,9 @@ BEGIN
     RETURN jsonb_build_object(
         'success', true,
         'sync_date', v_sync_date,
-        'should_sync_full', v_should_sync_full
+        'should_sync_full', v_should_sync_full,
+        'sync_interval', v_sync_interval,
+        'license_tier', v_license_tier
     );
 END;
 $$;
