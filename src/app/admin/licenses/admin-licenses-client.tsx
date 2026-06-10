@@ -150,9 +150,16 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
         setEditShowFarm(license.show_farm || false);
         setExpiryOption("custom"); // Changed default to custom
 
-        const date = new Date();
-        date.setMonth(date.getMonth() + 6);
-        setCustomDate(date.toISOString().split('T')[0]);
+        if (license.expiry_date) {
+            const d = new Date(license.expiry_date);
+            // ปรับ offset timezone เพื่อให้ตรงกับวันที่ในเวลาท้องถิ่น
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            setCustomDate(d.toISOString().split('T')[0]);
+        } else {
+            const date = new Date();
+            date.setMonth(date.getMonth() + 6);
+            setCustomDate(date.toISOString().split('T')[0]);
+        }
     };
 
     const handleInitiateOtp = async () => {
@@ -218,6 +225,11 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                 is_active: editIsActive,
                 show_farm: editShowFarm,
             };
+
+            // อัปเกรดระดับสิทธิ์จาก free เป็น pro เมื่อเปิดใช้งานปุ่มดูฟาร์ม
+            if (editShowFarm && (!editingLicense.license_tier || editingLicense.license_tier === 'free')) {
+                updates.license_tier = 'pro';
+            }
 
             if (editingLicense.is_ib) {
                 // IB Expiry Logic via Buttons
@@ -572,7 +584,6 @@ export default function AdminLicensesClient({ initialLicenses, allProducts = [] 
                                                         value={customDate}
                                                         onChange={(e) => setCustomDate(e.target.value)}
                                                         className="pl-9"
-                                                        min={new Date().toISOString().split('T')[0]}
                                                         required={expiryOption === "custom"}
                                                     />
                                                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

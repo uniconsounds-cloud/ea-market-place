@@ -108,6 +108,33 @@ function CheckoutContent({ productId }: { productId: string }) {
         return publicUrl;
     };
 
+    const getAmount = () => {
+        if (productId === '44d33c3e-2dd8-4804-9069-15d381ec8009') {
+            if (isIbRequest) return 0;
+            const parts = planType.split('_');
+            let total = 0;
+            const tier = parts[1]; // free, pro, max
+            
+            if (tier === 'pro') {
+                total = 1590;
+            } else if (tier === 'max') {
+                total = 4990;
+            } else {
+                total = 0;
+            }
+
+            if (planType.includes('_skin_')) {
+                const skinsPart = planType.split('_skin_')[1];
+                if (skinsPart.includes('pixel_farm') && !(tier === 'pro') && !(tier === 'max')) total += 990;
+                if (skinsPart.includes('f1_cockpit') && !(tier === 'max')) total += 1290;
+                if (skinsPart.includes('fighter_jet') && !(tier === 'max')) total += 1290;
+                if (skinsPart.includes('spaceship_commander') && !(tier === 'max')) total += 1590;
+            }
+            return total;
+        }
+        return (planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime));
+    };
+
     const handleSubmit = async () => {
         if (!isIbRequest && !slipFile) {
             alert('กรุณาแนบสลิปโอนเงิน');
@@ -189,7 +216,7 @@ function CheckoutContent({ productId }: { productId: string }) {
             const { error } = await supabase.from('orders').insert({
                 user_id: user.id,
                 product_id: product.id,
-                amount: isIbRequest ? 0 : (planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang,
+                amount: isIbRequest ? 0 : getAmount() + satang,
                 status: 'pending', // Both go to pending
                 is_ib_request: isIbRequest ? true : false,
                 ib_broker_name: isIbRequest ? ibBrokerName : null,
@@ -319,43 +346,90 @@ function CheckoutContent({ productId }: { productId: string }) {
                             )}
                         </div>
 
-                        <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
-                            <Label>แพ็กเกจที่เลือก</Label>
-                            <RadioGroup value={planType} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
-                                <div>
-                                    <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" disabled />
-                                    <Label
-                                        htmlFor="monthly"
-                                        className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
-                                    >
-                                        <span className="mb-2 text-sm font-semibold">รายเดือน</span>
-                                        <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
-                                    </Label>
+                        {productId === '44d33c3e-2dd8-4804-9069-15d381ec8009' ? (
+                            <div className="space-y-2">
+                                <Label>แพ็กเกจมอนิเตอร์และสกินที่เลือก</Label>
+                                <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm space-y-1">
+                                    <div className="flex justify-between font-semibold">
+                                        <span className="capitalize">ระดับ: {planType.split('_')[1] || 'Free'} Tier</span>
+                                        <span>฿{
+                                            planType.split('_')[1] === 'pro' 
+                                            ? (isIbRequest ? '0 (IB ฟรี)' : '1,590') 
+                                            : planType.split('_')[1] === 'max' 
+                                            ? '4,990' 
+                                            : '0'
+                                        }</span>
+                                    </div>
+                                    {planType.includes('_skin_') && (
+                                        <div className="text-xs text-muted-foreground pt-1 border-t border-border/30 mt-2 space-y-1">
+                                            <span className="font-semibold text-foreground block mb-1">สกินเสริมที่เลือก:</span>
+                                            {planType.split('_skin_')[1].includes('pixel_farm') && (
+                                                <div className="flex justify-between">
+                                                    <span>• Pixel Farm 2.5D</span>
+                                                    <span>{planType.split('_')[1] === 'pro' || planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿990'}</span>
+                                                </div>
+                                            )}
+                                            {planType.split('_skin_')[1].includes('f1_cockpit') && (
+                                                <div className="flex justify-between">
+                                                    <span>• F1 Cockpit</span>
+                                                    <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,290'}</span>
+                                                </div>
+                                            )}
+                                            {planType.split('_skin_')[1].includes('fighter_jet') && (
+                                                <div className="flex justify-between">
+                                                    <span>• Fighter Jet</span>
+                                                    <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,290'}</span>
+                                                </div>
+                                            )}
+                                            {planType.split('_skin_')[1].includes('spaceship_commander') && (
+                                                <div className="flex justify-between">
+                                                    <span>• Spaceship Commander</span>
+                                                    <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,590'}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                                {product.price_quarterly && (
+                            </div>
+                        ) : (
+                            <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
+                                <Label>แพ็กเกจที่เลือก</Label>
+                                <RadioGroup value={planType} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
                                     <div>
-                                        <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" disabled />
+                                        <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" disabled />
                                         <Label
-                                            htmlFor="quarterly"
-                                            className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
+                                            htmlFor="monthly"
+                                            className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
                                         >
-                                            <span className="mb-2 text-sm font-semibold">3 เดือน</span>
-                                            <span className="text-xl font-bold">฿{product.price_quarterly.toLocaleString()}</span>
+                                            <span className="mb-2 text-sm font-semibold">รายเดือน</span>
+                                            <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
                                         </Label>
                                     </div>
-                                )}
-                                <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
-                                    <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" disabled />
-                                    <Label
-                                        htmlFor="lifetime"
-                                        className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
-                                    >
-                                        <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
-                                        <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
-                                    </Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
+                                    {product.price_quarterly && (
+                                        <div>
+                                            <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" disabled />
+                                            <Label
+                                                htmlFor="quarterly"
+                                                className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
+                                            >
+                                                <span className="mb-2 text-sm font-semibold">3 เดือน</span>
+                                                <span className="text-xl font-bold">฿{product.price_quarterly.toLocaleString()}</span>
+                                            </Label>
+                                        </div>
+                                    )}
+                                    <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
+                                        <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" disabled />
+                                        <Label
+                                            htmlFor="lifetime"
+                                            className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
+                                        >
+                                            <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
+                                            <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
+                                        </Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -402,7 +476,7 @@ function CheckoutContent({ productId }: { productId: string }) {
                                     <p className="text-sm text-muted-foreground mb-1">ยอดชำระ (รวมเศษสตางค์เพื่อยืนยันตัวตน)</p>
                                     <div className="flex items-baseline justify-center gap-1">
                                         <span className="text-3xl font-bold text-primary">
-                                            ฿{((planType === 'monthly' ? product.price_monthly : (planType === 'quarterly' ? product.price_quarterly : product.price_lifetime)) + satang).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            ฿{(getAmount() + satang).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </div>
                                     <p className="text-xs text-red-400 mt-2 font-bold animate-pulse">

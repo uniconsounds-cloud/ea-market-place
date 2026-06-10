@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ProductPurchaseSection } from '@/components/product-purchase-section';
 import { ProductIbBanner } from '@/components/product-ib-banner';
 import { ProductGallery } from '@/components/product-gallery';
+import { MonitorProductDetail } from '@/components/monitor-product-detail';
 
 export const revalidate = 0;
 
@@ -32,6 +33,27 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
 
     if (!product) {
         notFound();
+    }
+
+    if (product.product_key === 'EA-UNIMON-01') {
+        return (
+            <main className="min-h-screen flex flex-col bg-background">
+                <Navbar />
+                <div className="flex-1 container mx-auto px-4 py-12">
+                    <Link href="/" className="text-sm text-muted-foreground hover:text-foreground mb-8 inline-block">
+                        &larr; กลับไปหน้าร้านค้า
+                    </Link>
+                    <div className="mb-8 space-y-4">
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent inline-block">{product.name}</h1>
+                        <p className="text-base text-muted-foreground leading-relaxed max-w-3xl">
+                            {product.description}
+                        </p>
+                    </div>
+                    <MonitorProductDetail product={product} />
+                </div>
+                <Footer />
+            </main>
+        );
     }
 
     return (

@@ -16,6 +16,9 @@ export default async function Home() {
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
+  const monitorProduct = products?.find(p => p.product_key === 'EA-UNIMON-01');
+  const eaProducts = products?.filter(p => p.product_key !== 'EA-UNIMON-01') || [];
+
   return (
     <main className="min-h-screen flex flex-col bg-background selection:bg-primary/30">
       <Navbar />
@@ -46,6 +49,44 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Dashboard & Monitor Special Banner */}
+      {false && monitorProduct && (
+        <section className="py-10 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-stone-900 border-y border-purple-500/20">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-8 bg-black/40 p-8 rounded-2xl border border-primary/20 backdrop-blur-md">
+              <div className="space-y-4 max-w-2xl text-left">
+                <span className="bg-primary/20 text-primary border border-primary/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                  NEW SERVICE
+                </span>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-white">
+                  ระบบเว็บมอนิเตอร์และแดชบอร์ดอัจฉริยะ <br/>
+                  <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">{monitorProduct.name}</span>
+                </h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  เชื่อมโยงพอร์ตการเทรด MT5 ของคุณ เข้ากับแดชบอร์ดสุดล้ำแบบเรียลไทม์ 
+                  มีสกินหน้ากากให้เลือกสลับมากมาย เช่น ธีมแผงควบคุมยานอวกาศ (Spaceship) หรือธีมฟาร์มผลไม้ 2.5D (Pixel Farm) 
+                  สมัครใช้งานแบบ Free ได้ทันที หรือปลดล็อกคุณสมบัติ Pro/Max เพื่อรองรับการใช้งานระดับสูง
+                </p>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center"><span className="w-2 h-2 bg-green-500 mr-1.5 animate-pulse" /> อัปเดตสดจาก MT5</span>
+                  <span>•</span>
+                  <span>เปลี่ยนธีมหน้ากากได้อิสระ</span>
+                  <span>•</span>
+                  <span>มีระบบปลุกอัตโนมัติ (On-Demand)</span>
+                </div>
+              </div>
+              <div className="shrink-0 w-full lg:w-auto text-center">
+                <Link href={`/products/${monitorProduct.id}`}>
+                  <Button size="lg" className="w-full lg:w-auto bg-gradient-to-r from-amber-500 to-orange-600 text-black hover:from-amber-400 hover:to-orange-500 font-bold px-8 shadow-lg shadow-orange-500/10">
+                    ดูแดชบอร์ด & เปิดใช้งานฟรี
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Featured Products */}
       <section id="products" className="py-6 bg-muted/20">
         <div className="container mx-auto px-4">
@@ -60,7 +101,7 @@ export default async function Home() {
           </div>
 
           <div className="min-h-[500px]">
-            <ProductList initialProducts={products || []} />
+            <ProductList initialProducts={eaProducts} />
           </div>
         </div>
       </section>

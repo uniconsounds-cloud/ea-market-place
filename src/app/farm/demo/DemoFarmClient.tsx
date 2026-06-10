@@ -848,12 +848,17 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         sellCount: stats.sellCount,
                         buyPnl: stats.buyPnl,
                         sellPnl: stats.sellPnl,
-                        todayProfit: stats.todayProfit
+                        todayProfit: smoothedTodayProfit,
+                        serverTime: stats.serverTime
                     }}
                     accountType={portStatus?.account_type || 'USC'}
                     assetType={assetType}
                     systemCode={portStatus?.system_code}
                     eaVersion={portStatus?.ea_version}
+                    customName={currentCustomName}
+                    adminMessage={currentAdminMessage || "ติดต่อผ่าน line ID : @jharvest"}
+                    dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
+                    todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                 />
                 {/* Visual indicator for secret toggle back */}
                 <div 

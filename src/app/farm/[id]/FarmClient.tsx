@@ -76,13 +76,189 @@ export default function FarmClient({
     const [clickCount, setClickCount] = useState(0);
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const ordersRef = useRef<any[]>(initialOrders);
+    const portStatusRef = useRef<any>(portStatus);
 
     // Sync ref with state for use in subscription cleanup
     useEffect(() => { ordersRef.current = orders; }, [orders]);
+    useEffect(() => { portStatusRef.current = portStatus; }, [portStatus]);
 
     const [isTabVisible, setIsTabVisible] = useState(true);
     const [isIdle, setIsIdle] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // --- Pro Trial & Theme Preview States ---
+    const [isActivatingTrial, setIsActivatingTrial] = useState(false);
+    const [forceShowEALoader, setForceShowEALoader] = useState(false);
+    const [trialActivationTime, setTrialActivationTime] = useState<number | null>(null);
+    const [activePreviewSkin, setActivePreviewSkin] = useState<string | null>(null);
+    const [previewTimeLeft, setPreviewTimeLeft] = useState(0);
+    const [secondsSinceLastUpdate, setSecondsSinceLastUpdate] = useState<number>(0);
+
+    const isOffline = useMemo(() => secondsSinceLastUpdate > 60, [secondsSinceLastUpdate]);
+
+    useEffect(() => {
+        if (!trialActivationTime || !portStatus?.updated_at) return;
+        const updatedAtTime = new Date(portStatus.updated_at).getTime();
+        // If updated_at is newer than activation start time, trial sync complete!
+        if (updatedAtTime > trialActivationTime - 2000) {
+            setTrialActivationTime(null);
+            setForceShowEALoader(false);
+            toast.success("ข้อมูลครั้งแรกดึงเสร็จสิ้น!");
+        }
+    }, [portStatus?.updated_at, trialActivationTime]);
+
+    useEffect(() => {
+        if (trialActivationTime) {
+            const timer = setTimeout(() => {
+                setTrialActivationTime(null);
+                setForceShowEALoader(false);
+                toast.error("หมดเวลาเชื่อมต่อกับ EA กรุณาลองใหม่อีกครั้ง");
+            }, 15000);
+            return () => clearTimeout(timer);
+        }
+    }, [trialActivationTime]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (portStatus?.updated_at) {
+                const diff = (Date.now() - new Date(portStatus.updated_at).getTime()) / 1000;
+                setSecondsSinceLastUpdate(diff);
+            } else {
+                setSecondsSinceLastUpdate(999);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [portStatus?.updated_at]);
+
+    const isTrialActive = useMemo(() => {
+        if (!portStatus?.pro_trial_expires_at) return false;
+        return new Date(portStatus.pro_trial_expires_at).getTime() > Date.now();
+    }, [portStatus?.pro_trial_expires_at]);
+
+    const [trialTimeLeft, setTrialTimeLeft] = useState(0);
+
+    useEffect(() => {
+        if (!isTrialActive || !portStatus?.pro_trial_expires_at) {
+            setTrialTimeLeft(0);
+            return;
+        }
+
+        const updateTimer = () => {
+            const exp = new Date(portStatus.pro_trial_expires_at).getTime();
+            const left = Math.max(0, Math.round((exp - Date.now()) / 1000));
+            setTrialTimeLeft(left);
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [isTrialActive, portStatus?.pro_trial_expires_at]);
+
+    const activeTier = useMemo(() => {
+        if (isTrialActive) return 'pro';
+        return licenseTier;
+    }, [isTrialActive, licenseTier]);
+
+    const currentViewMode = useMemo(() => {
+        if (activePreviewSkin === 'farm') return 'farm';
+        if (activePreviewSkin === 'spaceship') return 'spaceship';
+        if (activeTier === 'free') return 'spaceship';
+        return viewMode;
+    }, [activePreviewSkin, activeTier, viewMode]);
+
+    const canActivateLimit = (key: string, limit: number = 3): boolean => {
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            return true; // Bypass limits on localhost for testing
+        }
+        if (typeof window === 'undefined') return true;
+        const today = new Date().toDateString();
+        const stored = localStorage.getItem(key);
+        if (!stored) return true;
+        try {
+            const parsed = JSON.parse(stored);
+            if (parsed.date !== today) return true;
+            return parsed.count < limit;
+        } catch {
+            return true;
+        }
+    };
+
+    const recordActivationLimit = (key: string) => {
+        if (typeof window === 'undefined') return;
+        const today = new Date().toDateString();
+        const stored = localStorage.getItem(key);
+        let count = 1;
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.date === today) {
+                    count = parsed.count + 1;
+                }
+            } catch {}
+        }
+        localStorage.setItem(key, JSON.stringify({ date: today, count }));
+    };
+
+    const handleActivateProTrial = async () => {
+        if (!canActivateLimit('eae_pro_trial_limit', 3)) {
+            toast.error("คุณใช้สิทธิ์ทดลองใช้ Pro ครบ 3 ครั้งของวันนี้แล้ว");
+            return;
+        }
+        setIsActivatingTrial(true);
+        try {
+            const { error } = await supabase.rpc('activate_pro_trial', { p_port_number: portNumber });
+            if (error) throw error;
+            recordActivationLimit('eae_pro_trial_limit');
+            toast.success("เริ่มโหมดทดลองใช้ Pro 30 นาทีแล้ว ระบบกำลังปลุก EA...");
+            
+            setTrialActivationTime(Date.now());
+            setForceShowEALoader(true);
+        } catch (err: any) {
+            console.error(err);
+            toast.error("ไม่สามารถเปิดโหมดทดลองได้: " + err.message);
+        } finally {
+            setIsActivatingTrial(false);
+        }
+    };
+
+    const handleSelectSkinPreview = (skin: string) => {
+        if (skin === 'spaceship') {
+            setActivePreviewSkin(null);
+            return;
+        }
+        if (skin === 'farm') {
+            if (licenseTier !== 'free' || isTrialActive) {
+                setViewMode('farm');
+                return;
+            }
+            if (!canActivateLimit('eae_preview_limit', 3)) {
+                toast.error("คุณใช้สิทธิ์พรีวิวธีมครบ 3 ครั้งของวันนี้แล้ว");
+                return;
+            }
+            recordActivationLimit('eae_preview_limit');
+            setActivePreviewSkin('farm');
+            toast.success("กำลังทดลองใช้งานธีม Pixel Farm 2.5D เป็นเวลา 1 นาที");
+        }
+    };
+
+    useEffect(() => {
+        if (!activePreviewSkin) return;
+        const targetTime = Date.now() + 60 * 1000;
+        
+        const updatePreviewTimer = () => {
+            const left = Math.max(0, Math.round((targetTime - Date.now()) / 1000));
+            setPreviewTimeLeft(left);
+            if (left <= 0) {
+                setActivePreviewSkin(null);
+                toast.info("หมดเวลาทดลองใช้ธีมพรีเมียม");
+            }
+        };
+
+        updatePreviewTimer();
+        const interval = setInterval(updatePreviewTimer, 1000);
+        return () => clearInterval(interval);
+    }, [activePreviewSkin]);
+
 
     // Track user activity & window visibility
     useEffect(() => {
@@ -216,9 +392,22 @@ export default function FarmClient({
                     } else if (payload.eventType === 'DELETE') {
                         const closedOrder = ordersRef.current.find(o => o.ticket_id === payload.old.ticket_id);
                         if (closedOrder) {
+                            const curStatus = portStatusRef.current;
+                            const curPrice = Number(curStatus?.current_price) || 2354.50;
+                            const lots = (Number(closedOrder.raw_lot_size) || 20) / 100;
+                            const accountType = curStatus?.account_type || 'USC';
+                            const pnlUsd = accountType === 'USC' 
+                                ? (Number(closedOrder.current_pnl) || 0) / 100 
+                                : (Number(closedOrder.current_pnl) || 0);
+                            const priceDiff = lots > 0 ? pnlUsd / (lots * 100) : 0;
+                            const entryPrice = closedOrder.type === 'BUY' ? curPrice - priceDiff : curPrice + priceDiff;
+
                             pendingCloseQueue.current.push({
                                 ticket_id: closedOrder.ticket_id,
                                 pnl: Number(closedOrder.current_pnl) || 0,
+                                type: closedOrder.type,
+                                raw_lot_size: Number(closedOrder.raw_lot_size) || 20,
+                                entryPrice: parseFloat(entryPrice.toFixed(2)),
                                 closedAt: Date.now()
                             });
                         }
@@ -267,7 +456,7 @@ export default function FarmClient({
         if (recentlyClosed.length === 0) return;
         const timer = setInterval(() => {
             const now = Date.now();
-            setRecentlyClosed(prev => prev.filter(o => (now - o.closedAt) < 10000));
+            setRecentlyClosed(prev => prev.filter(o => (now - o.closedAt) < 60000));
         }, 1000);
         return () => clearInterval(timer);
     }, [recentlyClosed]);
@@ -276,7 +465,7 @@ export default function FarmClient({
     const prevOpenCountRef = useRef(0);
     const prevTodayProfitRef = useRef(0);
     // Batch orders closing aggregator for "รวบไม้" (Grid closes)
-    const pendingCloseQueue = useRef<{ ticket_id: number, pnl: number, closedAt: number }[]>([]);
+    const pendingCloseQueue = useRef<{ ticket_id: number, pnl: number, closedAt: number, type?: string, raw_lot_size?: number, entryPrice?: number }[]>([]);
     useEffect(() => {
         const interval = setInterval(() => {
             if (pendingCloseQueue.current.length > 0) {
@@ -293,6 +482,10 @@ export default function FarmClient({
                     
                     const newEvents = batch.map(o => ({
                         ticket_id: o.ticket_id,
+                        pnl: o.pnl,
+                        type: o.type,
+                        raw_lot_size: o.raw_lot_size,
+                        entryPrice: o.entryPrice,
                         closedAt: now,
                         isProfit: isProfit // Uniform profit/loss logic for the entire basket
                     }));
@@ -314,7 +507,7 @@ export default function FarmClient({
     // Cleanup old events
     useEffect(() => {
         const interval = setInterval(() => {
-            setRecentlyClosed(prev => prev.filter(e => Date.now() - e.closedAt < 15000));
+            setRecentlyClosed(prev => prev.filter(e => Date.now() - e.closedAt < 60000));
         }, 1000);
         return () => clearInterval(interval);
     }, []);
@@ -378,7 +571,20 @@ export default function FarmClient({
     const simulateOrderClose = (order: any) => {
         if (hiddenTickets.includes(order.ticket_id)) return;
         const pnl = Number(order.current_pnl) || 0;
-        const newEvent = { ...order, closedAt: Date.now(), isProfit: pnl >= 0 };
+        const curPrice = portStatus?.current_price || 2354.50;
+        const lots = (Number(order.raw_lot_size) || 20) / 100;
+        const accountType = portStatus?.account_type || 'USC';
+        const pnlUsd = accountType === 'USC' ? pnl / 100 : pnl;
+        const priceDiff = lots > 0 ? pnlUsd / (lots * 100) : 0;
+        const entryPrice = order.type === 'BUY' ? curPrice - priceDiff : curPrice + priceDiff;
+
+        const newEvent = { 
+            ...order, 
+            pnl,
+            entryPrice: parseFloat(entryPrice.toFixed(2)),
+            closedAt: Date.now(), 
+            isProfit: pnl >= 0 
+        };
         setRecentlyClosed(prev => [...prev, newEvent]);
         setHiddenTickets(prev => [...prev, order.ticket_id]);
         if (pnl > 0) {
@@ -595,7 +801,7 @@ export default function FarmClient({
             console.log(`[EAEZE] Secret Click Count: ${nextCount}/5`);
             
             if (nextCount >= 5) {
-                if (licenseTier === 'free' && !isAdmin) {
+                if (activeTier === 'free' && !isAdmin) {
                     toast.info("กรุณาอัปเกรดเป็นสิทธิ์ Pro หรือ Max เพื่อเปิดใช้งานระบบฟาร์ม 2.5D");
                     return 0;
                 }
@@ -616,7 +822,7 @@ export default function FarmClient({
         }, 2000);
     };
 
-    if (viewMode === 'spaceship') {
+    if (currentViewMode === 'spaceship') {
         return (
             <div className="relative">
                 <SpaceshipDashboard 
@@ -631,12 +837,32 @@ export default function FarmClient({
                         sellCount: stats.sellCount,
                         buyPnl: stats.buyPnl,
                         sellPnl: stats.sellPnl,
-                        todayProfit: stats.todayProfit
+                        todayProfit: smoothedTodayProfit,
+                        serverTime: stats.serverTime
                     }}
                     accountType={portStatus?.account_type || 'USC'}
                     assetType={assetType}
                     systemCode={portStatus?.system_code}
                     eaVersion={portStatus?.ea_version}
+                    orders={orders}
+                    recentlyClosed={recentlyClosed}
+                    licenseTier={licenseTier}
+                    isTrialActive={isTrialActive}
+                    trialTimeLeft={trialTimeLeft}
+                    onActivateTrial={handleActivateProTrial}
+                    isActivatingTrial={isActivatingTrial}
+                    onSelectSkinPreview={handleSelectSkinPreview}
+                    activePreviewSkin={activePreviewSkin}
+                    previewTimeLeft={previewTimeLeft}
+                    isOffline={isOffline}
+                    currentPrice={portStatus?.current_price}
+                    licenseCreatedAt={licenseCreatedAt}
+                    dailyHistory={dailyHistory}
+                    customName={currentCustomName}
+                    adminMessage={portStatus?.admin_message || "ติดต่อผ่าน line ID : @jharvest"}
+                    dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
+                    todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
+                    isFirstSyncLoading={forceShowEALoader}
                 />
                 {/* Visual indicator for secret toggle back */}
                 <div 
@@ -898,6 +1124,35 @@ export default function FarmClient({
                         </h3>
                         <p className="text-xs text-amber-100/50 leading-relaxed font-sans">
                             กรุณารอสักครู่ ระบบกำลังดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์...
+                        </p>
+                    </div>
+                </div>
+            )}
+            {/* Theme Preview Countdown Floating Overlay */}
+            {activePreviewSkin === 'farm' && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-[#1f1611]/95 border border-[#cfa545] text-[#cfa545] font-mono text-xs px-5 py-2.5 rounded-full shadow-[0_0_25px_rgba(207,165,69,0.35)] flex items-center gap-2 animate-bounce">
+                    <span className="w-2.5 h-2.5 bg-[#cfa545] rounded-full animate-ping" />
+                    <span>โหมดทดลองใช้ธีม Farm 2.5D: {previewTimeLeft} วินาทีที่เหลือ</span>
+                </div>
+            )}
+
+            {/* EA Wakeup / Trial Loading Spinner */}
+            {forceShowEALoader && currentViewMode === 'farm' && (
+                <div className="fixed inset-0 bg-[#0f0b08]/85 backdrop-blur-md z-[180] flex items-center justify-center p-4 transition-all duration-500">
+                    <div className="bg-[#1f1815]/95 border border-[#cfa545]/30 rounded-2xl p-8 max-w-xs w-full text-center shadow-[0_0_40px_rgba(207,165,69,0.2)] flex flex-col items-center animate-fade-in-up">
+                        <div className="relative w-16 h-16 mb-6">
+                            <div className="absolute inset-0 border-4 border-amber-500/10 border-t-[#cfa545] rounded-full animate-spin"></div>
+                            <div className="absolute inset-3 bg-gradient-to-br from-[#dcae4d] to-[#b88c32] rounded-full opacity-90 flex items-center justify-center shadow-[0_0_15px_rgba(207,165,69,0.4)]">
+                                <svg className="w-5 h-5 text-[#1a110a] animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 className="text-sm font-black text-[#cfa545] tracking-widest uppercase mb-2 font-mono">
+                            LOADING LIVE EA DATA
+                        </h3>
+                        <p className="text-xs text-amber-100/60 leading-relaxed font-sans">
+                            กำลังปลุก EA เพื่อส่งข้อมูลออเดอร์ชุดแรก... กรุณารอสักครู่
                         </p>
                     </div>
                 </div>
