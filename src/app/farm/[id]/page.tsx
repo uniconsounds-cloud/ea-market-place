@@ -23,11 +23,12 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     const isAdmin = profile?.role === 'admin';
 
     // 3. Fetch License Owner, registration date, and tier details
-    const { data: license } = await supabase
+    const { data: licenses } = await supabase
         .from('licenses')
-        .select('user_id, created_at, port_name, license_tier, dashboard_skin')
-        .eq('account_number', portNumber)
-        .single();
+        .select('user_id, created_at, port_name, license_tier, dashboard_skin, is_active')
+        .eq('account_number', portNumber);
+
+    const license = licenses?.find(l => l.is_active) || licenses?.[0];
 
     if (!isAdmin && (!license || license.user_id !== session.user.id)) {
         return (
