@@ -918,87 +918,58 @@ export function GameDashboardClient() {
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto px-2 sm:px-4">
       
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-900 pb-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-100">
+      <div className="flex flex-col gap-1.5 border-b border-slate-900 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-100 whitespace-nowrap">
               TRADING ARENA
             </h1>
-            <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 px-2.5 py-0.5 font-mono uppercase tracking-widest text-xs">
+            <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 px-2 py-0.5 font-mono uppercase tracking-widest text-[10px]">
               CONSOLE
             </Badge>
-            <Badge variant="outline" className="bg-slate-900/60 text-slate-300 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-xs flex items-center gap-1.5 select-none shrink-0">
-              <span className="text-[14px] leading-none">🇹🇭</span>
+            <Badge variant="outline" className="bg-slate-900/60 text-slate-300 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-[10px] flex items-center gap-1.5 select-none shrink-0">
+              <span className="text-[12px] leading-none">🇹🇭</span>
               <span>THAI TIME (GMT+7)</span>
             </Badge>
             <Badge 
               variant="outline" 
               onClick={!isSyncing ? syncSupabaseData : undefined}
-              className={`bg-slate-900/60 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-xs flex items-center gap-1.5 select-none shrink-0 transition-all duration-300 ${!isSyncing ? 'hover:bg-slate-800/80 hover:border-slate-700/80 cursor-pointer text-cyan-400' : 'cursor-wait text-slate-500'}`}
+              className={`bg-slate-900/60 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-[10px] flex items-center gap-1.5 select-none shrink-0 transition-all duration-300 ${!isSyncing ? 'hover:bg-slate-800/80 hover:border-slate-700/80 cursor-pointer text-cyan-400' : 'cursor-wait text-slate-500'}`}
             >
-              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-cyan-400' : 'text-slate-400'}`} />
+              <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? 'animate-spin text-cyan-400' : 'text-slate-400'}`} />
               <span>
                 {isSyncing ? 'Syncing...' : lastSynced ? `Synced ${lastSynced}` : 'Sync DB'}
               </span>
             </Badge>
           </div>
-          <p className="text-slate-500 font-medium text-sm sm:text-base max-w-xl leading-relaxed">
-            Real-time algorithmic simulation command center. Subscribe to copy master trades in real-money rounds.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:ml-auto w-full md:w-auto">
-          {/* Global Stats Block */}
-          <div className="flex gap-6 bg-slate-950 px-5 py-3.5 rounded-xl border border-slate-900 shadow-inner w-full sm:w-auto justify-between text-sm font-mono select-none">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Balance</span>
-              <span className="text-base sm:text-lg font-black text-slate-100 tabular-nums">${globalBalance.toFixed(2)}</span>
-            </div>
-            <div className="w-px bg-slate-900"></div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Equity</span>
-              <span className="text-base sm:text-lg font-black text-slate-100 tabular-nums">${globalEquity.toFixed(2)}</span>
-            </div>
-            <div className="w-px bg-slate-900"></div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Floating</span>
-              <span className={`text-base sm:text-lg font-black tabular-nums ${globalFloating >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {globalFloating >= 0 ? '+' : ''}${globalFloating.toFixed(2)}
-              </span>
-            </div>
-            <div className="w-px bg-slate-900"></div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Float DD</span>
-              <span className="text-base sm:text-lg font-black text-rose-400 tabular-nums">{ddDisplay}</span>
-            </div>
+          
+          {/* Engine Active Indicator - Compact! */}
+          <div className="shrink-0">
+            {checkIsMarketOpen() ? (
+              <div className="flex items-center justify-center bg-emerald-950/10 px-3.5 py-1.5 rounded-lg border border-emerald-900/20">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-1.5 w-1.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                  </div>
+                  <span className="text-[10px] font-black tracking-widest text-emerald-400 uppercase leading-none">ENGINE ONLINE</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center bg-amber-950/10 px-3.5 py-1.5 rounded-lg border border-amber-900/20">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-1.5 w-1.5 relative">
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
+                  </div>
+                  <span className="text-[10px] font-black tracking-widest text-amber-500 uppercase leading-none">ENGINE STANDBY</span>
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Engine Active Indicator */}
-          {checkIsMarketOpen() ? (
-            <div className="flex items-center justify-center bg-emerald-950/10 px-5 py-2.5 sm:h-12 rounded-lg border border-emerald-900/20 w-full sm:w-auto">
-              <div className="flex items-center gap-2">
-                <div className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                </div>
-                <div className="flex flex-col leading-none">
-                  <span className="text-[11px] sm:text-xs font-black tracking-widest text-emerald-400 uppercase">ENGINE ONLINE</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center bg-amber-950/10 px-5 py-2.5 sm:h-12 rounded-lg border border-amber-900/20 w-full sm:w-auto">
-              <div className="flex items-center gap-2">
-                <div className="flex h-2 w-2 relative">
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
-                </div>
-                <div className="flex flex-col leading-none">
-                  <span className="text-[11px] sm:text-xs font-black tracking-widest text-amber-500 uppercase">ENGINE STANDBY</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
+        <p className="text-slate-500 font-medium text-xs max-w-xl leading-relaxed">
+          Real-time algorithmic simulation command center. Subscribe to copy master trades in real-money rounds.
+        </p>
       </div>
 
       {/* Main Live Market Chart */}
