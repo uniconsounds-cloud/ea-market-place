@@ -323,6 +323,36 @@ const getTradingDayStart = (): Date => {
   return tradingStartMT5;
 };
 
+// Helper to check if the Gold market is currently open (Bangkok Time)
+// Gold closes Saturday at 04:00 AM (Thai time) and opens Monday at 05:00 AM (Thai time).
+// Also closed daily between 04:00 AM and 05:00 AM for maintenance/daily roll.
+const checkIsMarketOpen = (): boolean => {
+  const now = new Date();
+  const bangkokTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+  const day = bangkokTime.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const hours = bangkokTime.getHours();
+  
+  // Saturday: closed after 04:00 AM
+  if (day === 6) {
+    if (hours >= 4) return false;
+  }
+  // Sunday: completely closed
+  if (day === 0) {
+    return false;
+  }
+  // Monday: closed before 05:00 AM
+  if (day === 1) {
+    if (hours < 5) return false;
+  }
+  
+  // Daily maintenance break: 04:00 AM - 05:00 AM
+  if (hours === 4) {
+    return false;
+  }
+  
+  return true;
+};
+
 export function GameDashboardClient() {
   const [strategies, setStrategies] = useState<Strategy[]>(initialStrategies);
   const lastPurgedRef = useRef<string>("");
@@ -420,8 +450,12 @@ export function GameDashboardClient() {
     // Initial fetch immediately
     fetchRealGoldPrice();
 
-    // Poll every 5 seconds
-    pollInterval = setInterval(fetchRealGoldPrice, 5000);
+    // Poll every 5 seconds (only when market is open)
+    pollInterval = setInterval(() => {
+      if (checkIsMarketOpen()) {
+        fetchRealGoldPrice();
+      }
+    }, 5000);
 
     // Micro-ticks simulator: updates every 500ms to keep the chart moving fluidly in-between polls
     tickInterval = setInterval(() => {
@@ -430,9 +464,11 @@ export function GameDashboardClient() {
       }
       
       // Add very small micro-fluctuations (e.g. +/- $0.08) around the current base price
-      // to simulate natural tick-by-tick market volatility
-      const microNoise = (Math.random() - 0.5) * 0.16;
-      latestPriceRef.current = parseFloat((latestPriceRef.current + microNoise).toFixed(2));
+      // only when the market is open to simulate natural tick-by-tick market volatility
+      if (checkIsMarketOpen()) {
+        const microNoise = (Math.random() - 0.5) * 0.16;
+        latestPriceRef.current = parseFloat((latestPriceRef.current + microNoise).toFixed(2));
+      }
     }, 500);
 
     return () => {
@@ -449,23 +485,27 @@ export function GameDashboardClient() {
       if (latestPriceRef.current > 0) {
         setMarketData(prev => {
            const newSignals: number[] = [];
-           [1,2,3,4].forEach(stratId => {
-              const isActive = !!activeRoundsRef.current[stratId];
-              if (isActive) return; // Only plot when Approaching (80%), not when already active
-              
-              const cycle = 8000;
-              const offset = stratId * 2500;
-              const sinVal = Math.sin(((nowTimestamp + offset) % cycle) / cycle * Math.PI * 2);
-              const energy = (sinVal + 1) * 50; 
-              
-              if (energy >= 80) {
-                 const cycleId = Math.floor((nowTimestamp + offset) / cycle);
-                 if (lastSignalCycle.current[stratId] !== cycleId) {
-                     lastSignalCycle.current[stratId] = cycleId;
-                     newSignals.push(stratId);
-                 }
-              }
-           });
+           
+           // Only generate signals if the market is open!
+           if (checkIsMarketOpen()) {
+             [1,2,3,4].forEach(stratId => {
+                const isActive = !!activeRoundsRef.current[stratId];
+                if (isActive) return; // Only plot when Approaching (80%), not when already active
+                
+                const cycle = 8000;
+                const offset = stratId * 2500;
+                const sinVal = Math.sin(((nowTimestamp + offset) % cycle) / cycle * Math.PI * 2);
+                const energy = (sinVal + 1) * 50; 
+                
+                if (energy >= 80) {
+                   const cycleId = Math.floor((nowTimestamp + offset) / cycle);
+                   if (lastSignalCycle.current[stratId] !== cycleId) {
+                       lastSignalCycle.current[stratId] = cycleId;
+                       newSignals.push(stratId);
+                   }
+                }
+             });
+           }
            
            const newTick = { 
              timestamp: nowTimestamp,
@@ -801,6 +841,9 @@ export function GameDashboardClient() {
   };
 
   const getSignalState = (stratId: number, isIdle: boolean, energy: number) => {
+    if (!checkIsMarketOpen()) {
+      return { text: "MARKET CLOSED", color: "text-amber-500/70", pulse: false, Icon: Clock };
+    }
     if (!isIdle) return { text: "CONDITION MET", color: "text-amber-400", pulse: true, Icon: Zap };
     if (energy >= 80) {
       return { text: "APPROACHING SIGNAL", color: "text-cyan-400", pulse: true, Icon: Activity };
@@ -931,17 +974,30 @@ export function GameDashboardClient() {
           </div>
 
           {/* Engine Active Indicator */}
-          <div className="flex items-center justify-center bg-emerald-950/10 px-5 py-2.5 sm:h-12 rounded-lg border border-emerald-900/20 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
-              <div className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-              </div>
-              <div className="flex flex-col leading-none">
-                <span className="text-[11px] sm:text-xs font-black tracking-widest text-emerald-400 uppercase">ENGINE ONLINE</span>
+          {checkIsMarketOpen() ? (
+            <div className="flex items-center justify-center bg-emerald-950/10 px-5 py-2.5 sm:h-12 rounded-lg border border-emerald-900/20 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <div className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                </div>
+                <div className="flex flex-col leading-none">
+                  <span className="text-[11px] sm:text-xs font-black tracking-widest text-emerald-400 uppercase">ENGINE ONLINE</span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center bg-amber-950/10 px-5 py-2.5 sm:h-12 rounded-lg border border-amber-900/20 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <div className="flex h-2 w-2 relative">
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
+                </div>
+                <div className="flex flex-col leading-none">
+                  <span className="text-[11px] sm:text-xs font-black tracking-widest text-amber-500 uppercase">ENGINE STANDBY</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -950,43 +1006,70 @@ export function GameDashboardClient() {
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-blue-500/20 via-cyan-500/50 to-blue-500/20"></div>
         <div className="p-4 border-b border-slate-900 flex justify-between items-center bg-slate-950/60 relative z-10 select-none">
           <div className="flex items-center gap-3">
-             <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+             {checkIsMarketOpen() ? (
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+             ) : (
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></div>
+             )}
              <span className="text-xs sm:text-sm font-black tracking-widest text-slate-300">
-               XAUUSD REAL-TIME FEED
+               {checkIsMarketOpen() ? "XAUUSD REAL-TIME FEED" : "XAUUSD FEED (MARKET CLOSED)"}
              </span>
-             <span className="flex h-2 w-2 relative hidden sm:inline">
-               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-               <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>
-             </span>
+             {checkIsMarketOpen() && (
+               <span className="flex h-2 w-2 relative hidden sm:inline">
+                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>
+               </span>
+             )}
              <span className="text-xs text-slate-400 font-mono tracking-wider hidden md:inline">
-               Live Gold prices tracked in real-time from MT5 VPS stream
+               {checkIsMarketOpen() 
+                 ? "Live Gold prices tracked in real-time from MT5 VPS stream" 
+                 : "Live Gold prices (Market is closed for the weekend)"}
              </span>
           </div>
-          <span className="text-cyan-400 font-mono font-black text-xl sm:text-2xl tabular-nums drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">${currentChartPrice.toFixed(2)}</span>
+          <span className={`font-mono font-black text-xl sm:text-2xl tabular-nums ${
+            checkIsMarketOpen() 
+              ? "text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]" 
+              : "text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+          }`}>
+            ${currentChartPrice.toFixed(2)}
+          </span>
         </div>
         <div className="flex-1 w-full p-3 relative z-0">
           {marketData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-               <LineChart data={getMarketDataWithMarkers()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(30, 41, 59, 0.15)" vertical={false} />
-                  <XAxis dataKey="time" hide />
-                  <YAxis domain={['auto', 'auto']} hide />
-                  <Tooltip 
-                     contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid #1e293b', borderRadius: '6px', backdropFilter: 'blur(8px)', fontSize: '13px' }}
-                     itemStyle={{ color: '#22d3ee', fontWeight: 'bold' }}
-                     labelStyle={{ color: '#64748b', fontSize: '12px', marginBottom: '1px' }}
-                     isAnimationActive={false}
-                  />
-                  <Line 
-                     type="monotone" 
-                     dataKey="price" 
-                     stroke="#06b6d4" 
-                     strokeWidth={2.5} 
-                     dot={<CustomizedDot />} 
-                     isAnimationActive={false} 
-                  />
-               </LineChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height="100%">
+                 <LineChart data={getMarketDataWithMarkers()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(30, 41, 59, 0.15)" vertical={false} />
+                    <XAxis dataKey="time" hide />
+                    <YAxis domain={['auto', 'auto']} hide />
+                    <Tooltip 
+                       contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid #1e293b', borderRadius: '6px', backdropFilter: 'blur(8px)', fontSize: '13px' }}
+                       itemStyle={{ color: '#22d3ee', fontWeight: 'bold' }}
+                       labelStyle={{ color: '#64748b', fontSize: '12px', marginBottom: '1px' }}
+                       isAnimationActive={false}
+                    />
+                    <Line 
+                       type="monotone" 
+                       dataKey="price" 
+                       stroke={checkIsMarketOpen() ? "#06b6d4" : "#f59e0b"} 
+                       strokeWidth={2.5} 
+                       dot={<CustomizedDot />} 
+                       isAnimationActive={false} 
+                    />
+                 </LineChart>
+              </ResponsiveContainer>
+              
+              {!checkIsMarketOpen() && (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[0.5px] select-none pointer-events-none">
+                  <div className="bg-slate-950/90 border border-slate-900/60 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-2xl">
+                    <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                    <span className="text-xs text-slate-400 font-mono tracking-wider">
+                      Gold market is closed. Reopens Monday at 05:00 AM (Thai Time)
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center opacity-40">
                <Activity className="w-10 h-10 text-slate-500 animate-spin-slow mb-1.5" />
