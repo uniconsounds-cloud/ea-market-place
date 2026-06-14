@@ -79,7 +79,7 @@ function LoginContent() {
                         access_type: 'offline',
                         prompt: 'consent',
                     },
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirectUrl)}`,
                 },
             });
             if (error) throw error;

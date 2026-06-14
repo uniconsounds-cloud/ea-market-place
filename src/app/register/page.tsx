@@ -31,6 +31,10 @@ function RegisterContent() {
     if (refParam) queryParams.set('ref', refParam);
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
 
+    const finalRedirectUrl = refParam && redirectParam === '/demo-challenge'
+        ? `/demo-challenge?ref=${refParam}`
+        : (redirectParam || '/dashboard');
+
     useEffect(() => {
         const fetchReferrerAndAdmins = async () => {
             // 1. Check for existing referral code
@@ -165,7 +169,7 @@ function RegisterContent() {
                         access_type: 'offline',
                         prompt: 'consent',
                     },
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirectUrl)}`,
                 },
             });
             if (error) throw error;
