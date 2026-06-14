@@ -14,9 +14,9 @@ private:
    int m_hEma20;
 
 public:
-   virtual void Init(int id, CVirtualAccount *acc) override
+   virtual void Init(int id, CVirtualAccount *acc, ENUM_STRATEGY_VERSION ver) override
    {
-      CStrategyBase::Init(id, acc);
+      CStrategyBase::Init(id, acc, ver);
       m_hAtr = iATR(_Symbol, PERIOD_M1, 14);
       m_hEma20 = iMA(_Symbol, PERIOD_M1, 20, 0, MODE_EMA, PRICE_CLOSE);
    }
@@ -49,15 +49,15 @@ public:
          // Spike UP -> Fade SELL
          if(rates[1].close > rates[1].open)
          {
-            double sl = bid + (300 * point); // Balanced SL (30 gold pips)
-            double tp = bid - (200 * point); // Balanced TP (20 gold pips)
+            double sl = bid + ((m_version == VERSION_1_0_WINRATE ? 600 : 300) * point);
+            double tp = bid - ((m_version == VERSION_1_0_WINRATE ? 150 : 200) * point);
             m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "SPIKE_SELL");
          }
          // Spike DOWN -> Fade BUY
          else
          {
-            double sl = ask - (300 * point); // Balanced SL (30 gold pips)
-            double tp = ask + (200 * point); // Balanced TP (20 gold pips)
+            double sl = ask - ((m_version == VERSION_1_0_WINRATE ? 600 : 300) * point);
+            double tp = ask + ((m_version == VERSION_1_0_WINRATE ? 150 : 200) * point);
             m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "SPIKE_BUY");
          }
       }

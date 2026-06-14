@@ -14,9 +14,9 @@ private:
    int m_hEma21;
 
 public:
-   virtual void Init(int id, CVirtualAccount *acc) override
+   virtual void Init(int id, CVirtualAccount *acc, ENUM_STRATEGY_VERSION ver) override
    {
-      CStrategyBase::Init(id, acc);
+      CStrategyBase::Init(id, acc, ver);
       m_hEma9 = iMA(_Symbol, PERIOD_M1, 9, 0, MODE_EMA, PRICE_CLOSE);
       m_hEma21 = iMA(_Symbol, PERIOD_M1, 21, 0, MODE_EMA, PRICE_CLOSE);
    }
@@ -48,8 +48,8 @@ public:
          for(int i=1; i<=5; i++) { if(rates[i].high > highest) highest = rates[i].high; }
          if(rates[0].close > highest && rates[1].close <= highest) // Just crossed
          {
-            double sl = ask - (250 * point); // Balanced SL (25 gold pips)
-            double tp = ask + (200 * point); // Balanced TP (20 gold pips)
+            double sl = ask - ((m_version == VERSION_1_0_WINRATE ? 500 : 250) * point);
+            double tp = ask + ((m_version == VERSION_1_0_WINRATE ? 150 : 200) * point);
             m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "MOM_BUY");
          }
       }
@@ -61,8 +61,8 @@ public:
          for(int i=1; i<=5; i++) { if(rates[i].low < lowest) lowest = rates[i].low; }
          if(rates[0].close < lowest && rates[1].close >= lowest) // Just crossed
          {
-            double sl = bid + (250 * point); // Balanced SL (25 gold pips)
-            double tp = bid - (200 * point); // Balanced TP (20 gold pips)
+            double sl = bid + ((m_version == VERSION_1_0_WINRATE ? 500 : 250) * point);
+            double tp = bid - ((m_version == VERSION_1_0_WINRATE ? 150 : 200) * point);
             m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "MOM_SELL");
          }
       }

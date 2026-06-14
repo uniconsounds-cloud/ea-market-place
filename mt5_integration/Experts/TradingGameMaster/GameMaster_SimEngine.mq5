@@ -10,7 +10,7 @@
 //+------------------------------------------------------------------+
 #property copyright "juntarasate@gmail.com"
 #property link      ""
-#property version   "1.03"
+#property version   "1.04"
 #property strict
 
 #include "VirtualEngine.mqh"
@@ -23,6 +23,7 @@ input double InpInitialBalance_1 = 100.0; // Strat 1 Starting Balance ($100 USD)
 input double InpInitialBalance_2 = 100.0; // Strat 2 Starting Balance ($100 USD)
 input double InpInitialBalance_3 = 100.0; // Strat 3 Starting Balance ($100 USD)
 input double InpInitialBalance_4 = 100.0; // Strat 4 Starting Balance ($100 USD)
+input ENUM_STRATEGY_VERSION InpStrategyVersion = VERSION_1_1_BALANCED; // Strategy Parameter Version (v1.0 or v1.1)
 
 CVirtualAccount g_acc1;
 CVirtualAccount g_acc2;
@@ -43,10 +44,11 @@ ulong g_lastHeartbeat = 0;
 void UpdateChartDashboard()
 {
    string text = "==================================================\n";
-   text += "      TRADING GAME - SIMULATION ENGINE (v1.03)    \n";
+   text += "      TRADING GAME - SIMULATION ENGINE (v1.04)    \n";
    text += "==================================================\n";
    text += "Engine Status  : ACTIVE (RUNNING)\n";
    text += "Supabase Sync  : CONNECTED\n";
+   text += "Param Profile  : " + (InpStrategyVersion == VERSION_1_0_WINRATE ? "v1.0 (WinRate Focus)" : "v1.1 (Balanced)") + "\n";
    text += "Current Bid    : " + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_BID), 5) + "\n";
    text += "Current Ask    : " + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_ASK), 5) + "\n";
    text += "Time           : " + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS) + "\n\n";
@@ -100,10 +102,10 @@ int OnInit()
    g_acc4.Init(4, InpInitialBalance_4, &g_webSync);
    
    // Initialize Strategies
-   g_strat1.Init(1, &g_acc1);
-   g_strat2.Init(2, &g_acc2);
-   g_strat3.Init(3, &g_acc3);
-   g_strat4.Init(4, &g_acc4);
+   g_strat1.Init(1, &g_acc1, InpStrategyVersion);
+   g_strat2.Init(2, &g_acc2, InpStrategyVersion);
+   g_strat3.Init(3, &g_acc3, InpStrategyVersion);
+   g_strat4.Init(4, &g_acc4, InpStrategyVersion);
 
    // Reset DB states to clean initial state on MT5 startup
    g_webSync.BroadcastStrategyStatus(1, g_acc1.GetBalance(), 0.0, 0);

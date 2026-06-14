@@ -44,9 +44,11 @@ mkdir -p "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME"
 echo "Copying source file $FILE_NAME to MT5 ($MT5_DIR_NAME)..."
 cp "$SOURCE_FILE" "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/$FILE_NAME"
 
-# 4. Also copy any other dependencies in the same directory (like EAE_WebSync.mqh in Experts/)
-if [ "$DIR_NAME" = "Experts" ]; then
-    echo "Copying Experts MQH files to MT5..."
+# 4. Also copy any other MQH files in the same directory as dependencies
+echo "Copying MQH dependencies from $DIR_NAME to MT5..."
+cp "$WORKSPACE_DIR/$DIR_NAME"/*.mqh "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/" 2>/dev/null || true
+# If we are in a subdirectory of Experts, also copy the parent Experts MQH files just in case
+if [ "$DIR_NAME" != "Experts" ] && [[ "$DIR_NAME" == Experts/* ]]; then
     cp "$WORKSPACE_DIR"/Experts/*.mqh "$MT5_INSTALL_DIR/MQL5/Experts/" 2>/dev/null || true
 fi
 

@@ -1,35 +1,12 @@
 -- ===================================================================
--- SQL Patch to fix LOTS and MAX DD, add Pro Trials, and dynamic sync intervals
+-- SQL Patch to add current_price to farm_port_status and update sync_ea_data
 -- Run this script in your Supabase SQL Editor
 -- ===================================================================
 
--- 1. Ensure columns exist in public.farm_port_status
-ALTER TABLE public.farm_port_status ADD COLUMN IF NOT EXISTS daily_max_drawdown DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_port_status ADD COLUMN IF NOT EXISTS today_closed_lots DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_port_status ADD COLUMN IF NOT EXISTS today_pnl DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_port_status ADD COLUMN IF NOT EXISTS pro_trial_expires_at TIMESTAMPTZ;
+-- 1. Ensure current_price column exists in public.farm_port_status
+ALTER TABLE public.farm_port_status ADD COLUMN IF NOT EXISTS current_price DOUBLE PRECISION;
 
--- 2. Ensure columns exist in public.farm_daily_history (covering both naming styles)
-ALTER TABLE public.farm_daily_history ADD COLUMN IF NOT EXISTS max_drawdown DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_daily_history ADD COLUMN IF NOT EXISTS closed_lots DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_daily_history ADD COLUMN IF NOT EXISTS max_dd DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_daily_history ADD COLUMN IF NOT EXISTS lots DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE public.farm_daily_history ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-
--- 3. Create or Replace activate_pro_trial function
-CREATE OR REPLACE FUNCTION public.activate_pro_trial(p_port_number TEXT)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-    UPDATE public.farm_port_status
-    SET pro_trial_expires_at = NOW() + INTERVAL '30 minutes'
-    WHERE port_number = p_port_number;
-END;
-$$;
-
--- 4. Re-create sync_ea_data RPC to extract and upsert these values in real-time
+-- 2. Update sync_ea_data RPC to extract and upsert current_price
 DROP FUNCTION IF EXISTS public.sync_ea_data(JSONB, TEXT);
 DROP FUNCTION IF EXISTS public.sync_ea_data(TEXT, JSONB);
 
@@ -43,6 +20,7 @@ DECLARE
     v_today_profit NUMERIC;
     v_today_closed_lots NUMERIC;
     v_daily_max_drawdown NUMERIC;
+    v_current_price NUMERIC;
     v_server_time BIGINT;
     v_sync_date DATE;
     v_key_valid BOOLEAN := false;
@@ -57,6 +35,7 @@ BEGIN
     v_today_profit       := (p_payload->>'today_profit')::NUMERIC;
     v_today_closed_lots  := (p_payload->>'today_closed_lots')::NUMERIC;
     v_daily_max_drawdown := (p_payload->>'daily_max_drawdown')::NUMERIC;
+    v_current_price      := (p_payload->>'current_price')::NUMERIC;
     v_server_time        := (p_payload->>'server_time')::BIGINT;
 
     -- Validate API Key or Active License
@@ -120,8 +99,9 @@ BEGIN
         v_sync_interval := 30;
     END IF;
 
-    -- If free user and NOT in active trial, delete any existing active orders (free tier cannot see orders)
+    -- If free user and NOT in active trial, force v_should_sync_full to false and delete any existing active orders
     IF v_license_tier = 'free' AND NOT COALESCE(v_is_trial, false) THEN
+        v_should_sync_full := false;
         DELETE FROM public.farm_active_orders WHERE port_number = v_port_number;
     END IF;
 
@@ -137,12 +117,12 @@ BEGIN
         );
     END IF;
 
-    -- 5. Upsert farm_port_status with drawdown and closed lots
+    -- 5. Upsert farm_port_status with drawdown, closed lots, and current_price
     INSERT INTO public.farm_port_status (
         port_number, balance, equity, floating_pnl, today_pnl,
         buy_count, sell_count, buy_pnl, sell_pnl, total_lots,
         account_type, asset_type, system_code, ea_version,
-        server_time, daily_max_drawdown, today_closed_lots, updated_at
+        server_time, daily_max_drawdown, today_closed_lots, current_price, updated_at
     )
     VALUES (
         v_port_number,
@@ -162,6 +142,7 @@ BEGIN
         v_server_time,
         COALESCE(v_daily_max_drawdown, 0),
         COALESCE(v_today_closed_lots, 0),
+        COALESCE(v_current_price, 0),
         NOW()
     )
     ON CONFLICT (port_number) DO UPDATE SET
@@ -181,6 +162,7 @@ BEGIN
         server_time        = EXCLUDED.server_time,
         daily_max_drawdown = EXCLUDED.daily_max_drawdown,
         today_closed_lots  = EXCLUDED.today_closed_lots,
+        current_price      = EXCLUDED.current_price,
         updated_at         = NOW();
 
     -- 6. Manage Active Orders via Smart UPSERT

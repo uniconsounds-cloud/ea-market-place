@@ -14,9 +14,9 @@ private:
    int m_hEma50;
 
 public:
-   virtual void Init(int id, CVirtualAccount *acc) override
+   virtual void Init(int id, CVirtualAccount *acc, ENUM_STRATEGY_VERSION ver) override
    {
-      CStrategyBase::Init(id, acc);
+      CStrategyBase::Init(id, acc, ver);
       m_hEma20 = iMA(_Symbol, PERIOD_M1, 20, 0, MODE_EMA, PRICE_CLOSE);
       m_hEma50 = iMA(_Symbol, PERIOD_M1, 50, 0, MODE_EMA, PRICE_CLOSE);
    }
@@ -46,8 +46,8 @@ public:
       {
          if(rates[1].low < ema20[1] && rates[1].close > ema20[1] && rates[0].close > rates[1].high) 
          {
-            double sl = ask - (300 * point);
-            double tp = ask + (200 * point);
+            double sl = ask - ((m_version == VERSION_1_0_WINRATE ? 500 : 300) * point);
+            double tp = ask + ((m_version == VERSION_1_0_WINRATE ? 150 : 200) * point);
             m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "PULL_BUY");
          }
       }
@@ -57,8 +57,8 @@ public:
       {
          if(rates[1].high > ema20[1] && rates[1].close < ema20[1] && rates[0].close < rates[1].low) 
          {
-            double sl = bid + (300 * point);
-            double tp = bid - (200 * point);
+            double sl = bid + ((m_version == VERSION_1_0_WINRATE ? 500 : 300) * point);
+            double tp = bid - ((m_version == VERSION_1_0_WINRATE ? 150 : 200) * point);
             m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "PULL_SELL");
          }
       }

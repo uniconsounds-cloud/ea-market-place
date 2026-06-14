@@ -1,11 +1,11 @@
 import { GameDashboardClient } from "./GameDashboardClient";
 
 export const metadata = {
-  title: "Trading Game | EA Market Place",
-  description: "Live Simulation Trading Dashboard",
+  title: "Trading Arena | EA Market Place",
+  description: "Live Simulation Trading Arena",
 };
 
-export default function TradingGamePage() {
+export default function TradingArenaPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-cyan-500/30 overflow-hidden">
       {/* Background Ambient Glow */}

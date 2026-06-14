@@ -269,7 +269,6 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    datetime now = TimeCurrent();
    datetime today_start = (now / 86400) * 86400;
    uint now_ticks = GetTickCount();
-   string current_hash = "";
    
    // 1. Throttling / Sleep-Wake Check
    if(g_eae_last_sync_ticks > 0)
@@ -319,7 +318,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    // Hash Check for Throttling (only applies in full sync mode)
    if(g_eae_full_sync_mode)
    {
-      current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2);
+      string current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2);
       if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now_ticks - g_eae_last_heartbeat_ticks) < g_eae_heartbeat_interval * 1000)
       {
          return true; // Skip redundant upload if nothing changed
@@ -361,20 +360,11 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    
    ResetLastError();
    int res = WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
+   
    if(res == -1) {
-      int err = GetLastError();
       g_eae_sync_status = "ERR: CONN";
-      g_eae_sync_message = "Connection Failed (" + IntegerToString(err) + ")";
-      
-      if(err == 4060 || err == 4014) {
-         static bool printed_sync_warning = false;
-         if(!printed_sync_warning) {
-            Print("[EAE_SYSTEM WARNING] Supabase WebRequest is not whitelisted. Web Dashboard Sync is disabled. Please add 'https://mfrspvzxmpksqnzcrysz.supabase.co' to MT5 WebRequest options if you wish to see the Web Dashboard.");
-            printed_sync_warning = true;
-         }
-      } else {
-         Print("EAE Sync Error (WebRequest failed): ", err);
-      }
+      g_eae_sync_message = "Connection Failed (" + IntegerToString(GetLastError()) + ")";
+      Print("EAE Sync Error (WebRequest failed): ", GetLastError());
       return false;
    }
    
@@ -421,9 +411,6 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
       }
       g_eae_full_sync_mode = true;
    } else {
-      if(g_eae_full_sync_mode) {
-         Print("EAE WebSync: >> GOING TO SLEEP << (No active viewer, entering sleep mode...)");
-      }
       g_eae_full_sync_mode = false;
    }
    
@@ -482,6 +469,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
           g_eae_is_trial = (trial_val == "true" || trial_val == "TRUE");
        }
     }
+   
+   if(g_eae_full_sync_mode) {
+      Print("EAE WebSync: WAKE MODE (Full push successful). Response: ", response);
+   } else {
+      Print("EAE WebSync: SLEEP MODE (Lightweight ping sent). Response: ", response);
+   }
    
    return true;
 }

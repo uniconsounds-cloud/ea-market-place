@@ -13,9 +13,9 @@ private:
    int m_hRsi;
 
 public:
-   virtual void Init(int id, CVirtualAccount *acc) override
+   virtual void Init(int id, CVirtualAccount *acc, ENUM_STRATEGY_VERSION ver) override
    {
-      CStrategyBase::Init(id, acc);
+      CStrategyBase::Init(id, acc, ver);
       m_hRsi = iRSI(_Symbol, PERIOD_M1, 7, PRICE_CLOSE);
    }
 
@@ -37,16 +37,16 @@ public:
       // Buy logic: RSI dipped below 30 and crossed back up
       if(rsi[1] < 30 && rsi[0] >= 30)
       {
-         double sl = ask - (200 * point); // Balanced SL (20 gold pips)
-         double tp = ask + (150 * point); // Balanced TP (15 gold pips)
+         double sl = ask - ((m_version == VERSION_1_0_WINRATE ? 500 : 200) * point);
+         double tp = ask + ((m_version == VERSION_1_0_WINRATE ? 150 : 150) * point);
          m_account.OpenOrder(POSITION_TYPE_BUY, 0.05, sl, tp, "BOUNCE_BUY");
       }
       
       // Sell logic: RSI spiked above 70 and crossed back down
       if(rsi[1] > 70 && rsi[0] <= 70)
       {
-         double sl = bid + (200 * point); // Balanced SL (20 gold pips)
-         double tp = bid - (150 * point); // Balanced TP (15 gold pips)
+         double sl = bid + ((m_version == VERSION_1_0_WINRATE ? 500 : 200) * point);
+         double tp = bid - ((m_version == VERSION_1_0_WINRATE ? 150 : 150) * point);
          m_account.OpenOrder(POSITION_TYPE_SELL, 0.05, sl, tp, "BOUNCE_SELL");
       }
    }

@@ -879,7 +879,7 @@ export function GameDashboardClient() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-100">
-              TRADING GAME
+              TRADING ARENA
             </h1>
             <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 px-2.5 py-0.5 font-mono uppercase tracking-widest text-xs">
               CONSOLE

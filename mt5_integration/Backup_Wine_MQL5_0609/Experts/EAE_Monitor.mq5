@@ -35,9 +35,9 @@ int OnInit()
    }
    
    // Verify account status
-   if(!EaezeCheckLicense("EA-UNIMON-01"))
+   if(!EaezeCheckLicense("EAE-MONITOR"))
    {
-      Print("EAE_SYSTEM: EA-UNIMON-01 license check failed.");
+      Print("EAE_SYSTEM: EAE-MONITOR license check failed.");
       return(INIT_FAILED);
    }
    EaezeRemoveLicenseAlert();
@@ -65,7 +65,7 @@ void OnDeinit(const int reason)
 void OnTimer()
 {
    // [EAE_SYSTEM] - Perform licensing checks and lightweight Sci-Fi sync
-   EaezeCheckLicenseAndSync("EA-UNIMON-01", InpSystemCode, "1.03", InpSyncSeconds, InpMagicBuy, InpMagicSell);
+   EaezeCheckLicenseAndSync("EAE-MONITOR", InpSystemCode, "1.03", InpSyncSeconds, InpMagicBuy, InpMagicSell);
    
    // --- On-Chart Status Dashboard ---
    string dash = "========================================\n";
