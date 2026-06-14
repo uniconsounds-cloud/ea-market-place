@@ -908,7 +908,7 @@ export function GameDashboardClient() {
   };
 
   const globalBalance = strategies.reduce((sum, s) => sum + (Number(s.virtual_balance) || 0), 0);
-  const globalFloating = strategies.reduce((sum, s) => sum + (Number(s.floating_pl) || 0), 0);
+  const globalFloating = checkIsMarketOpen() ? strategies.reduce((sum, s) => sum + (Number(s.floating_pl) || 0), 0) : 0;
   const globalEquity = globalBalance + globalFloating;
   const globalDdPct = globalBalance > 0 ? (globalFloating / globalBalance) * 100 : 0;
   const ddDisplay = globalFloating < 0 ? `${globalDdPct.toFixed(2)}%` : '0.00%';
@@ -1098,7 +1098,7 @@ export function GameDashboardClient() {
             };
           });
 
-          const activeRound = activeRounds[strat.id];
+          const activeRound = checkIsMarketOpen() ? activeRounds[strat.id] : undefined;
           // Active if we have a live active round in tg_virtual_rounds (most reliable and transactional source of truth)
           const hasActiveOrder = !!activeRound;
           const isIdle = !hasActiveOrder;
