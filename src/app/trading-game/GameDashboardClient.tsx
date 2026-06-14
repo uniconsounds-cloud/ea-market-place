@@ -918,57 +918,44 @@ export function GameDashboardClient() {
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto px-2 sm:px-4">
       
       {/* Header Area */}
-      <div className="flex flex-col gap-1.5 border-b border-slate-900 pb-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-100 whitespace-nowrap">
+      <div className="flex flex-col gap-1 border-b border-slate-900 pb-2.5">
+        <div className="flex items-center justify-between gap-2 w-full select-none">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h1 className="text-xs sm:text-base md:text-xl font-black tracking-tight text-slate-100 whitespace-nowrap">
               TRADING ARENA
             </h1>
-            <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 px-2 py-0.5 font-mono uppercase tracking-widest text-[10px]">
-              CONSOLE
-            </Badge>
-            <Badge variant="outline" className="bg-slate-900/60 text-slate-300 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-[10px] flex items-center gap-1.5 select-none shrink-0">
-              <span className="text-[12px] leading-none">🇹🇭</span>
-              <span>THAI TIME (GMT+7)</span>
+            <Badge variant="outline" className="bg-slate-900/60 text-slate-300 border-slate-800/80 px-1.5 py-0.5 font-mono uppercase tracking-widest text-[9px] sm:text-[10px] flex items-center gap-1 shrink-0">
+              <span className="text-[11px] sm:text-[12px] leading-none">🇹🇭</span>
+              <span>GMT+7</span>
             </Badge>
             <Badge 
               variant="outline" 
               onClick={!isSyncing ? syncSupabaseData : undefined}
-              className={`bg-slate-900/60 border-slate-800/80 px-2.5 py-0.5 font-mono uppercase tracking-widest text-[10px] flex items-center gap-1.5 select-none shrink-0 transition-all duration-300 ${!isSyncing ? 'hover:bg-slate-800/80 hover:border-slate-700/80 cursor-pointer text-cyan-400' : 'cursor-wait text-slate-500'}`}
+              className={`bg-slate-900/60 border-slate-800/80 px-1.5 py-0.5 font-mono uppercase tracking-widest text-[9px] sm:text-[10px] flex items-center gap-1 select-none shrink-0 transition-all duration-300 ${!isSyncing ? 'hover:bg-slate-800/80 hover:border-slate-700/80 cursor-pointer text-cyan-400' : 'cursor-wait text-slate-500'}`}
             >
               <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? 'animate-spin text-cyan-400' : 'text-slate-400'}`} />
-              <span>
-                {isSyncing ? 'Syncing...' : lastSynced ? `Synced ${lastSynced}` : 'Sync DB'}
-              </span>
+              <span>{lastSynced ? lastSynced : 'SYNC'}</span>
             </Badge>
           </div>
           
           {/* Engine Active Indicator - Compact! */}
           <div className="shrink-0">
             {checkIsMarketOpen() ? (
-              <div className="flex items-center justify-center bg-emerald-950/10 px-3.5 py-1.5 rounded-lg border border-emerald-900/20">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-1.5 w-1.5 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                  </div>
-                  <span className="text-[10px] font-black tracking-widest text-emerald-400 uppercase leading-none">ENGINE ONLINE</span>
-                </div>
+              <div className="flex items-center bg-emerald-950/10 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-emerald-900/20 text-[9px] sm:text-[10px] font-black tracking-widest text-emerald-400 uppercase leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping mr-1.5 shrink-0" />
+                <span>ONLINE</span>
               </div>
             ) : (
-              <div className="flex items-center justify-center bg-amber-950/10 px-3.5 py-1.5 rounded-lg border border-amber-900/20">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-1.5 w-1.5 relative">
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
-                  </div>
-                  <span className="text-[10px] font-black tracking-widest text-amber-500 uppercase leading-none">ENGINE STANDBY</span>
-                </div>
+              <div className="flex items-center bg-amber-950/10 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-amber-900/20 text-[9px] sm:text-[10px] font-black tracking-widest text-amber-500 uppercase leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 shrink-0" />
+                <span>STANDBY</span>
               </div>
             )}
           </div>
         </div>
-        <p className="text-slate-500 font-medium text-xs max-w-xl leading-relaxed">
-          Real-time algorithmic simulation command center. Subscribe to copy master trades in real-money rounds.
+        {/* Description - Forced Single Line on both Computer and Mobile! */}
+        <p className="text-slate-500 font-medium text-[9px] sm:text-xs max-w-xl truncate leading-normal">
+          Live algorithmic simulation console. Subscribe to copy master trades in real-money rounds.
         </p>
       </div>
 
