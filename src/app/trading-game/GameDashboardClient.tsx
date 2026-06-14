@@ -1121,9 +1121,11 @@ export function GameDashboardClient() {
                           ></div>
                         </div>
                       </div>
-                      <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none ${sigState.color}`}>
+                      <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${sigState.color}`}>
                         <span className="inline lg:hidden">
-                          {sigState.text === "SCANNING MARKET" ? "SCANNING" : sigState.text === "APPROACHING SIGNAL" ? "APPROACHING" : "MET"}
+                          {sigState.text === "SCANNING MARKET" ? "SCANNING" : 
+                           sigState.text === "APPROACHING SIGNAL" ? "APPROACHING" : 
+                           sigState.text === "MARKET CLOSED" ? "CLOSED" : "MET"}
                         </span>
                         <span className="hidden lg:inline">
                           {sigState.text}
@@ -1131,9 +1133,10 @@ export function GameDashboardClient() {
                       </Badge>
                     </>
                   ) : (
-                    <div className="flex items-center gap-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.05)]">
+                    <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.05)] shrink-0">
                       <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                      <span>TRADING IN PROGRESS</span>
+                      <span className="hidden sm:inline">TRADING IN PROGRESS</span>
+                      <span className="inline sm:hidden">TRADING</span>
                     </div>
                   )}
                 </div>
@@ -1151,24 +1154,38 @@ export function GameDashboardClient() {
                 </Button>
               </div>
 
-              {/* Row 2: Live Trade Data (50%) & History Sparkline (50%) */}
-              <div className="grid grid-cols-2 gap-6 border-t border-slate-900/60 pt-4 w-full items-center">
+              {/* Row 2: History Sparkline & Live Trade/Profit Data (Responsive Ratios) */}
+              <div className="flex flex-row gap-3 sm:gap-6 border-t border-slate-900/60 pt-4 w-full items-center">
                 
-                {/* Col 2.1: Cubic History Stream (20 fixed cubes) - Swapped to Left */}
-                <div className="w-full flex flex-col gap-1.5 border-r border-slate-900/60 pr-5 min-w-0">
+                {/* Col 2.1: Cubic History Stream (20 fixed cubes) - Left column: 90% mobile, 80% desktop */}
+                <div className="w-[90%] sm:w-[80%] flex flex-col gap-1.5 border-r border-slate-900/60 pr-2.5 sm:pr-5 min-w-0 shrink-0">
                   <div className="flex items-center justify-between w-full mb-1 min-h-[14px]">
-                    <span className="text-[8px] text-slate-500 font-black tracking-widest uppercase">CUBIC HISTORY (LAST 20)</span>
-                    <div className="text-[9px] font-bold font-mono transition-all duration-300">
+                    <span className="text-[8px] text-slate-500 font-black tracking-widest uppercase whitespace-nowrap">CUBIC HISTORY (LAST 20)</span>
+                    <div className="text-[9px] font-bold font-mono transition-all duration-300 min-w-0 overflow-hidden">
                       {hoveredRounds[strat.id] ? (
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black ${
-                          parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 
-                            ? "text-emerald-400 bg-emerald-950/20 border border-emerald-900/20 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" 
-                            : "text-rose-400 bg-rose-955 border border-rose-900/15 drop-shadow-[0_0_6px_rgba(244,63,94,0.2)]"
-                        }`}>
-                          AGE: {getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | P/L: ${(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(2)} | DD: -${Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} | TRADES: {hoveredRounds[strat.id]?.order_count ?? 1}
-                        </span>
+                        <>
+                          {/* Desktop Version */}
+                          <span className={`hidden sm:inline px-2 py-0.5 rounded text-[8px] font-black whitespace-nowrap truncate ${
+                            parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 
+                              ? "text-emerald-400 bg-emerald-950/20 border border-emerald-900/20 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" 
+                              : "text-rose-400 bg-rose-955 border border-rose-900/15 drop-shadow-[0_0_6px_rgba(244,63,94,0.2)]"
+                          }`}>
+                            AGE: {getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | P/L: ${(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(2)} | DD: -${Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} | TRADES: {hoveredRounds[strat.id]?.order_count ?? 1}
+                          </span>
+                          {/* Mobile Version - compact with emojis */}
+                          <span className={`inline sm:hidden px-1 py-0.5 rounded text-[8px] font-black whitespace-nowrap truncate ${
+                            parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 
+                              ? "text-emerald-400 bg-emerald-950/20 border border-emerald-900/20 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" 
+                              : "text-rose-400 bg-rose-955 border border-rose-900/15 drop-shadow-[0_0_6px_rgba(244,63,94,0.2)]"
+                          }`}>
+                            🕒{getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | 💰{(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(1)} | 📉-{Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} | 📊{hoveredRounds[strat.id]?.order_count ?? 1}
+                          </span>
+                        </>
                       ) : (
-                        <span className="text-slate-600 font-black tracking-wider text-[8px] uppercase">HOVER CUBE FOR DETAILS</span>
+                        <span className="text-slate-600 font-black tracking-wider text-[8px] uppercase whitespace-nowrap">
+                          <span className="hidden sm:inline">HOVER CUBE FOR DETAILS</span>
+                          <span className="inline sm:hidden">TAP CUBE</span>
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1194,7 +1211,7 @@ export function GameDashboardClient() {
                                   : 'border-t-rose-500 shadow-[inset_0_1px_4px_rgba(244,63,94,0.05)]'
                               }`}
                             >
-                              <span className={`text-[8px] font-black font-mono leading-none ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <span className={`text-[8px] font-black font-mono leading-none whitespace-nowrap truncate ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {formattedProfit}
                               </span>
                               
@@ -1228,11 +1245,12 @@ export function GameDashboardClient() {
                   </div>
                 </div>
 
-                {/* Col 2.2: Live Trade Status / Today PL - Swapped to Right */}
-                <div className="flex flex-col justify-center w-full min-h-[48px] pl-1">
+                {/* Col 2.2: Live Trade Status / Today PL - Right column: 10% mobile, 20% desktop */}
+                <div className="w-[10%] sm:w-[20%] flex flex-col justify-center min-h-[48px] pl-1 sm:pl-2 min-w-0 shrink-0">
                   {!isIdle ? (
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex flex-col">
+                    <div className="flex items-center justify-between w-full min-w-0">
+                      {/* On desktop, show details. On mobile, hide active order details as width is too narrow */}
+                      <div className="hidden sm:flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[9px] font-black px-1.5 py-0.5 rounded leading-none ${activeRound?.type === 'SELL' ? 'bg-fuchsia-955 text-fuchsia-400 border border-fuchsia-900/15' : 'bg-blue-955 text-blue-400 border border-blue-900/20'}`}>
                             {activeRound?.type || (currentPl < 0 ? 'SELL' : 'BUY')}
@@ -1242,26 +1260,26 @@ export function GameDashboardClient() {
                             {isProfit ? '+' : ''}${currentPl.toFixed(2)}
                           </span>
                         </div>
-                        <span className="text-[9px] text-slate-500 font-mono mt-1 tabular-nums">
+                        <span className="text-[9px] text-slate-500 font-mono mt-1 tabular-nums truncate">
                           {activeRound ? `DD:-$${Math.abs(activeRound.max_dd ?? 0).toFixed(1)} | ${getLiveDuration(activeRound.open_time)}` : `FLOATING PL`}
                         </span>
                       </div>
                       
-                      {/* Always show Today P/L on the right to match the Idle layout and avoid flashing */}
-                      <div className="flex flex-col items-end justify-center">
-                        <span className="text-[8px] text-slate-500 font-black tracking-widest uppercase leading-none mb-1">TODAY P/L</span>
-                        <span className={`text-base font-mono font-black tabular-nums leading-none ${todayPl === 0 ? 'text-slate-500' : isTodayProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {/* Always show Today P/L on the right, show only profit number on mobile */}
+                      <div className="flex flex-col items-end justify-center w-full sm:w-auto min-w-0">
+                        <span className="hidden sm:inline text-[8px] text-slate-500 font-black tracking-widest uppercase leading-none mb-1">TODAY P/L</span>
+                        <span className={`text-xs sm:text-base font-mono font-black tabular-nums leading-none truncate ${todayPl === 0 ? 'text-slate-500' : isTodayProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {todayPl > 0 ? '+' : ''}${todayPl.toFixed(2)}
                         </span>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2 text-slate-500">
+                    <div className="flex items-center justify-between w-full min-w-0">
+                      <div className="hidden sm:flex items-center gap-2 text-slate-500 min-w-0">
                         <Clock className="w-4 h-4 shrink-0 text-slate-500" />
-                        <span className="text-xs font-black tracking-widest uppercase">TODAY P/L</span>
+                        <span className="text-xs font-black tracking-widest uppercase truncate">TODAY P/L</span>
                       </div>
-                      <span className={`text-lg font-mono font-black tabular-nums ${todayPl === 0 ? 'text-slate-500' : isTodayProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span className={`text-xs sm:text-lg font-mono font-black tabular-nums truncate w-full sm:w-auto text-right sm:text-left ${todayPl === 0 ? 'text-slate-500' : isTodayProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {todayPl > 0 ? '+' : ''}${todayPl.toFixed(2)}
                       </span>
                     </div>
