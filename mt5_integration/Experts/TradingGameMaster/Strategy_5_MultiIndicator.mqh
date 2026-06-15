@@ -20,14 +20,13 @@ private:
 
    CGameMasterWebSync *m_webSync;
    int m_requiredThreshold;
-   ulong m_lastThresholdQuery;
    
    string m_lastSignal;
    datetime m_signalStartTime;
    string m_indicatorStates;
 
 public:
-   CStrategy5_MultiIndicator() : m_webSync(NULL), m_requiredThreshold(3), m_lastThresholdQuery(0), m_lastSignal("NONE"), m_signalStartTime(0), m_indicatorStates("0,0,0,0,0") {}
+   CStrategy5_MultiIndicator() : m_webSync(NULL), m_requiredThreshold(3), m_lastSignal("NONE"), m_signalStartTime(0), m_indicatorStates("0,0,0,0,0") {}
    
    virtual void Init(int id, CVirtualAccount *acc, ENUM_STRATEGY_VERSION ver) override
    {
@@ -40,6 +39,11 @@ public:
       m_hSar = iSAR(_Symbol, PERIOD_M1, 0.02, 0.2);
    }
    
+   void SetRequiredThreshold(int threshold)
+   {
+      m_requiredThreshold = threshold;
+   }
+
    void SetWebSync(CGameMasterWebSync *sync)
    {
       m_webSync = sync;
@@ -52,18 +56,7 @@ public:
 
    virtual void OnTickInternal() override
    {
-      // 1. Query required threshold dynamically
-      ulong nowMs = GetTickCount64();
-      if(nowMs - m_lastThresholdQuery >= 10000)
-      {
-         m_lastThresholdQuery = nowMs;
-         if(m_webSync != NULL)
-         {
-            m_requiredThreshold = m_webSync.GetRequiredThreshold(m_strategy_id);
-            if(m_requiredThreshold < 2) m_requiredThreshold = 2;
-            if(m_requiredThreshold > 5) m_requiredThreshold = 5;
-         }
-      }
+      // 1. Threshold config is pre-set via SetRequiredThreshold()
 
       // 2. Fetch buffers
       double ema9[], ema21[], rsi[], macdMain[], macdSig[], stochK[], stochD[], sar[];
