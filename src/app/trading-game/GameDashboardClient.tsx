@@ -54,13 +54,16 @@ const initialStrategies: Strategy[] = [
   { id: 2, name: "Micro Pullback Trend", description: "Trend following pullback using EMA20/50", current_status: "IDLE", virtual_balance: 1680.00, floating_pl: 0.0, win_rate: 76.5, total_trades: 34 },
   { id: 3, name: "Range Bounce Scalper", description: "Sideway ping-pong using RSI bounce", current_status: "IDLE", virtual_balance: 1120.20, floating_pl: 0.0, win_rate: 68.2, total_trades: 55 },
   { id: 4, name: "Spike Fade", description: "Mean reversion on abnormal volatility spikes", current_status: "IDLE", virtual_balance: 1390.80, floating_pl: 0.0, win_rate: 70.0, total_trades: 30 },
-  { id: 5, name: "Quantum Multi-Indicator", description: "5-Indicator agreement system targeting $3 profit", current_status: "IDLE", virtual_balance: 100.00, floating_pl: 0.0, win_rate: 68.4, total_trades: 0, required_threshold: 3, indicator_states: "0,0,0,0,0" },
+  { id: 5, name: "Quantum (2+ Met)", description: "Aggressive: 2+ indicators agreement scalping", current_status: "IDLE", virtual_balance: 100.00, floating_pl: 0.0, win_rate: 58.2, total_trades: 0, required_threshold: 2, indicator_states: "0,0,0,0,0" },
+  { id: 6, name: "Quantum (3+ Met)", description: "Balanced: 3+ indicators agreement scalping", current_status: "IDLE", virtual_balance: 100.00, floating_pl: 0.0, win_rate: 68.4, total_trades: 0, required_threshold: 3, indicator_states: "0,0,0,0,0" },
+  { id: 7, name: "Quantum (4+ Met)", description: "Conservative: 4+ indicators agreement scalping", current_status: "IDLE", virtual_balance: 100.00, floating_pl: 0.0, win_rate: 76.5, total_trades: 0, required_threshold: 4, indicator_states: "0,0,0,0,0" },
+  { id: 8, name: "Quantum (5 Met)", description: "Max Accuracy: 5 indicators agreement scalping", current_status: "IDLE", virtual_balance: 100.00, floating_pl: 0.0, win_rate: 85.1, total_trades: 0, required_threshold: 5, indicator_states: "0,0,0,0,0" },
 ];
 
 const generateMockHistory = (stratId: number): VirtualRound[] => {
   const list: VirtualRound[] = [];
   const nowMs = Date.now();
-  const winRate = [72.4, 76.5, 68.2, 70.0, 68.4][stratId - 1];
+  const winRate = [72.4, 76.5, 68.2, 70.0, 58.2, 68.4, 76.5, 85.1][stratId - 1] || 70.0;
   
   for (let i = 0; i < 20; i++) {
     const isWin = Math.random() * 100 < winRate;
@@ -363,12 +366,18 @@ export function GameDashboardClient() {
     1: [],
     2: [],
     3: [],
-    4: []
+    4: [],
+    5: [],
+    6: [],
+    7: [],
+    8: []
   });
   const [activeRounds, setActiveRounds] = useState<Record<number, VirtualRound>>({});
 
   const [subscriptions, setSubscriptions] = useState<Record<number, boolean>>({});
-  const [hoveredRounds, setHoveredRounds] = useState<Record<number, any | null>>({ 1: null, 2: null, 3: null, 4: null });
+  const [hoveredRounds, setHoveredRounds] = useState<Record<number, any | null>>({ 
+    1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null 
+  });
   const [now, setNow] = useState(0);
   const historyRef = useRef(history);
   const [marketData, setMarketData] = useState<{timestamp?: number, time: string, price: number, signals: number[]}[]>([]);
@@ -552,8 +561,8 @@ export function GameDashboardClient() {
       }
 
       // 3. Fetch Closed History (Take only closed rounds in the current trading session)
-      const histMap: Record<number, VirtualRound[]> = { 1: [], 2: [], 3: [], 4: [] };
-      await Promise.all([1, 2, 3, 4].map(async (stratId) => {
+      const histMap: Record<number, VirtualRound[]> = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [] };
+      await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map(async (stratId) => {
         const { data: stratHist } = await supabase
           .from("tg_virtual_rounds")
           .select("*")
@@ -784,7 +793,10 @@ export function GameDashboardClient() {
       case 2: return <TrendingUp className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" />;
       case 3: return <Activity className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />;
       case 4: return <Crosshair className="w-6 h-6 text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]" />;
-      case 5: return <Cpu className="w-6 h-6 text-fuchsia-400 drop-shadow-[0_0_8px_rgba(232,121,249,0.5)]" />;
+      case 5:
+      case 6:
+      case 7:
+      case 8: return <Cpu className="w-6 h-6 text-fuchsia-400 drop-shadow-[0_0_8px_rgba(232,121,249,0.5)]" />;
       default: return <ShieldAlert className="w-6 h-6" />;
     }
   };
@@ -1086,7 +1098,7 @@ export function GameDashboardClient() {
 
       {/* Strategies List (Horizontal Flat Rows - Impeccable Style) */}
       <div className="flex flex-col gap-4">
-        {strategies.map((strat) => {
+        {strategies.filter(strat => strat.id <= 4).map((strat) => {
           const isSubscribed = subscriptions[strat.id];
           const rawHist = history[strat.id] || [];
           const aggregatedHist = aggregateRoundsByCloseTime(rawHist);
@@ -1157,56 +1169,28 @@ export function GameDashboardClient() {
                 {/* 1.2 Proximity & Signal State - Scales cleanly to wider bars on Desktop! */}
                 <div className="flex items-center gap-4 shrink-0 lg:flex-1 lg:justify-center">
                   {isIdle ? (
-                    strat.id === 5 ? (
-                      <>
-                        <div className="flex flex-col items-end lg:items-start gap-1">
-                          <span className="text-xs font-mono font-black tabular-nums leading-none text-slate-500">
-                            {getAgreementCount(strat.indicator_states).count}/5 INDICATORS
-                          </span>
-                          <div className="text-[9px] font-black text-slate-400 font-mono">
-                            BIAS: <span className={getAgreementCount(strat.indicator_states).bias === "BUY" ? "text-emerald-400" : "text-rose-400"}>{getAgreementCount(strat.indicator_states).bias}</span>
-                          </div>
+                    <>
+                      <div className="flex flex-col items-end lg:items-start gap-1">
+                        <span className={`text-xs font-mono font-black tabular-nums leading-none ${energy >= 80 ? "text-cyan-400" : "text-slate-500"}`}>{energy.toFixed(0)}%</span>
+                        <div className="h-2 w-16 sm:w-24 lg:w-36 xl:w-48 bg-slate-950 rounded-full overflow-hidden border border-slate-900/60 relative">
+                          <div className="absolute top-0 bottom-0 left-[80%] w-px bg-slate-800 z-10"></div>
+                          <div 
+                            className={`h-full transition-all duration-1000 ease-linear rounded-full ${energy >= 80 ? 'bg-cyan-400' : 'bg-slate-600'}`} 
+                            style={{ width: `${energy}%` }}
+                          ></div>
                         </div>
-                        <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${
-                          !checkIsMarketOpen() ? "text-amber-500/70" :
-                          getAgreementCount(strat.indicator_states).count >= (strat.required_threshold ?? 3) 
-                            ? "text-emerald-400 animate-pulse" 
-                            : "text-slate-500"
-                        }`}>
-                          <span className="inline lg:hidden">
-                            {!checkIsMarketOpen() ? "CLOSED" :
-                             getAgreementCount(strat.indicator_states).count >= (strat.required_threshold ?? 3) ? "READY" : "SCANNING"}
-                          </span>
-                          <span className="hidden lg:inline">
-                            {!checkIsMarketOpen() ? "MARKET CLOSED" :
-                             getAgreementCount(strat.indicator_states).count >= (strat.required_threshold ?? 3) ? "SIGNAL READY" : "SCANNING MARKET"}
-                          </span>
-                        </Badge>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex flex-col items-end lg:items-start gap-1">
-                          <span className={`text-xs font-mono font-black tabular-nums leading-none ${energy >= 80 ? "text-cyan-400" : "text-slate-500"}`}>{energy.toFixed(0)}%</span>
-                          <div className="h-2 w-16 sm:w-24 lg:w-36 xl:w-48 bg-slate-950 rounded-full overflow-hidden border border-slate-900/60 relative">
-                            <div className="absolute top-0 bottom-0 left-[80%] w-px bg-slate-800 z-10"></div>
-                            <div 
-                              className={`h-full transition-all duration-1000 ease-linear rounded-full ${energy >= 80 ? 'bg-cyan-400' : 'bg-slate-600'}`} 
-                              style={{ width: `${energy}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${sigState.color}`}>
-                          <span className="inline lg:hidden">
-                            {sigState.text === "SCANNING MARKET" ? "SCANNING" : 
-                             sigState.text === "APPROACHING SIGNAL" ? "APPROACHING" : 
-                             sigState.text === "MARKET CLOSED" ? "CLOSED" : "MET"}
-                          </span>
-                          <span className="hidden lg:inline">
-                            {sigState.text}
-                          </span>
-                        </Badge>
-                      </>
-                    )
+                      </div>
+                      <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${sigState.color}`}>
+                        <span className="inline lg:hidden">
+                          {sigState.text === "SCANNING MARKET" ? "SCANNING" : 
+                           sigState.text === "APPROACHING SIGNAL" ? "APPROACHING" : 
+                           sigState.text === "MARKET CLOSED" ? "CLOSED" : "MET"}
+                        </span>
+                        <span className="hidden lg:inline">
+                          {sigState.text}
+                        </span>
+                      </Badge>
+                    </>
                   ) : (
                     <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.05)] shrink-0">
                       <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
@@ -1228,60 +1212,6 @@ export function GameDashboardClient() {
                   {isSubscribed ? "✓ ACTIVE" : "SUBSCRIBE"}
                 </Button>
               </div>
-
-              {/* Row 1.5: Strategy 5 Indicator Dashboard & Outcomes projection */}
-              {strat.id === 5 && (
-                <div className="flex flex-col gap-3 w-full border-t border-slate-900/40 pt-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-950/40 p-3 rounded-lg border border-slate-900/60 w-full">
-                    {/* Indicators Panel */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[9px] text-slate-500 font-black tracking-widest uppercase">CONCURRENT FEEDS:</span>
-                      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
-                        {renderIndicatorLights(strat.indicator_states)}
-                      </div>
-                    </div>
-                    
-                    {/* Threshold Selector */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[9px] text-slate-500 font-black tracking-widest uppercase">TRIGGER RULE:</span>
-                      <select 
-                        value={strat.required_threshold ?? 3}
-                        onChange={(e) => handleThresholdChange(strat.id, parseInt(e.target.value))}
-                        className="bg-slate-950 border border-slate-800 text-[10px] font-black text-cyan-400 px-2.5 py-1 rounded cursor-pointer outline-none focus:border-cyan-500/50 transition-colors"
-                      >
-                        <option value={2}>2+ INDICATORS AGREE</option>
-                        <option value={3}>3+ INDICATORS AGREE</option>
-                        <option value={4}>4+ INDICATORS AGREE</option>
-                        <option value={5}>5 INDICATORS AGREE</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  {/* Historical Outcomes Comparison Box */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/20 p-2.5 rounded-lg border border-slate-900/40 w-full text-[9px] font-mono select-none">
-                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
-                      <span className="text-slate-500 font-bold">2+ MET (AGGRESSIVE)</span>
-                      <span className="text-cyan-400 font-black mt-1">WIN: ~58.2%</span>
-                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Very High</span>
-                    </div>
-                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
-                      <span className="text-slate-500 font-bold">3+ MET (BALANCED)</span>
-                      <span className="text-emerald-400 font-black mt-1">WIN: ~68.4%</span>
-                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Moderate</span>
-                    </div>
-                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
-                      <span className="text-slate-500 font-bold">4+ MET (CONSERVATIVE)</span>
-                      <span className="text-amber-400 font-black mt-1">WIN: ~76.5%</span>
-                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Low</span>
-                    </div>
-                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
-                      <span className="text-slate-500 font-bold">5 MET (MAX ACCURACY)</span>
-                      <span className="text-fuchsia-400 font-black mt-1">WIN: ~85.1%</span>
-                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Very Low</span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Row 2: History Sparkline & Live Trade/Profit Data (Responsive Ratios) */}
               <div className="flex flex-row gap-3 sm:gap-6 border-t border-slate-900/60 pt-4 w-full items-center">
@@ -1420,6 +1350,245 @@ export function GameDashboardClient() {
             </div>
           );
         })}
+
+        {/* Quantum Multi-Indicator Hub Card */}
+        <div className="relative rounded-xl border border-slate-900/80 bg-slate-900/10 p-5 backdrop-blur-md transition-all duration-300 hover:bg-slate-900/30 flex flex-col gap-4 group z-10">
+          {/* Left Accent Color bar */}
+          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-slate-800"></div>
+
+          {/* Card Header: Hub Identity & Master Indicator Panel */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full select-none pb-3 border-b border-slate-900/60">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-12 h-12 rounded-lg bg-slate-950 flex items-center justify-center border border-slate-900 shadow-inner shrink-0 transition-transform duration-300 group-hover:scale-105">
+                <Cpu className="w-6 h-6 text-fuchsia-400 drop-shadow-[0_0_8px_rgba(232,121,249,0.5)]" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h3 className="text-base font-black text-slate-200 truncate">Quantum Multi-Indicator Hub</h3>
+                <p className="text-[10px] text-slate-500 font-medium truncate">
+                  Concurrent multi-threshold agreement scalping system
+                </p>
+              </div>
+            </div>
+
+            {/* Master Indicator Panel */}
+            <div className="flex items-center gap-2 min-w-0 self-start sm:self-auto">
+              <span className="text-[9px] text-slate-500 font-black tracking-widest uppercase shrink-0">CONCURRENT FEEDS:</span>
+              <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                {renderIndicatorLights(strategies.find(s => s.id === 5)?.indicator_states)}
+              </div>
+            </div>
+          </div>
+
+          {/* Rows for strategies 5, 6, 7, 8 */}
+          <div className="flex flex-col gap-4">
+            {strategies.filter(strat => strat.id >= 5).map((strat) => {
+              const isSubscribed = subscriptions[strat.id];
+              const rawHist = history[strat.id] || [];
+              const aggregatedHist = aggregateRoundsByCloseTime(rawHist);
+              const latestGroups = aggregatedHist.slice(-20);
+              
+              const chartData: any[] = latestGroups.map((entry, index) => {
+                const isRecent = index >= latestGroups.length - 3;
+                const profitNum = parseFloat(String(entry.profit)) || 0;
+                return {
+                  ...entry,
+                  profit: profitNum,
+                  copied: isRecent,
+                  userProfit: isRecent ? profitNum * 0.95 : profitNum
+                };
+              });
+
+              const activeRound = checkIsMarketOpen() ? activeRounds[strat.id] : undefined;
+              const hasActiveOrder = !!activeRound;
+              const isIdle = !hasActiveOrder;
+              const currentPl = activeRound ? (activeRound.profit ?? 0) : 0.0;
+              const isProfit = currentPl >= 0;
+              
+              const todayPl = getTodayProfit(strat.id);
+              const isTodayProfit = todayPl >= 0;
+
+              return (
+                <div 
+                  key={strat.id} 
+                  className={`relative flex flex-col gap-3 py-3 px-4 rounded-lg border backdrop-blur-sm transition-all duration-300 ${
+                    !isIdle 
+                      ? 'border-amber-500/20 bg-amber-500/5 shadow-[0_0_10px_rgba(245,158,11,0.02)]' 
+                      : 'border-slate-900/40 bg-slate-950/20'
+                  }`}
+                >
+                  {/* Left Accent indicator for active deal on sub-row */}
+                  {!isIdle && (
+                    <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l bg-amber-400 animate-pulse"></div>
+                  )}
+
+                  {/* Sub-row Header: Name, Status, Copy-Subscribe Button */}
+                  <div className="flex items-center justify-between gap-4 w-full select-none">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        strat.id === 5 ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]' :
+                        strat.id === 6 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' :
+                        strat.id === 7 ? 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.6)]' :
+                        'bg-fuchsia-400 shadow-[0_0_6px_rgba(232,121,249,0.6)]'
+                      }`} />
+                      <span className="text-xs sm:text-sm font-black text-slate-300 truncate whitespace-nowrap">
+                        {strat.name}
+                      </span>
+                      {!isIdle && (
+                        <span className="flex items-center gap-1 bg-amber-500/15 text-amber-400 border border-amber-500/25 px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-widest shrink-0 leading-none">
+                          <span className="w-1 h-1 rounded-full bg-amber-400 animate-ping shrink-0" />
+                          LIVE DEAL
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-500 font-mono tracking-wider whitespace-nowrap truncate">
+                        Bal: ${Number(strat.virtual_balance).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Subscribe Button */}
+                    <Button 
+                      onClick={() => handleSubscribe(strat.id)}
+                      className={`h-7 px-3.5 font-black tracking-widest text-[9px] uppercase transition-all duration-300 rounded shrink-0 ${
+                        isSubscribed 
+                          ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30" 
+                          : "bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/40 shadow-sm"
+                      }`}
+                    >
+                      {isSubscribed ? "✓ ACTIVE" : "SUBSCRIBE"}
+                    </Button>
+                  </div>
+
+                  {/* Sub-row Content: 80:20 (Cubic History & Today P/L) */}
+                  <div className="flex flex-row gap-3 sm:gap-6 w-full items-center">
+                    {/* 80% column (90% on mobile): Cubic history stream */}
+                    <div className="w-[90%] sm:w-[80%] flex flex-col gap-1 min-w-0 shrink-0 border-r border-slate-900/60 pr-2.5 sm:pr-5">
+                      <div className="flex items-center justify-between w-full min-h-[14px]">
+                        <span className="text-[8px] text-slate-500 font-black tracking-widest uppercase whitespace-nowrap">CUBIC HISTORY (LAST 20)</span>
+                        <div className="text-[9px] font-bold font-mono transition-all duration-300 min-w-0 overflow-hidden">
+                          {hoveredRounds[strat.id] ? (
+                            <>
+                              <span className={`hidden sm:inline px-2 py-0.5 rounded text-[8px] font-black whitespace-nowrap truncate ${
+                                parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 
+                                  ? "text-emerald-400 bg-emerald-950/20 border border-emerald-900/20 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" 
+                                  : "text-rose-400 bg-rose-955 border border-rose-900/15 drop-shadow-[0_0_6px_rgba(244,63,94,0.2)]"
+                              }`}>
+                                AGE: {getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | P/L: ${(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(2)} | DD: -${Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} | TRADES: {hoveredRounds[strat.id]?.order_count ?? 1}
+                              </span>
+                              <span className={`inline sm:hidden px-1 py-0.5 rounded text-[8px] font-black whitespace-nowrap truncate ${
+                                parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 
+                                  ? "text-emerald-400 bg-emerald-950/20 border border-emerald-900/20 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" 
+                                  : "text-rose-400 bg-rose-955 border border-rose-900/15 drop-shadow-[0_0_6px_rgba(244,63,94,0.2)]"
+                              }`}>
+                                🕒{getRoundDuration(hoveredRounds[strat.id]?.open_time, hoveredRounds[strat.id]?.close_time)} | 💰{(parseFloat(String(hoveredRounds[strat.id]?.profit)) >= 0 ? '+' : '')}${parseFloat(String(hoveredRounds[strat.id]?.profit)).toFixed(1)} | 📉-{Math.abs(hoveredRounds[strat.id]?.max_dd ?? 0).toFixed(1)} | 📊{hoveredRounds[strat.id]?.order_count ?? 1}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-slate-600 font-black tracking-wider text-[8px] uppercase whitespace-nowrap">
+                              <span className="hidden sm:inline">HOVER CUBE FOR DETAILS</span>
+                              <span className="inline sm:hidden">TAP CUBE</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-row-reverse items-center gap-1 w-full overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                        {(() => {
+                          const emptyCount = Math.max(0, 20 - chartData.length);
+                          const paddedData = [...Array(emptyCount).fill(null), ...chartData].reverse();
+                          return paddedData.map((round, idx) => {
+                            if (round) {
+                              const profitVal = parseFloat(String(round.profit)) || 0;
+                              const isWin = profitVal >= 0;
+                              const formattedProfit = (isWin ? '+' : '') + profitVal.toFixed(1);
+                              
+                              return (
+                                <div 
+                                  key={round.round_id || idx}
+                                  title={`PROFIT/LOSS: ${isWin ? '+' : ''}$${profitVal.toFixed(2)}\nTRADES: ${round.order_count ?? 1}\nAGE: ${getRoundDuration(round.open_time, round.close_time)}\nCLOSE TIME (TH): ${round.close_time ? parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false }) : 'N/A'}\nMAX DD: -$${Math.abs(round.max_dd ?? 0).toFixed(2)}`}
+                                  onMouseEnter={() => setHoveredRounds(prev => ({ ...prev, [strat.id]: round }))}
+                                  onMouseLeave={() => setHoveredRounds(prev => ({ ...prev, [strat.id]: null }))}
+                                  className={`w-9 h-7 rounded border-t-2 shrink-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-slate-800/90 relative group cursor-pointer ${
+                                    isWin 
+                                      ? 'border-t-emerald-500 shadow-[inset_0_1px_4px_rgba(16,185,129,0.05)]' 
+                                      : 'border-t-rose-500 shadow-[inset_0_1px_4px_rgba(244,63,94,0.05)]'
+                                  }`}
+                                >
+                                  <span className={`text-[8px] font-black font-mono leading-none whitespace-nowrap truncate ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {formattedProfit}
+                                  </span>
+                                  
+                                  {/* Hover Tooltip */}
+                                  <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col bg-slate-950/95 border border-slate-800 text-[8px] font-black font-mono text-slate-300 p-2 rounded shadow-xl z-50 pointer-events-none min-w-[110px] gap-1 shrink-0">
+                                    <span className={isWin ? 'text-emerald-400 animate-pulse' : 'text-rose-400 animate-pulse'}>
+                                      {isWin ? 'PROFIT' : 'LOSS'}: ${profitVal.toFixed(2)}
+                                    </span>
+                                    <span>AGE: {getRoundDuration(round.open_time, round.close_time)}</span>
+                                    <span className="text-cyan-400">TRADES: {round.order_count ?? 1}</span>
+                                    {round.close_time && (
+                                      <span>TIME (TH): {parseMt5Date(round.close_time)?.toLocaleTimeString('en-US', { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}</span>
+                                    )}
+                                    <span>MAX DD: -${Math.abs(round.max_dd ?? 0).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div 
+                                  key={`empty-${idx}`}
+                                  className="w-9 h-7 rounded border border-slate-900/40 shrink-0 bg-slate-950/80 flex items-center justify-center"
+                                >
+                                  <span className="text-[9px] text-slate-800 font-black">•</span>
+                                </div>
+                              );
+                            }
+                          });
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* 20% column (10% on mobile): Live trade stats or Today profit */}
+                    <div className="w-[10%] sm:w-[20%] flex flex-col justify-center min-h-[48px] pl-1 sm:pl-2 min-w-0 shrink-0">
+                      {!isIdle ? (
+                        <div className="flex items-center justify-between w-full min-w-0">
+                          <div className="hidden sm:flex flex-col min-w-0">
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[8px] font-black px-1 py-0.2 rounded leading-none ${activeRound?.type === 'SELL' ? 'bg-fuchsia-955 text-fuchsia-400 border border-fuchsia-900/15' : 'bg-blue-955 text-blue-400 border border-blue-900/20'}`}>
+                                {activeRound?.type || (currentPl < 0 ? 'SELL' : 'BUY')}
+                              </span>
+                              <span className="text-[9px] font-black text-slate-400 font-mono tabular-nums">{(activeRound?.volume ?? 0.01)}L</span>
+                              <span className={`text-[9px] font-mono font-black px-1 py-0.2 rounded leading-none ${isProfit ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-900/20' : 'bg-rose-955 text-rose-400 border border-rose-900/15'}`}>
+                                {isProfit ? '+' : ''}${currentPl.toFixed(2)}
+                              </span>
+                            </div>
+                            <span className="text-[8px] text-slate-500 font-mono mt-0.5 tabular-nums truncate">
+                              {activeRound ? `DD:-$${Math.abs(activeRound.max_dd ?? 0).toFixed(1)} | ${getLiveDuration(activeRound.open_time)}` : `FLOATING PL`}
+                            </span>
+                          </div>
+                          
+                          <div className="flex flex-col items-end justify-center w-full sm:w-auto min-w-0">
+                            <span className="hidden sm:inline text-[8px] text-slate-500 font-black tracking-widest uppercase leading-none mb-1">TODAY P/L</span>
+                            <span className={`text-xs sm:text-sm font-mono font-black tabular-nums leading-none truncate ${todayPl === 0 ? 'text-slate-500' : isTodayProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {todayPl > 0 ? '+' : ''}${todayPl.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between w-full min-w-0">
+                          <div className="hidden sm:flex items-center gap-1.5 text-slate-500 min-w-0">
+                            <Clock className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                            <span className="text-[10px] font-black tracking-widest uppercase truncate">TODAY P/L</span>
+                          </div>
+                          <span className={`text-xs sm:text-sm font-mono font-black tabular-nums truncate w-full sm:w-auto text-right sm:text-left ${todayPl === 0 ? 'text-slate-500' : isTodayProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {todayPl > 0 ? '+' : ''}${todayPl.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
       
     </div>
