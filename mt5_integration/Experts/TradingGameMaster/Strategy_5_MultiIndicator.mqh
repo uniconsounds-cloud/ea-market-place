@@ -113,12 +113,18 @@ public:
                                        stoch_bull ? 1 : 0,
                                        sar_bull ? 1 : 0);
 
-      // 4. Calculate signal and check stability
+      // 4. Calculate signal based on EMA trend direction and required threshold
       string currentSignal = "NONE";
-      if(bullishCount >= m_requiredThreshold && bearishCount < m_requiredThreshold)
-         currentSignal = "BUY";
-      else if(bearishCount >= m_requiredThreshold && bullishCount < m_requiredThreshold)
-         currentSignal = "SELL";
+      if(ema_bull)
+      {
+         if(bullishCount >= m_requiredThreshold)
+            currentSignal = "BUY";
+      }
+      else
+      {
+         if(bearishCount >= m_requiredThreshold)
+            currentSignal = "SELL";
+      }
 
       if(currentSignal != m_lastSignal)
       {
@@ -129,7 +135,7 @@ public:
       bool isStable = false;
       if(currentSignal != "NONE" && m_signalStartTime > 0)
       {
-         if(TimeCurrent() - m_signalStartTime >= 5) // Stable for 5 seconds
+         if(TimeCurrent() - m_signalStartTime >= 20) // Stable for 20 seconds or more
          {
             isStable = true;
          }
