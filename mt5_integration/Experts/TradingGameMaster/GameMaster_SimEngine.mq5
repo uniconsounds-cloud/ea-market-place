@@ -18,22 +18,26 @@
 #include "Strategy_2_MicroPullback.mqh"
 #include "Strategy_3_RangeBounce.mqh"
 #include "Strategy_4_SpikeFade.mqh"
+#include "Strategy_5_MultiIndicator.mqh"
 
 input double InpInitialBalance_1 = 100.0; // Strat 1 Starting Balance ($100 USD)
 input double InpInitialBalance_2 = 100.0; // Strat 2 Starting Balance ($100 USD)
 input double InpInitialBalance_3 = 100.0; // Strat 3 Starting Balance ($100 USD)
 input double InpInitialBalance_4 = 100.0; // Strat 4 Starting Balance ($100 USD)
+input double InpInitialBalance_5 = 100.0; // Strat 5 Starting Balance ($100 USD)
 input ENUM_STRATEGY_VERSION InpStrategyVersion = VERSION_1_1_BALANCED; // Strategy Parameter Version (v1.0 or v1.1)
 
 CVirtualAccount g_acc1;
 CVirtualAccount g_acc2;
 CVirtualAccount g_acc3;
 CVirtualAccount g_acc4;
+CVirtualAccount g_acc5;
 
 CStrategy1_MomentumBurst g_strat1;
 CStrategy2_MicroPullback g_strat2;
 CStrategy3_RangeBounce   g_strat3;
 CStrategy4_SpikeFade     g_strat4;
+CStrategy5_MultiIndicator g_strat5;
 
 CGameMasterWebSync g_webSync;
 ulong g_lastHeartbeat = 0;
@@ -83,6 +87,13 @@ void UpdateChartDashboard()
    else
       text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc4.GetBalance(), 2) + ")\n";
       
+   // Strat 5
+   text += "[5] Quantum Multi-Ind   : ";
+   if(g_acc5.GetOpenOrdersCount() > 0)
+      text += "ACTIVE ROUND (Float: $" + DoubleToString(g_acc5.GetFloatingProfit(), 2) + ", MaxDD: $" + DoubleToString(g_acc5.GetActiveMaxDD(), 2) + ")\n";
+   else
+      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc5.GetBalance(), 2) + " | States: " + g_strat5.GetIndicatorStates() + ")\n";
+      
    text += "==================================================\n";
    
    Comment(text);
@@ -100,18 +111,22 @@ int OnInit()
    g_acc2.Init(2, InpInitialBalance_2, &g_webSync);
    g_acc3.Init(3, InpInitialBalance_3, &g_webSync);
    g_acc4.Init(4, InpInitialBalance_4, &g_webSync);
+   g_acc5.Init(5, InpInitialBalance_5, &g_webSync);
    
    // Initialize Strategies
    g_strat1.Init(1, &g_acc1, InpStrategyVersion);
    g_strat2.Init(2, &g_acc2, InpStrategyVersion);
    g_strat3.Init(3, &g_acc3, InpStrategyVersion);
    g_strat4.Init(4, &g_acc4, InpStrategyVersion);
+   g_strat5.Init(5, &g_acc5, InpStrategyVersion);
+   g_strat5.SetWebSync(&g_webSync);
 
    // Reset DB states to clean initial state on MT5 startup
    g_webSync.BroadcastStrategyStatus(1, g_acc1.GetBalance(), 0.0, 0);
    g_webSync.BroadcastStrategyStatus(2, g_acc2.GetBalance(), 0.0, 0);
    g_webSync.BroadcastStrategyStatus(3, g_acc3.GetBalance(), 0.0, 0);
    g_webSync.BroadcastStrategyStatus(4, g_acc4.GetBalance(), 0.0, 0);
+   g_webSync.BroadcastStrategyStatus(5, g_acc5.GetBalance(), 0.0, 0, "0,0,0,0,0");
 
    EventSetTimer(1); // For background sync if needed later
    
@@ -142,12 +157,14 @@ void OnTick()
    g_acc2.ProcessTicks(bid, ask, tv);
    g_acc3.ProcessTicks(bid, ask, tv);
    g_acc4.ProcessTicks(bid, ask, tv);
+   g_acc5.ProcessTicks(bid, ask, tv);
    
    // 2. Evaluate Strategy Logic
    g_strat1.ProcessTick();
    g_strat2.ProcessTick();
    g_strat3.ProcessTick();
    g_strat4.ProcessTick();
+   g_strat5.ProcessTick();
    
    // 3. Update dashboard overlay in real-time
    UpdateChartDashboard();
@@ -176,6 +193,13 @@ void OnTick()
       {
          g_webSync.BroadcastStrategyStatus(4, g_acc4.GetBalance(), g_acc4.GetFloatingProfit(), 0);
          g_webSync.BroadcastRoundPing(g_acc4.GetActiveTicket(), g_acc4.GetFloatingProfit(), g_acc4.GetActiveMaxDD());
+      }
+      
+      // Strategy 5: Always broadcast states for real-time dashboard lights
+      g_webSync.BroadcastStrategyStatus(5, g_acc5.GetBalance(), g_acc5.GetFloatingProfit(), 0, g_strat5.GetIndicatorStates());
+      if(g_acc5.GetOpenOrdersCount() > 0)
+      {
+         g_webSync.BroadcastRoundPing(g_acc5.GetActiveTicket(), g_acc5.GetFloatingProfit(), g_acc5.GetActiveMaxDD());
       }
          
       g_lastHeartbeat = nowTick;

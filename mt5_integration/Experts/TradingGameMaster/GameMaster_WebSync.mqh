@@ -106,17 +106,55 @@ public:
       SendPatchRequest(endpoint, payload);
    }
    
-   void BroadcastStrategyStatus(int strategyId, double balance, double floatingPl, int totalTrades)
-   {
-      string updateTimeStr = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
-      StringReplace(updateTimeStr, ".", "-");
-      
-      string payload = StringFormat("{\"virtual_balance\":%.2f, \"floating_pl\":%.2f, \"total_trades\":%d, \"last_updated\":\"%s\"}", 
-                                     balance, floatingPl, totalTrades, updateTimeStr);
-      
-      string endpoint = StringFormat("tg_strategies?id=eq.%d", strategyId);
-      SendPatchRequest(endpoint, payload);
-   }
+   void BroadcastStrategyStatus(int strategyId, double balance, double floatingPl, int totalTrades, string indicatorStates="")
+    {
+       string updateTimeStr = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
+       StringReplace(updateTimeStr, ".", "-");
+       
+       string payload;
+       if(indicatorStates != "")
+       {
+          payload = StringFormat("{\"virtual_balance\":%.2f, \"floating_pl\":%.2f, \"total_trades\":%d, \"last_updated\":\"%s\", \"indicator_states\":\"%s\"}", 
+                                         balance, floatingPl, totalTrades, updateTimeStr, indicatorStates);
+       }
+       else
+       {
+          payload = StringFormat("{\"virtual_balance\":%.2f, \"floating_pl\":%.2f, \"total_trades\":%d, \"last_updated\":\"%s\"}", 
+                                         balance, floatingPl, totalTrades, updateTimeStr);
+       }
+       
+       string endpoint = StringFormat("tg_strategies?id=eq.%d", strategyId);
+       SendPatchRequest(endpoint, payload);
+    }
+    
+    int GetRequiredThreshold(int strategyId)
+    {
+       if(m_baseUrl == "" || m_apiKey == "") return 3;
+       
+       char post[], result[];
+       string headers = "apikey: " + m_apiKey + "\r\n" +
+                        "Authorization: Bearer " + m_apiKey + "\r\n";
+                        
+       string resultHeaders;
+       string url = m_baseUrl + "/rest/v1/tg_strategies?id=eq." + IntegerToString(strategyId) + "&select=required_threshold";
+       
+       int res = WebRequest("GET", url, headers, 5000, post, result, resultHeaders);
+       if(res == 200)
+       {
+          string responseText = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+          int pos = StringFind(responseText, "\"required_threshold\":");
+          if(pos >= 0)
+          {
+             int start = pos + StringLen("\"required_threshold\":");
+             string valStr = StringSubstr(responseText, start);
+             StringReplace(valStr, " ", "");
+             StringReplace(valStr, "}", "");
+             StringReplace(valStr, "]", "");
+             return (int)StringToInteger(valStr);
+          }
+       }
+       return 3;
+    }
 };
 
 #endif

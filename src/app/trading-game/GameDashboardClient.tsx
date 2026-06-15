@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Activity, Crosshair, TrendingUp, Zap, Clock, ShieldAlert, AlertTriangle, RefreshCw } from "lucide-react";
+import { Activity, Crosshair, TrendingUp, Zap, Clock, ShieldAlert, AlertTriangle, RefreshCw, Cpu } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, BarChart, Bar, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -23,6 +23,8 @@ interface Strategy {
   floating_pl: number;
   win_rate: number;
   total_trades: number;
+  indicator_states?: string;
+  required_threshold?: number;
 }
 
 interface VirtualRound {
@@ -52,12 +54,13 @@ const initialStrategies: Strategy[] = [
   { id: 2, name: "Micro Pullback Trend", description: "Trend following pullback using EMA20/50", current_status: "IDLE", virtual_balance: 1680.00, floating_pl: 0.0, win_rate: 76.5, total_trades: 34 },
   { id: 3, name: "Range Bounce Scalper", description: "Sideway ping-pong using RSI bounce", current_status: "IDLE", virtual_balance: 1120.20, floating_pl: 0.0, win_rate: 68.2, total_trades: 55 },
   { id: 4, name: "Spike Fade", description: "Mean reversion on abnormal volatility spikes", current_status: "IDLE", virtual_balance: 1390.80, floating_pl: 0.0, win_rate: 70.0, total_trades: 30 },
+  { id: 5, name: "Quantum Multi-Indicator", description: "5-Indicator agreement system targeting $3 profit", current_status: "IDLE", virtual_balance: 100.00, floating_pl: 0.0, win_rate: 68.4, total_trades: 0, required_threshold: 3, indicator_states: "0,0,0,0,0" },
 ];
 
 const generateMockHistory = (stratId: number): VirtualRound[] => {
   const list: VirtualRound[] = [];
   const nowMs = Date.now();
-  const winRate = [72.4, 76.5, 68.2, 70.0][stratId - 1];
+  const winRate = [72.4, 76.5, 68.2, 70.0, 68.4][stratId - 1];
   
   for (let i = 0; i < 20; i++) {
     const isWin = Math.random() * 100 < winRate;
@@ -732,12 +735,56 @@ export function GameDashboardClient() {
 
   const handleSubscribe = (id: number) => setSubscriptions((prev) => ({ ...prev, [id]: !prev[id] }));
 
+  const handleThresholdChange = async (strategyId: number, threshold: number) => {
+    setStrategies(prev => prev.map(s => s.id === strategyId ? { ...s, required_threshold: threshold } : s));
+    if (supabase) {
+      const { error } = await supabase
+        .from("tg_strategies")
+        .update({ required_threshold: threshold })
+        .eq("id", strategyId);
+      if (error) {
+        console.error("Failed to update threshold:", error);
+      }
+    }
+  };
+
+  const renderIndicatorLights = (statesStr: string | undefined) => {
+    const names = ["EMA", "RSI", "MACD", "STOCH", "SAR"];
+    const states = statesStr ? statesStr.split(",").map(s => s.trim() === "1") : [false, false, false, false, false];
+    
+    return names.map((name, idx) => {
+      const isBullish = states[idx];
+      return (
+        <div 
+          key={name}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider border transition-all duration-300 ${
+            isBullish 
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.05)]" 
+              : "bg-rose-500/10 text-rose-400 border-rose-400/20 shadow-[0_0_8px_rgba(244,63,94,0.05)]"
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${isBullish ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
+          <span>{name}</span>
+        </div>
+      );
+    });
+  };
+
+  const getAgreementCount = (statesStr: string | undefined) => {
+    if (!statesStr) return { count: 3, bias: "BUY" };
+    const states = statesStr.split(",").map(s => s.trim() === "1");
+    const bullish = states.filter(s => s).length;
+    const bearish = 5 - bullish;
+    return bullish >= bearish ? { count: bullish, bias: "BUY" } : { count: bearish, bias: "SELL" };
+  };
+
   const getIcon = (id: number) => {
     switch (id) {
       case 1: return <Zap className="w-6 h-6 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />;
       case 2: return <TrendingUp className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" />;
       case 3: return <Activity className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />;
       case 4: return <Crosshair className="w-6 h-6 text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]" />;
+      case 5: return <Cpu className="w-6 h-6 text-fuchsia-400 drop-shadow-[0_0_8px_rgba(232,121,249,0.5)]" />;
       default: return <ShieldAlert className="w-6 h-6" />;
     }
   };
@@ -1110,28 +1157,56 @@ export function GameDashboardClient() {
                 {/* 1.2 Proximity & Signal State - Scales cleanly to wider bars on Desktop! */}
                 <div className="flex items-center gap-4 shrink-0 lg:flex-1 lg:justify-center">
                   {isIdle ? (
-                    <>
-                      <div className="flex flex-col items-end lg:items-start gap-1">
-                        <span className={`text-xs font-mono font-black tabular-nums leading-none ${energy >= 80 ? "text-cyan-400" : "text-slate-500"}`}>{energy.toFixed(0)}%</span>
-                        <div className="h-2 w-16 sm:w-24 lg:w-36 xl:w-48 bg-slate-950 rounded-full overflow-hidden border border-slate-900/60 relative">
-                          <div className="absolute top-0 bottom-0 left-[80%] w-px bg-slate-800 z-10"></div>
-                          <div 
-                            className={`h-full transition-all duration-1000 ease-linear rounded-full ${energy >= 80 ? 'bg-cyan-400' : 'bg-slate-600'}`} 
-                            style={{ width: `${energy}%` }}
-                          ></div>
+                    strat.id === 5 ? (
+                      <>
+                        <div className="flex flex-col items-end lg:items-start gap-1">
+                          <span className="text-xs font-mono font-black tabular-nums leading-none text-slate-500">
+                            {getAgreementCount(strat.indicator_states).count}/5 INDICATORS
+                          </span>
+                          <div className="text-[9px] font-black text-slate-400 font-mono">
+                            BIAS: <span className={getAgreementCount(strat.indicator_states).bias === "BUY" ? "text-emerald-400" : "text-rose-400"}>{getAgreementCount(strat.indicator_states).bias}</span>
+                          </div>
                         </div>
-                      </div>
-                      <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${sigState.color}`}>
-                        <span className="inline lg:hidden">
-                          {sigState.text === "SCANNING MARKET" ? "SCANNING" : 
-                           sigState.text === "APPROACHING SIGNAL" ? "APPROACHING" : 
-                           sigState.text === "MARKET CLOSED" ? "CLOSED" : "MET"}
-                        </span>
-                        <span className="hidden lg:inline">
-                          {sigState.text}
-                        </span>
-                      </Badge>
-                    </>
+                        <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${
+                          !checkIsMarketOpen() ? "text-amber-500/70" :
+                          getAgreementCount(strat.indicator_states).count >= (strat.required_threshold ?? 3) 
+                            ? "text-emerald-400 animate-pulse" 
+                            : "text-slate-500"
+                        }`}>
+                          <span className="inline lg:hidden">
+                            {!checkIsMarketOpen() ? "CLOSED" :
+                             getAgreementCount(strat.indicator_states).count >= (strat.required_threshold ?? 3) ? "READY" : "SCANNING"}
+                          </span>
+                          <span className="hidden lg:inline">
+                            {!checkIsMarketOpen() ? "MARKET CLOSED" :
+                             getAgreementCount(strat.indicator_states).count >= (strat.required_threshold ?? 3) ? "SIGNAL READY" : "SCANNING MARKET"}
+                          </span>
+                        </Badge>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex flex-col items-end lg:items-start gap-1">
+                          <span className={`text-xs font-mono font-black tabular-nums leading-none ${energy >= 80 ? "text-cyan-400" : "text-slate-500"}`}>{energy.toFixed(0)}%</span>
+                          <div className="h-2 w-16 sm:w-24 lg:w-36 xl:w-48 bg-slate-950 rounded-full overflow-hidden border border-slate-900/60 relative">
+                            <div className="absolute top-0 bottom-0 left-[80%] w-px bg-slate-800 z-10"></div>
+                            <div 
+                              className={`h-full transition-all duration-1000 ease-linear rounded-full ${energy >= 80 ? 'bg-cyan-400' : 'bg-slate-600'}`} 
+                              style={{ width: `${energy}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={`px-2.5 py-0.5 text-xs tracking-wider transition-colors duration-500 border-none bg-transparent font-black leading-none whitespace-nowrap ${sigState.color}`}>
+                          <span className="inline lg:hidden">
+                            {sigState.text === "SCANNING MARKET" ? "SCANNING" : 
+                             sigState.text === "APPROACHING SIGNAL" ? "APPROACHING" : 
+                             sigState.text === "MARKET CLOSED" ? "CLOSED" : "MET"}
+                          </span>
+                          <span className="hidden lg:inline">
+                            {sigState.text}
+                          </span>
+                        </Badge>
+                      </>
+                    )
                   ) : (
                     <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.05)] shrink-0">
                       <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
@@ -1153,6 +1228,60 @@ export function GameDashboardClient() {
                   {isSubscribed ? "✓ ACTIVE" : "SUBSCRIBE"}
                 </Button>
               </div>
+
+              {/* Row 1.5: Strategy 5 Indicator Dashboard & Outcomes projection */}
+              {strat.id === 5 && (
+                <div className="flex flex-col gap-3 w-full border-t border-slate-900/40 pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-950/40 p-3 rounded-lg border border-slate-900/60 w-full">
+                    {/* Indicators Panel */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[9px] text-slate-500 font-black tracking-widest uppercase">CONCURRENT FEEDS:</span>
+                      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                        {renderIndicatorLights(strat.indicator_states)}
+                      </div>
+                    </div>
+                    
+                    {/* Threshold Selector */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[9px] text-slate-500 font-black tracking-widest uppercase">TRIGGER RULE:</span>
+                      <select 
+                        value={strat.required_threshold ?? 3}
+                        onChange={(e) => handleThresholdChange(strat.id, parseInt(e.target.value))}
+                        className="bg-slate-950 border border-slate-800 text-[10px] font-black text-cyan-400 px-2.5 py-1 rounded cursor-pointer outline-none focus:border-cyan-500/50 transition-colors"
+                      >
+                        <option value={2}>2+ INDICATORS AGREE</option>
+                        <option value={3}>3+ INDICATORS AGREE</option>
+                        <option value={4}>4+ INDICATORS AGREE</option>
+                        <option value={5}>5 INDICATORS AGREE</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Historical Outcomes Comparison Box */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/20 p-2.5 rounded-lg border border-slate-900/40 w-full text-[9px] font-mono select-none">
+                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
+                      <span className="text-slate-500 font-bold">2+ MET (AGGRESSIVE)</span>
+                      <span className="text-cyan-400 font-black mt-1">WIN: ~58.2%</span>
+                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Very High</span>
+                    </div>
+                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
+                      <span className="text-slate-500 font-bold">3+ MET (BALANCED)</span>
+                      <span className="text-emerald-400 font-black mt-1">WIN: ~68.4%</span>
+                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Moderate</span>
+                    </div>
+                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
+                      <span className="text-slate-500 font-bold">4+ MET (CONSERVATIVE)</span>
+                      <span className="text-amber-400 font-black mt-1">WIN: ~76.5%</span>
+                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Low</span>
+                    </div>
+                    <div className="flex flex-col p-1.5 rounded bg-slate-950/50 border border-slate-900/40 text-center">
+                      <span className="text-slate-500 font-bold">5 MET (MAX ACCURACY)</span>
+                      <span className="text-fuchsia-400 font-black mt-1">WIN: ~85.1%</span>
+                      <span className="text-slate-600 text-[8px] mt-0.5">Freq: Very Low</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Row 2: History Sparkline & Live Trade/Profit Data (Responsive Ratios) */}
               <div className="flex flex-row gap-3 sm:gap-6 border-t border-slate-900/60 pt-4 w-full items-center">
