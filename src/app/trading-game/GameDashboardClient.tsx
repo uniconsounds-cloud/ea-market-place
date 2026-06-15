@@ -773,7 +773,7 @@ export function GameDashboardClient() {
           }`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${isBullish ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
-          <span>{name}</span>
+          <span>{name} {isBullish ? "▲ BUY" : "▼ SELL"}</span>
         </div>
       );
     });
