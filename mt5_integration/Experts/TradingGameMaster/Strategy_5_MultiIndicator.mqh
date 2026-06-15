@@ -24,9 +24,57 @@ private:
    string m_lastSignal;
    datetime m_signalStartTime;
    string m_indicatorStates;
+   bool m_isSideway;
+
+   bool CheckSidewayState()
+   {
+      double ema9_vals[30];
+      double ema21_vals[30];
+      
+      // Copy from index 1 (previous completed bars) to avoid live tick fluctuations
+      if(CopyBuffer(m_hEma9, 0, 1, 30, ema9_vals) < 30) return false;
+      if(CopyBuffer(m_hEma21, 0, 1, 30, ema21_vals) < 30) return false;
+      
+      // 1. Count EMA crosses in the last 30 bars
+      int crossCount = 0;
+      bool lastState = (ema9_vals[0] > ema21_vals[0]);
+      for(int i = 1; i < 30; i++)
+      {
+         bool currentState = (ema9_vals[i] > ema21_vals[i]);
+         if(currentState != lastState)
+         {
+            crossCount++;
+            lastState = currentState;
+         }
+      }
+      
+      if(crossCount >= 3) return true;
+      
+      // 2. Check the average distance between EMA9 and EMA21 over the last 15 bars
+      double totalDist = 0.0;
+      for(int i = 15; i < 30; i++)
+      {
+         totalDist += MathAbs(ema9_vals[i] - ema21_vals[i]);
+      }
+      double avgDist = totalDist / 15.0;
+      
+      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+      if(digits == 3 || digits == 5) point = point * 10.0;
+      
+      double minDistancePoints = 80.0; // 80 points (0.80 USD on Gold)
+      if(avgDist < minDistancePoints * point) return true;
+      
+      return false;
+   }
 
 public:
-   CStrategy5_MultiIndicator() : m_webSync(NULL), m_requiredThreshold(3), m_lastSignal("NONE"), m_signalStartTime(0), m_indicatorStates("0,0,0,0,0") {}
+   CStrategy5_MultiIndicator() : m_webSync(NULL), m_requiredThreshold(3), m_lastSignal("NONE"), m_signalStartTime(0), m_indicatorStates("0,0,0,0,0"), m_isSideway(false) {}
+   
+   bool IsSideway() const
+   {
+      return m_isSideway;
+   }
    
    virtual void Init(int id, CVirtualAccount *acc, ENUM_STRATEGY_VERSION ver) override
    {
@@ -113,6 +161,8 @@ public:
                                        stoch_bull ? 1 : 0,
                                        sar_bull ? 1 : 0);
 
+      m_isSideway = CheckSidewayState();
+
       // 4. Calculate signal based on EMA trend direction and required threshold
       string currentSignal = "NONE";
       if(ema_bull)
@@ -146,6 +196,7 @@ public:
 
       if(isStable)
       {
+         if(m_isSideway) return; // Block trade entry in sideway market
          double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
          int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
          if(digits == 3 || digits == 5) point = point * 10.0;

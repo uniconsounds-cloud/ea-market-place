@@ -101,28 +101,44 @@ void UpdateChartDashboard()
    if(g_acc5.GetOpenOrdersCount() > 0)
       text += "ACTIVE ROUND (Float: $" + DoubleToString(g_acc5.GetFloatingProfit(), 2) + ", MaxDD: $" + DoubleToString(g_acc5.GetActiveMaxDD(), 2) + ")\n";
    else
-      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc5.GetBalance(), 2) + " | States: " + g_strat5.GetIndicatorStates() + ")\n";
+   {
+      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc5.GetBalance(), 2) + " | States: " + g_strat5.GetIndicatorStates();
+      if(g_strat5.IsSideway()) text += " | SIDEWAY BLOCKED";
+      text += ")\n";
+   }
       
    // Strat 6
    text += "[6] Quantum (3+ Met)    : ";
    if(g_acc6.GetOpenOrdersCount() > 0)
       text += "ACTIVE ROUND (Float: $" + DoubleToString(g_acc6.GetFloatingProfit(), 2) + ", MaxDD: $" + DoubleToString(g_acc6.GetActiveMaxDD(), 2) + ")\n";
    else
-      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc6.GetBalance(), 2) + ")\n";
+   {
+      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc6.GetBalance(), 2);
+      if(g_strat6.IsSideway()) text += " | SIDEWAY BLOCKED";
+      text += ")\n";
+   }
 
    // Strat 7
    text += "[7] Quantum (4+ Met)    : ";
    if(g_acc7.GetOpenOrdersCount() > 0)
       text += "ACTIVE ROUND (Float: $" + DoubleToString(g_acc7.GetFloatingProfit(), 2) + ", MaxDD: $" + DoubleToString(g_acc7.GetActiveMaxDD(), 2) + ")\n";
    else
-      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc7.GetBalance(), 2) + ")\n";
+   {
+      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc7.GetBalance(), 2);
+      if(g_strat7.IsSideway()) text += " | SIDEWAY BLOCKED";
+      text += ")\n";
+   }
 
    // Strat 8
    text += "[8] Quantum (5 Met)     : ";
    if(g_acc8.GetOpenOrdersCount() > 0)
       text += "ACTIVE ROUND (Float: $" + DoubleToString(g_acc8.GetFloatingProfit(), 2) + ", MaxDD: $" + DoubleToString(g_acc8.GetActiveMaxDD(), 2) + ")\n";
    else
-      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc8.GetBalance(), 2) + ")\n";
+   {
+      text += "WAITING SIGNAL (Bal: $" + DoubleToString(g_acc8.GetBalance(), 2);
+      if(g_strat8.IsSideway()) text += " | SIDEWAY BLOCKED";
+      text += ")\n";
+   }
       
    text += "==================================================\n";
    
