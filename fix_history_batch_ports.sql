@@ -59,9 +59,21 @@ BEGIN
                 COALESCE((v_item->>'lots')::DOUBLE PRECISION, 0)
             )
             ON CONFLICT (port_number, date) DO UPDATE SET
-                profit = CASE WHEN EXCLUDED.profit <> 0 THEN EXCLUDED.profit ELSE farm_daily_history.profit END,
-                max_drawdown = CASE WHEN EXCLUDED.max_drawdown <> 0 THEN EXCLUDED.max_drawdown ELSE farm_daily_history.max_drawdown END,
-                closed_lots = CASE WHEN EXCLUDED.closed_lots <> 0 THEN EXCLUDED.closed_lots ELSE farm_daily_history.closed_lots END,
+                profit = CASE 
+                    WHEN (CURRENT_DATE - EXCLUDED.date) <= 7 THEN EXCLUDED.profit
+                    WHEN EXCLUDED.profit <> 0 THEN EXCLUDED.profit 
+                    ELSE farm_daily_history.profit 
+                END,
+                max_drawdown = CASE 
+                    WHEN (CURRENT_DATE - EXCLUDED.date) <= 7 THEN EXCLUDED.max_drawdown
+                    WHEN EXCLUDED.max_drawdown <> 0 THEN EXCLUDED.max_drawdown 
+                    ELSE farm_daily_history.max_drawdown 
+                END,
+                closed_lots = CASE 
+                    WHEN (CURRENT_DATE - EXCLUDED.date) <= 7 THEN EXCLUDED.closed_lots
+                    WHEN EXCLUDED.closed_lots <> 0 THEN EXCLUDED.closed_lots 
+                    ELSE farm_daily_history.closed_lots 
+                END,
                 updated_at = NOW();
         END LOOP;
     END IF;

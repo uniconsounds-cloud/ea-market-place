@@ -755,8 +755,26 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             const startStr = startD.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
             filteredData = filteredData.filter(item => item.date >= startStr);
         }
+
+        // Filter out weekends (Saturday and Sunday) ONLY if they have 0 profit
+        filteredData = filteredData.filter(item => {
+            const localDate = new Date(item.date + 'T00:00:00');
+            const day = localDate.getDay(); // 0 is Sunday, 6 is Saturday
+            const isWeekend = (day === 0 || day === 6);
+            if (isWeekend && Math.abs(Number(item.profit)) < 0.01) {
+                return false;
+            }
+            return true;
+        });
         
         const accountType = portStatus?.account_type || 'USC';
+
+        const MARKET_HOLIDAYS: Record<string, string> = {
+            '12-25': 'Christmas Day',
+            '01-01': 'New Year\'s Day',
+            '2026-04-03': 'Good Friday',
+            '2027-03-26': 'Good Friday'
+        };
 
         return filteredData.map(item => {
             const proportionalRatio = 1.0;
@@ -770,13 +788,20 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             else if (cents > 1000) asset = '/farm/base_farmbox_mid.png';
             else if (cents > 0) asset = '/farm/base_farmbox_min.png';
             
+            // Check if this date is a market holiday and profit is 0
+            const dateMD = item.date.substring(5); // 'MM-DD'
+            const holidayName = MARKET_HOLIDAYS[dateMD] || MARKET_HOLIDAYS[item.date];
+            const isHoliday = !!(holidayName && Math.abs(pnl) < 0.01);
+
             // Re-parse the date string into a localized Thailand date for display
             const localDate = new Date(item.date + 'T00:00:00');
             return {
                 id: item.id,
                 date: localDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
                 pnl,
-                asset
+                asset,
+                isHoliday,
+                holidayName
             };
         });
     }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab]);
@@ -784,9 +809,16 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const historyScrollRef = useRef<HTMLDivElement>(null);
     const [isScrolledLeft, setIsScrolledLeft] = useState(false);
 
+    const hasInitialScrolled = useRef(false);
+
     useEffect(() => {
-        if (historyScrollRef.current) {
+        hasInitialScrolled.current = false;
+    }, [portNumber]);
+
+    useEffect(() => {
+        if (historyScrollRef.current && dailyHistory.length > 0 && !hasInitialScrolled.current) {
             historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth;
+            hasInitialScrolled.current = true;
         }
     }, [isClient, dailyHistory]);
 
@@ -1035,9 +1067,15 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
-                                    <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                        {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
-                                    </span>
+                                    {item.isHoliday ? (
+                                        <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>
+                                            CLOSED
+                                        </span>
+                                    ) : (
+                                        <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                            {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         ))}

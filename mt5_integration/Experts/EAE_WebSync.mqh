@@ -633,8 +633,22 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
 {
    if(g_eae_history_checked) return;
    
+   // --- Staggered anti-spike delay ---
+   static datetime boot_time = 0;
+   static int random_delay = -1;
+   if(boot_time == 0)
+   {
+      boot_time = TimeCurrent();
+      MathSrand((uint)GetTickCount());
+      random_delay = MathRand() % 120; // 0 to 119 seconds randomized delay
+      Print("EAE WebSync: Boot detected. History sync scheduled in ", random_delay, " seconds to stagger server load.");
+   }
+   
+   if(TimeCurrent() - boot_time < random_delay) return;
+   
+   // --- Self-healing gap calculation ---
    string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   int days_to_sync = 30; // Default if no GV exists
+   int days_to_sync = 7; // Always sync at least 7 days to self-heal recent history
    
    if(GlobalVariableCheck(gv_last_history))
    {
@@ -643,24 +657,22 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
       int diff_sec = (int)(now - last_sync);
       
       if(diff_sec > 0) {
-         days_to_sync = (diff_sec / 86400) + 1; // Round up to cover the missing gap
-      } else {
-         days_to_sync = 0;
+         int gap_days = (diff_sec / 86400) + 1;
+         if(gap_days > days_to_sync) days_to_sync = gap_days;
       }
    }
    
-   if(days_to_sync > 0)
+   if(days_to_sync > 30) days_to_sync = 30; // Cap at 30 days to limit server load
+   
+   Print("EAE WebSync: Performing self-healing history check for the last ", days_to_sync, " days...");
+   if(EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS))
    {
-      if(days_to_sync > 30) days_to_sync = 30;
-      Print("EAE WebSync: Self-Healing Triggered. Missing days: ", days_to_sync);
-      if(EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS))
-      {
-         GlobalVariableSet(gv_last_history, (double)TimeCurrent());
-      }
+      GlobalVariableSet(gv_last_history, (double)TimeCurrent());
+      Print("EAE WebSync: History check completed and synced successfully.");
    }
    else
    {
-      Print("EAE WebSync: History is up to date.");
+      Print("EAE WebSync: History check failed. Will retry next time.");
    }
    
    g_eae_history_checked = true; // Only check once per EA Boot

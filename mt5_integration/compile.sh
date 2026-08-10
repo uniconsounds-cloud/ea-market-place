@@ -37,28 +37,54 @@ if [ "$DIR_NAME" = "Experts/EasyM" ]; then
     MT5_DIR_NAME="Experts/Easy M"
 fi
 
-# Ensure the destination subdirectory in MT5 exists (e.g. Experts/Easy M)
-mkdir -p "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME"
+# Check if paths contain spaces (which MetaEditor CLI fails to compile)
+HAS_SPACES=false
+if [[ "$MT5_DIR_NAME" == *" "* || "$FILE_NAME" == *" "* ]]; then
+    HAS_SPACES=true
+fi
 
-# 3. Copy the target MQ5 source file to MT5 installation
-echo "Copying source file $FILE_NAME to MT5 ($MT5_DIR_NAME)..."
-cp "$SOURCE_FILE" "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/$FILE_NAME"
-
-# 4. Also copy any other MQH files in the same directory as dependencies
-echo "Copying MQH dependencies from $DIR_NAME to MT5..."
-cp "$WORKSPACE_DIR/$DIR_NAME"/*.mqh "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/" 2>/dev/null || true
-# If we are in a subdirectory of Experts, also copy the parent Experts MQH files just in case
-if [ "$DIR_NAME" != "Experts" ] && [[ "$DIR_NAME" == Experts/* ]]; then
-    cp "$WORKSPACE_DIR"/Experts/*.mqh "$MT5_INSTALL_DIR/MQL5/Experts/" 2>/dev/null || true
+if [ "$HAS_SPACES" = true ]; then
+    # We will use temporary space-free paths for compilation
+    TEMP_DIR_NAME="Experts/temp_compile_dir"
+    TEMP_FILE_NAME=$(echo "$FILE_NAME" | sed 's/ /_/g')
+    
+    echo "Paths contain spaces. Compiling using temporary space-free path: $TEMP_DIR_NAME/$TEMP_FILE_NAME"
+    
+    # Ensure temp dir exists
+    mkdir -p "$MT5_INSTALL_DIR/MQL5/$TEMP_DIR_NAME"
+    
+    # Copy target MQ5 source file to temp dir with space-free name
+    cp "$SOURCE_FILE" "$MT5_INSTALL_DIR/MQL5/$TEMP_DIR_NAME/$TEMP_FILE_NAME"
+    
+    # Copy MQH dependencies from original workspace dir to temp dir
+    cp "$WORKSPACE_DIR/$DIR_NAME"/*.mqh "$MT5_INSTALL_DIR/MQL5/$TEMP_DIR_NAME/" 2>/dev/null || true
+    
+    # If in subdirectory of Experts, copy parent Experts MQH files
+    if [ "$DIR_NAME" != "Experts" ] && [[ "$DIR_NAME" == Experts/* ]]; then
+        cp "$WORKSPACE_DIR"/Experts/*.mqh "$MT5_INSTALL_DIR/MQL5/Experts/" 2>/dev/null || true
+    fi
+    
+    # Use temp paths for compiling
+    COMPILE_DIR_NAME="$TEMP_DIR_NAME"
+    COMPILE_FILE_NAME="$TEMP_FILE_NAME"
+else
+    # Compile directly
+    mkdir -p "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME"
+    cp "$SOURCE_FILE" "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/$FILE_NAME"
+    cp "$WORKSPACE_DIR/$DIR_NAME"/*.mqh "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/" 2>/dev/null || true
+    if [ "$DIR_NAME" != "Experts" ] && [[ "$DIR_NAME" == Experts/* ]]; then
+        cp "$WORKSPACE_DIR"/Experts/*.mqh "$MT5_INSTALL_DIR/MQL5/Experts/" 2>/dev/null || true
+    fi
+    COMPILE_DIR_NAME="$MT5_DIR_NAME"
+    COMPILE_FILE_NAME="$FILE_NAME"
 fi
 
 # 5. Compile using MT5's Wine runtime
-echo "Compiling $FILE_NAME via Wine..."
+echo "Compiling $COMPILE_FILE_NAME via Wine..."
 cd "$MT5_INSTALL_DIR"
 
-# Convert Unix directory path separators to Windows backslashes for MetaEditor
-WINDOWS_SOURCE_PATH=$(echo "MQL5/$MT5_DIR_NAME/$FILE_NAME" | sed 's/\//\\/g')
-WINDOWS_LOG_PATH=$(echo "MQL5/Logs/${FILE_NAME%.mq5}_compile.log" | sed 's/\//\\/g')
+WINDOWS_SOURCE_PATH=$(echo "MQL5/$COMPILE_DIR_NAME/$COMPILE_FILE_NAME" | sed 's/\//\\/g')
+WINDOWS_LOG_PATH=$(echo "MQL5/Logs/${COMPILE_FILE_NAME%.mq5}_compile.log" | sed 's/\//\\/g')
 
 WINEPREFIX="$MT5_WINE_PREFIX" "$WINE64_EXE" "MetaEditor64.exe" \
     /portable \
@@ -66,7 +92,7 @@ WINEPREFIX="$MT5_WINE_PREFIX" "$WINE64_EXE" "MetaEditor64.exe" \
     /log:"$WINDOWS_LOG_PATH"
 
 # 6. Read and decode the UTF-16LE compiler log
-LOG_PATH="$MT5_INSTALL_DIR/MQL5/Logs/${FILE_NAME%.mq5}_compile.log"
+LOG_PATH="$MT5_INSTALL_DIR/MQL5/Logs/${COMPILE_FILE_NAME%.mq5}_compile.log"
 if [ -f "$LOG_PATH" ]; then
     echo "==================== COMPILE LOG ===================="
     iconv -f UTF-16LE -t UTF-8 "$LOG_PATH"
@@ -76,17 +102,35 @@ else
     exit 1
 fi
 
-# 7. Verify the output .ex5 file and copy it back to the workspace
-compiled_ex5="${FILE_NAME%.mq5}.ex5"
-MT5_EX5_PATH="$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/$compiled_ex5"
-WORKSPACE_EX5_PATH="$WORKSPACE_DIR/$DIR_NAME/$compiled_ex5"
+# 7. Verify and copy back
+compiled_ex5="${COMPILE_FILE_NAME%.mq5}.ex5"
+MT5_EX5_PATH="$MT5_INSTALL_DIR/MQL5/$COMPILE_DIR_NAME/$compiled_ex5"
+
+# Target output files
+original_ex5="${FILE_NAME%.mq5}.ex5"
+MT5_TARGET_EX5_PATH="$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME/$original_ex5"
+WORKSPACE_TARGET_EX5_PATH="$WORKSPACE_DIR/$DIR_NAME/$original_ex5"
 
 if [ -f "$MT5_EX5_PATH" ]; then
     echo "Success! Compiled file found: $compiled_ex5"
-    cp "$MT5_EX5_PATH" "$WORKSPACE_EX5_PATH"
-    echo "Copied compiled file back to workspace: mt5_integration/$DIR_NAME/$compiled_ex5"
+    
+    # If we used space-free temp paths, copy to the final MT5 destination
+    if [ "$HAS_SPACES" = true ]; then
+        mkdir -p "$MT5_INSTALL_DIR/MQL5/$MT5_DIR_NAME"
+        cp "$MT5_EX5_PATH" "$MT5_TARGET_EX5_PATH"
+        # Cleanup temp directory
+        rm -rf "$MT5_INSTALL_DIR/MQL5/$TEMP_DIR_NAME"
+    fi
+    
+    # Copy back to workspace
+    cp "$MT5_TARGET_EX5_PATH" "$WORKSPACE_TARGET_EX5_PATH"
+    echo "Copied compiled file back to workspace: mt5_integration/$DIR_NAME/$original_ex5"
     exit 0
 else
     echo "Failure: Compiled file $compiled_ex5 was not generated."
+    # Cleanup temp directory just in case
+    if [ "$HAS_SPACES" = true ]; then
+        rm -rf "$MT5_INSTALL_DIR/MQL5/$TEMP_DIR_NAME"
+    fi
     exit 1
 fi
