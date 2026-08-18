@@ -23,8 +23,15 @@ export default async function DemoFarmPage() {
         redirect('/demo-challenge');
     }
 
+    // Fetch user's dynamic challenge balance (cumulative profits starting from join_date)
+    const { data: challengeView } = await supabase
+        .from('admin_demo_challenges_view')
+        .select('current_balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
     const scaleFactor = 1.0;
-    let currentBalance = Number(challenge.current_balance) || 100000;
+    let currentBalance = Number(challengeView?.current_balance || challenge.current_balance) || 100000;
 
     // Determine custom port name with emoji
     const rawPortName = challenge.port_name || user.email || 'My Demo Port';
