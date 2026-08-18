@@ -17,31 +17,37 @@ export default function ResetPasswordPage() {
     const router = useRouter();
 
     useEffect(() => {
-        // Verify that the user has a valid active session to reset password
-        // The recovery email link should have logged them in.
+        // Handle hash fragments (e.g. #error=access_denied&error_code=otp_expired)
+        if (typeof window !== 'undefined' && window.location.hash) {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const errorDesc = hashParams.get('error_description');
+            const errorCode = hashParams.get('error_code');
+            if (errorDesc || errorCode) {
+                setError(errorDesc || 'ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณาทำรายการลืมรหัสผ่านใหม่อีกครั้ง');
+                return;
+            }
+        }
+
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                // If they land here without a session, they might need to go to login
-                // We'll give them a small warning but don't force redirect immediately 
-                // in case the session is setting up.
+            if (session) {
+                setError(null);
+            } else {
                 setTimeout(async () => {
                     const { data } = await supabase.auth.getSession();
-                    if (!data.session) {
+                    if (data.session) {
+                        setError(null);
+                    } else {
                         setError('ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณาทำรายการลืมรหัสผ่านใหม่อีกครั้ง');
                     }
-                }, 1500);
+                }, 2000);
             }
         };
-        
-        // Supabase sometimes puts hash params like #access_token= in the URL instead of using SSR callback
-        // This useEffect will capture the session implicitly via the client library
+
         checkSession();
 
-        // Listen for auth state changes specific to password recovery
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'PASSWORD_RECOVERY') {
-                // User is verified and ready to change password
+            if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
                 setError(null);
             }
         });
