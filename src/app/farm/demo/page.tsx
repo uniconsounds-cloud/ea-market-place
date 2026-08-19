@@ -73,21 +73,32 @@ export default async function DemoFarmPage() {
 
     const finalAdminMessage = adminMessage || "💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀";
     const masterPortNumber = customMasterPort || challenge.master_port_number || '100000';
+    const joinDateStr = challenge.join_date ? challenge.join_date.split('T')[0] : '2026-05-09';
 
-    // Fetch initial active orders from master port
-    const { data: initialOrders } = await supabase
-        .from('farm_active_orders')
-        .select('*')
-        .eq('port_number', masterPortNumber);
+    // Fetch dynamic history & status in parallel
+    const [viewRes, historyRes, ordersRes, statusRes] = await Promise.all([
+        supabase.from('admin_demo_challenges_view').select('current_balance').eq('user_id', user.id).maybeSingle(),
+        supabase.from('farm_daily_history').select('profit, date').eq('port_number', masterPortNumber).gte('date', joinDateStr),
+        supabase.from('farm_active_orders').select('*').eq('port_number', masterPortNumber),
+        supabase.from('farm_port_status').select('*').eq('port_number', masterPortNumber).single()
+    ]);
 
-    // Fetch initial port status from master port
-    const { data: portStatus } = await supabase
-        .from('farm_port_status')
-        .select('*')
-        .eq('port_number', masterPortNumber)
-        .single();
+    const initialOrders = ordersRes.data || [];
+    const portStatus = statusRes.data;
+    const dailyHistory = historyRes.data || [];
+    const challengeView = viewRes.data;
+
+    // Calculate dynamic balance (100,000 + profits accumulated since user's join_date + unrecorded today_pnl)
+    const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    const historyProfitSum = dailyHistory.reduce((sum, h) => sum + (Number(h.profit) || 0), 0);
+    const isTodayRecorded = dailyHistory.some(h => h.date === bkkTodayStr);
+    const todayPnlToAdd = isTodayRecorded ? 0 : (Number(portStatus?.today_pnl) || 0);
+
+    const computedCumulativeBalance = 100000 + historyProfitSum + todayPnlToAdd;
+    let currentBalance = Number(challengeView?.current_balance || computedCumulativeBalance) || 100000;
 
     // 1:1 Replication with Master Port
+    const scaleFactor = 1.0;
     const proportionalRatio = 1.0;
     const masterBalance = Number(portStatus?.balance) || 100000;
 
@@ -98,7 +109,7 @@ export default async function DemoFarmPage() {
         raw_lot_size: Number(order.raw_lot_size) * proportionalRatio
     }));
 
-    // Scale port status (1:1 except balance starting at 100,000 USC)
+    // Scale port status (1:1 except balance starting at 100,000 USC + cumulative profits)
     const floatingPnl = Number(portStatus?.floating_pnl || 0) * proportionalRatio;
     const scaledPortStatus = portStatus ? {
         ...portStatus,
