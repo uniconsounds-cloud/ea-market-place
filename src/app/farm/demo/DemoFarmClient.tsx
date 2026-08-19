@@ -569,8 +569,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 .from('farm_daily_history')
                 .select('*')
                 .eq('port_number', portNumber)
-                .order('date', { ascending: false })
-                .limit(60);
+                .order('date', { ascending: false });
 
             if (data) {
                 setHistory(data.reverse());
@@ -589,7 +588,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     }, [portNumber, isTabVisible, isIdle]);
 
     const liveUserBalance = useMemo(() => {
-        if (!challengeStartDate) return 100000;
+        if (!challengeStartDate) return demoBalance || 100000;
         
         const startD = new Date(challengeStartDate);
         const startStr = startD.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -614,8 +613,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             }
         }
         
-        return 100000 + sumProfit;
-    }, [history, challengeStartDate, portStatus?.today_pnl]);
+        const computed = 100000 + sumProfit;
+        return (computed > 100000 || history.length > 0) ? computed : (demoBalance || computed);
+    }, [history, challengeStartDate, portStatus?.today_pnl, demoBalance]);
 
     const stats = useMemo(() => {
         // If EA is sending data to farm_port_status, use that directly
