@@ -762,18 +762,57 @@ export default function FarmClient({
             filteredData = filteredData.filter(item => item.date >= licenseCreatedDateStr);
         }
 
-        // Filter out weekends (Saturday and Sunday) ONLY if they have 0 profit
-        filteredData = filteredData.filter(item => {
-            const localDate = new Date(item.date + 'T00:00:00');
-            const day = localDate.getDay(); // 0 is Sunday, 6 is Saturday
-            const isWeekend = (day === 0 || day === 6);
-            if (isWeekend && Math.abs(Number(item.profit)) < 0.01) {
-                return false;
-            }
-            return true;
-        });
+        // Sort ascending by date
+        const sorted = [...filteredData].sort((a, b) => a.date.localeCompare(b.date));
+
+        // --- AUTOMATIC MISSING-DAY CHECKER & GAP FILLER ---
+        const historyMap = new Map(sorted.map(item => [item.date.split('T')[0], item]));
         
+        const filledList: any[] = [];
+        if (sorted.length > 0) {
+            const firstDateStr = sorted[0].date.split('T')[0];
+            const startDate = new Date(firstDateStr + 'T00:00:00');
+
+            const bkkDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const yesterdayDate = new Date(bkkDateStr + 'T00:00:00');
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+
+            const curr = new Date(startDate);
+            while (curr <= yesterdayDate) {
+                const yyyy = curr.getFullYear();
+                const mm = String(curr.getMonth() + 1).padStart(2, '0');
+                const dd = String(curr.getDate()).padStart(2, '0');
+                const dateStr = `${yyyy}-${mm}-${dd}`;
+                
+                const dayOfWeek = curr.getDay(); // 0: Sun, 6: Sat
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+                if (historyMap.has(dateStr)) {
+                    const item = historyMap.get(dateStr)!;
+                    if (isWeekend && Math.abs(Number(item.profit)) < 0.01) {
+                        // skip zero-profit weekend
+                    } else {
+                        filledList.push(item);
+                    }
+                } else if (!isWeekend) {
+                    // MISSING WEEKDAY DETECTED! (e.g. Aug 17)
+                    // Auto-fill missing weekday with 0 profit record
+                    filledList.push({
+                        id: `missing_${dateStr}`,
+                        date: dateStr,
+                        profit: 0,
+                        isAutoFilled: true
+                    });
+                }
+
+                curr.setDate(curr.getDate() + 1);
+            }
+        } else {
+            filledList.push(...sorted);
+        }
+
         const accountType = portStatus?.account_type || 'USC';
+        const isUSC = accountType.toUpperCase().trim() === 'USC' || accountType.toUpperCase().trim() === 'CENT';
 
         const MARKET_HOLIDAYS: Record<string, string> = {
             '12-25': 'Christmas Day',
@@ -782,10 +821,9 @@ export default function FarmClient({
             '2027-03-26': 'Good Friday'
         };
 
-        return filteredData.map(item => {
-            const pnl = Number(item.profit);
-            const isUSD = accountType.toUpperCase().trim() === 'USD' || accountType.toUpperCase().trim() === 'STANDARD';
-            const cents = isUSD ? pnl * 100 : pnl;
+        return filledList.map((item, idx) => {
+            const pnl = Number(item.profit || 0);
+            const cents = isUSC ? pnl : pnl * 100;
             
             let asset = '/farm/base_farmbox_empty.png';
             if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
@@ -800,13 +838,27 @@ export default function FarmClient({
 
             // Re-parse the date string into a localized Thailand date for display
             const localDate = new Date(item.date + 'T00:00:00');
+            const dayOfWeek = localDate.getDay();
+            
+            // Week boundary detection (End of trading week / Friday / Gap before next item)
+            let isEndOfWeek = dayOfWeek === 5;
+            if (idx < filledList.length - 1) {
+                const nextDate = new Date(filledList[idx + 1].date + 'T00:00:00');
+                const diffDays = Math.round((nextDate.getTime() - localDate.getTime()) / (1000 * 3600 * 24));
+                if (diffDays > 2 || nextDate.getDay() < dayOfWeek) {
+                    isEndOfWeek = true;
+                }
+            }
+
             return {
                 id: item.id,
+                dateStr: item.date,
                 date: localDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
                 pnl,
                 asset,
                 isHoliday,
-                holidayName
+                holidayName,
+                isEndOfWeek
             };
         });
     }, [history, brokerDateStr, licenseCreatedDateStr, portStatus?.account_type]);
@@ -1032,6 +1084,42 @@ export default function FarmClient({
                                         </div>
                                     )}
 
+                                    {/* Floating Drawdown Badge on Withered Trees */}
+                                    {(() => {
+                                        const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
+                                        const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
+                                        const hasDrawdown = stats.floatingPnl < 0 || stats.maxDrawdown > 0 || plot.trees.some(t => t.level < 4);
+                                        if (i === targetIdx && hasDrawdown && isClient) {
+                                            const bal = stats.balance || 1;
+                                            const ddPct = Math.abs((stats.floatingPnl / bal) * 100);
+                                            const maxDdPct = stats.maxDrawdown || 0;
+                                            const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
+                                            
+                                            return (
+                                                <div className="absolute top-[30px] left-[20%] -translate-x-1/2 z-[80] flex flex-col items-center animate-fade-in pointer-events-none">
+                                                    <div className="bg-[#1f0909]/95 border border-red-500/80 rounded-md px-2.5 py-1.5 shadow-[0_0_25px_rgba(239,68,68,0.5)] text-center backdrop-blur-md">
+                                                        <div className="flex items-center justify-center gap-1 text-red-400 font-black text-[10px] sm:text-xs tracking-wider">
+                                                            <span>🥀 DRAWDOWN</span>
+                                                        </div>
+                                                        <div className="text-red-400 font-mono font-black text-xs sm:text-sm whitespace-nowrap">
+                                                            {isUSC ? '' : '$'}{stats.floatingPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            <span className="text-[10px] ml-1 text-red-300">
+                                                                ({stats.floatingPnl < 0 ? '-' : ''}{ddPct.toFixed(2)}%)
+                                                            </span>
+                                                        </div>
+                                                        {maxDdPct > 0 && (
+                                                            <div className="text-[9px] text-red-300/80 font-mono font-bold mt-0.5">
+                                                                MAX DD: {maxDdPct.toFixed(2)}%
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="w-0.5 h-6 bg-gradient-to-b from-red-500/80 to-transparent"></div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+
                                     {i === 24 && (
                                         <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
@@ -1059,7 +1147,7 @@ export default function FarmClient({
                     {/* Desktop header row */}
                     <div className="hidden sm:flex justify-between px-6 pt-2 mb-1">
                         <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
-                            Daily Harvest History (30D)
+                            Daily Harvest History ({dailyHistory.length}D)
                         </span>
                         <button 
                             onClick={() => {
@@ -1078,23 +1166,33 @@ export default function FarmClient({
                         ref={historyScrollRef}
                         className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar"
                     >
-                        {dailyHistory.map((item) => (
-                            <div key={item.id} className="flex-shrink-0 flex flex-col items-center group">
-                                <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
-                                    <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
+                        {dailyHistory.map((item, idx) => (
+                            <div key={item.id || idx} className="flex items-center flex-shrink-0">
+                                <div className="flex flex-col items-center group relative">
+                                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
+                                        <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
+                                        {item.isHoliday ? (
+                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>
+                                                CLOSED
+                                            </span>
+                                        ) : (
+                                            <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                                {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-center">
-                                    <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
-                                    {item.isHoliday ? (
-                                        <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>
-                                            CLOSED
-                                        </span>
-                                    ) : (
-                                        <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                            {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
-                                        </span>
-                                    )}
-                                </div>
+
+                                {/* Subtle Vertical Week Divider Line */}
+                                {item.isEndOfWeek && idx < dailyHistory.length - 1 && (
+                                    <div className="flex flex-col items-center justify-center mx-2 sm:mx-3 h-16 sm:h-20 self-start">
+                                        <div className="w-[1px] h-full bg-gradient-to-b from-amber-500/0 via-amber-500/40 to-amber-500/0"></div>
+                                        <span className="text-[7px] font-mono text-amber-400/40 font-bold uppercase tracking-widest mt-1 whitespace-nowrap">WEEK</span>
+                                    </div>
+                                )}
                             </div>
                         ))}
 
