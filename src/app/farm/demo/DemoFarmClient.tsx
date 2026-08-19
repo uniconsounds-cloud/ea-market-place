@@ -1083,36 +1083,38 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                         </div>
                                     )}
 
-                                    {/* Floating Drawdown Badge on Withered Trees */}
+                                    {/* Floating Drawdown Badge on Withered Trees (~2x Larger & Unified Math) */}
                                     {(() => {
                                         const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
                                         const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
                                         const hasDrawdown = stats.floatingPnl < 0 || stats.maxDrawdown > 0 || plot.trees.some(t => t.level < 4);
                                         if (i === targetIdx && hasDrawdown && isClient) {
                                             const bal = stats.balance || 1;
-                                            const ddPct = Math.abs((stats.floatingPnl / bal) * 100);
+                                            const floatingPnl = stats.floatingPnl;
+                                            const ddPct = (floatingPnl / bal) * 100;
                                             const maxDdPct = stats.maxDrawdown || 0;
                                             const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
                                             
                                             return (
-                                                <div className="absolute top-[30px] left-[20%] -translate-x-1/2 z-[80] flex flex-col items-center animate-fade-in pointer-events-none">
-                                                    <div className="bg-[#1f0909]/95 border border-red-500/80 rounded-md px-2.5 py-1.5 shadow-[0_0_25px_rgba(239,68,68,0.5)] text-center backdrop-blur-md">
-                                                        <div className="flex items-center justify-center gap-1 text-red-400 font-black text-[10px] sm:text-xs tracking-wider">
-                                                            <span>🥀 DRAWDOWN</span>
+                                                <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none">
+                                                    <div className="bg-[#1f0707]/95 border-2 border-red-500 rounded-xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-[0_0_35px_rgba(239,68,68,0.7)] text-center backdrop-blur-md">
+                                                        <div className="flex items-center justify-center gap-1.5 text-red-400 font-black text-xs sm:text-sm tracking-widest uppercase mb-0.5">
+                                                            <span className="text-base sm:text-lg animate-pulse">🥀</span>
+                                                            <span>DRAWDOWN</span>
                                                         </div>
-                                                        <div className="text-red-400 font-mono font-black text-xs sm:text-sm whitespace-nowrap">
-                                                            {isUSC ? '' : '$'}{stats.floatingPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                            <span className="text-[10px] ml-1 text-red-300">
-                                                                ({stats.floatingPnl < 0 ? '-' : ''}{ddPct.toFixed(2)}%)
+                                                        <div className="text-red-400 font-mono font-black text-sm sm:text-lg tracking-tight whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                                                            {floatingPnl >= 0 ? '+' : ''}{isUSC ? '' : '$'}{floatingPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            <span className="text-xs sm:text-sm ml-1.5 text-red-300 font-extrabold">
+                                                                ({ddPct.toFixed(2)}%)
                                                             </span>
                                                         </div>
                                                         {maxDdPct > 0 && (
-                                                            <div className="text-[9px] text-red-300/80 font-mono font-bold mt-0.5">
+                                                            <div className="text-[10px] sm:text-xs text-red-300/90 font-mono font-black tracking-wider mt-1 bg-red-950/60 rounded px-2 py-0.5 border border-red-800/40">
                                                                 MAX DD: {maxDdPct.toFixed(2)}%
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="w-0.5 h-6 bg-gradient-to-b from-red-500/80 to-transparent"></div>
+                                                    <div className="w-1 h-8 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
                                                 </div>
                                             );
                                         }
