@@ -1,0 +1,93 @@
+//+------------------------------------------------------------------+
+//|                                                  EAE_Monitor.mq5 |
+//|                                  Copyright 2024, eaeze.com (EAE_) |
+//|                                             https://www.eaeze.com |
+//|                                             update : 2026.08.20 (v1.15 0820) - [2026-08-20] Update version to v1.15 0820 and add Day-Change Staggered Auto History Sync  |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2024, eaeze.com (EAE_)"
+#property link      "https://www.eaeze.com"
+#property version   "1.15"
+#property strict
+
+// --- Include Core Licensing & Sync Library ---
+#define EAEZE_SYNC_ENABLED
+#include "../../Include/EAE_Licensing.mqh"
+
+input int      InpSyncSeconds = 20;             // Sync Interval (Seconds)
+input string   InpSystemCode  = "EAE_MONITOR";  // System Identifier (e.g. EASYM, EAE_MONITOR)
+input long     InpMagicBuy    = 0;              // Filter Buy Magic (0 = All)
+input long     InpMagicSell   = 0;              // Filter Sell Magic (0 = All)
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   Print("EAE Universal Monitor: Starting (Unified Library Mode).");
+   
+   // Collision prevention check
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   string gvName = "EAE_Universal_Active_" + IntegerToString(login);
+   if(GlobalVariableCheck(gvName))
+   {
+      Alert("EAE_Monitor: ตรวจพบ EASY_M Universal กำลังรันอยู่แล้วในบัญชีนี้! ปิดการทำงาน EAE_Monitor อัตโนมัติเพื่อป้องกันข้อมูลชนกัน");
+      return(INIT_FAILED);
+   }
+   
+   // Verify account status
+   if(!EaezeCheckLicense("EA-UNIMON-01"))
+   {
+      Print("EAE_SYSTEM: EA-UNIMON-01 license check failed.");
+      return(INIT_FAILED);
+   }
+   EaezeRemoveLicenseAlert();
+   
+   EventSetTimer(1);
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   EventKillTimer();
+   Comment(""); // Clear dashboard on exit
+   if(reason != REASON_INITFAILED)
+   {
+      EaezeRemoveLicenseAlert();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Timer function                                                   |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   // [EAE_SYSTEM] - Perform licensing checks and lightweight Sci-Fi sync
+   EaezeCheckLicenseAndSync("EA-UNIMON-01", InpSystemCode, "1.15", InpSyncSeconds, InpMagicBuy, InpMagicSell);
+   
+   // --- On-Chart Status Dashboard ---
+   string dash = "========================================\n";
+   dash += "       EAE UNIVERSAL MONITOR v1.15 0820\n";
+   dash += "========================================\n\n";
+   dash += " Account   : " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " (" + AccountInfoString(ACCOUNT_CURRENCY) + ")\n";
+   dash += " Balance   : " + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\n";
+   dash += " Equity    : " + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + "\n";
+   dash += " Magic Buy : " + IntegerToString(InpMagicBuy) + " (0 = All)\n";
+   dash += " Magic Sell: " + IntegerToString(InpMagicSell) + " (0 = All)\n\n";
+   dash += "----------------------------------------\n";
+   dash += " [ CLOUD TELEMETRY STATUS ]\n";
+   dash += " Mode      : Light Sync (Sci-Fi Dashboard)\n";
+   dash += " Status    : OK (ONLINE)\n";
+   dash += "========================================";
+   
+   Comment(dash);
+}
+
+//+------------------------------------------------------------------+
+//| OnTick function                                                  |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+}

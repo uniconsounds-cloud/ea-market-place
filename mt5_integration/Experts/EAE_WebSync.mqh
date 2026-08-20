@@ -627,55 +627,85 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
 }
 
 //+------------------------------------------------------------------+
-//| Self-Healing Boot Check: Call this in OnTimer                    |
+//+------------------------------------------------------------------+
+//| [2026-08-20] Self-Healing Boot & Day-Change Rollover Sync        |
+//| Staggered execution prevents cloud server request spikes.        |
 //+------------------------------------------------------------------+
 void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
 {
-   if(g_eae_history_checked) return;
-   
-   // --- Staggered anti-spike delay ---
-   static datetime boot_time = 0;
-   static int random_delay = -1;
-   if(boot_time == 0)
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   datetime now = TimeCurrent();
+   datetime current_day = (now / 86400) * 86400;
+
+   // Static trackers for rollover detection and staggered execution
+   static datetime last_synced_day = 0;
+   static datetime scheduled_sync_time = 0;
+   static bool boot_scheduled = false;
+
+   // 1. Initial Boot Check: Schedule with staggered delay
+   if(!boot_scheduled)
    {
-      boot_time = TimeCurrent();
-      MathSrand((uint)GetTickCount());
-      random_delay = MathRand() % 120; // 0 to 119 seconds randomized delay
-      Print("EAE WebSync: Boot detected. History sync scheduled in ", random_delay, " seconds to stagger server load.");
+      boot_scheduled = true;
+      MathSrand((uint)GetTickCount() + (uint)login);
+      int boot_delay = (int)(login % 120) + (MathRand() % 60);
+      scheduled_sync_time = now + boot_delay;
+      Print("EAE WebSync: [2026-08-20] Boot detected. Staggered history sync scheduled in ", boot_delay, "s.");
    }
-   
-   if(TimeCurrent() - boot_time < random_delay) return;
-   
-   // --- Self-healing gap calculation ---
-   string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   int days_to_sync = 7; // Always sync at least 7 days to self-heal recent history
-   
+
+   // 2. Day-Change Rollover Detection: When server time crosses into new day
+   if(last_synced_day == 0)
+   {
+      string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
+      if(GlobalVariableCheck(gv_last_history))
+      {
+         datetime saved_time = (datetime)GlobalVariableGet(gv_last_history);
+         last_synced_day = (saved_time / 86400) * 86400;
+      }
+   }
+
+   if(current_day > last_synced_day && scheduled_sync_time <= now)
+   {
+      // Schedule new day sync with staggered jitter (0-300s) to avoid cloud spike at midnight
+      MathSrand((uint)GetTickCount() + (uint)login);
+      int day_delay = (int)(login % 180) + (MathRand() % 120);
+      scheduled_sync_time = current_day + day_delay;
+      last_synced_day = current_day;
+      Print("EAE WebSync: [2026-08-20] Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
+   }
+
+   // 3. Check if scheduled time has arrived
+   if(scheduled_sync_time == 0 || now < scheduled_sync_time) return;
+
+   // Reset scheduled time so it executes once per trigger
+   scheduled_sync_time = 0;
+
+   // Calculate self-healing gap
+   int days_to_sync = 7; // Sync past 7 days to wrap up yesterday & heal missing records
+   string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
    if(GlobalVariableCheck(gv_last_history))
    {
       datetime last_sync = (datetime)GlobalVariableGet(gv_last_history);
-      datetime now = TimeCurrent();
       int diff_sec = (int)(now - last_sync);
-      
-      if(diff_sec > 0) {
+      if(diff_sec > 0)
+      {
          int gap_days = (diff_sec / 86400) + 1;
          if(gap_days > days_to_sync) days_to_sync = gap_days;
       }
    }
-   
-   if(days_to_sync > 30) days_to_sync = 30; // Cap at 30 days to limit server load
-   
-   Print("EAE WebSync: Performing self-healing history check for the last ", days_to_sync, " days...");
+   if(days_to_sync > 30) days_to_sync = 30; // Cap at 30 days to protect network
+
+   Print("EAE WebSync: [2026-08-20] Executing auto history sync for last ", days_to_sync, " days...");
    if(EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS))
    {
-      GlobalVariableSet(gv_last_history, (double)TimeCurrent());
-      Print("EAE WebSync: History check completed and synced successfully.");
+      GlobalVariableSet(gv_last_history, (double)now);
+      last_synced_day = current_day;
+      Print("EAE WebSync: [2026-08-20] Auto history sync completed successfully.");
    }
    else
    {
-      Print("EAE WebSync: History check failed. Will retry next time.");
+      Print("EAE WebSync: [2026-08-20] Auto history sync failed. Will retry in 60s.");
+      scheduled_sync_time = now + 60; // Retry in 60 seconds
    }
-   
-   g_eae_history_checked = true; // Only check once per EA Boot
 }
 
 //+------------------------------------------------------------------+

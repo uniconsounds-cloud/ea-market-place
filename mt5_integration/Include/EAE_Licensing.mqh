@@ -600,44 +600,85 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
    return false;
 }
 
-// --- Self-healing history sync check ---
+//+------------------------------------------------------------------+
+//| [2026-08-20] Self-Healing Boot & Day-Change Rollover Sync        |
+//| Staggered execution prevents cloud server request spikes.        |
+//+------------------------------------------------------------------+
 void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
 {
-   static bool local_history_checked = false;
-   if(local_history_checked) return;
-   
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   datetime now = TimeCurrent();
+   datetime current_day = (now / 86400) * 86400;
+
+   // Static trackers for rollover detection and staggered execution
+   static datetime last_synced_day = 0;
+   static datetime scheduled_sync_time = 0;
+   static bool boot_scheduled = false;
+
+   // 1. Initial Boot Check: Schedule with staggered delay
+   if(!boot_scheduled)
+   {
+      boot_scheduled = true;
+      MathSrand((uint)GetTickCount() + (uint)login);
+      int boot_delay = (int)(login % 120) + (MathRand() % 60);
+      scheduled_sync_time = now + boot_delay;
+      Print("EAEZE History Sync: [2026-08-20] Boot detected. Staggered history sync scheduled in ", boot_delay, "s.");
+   }
+
+   // 2. Day-Change Rollover Detection: When server time crosses into new day
+   if(last_synced_day == 0)
+   {
+      string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
+      if(GlobalVariableCheck(gv_last_history))
+      {
+         datetime saved_time = (datetime)GlobalVariableGet(gv_last_history);
+         last_synced_day = (saved_time / 86400) * 86400;
+      }
+   }
+
+   if(current_day > last_synced_day && scheduled_sync_time <= now)
+   {
+      // Schedule new day sync with staggered jitter (0-300s) to avoid cloud spike at midnight
+      MathSrand((uint)GetTickCount() + (uint)login);
+      int day_delay = (int)(login % 180) + (MathRand() % 120);
+      scheduled_sync_time = current_day + day_delay;
+      last_synced_day = current_day;
+      Print("EAEZE History Sync: [2026-08-20] Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
+   }
+
+   // 3. Check if scheduled time has arrived
+   if(scheduled_sync_time == 0 || now < scheduled_sync_time) return;
+
+   // Reset scheduled time so it executes once per trigger
+   scheduled_sync_time = 0;
+
+   // Calculate self-healing gap
+   int days_to_sync = 7; // Sync past 7 days to wrap up yesterday & heal missing records
    string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
-   int days_to_sync = 30; // Default: Sync last 30 days on new boot
-   
    if(GlobalVariableCheck(gv_last_history))
    {
       datetime last_sync = (datetime)GlobalVariableGet(gv_last_history);
-      datetime now = TimeCurrent();
       int diff_sec = (int)(now - last_sync);
-      
-      if(diff_sec > 0) {
-         days_to_sync = (diff_sec / 86400) + 1; // Round up
-      } else {
-         days_to_sync = 0;
+      if(diff_sec > 0)
+      {
+         int gap_days = (diff_sec / 86400) + 1;
+         if(gap_days > days_to_sync) days_to_sync = gap_days;
       }
    }
-   
-   if(days_to_sync > 0)
+   if(days_to_sync > 30) days_to_sync = 30; // Cap at 30 days to protect network
+
+   Print("EAEZE History Sync: [2026-08-20] Executing auto history sync for last ", days_to_sync, " days...");
+   if(EaezeWebSyncPushHistoryBatch(days_to_sync, magic_buy, magic_sell))
    {
-      if(days_to_sync > 30) days_to_sync = 30;
-      Print("EAEZE History Sync: Boot-up Self-Healing triggered. Checking missing days: ", days_to_sync);
-      if(EaezeWebSyncPushHistoryBatch(days_to_sync, magic_buy, magic_sell))
-      {
-         GlobalVariableSet(gv_last_history, (double)TimeCurrent());
-      }
+      GlobalVariableSet(gv_last_history, (double)now);
+      last_synced_day = current_day;
+      Print("EAEZE History Sync: [2026-08-20] Auto history sync completed successfully.");
    }
    else
    {
-      Print("EAEZE History Sync: History is up to date.");
+      Print("EAEZE History Sync: [2026-08-20] Auto history sync failed. Will retry in 60s.");
+      scheduled_sync_time = now + 60; // Retry in 60 seconds
    }
-   
-   local_history_checked = true;
 }
 
 // Helper to build an Order JSON list for the EAEZE Sync
