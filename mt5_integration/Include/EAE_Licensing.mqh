@@ -109,7 +109,8 @@ bool EaezeCheckLicense(string product_id, string api_key = "KHUCHAI_SUPHAKORN", 
     // 2. Prevent spamming the server if within retry cooldown
     if(!force_check && GlobalVariableCheck(attempt_var)) {
         datetime last_attempt = (datetime)GlobalVariableGet(attempt_var);
-        if((now - last_attempt) < EAE_RETRY_COOLDOWN) {
+        // Only throttle if within 10 seconds (instead of 120s) to allow easy retry on chart reload
+        if((now - last_attempt) < 10) {
             if(GlobalVariableCheck(status_var) && GlobalVariableCheck(checksum_var)) {
                 double cached_status = GlobalVariableGet(status_var);
                 double cached_checksum = GlobalVariableGet(checksum_var);
@@ -123,7 +124,7 @@ bool EaezeCheckLicense(string product_id, string api_key = "KHUCHAI_SUPHAKORN", 
                     return true;
                 }
             }
-            Print("EAEZE: WebRequest rate-limited. Failing check.");
+            Print("EAEZE: WebRequest rate-limited. Retrying in 10s.");
             return false;
         }
     }
@@ -144,15 +145,16 @@ bool EaezeCheckLicense(string product_id, string api_key = "KHUCHAI_SUPHAKORN", 
     string headers = "Content-Type: application/json\r\n" + "x-api-key: " + api_key + "\r\n";
     
     ResetLastError();
-    int res = WebRequest("POST", EAE_LICENSE_URL, headers, 2000, data, result, result_headers);
+    // [2026-08-23] Increased timeout to 10,000ms (10s) to handle VPS latency & cloud cold starts
+    int res = WebRequest("POST", EAE_LICENSE_URL, headers, 10000, data, result, result_headers);
     
     if(res == -1) {
         int last_error = GetLastError();
         Print("EAEZE: Connection Error. Code: ", last_error);
         
         if(last_error == 4060 || last_error == 4014) {
-            Print("EAEZE ERROR: Please enable 'Allow WebRequest' in Tools > Options > Expert Advisors");
-            ShowLicenseAlert("Please enable 'Allow WebRequest' in Tools > Options");
+            Print("EAEZE ERROR: Please ensure 'https://eaeze.com' is added to Allow WebRequest in Tools > Options > Expert Advisors");
+            ShowLicenseAlert("Please add https://eaeze.com to MT5 WebRequest Options");
             return false;
         }
         
@@ -818,7 +820,7 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
                     "Authorization: Bearer " + EAE_SYSTEM_KEY + "\r\n";
    
    ResetLastError();
-   int res = WebRequest("POST", EAE_SYNC_URL, headers, 2000, data, result, result_headers);
+   int res = WebRequest("POST", EAE_SYNC_URL, headers, 10000, data, result, result_headers);
    
    if(res == -1) {
       int err = GetLastError();
