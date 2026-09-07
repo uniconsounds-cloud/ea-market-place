@@ -8,17 +8,19 @@
 ============== 4 Steps to Integrate Licensing in EA (.mq5) ==============
 
    [1] At Top of EA (.mq5) - Above any include:
+         //----------- Copy ตั้งแต่ตรงนี้ --------------
          #define EA_PRODUCT_ID "YOUR_PRODUCT_KEY"  // e.g. "EASYGOLDTP"
          #include <EAEZE_Licensing.mqh>
+         //----------- จนถึงตรงนี้ ----------------
 
    [2] In OnInit():
          int OnInit() {
-             //--- EAEZE License Check ---
+             //----------- Copy ตั้งแต่ตรงนี้ --------------
              if(!CheckEaezeLicense()) {
                  return(INIT_FAILED);
              }
              RemoveLicenseAlert();
-             //---------------------------
+             //----------- จนถึงตรงนี้ ----------------
              
              //... EA Init code ...
              return(INIT_SUCCEEDED);
@@ -26,20 +28,20 @@
 
    [3] In OnTick():
          void OnTick() {
-             //--- EAEZE Periodic Cache Check (Non-blocking) ---
+             //----------- Copy ตั้งแต่ตรงนี้ --------------
              CheckEaezeLicensePeriodic();
-             //-------------------------------------------------
+             //----------- จนถึงตรงนี้ ----------------
 
              //... EA Tick code ...
          }
 
    [4] In OnDeinit():
          void OnDeinit(const int reason) {
-             //--- EAEZE Cleanup ---
+             //----------- Copy ตั้งแต่ตรงนี้ --------------
              if(reason != REASON_INITFAILED) {
                  RemoveLicenseAlert();
              }
-             //---------------------
+             //----------- จนถึงตรงนี้ ----------------
 
              //... EA Deinit code ...
          }
