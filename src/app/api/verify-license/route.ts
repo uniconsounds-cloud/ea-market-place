@@ -48,11 +48,24 @@ export async function POST(req: Request) {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product_id);
 
         if (!isUUID) {
-            const { data: product } = await supabase
+            let { data: product } = await supabase
                 .from('products')
-                .select('id, min_balance, currency')
+                .select('id, min_balance, currency, product_key, name')
                 .eq('product_key', product_id)
-                .single();
+                .maybeSingle();
+
+            if (!product) {
+                const cleanId = product_id.replace(/[-_\s]/g, '').toLowerCase();
+                const { data: allProds } = await supabase
+                    .from('products')
+                    .select('id, min_balance, currency, product_key, name');
+                if (allProds) {
+                    product = allProds.find(p => 
+                        (p.product_key && p.product_key.replace(/[-_\s]/g, '').toLowerCase() === cleanId) ||
+                        (p.name && p.name.replace(/[-_\s]/g, '').toLowerCase() === cleanId)
+                    ) || null;
+                }
+            }
 
             if (product) {
                 targetProductUUID = product.id;

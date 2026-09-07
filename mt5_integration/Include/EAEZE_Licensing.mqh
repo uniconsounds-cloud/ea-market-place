@@ -5,35 +5,43 @@
 //|                                             update : 21 May 2026  |
 //+------------------------------------------------------------------+
 /*
-============== Doing 5 Steps to Make EA Product Complete ==============
-   [1] on this code : Change Product ID
-   [2] on EA Product : insert Code at Top line
+============== 4 Steps to Integrate Licensing in EA (.mq5) ==============
+
+   [1] At Top of EA (.mq5) - Above any include:
+         #define EA_PRODUCT_ID "YOUR_PRODUCT_KEY"  // e.g. "EASYGOLDTP"
          #include <EAEZE_Licensing.mqh>
-   [3] on EA Product : insert Code at > Oninit <
+
+   [2] In OnInit():
          int OnInit() {
-             //----------- Copy Start Here --------------
+             //--- EAEZE License Check ---
              if(!CheckEaezeLicense()) {
                  return(INIT_FAILED);
              }
              RemoveLicenseAlert();
-             //----------- Copy End Here ----------------
-             //.......................    already Code
-             return(INIT_SUCCEEDED);   // at the end. if none.
-          }      
-   [4] void OnTick() {
-             //--- Check cached license (non-blocking) ---
-             CheckEaezeLicensePeriodic(); 
-             //... already EA code ...
-             }
-         
-   [5] on EA Product : insert Code at > OnDeinit <
+             //---------------------------
+             
+             //... EA Init code ...
+             return(INIT_SUCCEEDED);
+         }
+
+   [3] In OnTick():
+         void OnTick() {
+             //--- EAEZE Periodic Cache Check (Non-blocking) ---
+             CheckEaezeLicensePeriodic();
+             //-------------------------------------------------
+
+             //... EA Tick code ...
+         }
+
+   [4] In OnDeinit():
          void OnDeinit(const int reason) {
-             //----------- Copy Start Here --------------
+             //--- EAEZE Cleanup ---
              if(reason != REASON_INITFAILED) {
                  RemoveLicenseAlert();
              }
-             //----------- Copy End Here ----------------
-             //.......................    already Code
+             //---------------------
+
+             //... EA Deinit code ...
          }
 */
 
@@ -115,8 +123,8 @@ bool CheckEaezeLicense(bool force_check = false) {
     string headers = "Content-Type: application/json\r\n" + "x-api-key: " + InpApiKey + "\r\n";
     
     ResetLastError();
-    // Timeout set to 2000ms (2s) to prevent locking up tick processing thread
-    int res = WebRequest("POST", InpLicenseUrl, headers, 2000, data, result, result_headers);
+    // Timeout set to 10000ms (10s) to handle cloud cold starts and network latency
+    int res = WebRequest("POST", InpLicenseUrl, headers, 10000, data, result, result_headers);
     
     // Check if WebRequest is NOT allowed (Error 4060/4014) or failed
     if(res == -1) {
