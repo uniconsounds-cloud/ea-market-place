@@ -14,6 +14,39 @@ function seededRandom(seed: number) {
     return x - Math.floor(x);
 }
 
+/**
+ * Calculates the effective market trading date (Forex broker market day).
+ * Market day begins at 05:00 AM Thailand time (Asia/Bangkok).
+ * Before 05:00 AM (00:00:00 - 04:59:59), it retains the previous day's date.
+ */
+function getMarketTradingDate(date: Date): Date {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const partMap: Record<string, string> = {};
+    for (const p of parts) {
+        partMap[p.type] = p.value;
+    }
+    const year = parseInt(partMap.year, 10);
+    const month = parseInt(partMap.month, 10) - 1;
+    const day = parseInt(partMap.day, 10);
+    const hour = parseInt(partMap.hour, 10);
+
+    const bkkDate = new Date(year, month, day);
+    if (hour < 5) {
+        bkkDate.setDate(bkkDate.getDate() - 1);
+    }
+    return bkkDate;
+}
+
 // ==========================================
 // 🛠️ CONFIGURABLE VARIABLES (สำหรับปรับจูนระยะ)
 // ==========================================
@@ -747,8 +780,12 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
     const brokerDateStr = useMemo(() => {
         const d = stats.serverTime;
-        // Use Thailand time as the constant reference for the dashboard
-        return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // 'en-CA' gives YYYY-MM-DD
+        // Use Thailand market trading date as the constant reference for the dashboard (rolls over at 05:00 AM Bangkok)
+        const mDate = getMarketTradingDate(d);
+        const yyyy = mDate.getFullYear();
+        const mm = String(mDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(mDate.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
     }, [stats.serverTime]);
 
     const dailyHistory = useMemo(() => {
@@ -1105,27 +1142,27 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                             const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
                                             const currPrefix = isUSC ? '' : '$';
                                             const currSuffix = isUSC ? ' USC' : '';
-                                            const badgeCounterScale = (scale > 0 && scale < 0.85) ? (0.85 / scale) : 1;
+                                            const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
                                             
                                             return (
                                                 <div 
-                                                    className="absolute -top-16 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
+                                                    className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
                                                     style={{
                                                         transform: `translateX(-50%) scale(${badgeCounterScale})`,
                                                         transformOrigin: 'bottom center'
                                                     }}
                                                 >
-                                                    <div className="bg-[#1a0505]/95 border-2 border-red-500/90 rounded-xl px-3.5 py-1.5 sm:px-5 sm:py-2.5 shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center min-w-[90px]">
-                                                        {/* Line 1: Big Percentage */}
-                                                        <div className="text-sm sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                    <div className="bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center">
+                                                        {/* Line 1: Percentage (compact on mobile to match right corner DD) */}
+                                                        <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
                                                             -{stats.drawdownPercent.toFixed(2)}%
                                                         </div>
-                                                        {/* Line 2: DD Amount (same scale as top-right DD) */}
-                                                        <div className="text-[9px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
+                                                        {/* Line 2: DD Amount */}
+                                                        <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
                                                             -{currPrefix}{stats.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{currSuffix}
                                                         </div>
                                                     </div>
-                                                    <div className="w-1 h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
+                                                    <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
                                                 </div>
                                             );
                                         }
@@ -1136,11 +1173,10 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                         <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
                                                 <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
-                                                    {isClient ? stats.serverTime.toLocaleDateString('en-GB', { 
+                                                    {isClient ? getMarketTradingDate(stats.serverTime).toLocaleDateString('en-GB', { 
                                                         day: 'numeric', 
                                                         month: 'short', 
-                                                        year: 'numeric',
-                                                        timeZone: 'Asia/Bangkok'
+                                                        year: 'numeric'
                                                     }).toUpperCase() : '...'}
                                                 </h2>
                                             </div>
