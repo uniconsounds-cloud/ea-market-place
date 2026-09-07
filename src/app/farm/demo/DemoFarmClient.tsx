@@ -622,10 +622,15 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         if (portStatus?.floating_pnl !== undefined) {
             const currentBalanceValue = liveUserBalance;
             const currentEquityValue = liveUserBalance + Number(portStatus.floating_pnl);
+            const floatingPnl = Number(portStatus.floating_pnl);
+            const drawdownAmt = floatingPnl < 0 ? Math.abs(floatingPnl) : 0;
+            const drawdownPct = currentBalanceValue > 0 ? (drawdownAmt / currentBalanceValue) * 100 : 0;
             
             return {
                 openOrdersCount: orders.length,
-                floatingPnl: Number(portStatus.floating_pnl),
+                floatingPnl,
+                drawdownAmount: drawdownAmt,
+                drawdownPercent: drawdownPct,
                 totalLots: Number(portStatus.total_lots),
                 buyCount: Number(portStatus.buy_count),
                 sellCount: Number(portStatus.sell_count),
@@ -659,10 +664,14 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         const currentBalanceValue = liveUserBalance;
         const currentEquityValue = liveUserBalance + floatingPnl;
         const maxDrawdownValue = Math.max(0, Math.floor(((currentBalanceValue - currentEquityValue) / currentBalanceValue) * 100));
+        const drawdownAmt = floatingPnl < 0 ? Math.abs(floatingPnl) : 0;
+        const drawdownPct = currentBalanceValue > 0 ? (drawdownAmt / currentBalanceValue) * 100 : 0;
 
         return {
             openOrdersCount: openOrders.length,
             floatingPnl,
+            drawdownAmount: drawdownAmt,
+            drawdownPercent: drawdownPct,
             totalLots,
             buyCount: buyOrders.length,
             sellCount: sellOrders.length,
@@ -975,6 +984,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     todayProfit={smoothedTodayProfit}
                     todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                     dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
+                    drawdownPercent={stats.drawdownPercent}
+                    drawdownAmount={stats.drawdownAmount}
                     assetType={assetType}
                     isShaking={isShaking}
                     systemCode={portStatus?.system_code}
@@ -1020,6 +1031,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 accountType={portStatus?.account_type || 'USC'}
                 todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
+                drawdownPercent={stats.drawdownPercent}
+                drawdownAmount={stats.drawdownAmount}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
                 customName={currentCustomName}
@@ -1087,23 +1100,29 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     {(() => {
                                         const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
                                         const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
-                                        const hasDrawdown = stats.floatingPnl < 0 || stats.maxDrawdown > 0 || plot.trees.some(t => t.level < 4);
+                                        const hasDrawdown = stats.drawdownPercent > 0 || stats.floatingPnl < 0;
                                         if (i === targetIdx && hasDrawdown && isClient) {
-                                            const bal = stats.balance || 1;
-                                            const floatingPnl = stats.floatingPnl;
-                                            const ddPct = (floatingPnl / bal) * 100;
                                             const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
+                                            const currPrefix = isUSC ? '' : '$';
+                                            const currSuffix = isUSC ? ' USC' : '';
+                                            const badgeCounterScale = (scale > 0 && scale < 0.85) ? (0.85 / scale) : 1;
                                             
                                             return (
-                                                <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none">
-                                                    <div className="bg-[#1a0505]/95 border-2 border-red-500/90 rounded-xl px-4 py-2 sm:px-5 sm:py-2.5 shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center">
+                                                <div 
+                                                    className="absolute -top-16 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
+                                                    style={{
+                                                        transform: `translateX(-50%) scale(${badgeCounterScale})`,
+                                                        transformOrigin: 'bottom center'
+                                                    }}
+                                                >
+                                                    <div className="bg-[#1a0505]/95 border-2 border-red-500/90 rounded-xl px-3.5 py-1.5 sm:px-5 sm:py-2.5 shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center min-w-[90px]">
                                                         {/* Line 1: Big Percentage */}
-                                                        <div className="text-base sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
-                                                            {floatingPnl < 0 ? '' : '+'}{ddPct.toFixed(2)}%
+                                                        <div className="text-sm sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                            -{stats.drawdownPercent.toFixed(2)}%
                                                         </div>
                                                         {/* Line 2: DD Amount (same scale as top-right DD) */}
-                                                        <div className="text-[10px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
-                                                            {floatingPnl >= 0 ? '+' : ''}{isUSC ? '' : '$'}{floatingPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        <div className="text-[9px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
+                                                            -{currPrefix}{stats.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{currSuffix}
                                                         </div>
                                                     </div>
                                                     <div className="w-1 h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
