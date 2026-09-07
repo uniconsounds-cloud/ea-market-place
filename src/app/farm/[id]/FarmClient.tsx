@@ -781,14 +781,13 @@ export default function FarmClient({
     }, [portNumber, isTabVisible, isIdle]);
 
     const brokerDateStr = useMemo(() => {
-        const d = stats.serverTime;
         // Use Thailand market trading date as the constant reference for the dashboard (rolls over at 05:00 AM Bangkok)
-        const mDate = getMarketTradingDate(d);
+        const mDate = getMarketTradingDate(time || new Date());
         const yyyy = mDate.getFullYear();
         const mm = String(mDate.getMonth() + 1).padStart(2, '0');
         const dd = String(mDate.getDate()).padStart(2, '0');
         return `${yyyy}-${mm}-${dd}`;
-    }, [stats.serverTime]);
+    }, [time]);
 
     const licenseCreatedDateStr = useMemo(() => {
         if (!licenseCreatedAt) return null;
@@ -1178,7 +1177,7 @@ export default function FarmClient({
                                         <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
                                                 <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
-                                                    {isClient ? getMarketTradingDate(stats.serverTime).toLocaleDateString('en-GB', { 
+                                                    {isClient ? getMarketTradingDate(time || new Date()).toLocaleDateString('en-GB', { 
                                                         day: 'numeric', 
                                                         month: 'short', 
                                                         year: 'numeric'
