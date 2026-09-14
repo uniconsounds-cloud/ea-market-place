@@ -44,4 +44,5 @@ next-env.d.ts
 scratch/
 *.mjs
 *.bak
+*.ex5
 

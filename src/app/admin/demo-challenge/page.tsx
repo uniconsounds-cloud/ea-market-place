@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Copy, Users, TrendingUp, ShieldCheck, AlertCircle, MessageSquare, Trash2, Trophy, Filter, Download } from 'lucide-react';
+import { Copy, Users, TrendingUp, ShieldCheck, AlertCircle, MessageSquare, Trash2, Trophy, Filter, Download, ShieldAlert } from 'lucide-react';
 
 interface DemoUser {
     id: string;
@@ -22,11 +23,13 @@ interface DemoUser {
 export default function DemoChallengeAdminPage() {
     const [users, setUsers] = useState<DemoUser[]>([]);
     const [loading, setLoading] = useState(true);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
     const [adminId, setAdminId] = useState<string | null>(null);
     const [originUrl, setOriginUrl] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('');
     const [demoMasterPort, setDemoMasterPort] = useState('');
     const [savingBroadcast, setSavingBroadcast] = useState(false);
+    const router = useRouter();
     
     // Leaderboard states
     const [activeTab, setActiveTab] = useState<'team' | 'leaderboard'>('team');
@@ -42,7 +45,16 @@ export default function DemoChallengeAdminPage() {
         try {
             setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) {
+                router.push('/login');
+                return;
+            }
+            
+            setUserEmail(user.email || null);
+            if (user.email !== 'juntarasate@gmail.com') {
+                setLoading(false);
+                return;
+            }
             
             setAdminId(user.id);
 
@@ -162,6 +174,27 @@ export default function DemoChallengeAdminPage() {
             console.error(err);
         }
     };
+
+    if (!loading && userEmail !== 'juntarasate@gmail.com') {
+        return (
+            <div className="flex h-[70vh] items-center justify-center p-4">
+                <Card className="max-w-md w-full border-red-500/20 bg-red-950/10 text-center">
+                    <CardHeader>
+                        <ShieldAlert className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                        <CardTitle className="text-xl text-red-500">สิทธิ์การเข้าถึงถูกจำกัด</CardTitle>
+                        <CardDescription>
+                            หน้านี้อนุญาตให้เฉพาะผู้ดูแลระบบหลัก (juntarasate@gmail.com) เข้าใช้งานเท่านั้น
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button variant="outline" onClick={() => router.push('/admin')}>
+                            กลับสู่หน้า Admin
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

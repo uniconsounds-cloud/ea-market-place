@@ -5,12 +5,62 @@
 ---
 
 ## 📌 สารบัญเวอร์ชัน (Version Index)
+- [🚀 แผนการปรับปรุงในเวอร์ชันถัดไป (Upcoming Roadmap - v1.17)](#-แผนการปรับปรุงในเวอร์ชันถัดไป-upcoming-roadmap---v117) : สวิตช์เปิด-ปิด 20 คู่เงิน, คัดกรองคู่เงิน Drawdown สูง, ปรับปรุงการแก้ไม้
 - [v1.16 (0904) - 2026-09-04](#v116-0904---2026-09-04) : ปรับปรุงระบบปิดทำกำไร (Continuous Basket Exit & Trade Filling)
 - [v1.15 (0820) - 2026-08-20](#v115-0820---2026-08-20) : ซิงค์ประวัติรายวันอัตโนมัติเมื่อขึ้นวันใหม่ (Anti-Spike History Sync)
 - [v1.14 (0810) - 2026-08-10](#v114-0810---2026-08-10) : ระบบ Staggered Boot Delay & Auto Self-Healing 7 วัน
 - [v1.13 (0609) - 2026-06-09](#v113-0609---2026-06-09) : จัดการ WebRequest Warning และเพิ่มความเสถียรของ Licensing Grace Period
 - [v1.12.8.L2 (0526 / 0530) - 2026-05-30](#v1128l2-0526--0530---2026-05-30) : Universal Dynamic Suffix & Auto Filling Mode
 - [v1.0 (0123 / 0304) - 2026-03-04](#v10-0123--0304---2026-03-04) : Multi-Symbol MVP (10 Correlation Pairs = 20 Symbols) & Portfolio Safety
+
+---
+
+## 🚀 แผนการปรับปรุงในเวอร์ชันถัดไป (Upcoming Roadmap - v1.17)
+> **สถานะ**: จัดทำแบบพิมพ์เขียว (Blueprint) และเก็บสถิติเรียบร้อยแล้ว — **พร้อมดำเนินการโค้ดทันทีเมื่อสั่งเริ่มงาน**  
+> **เอกสารสถิติอ้างอิง**: ดูรายละเอียดการคำนวณ Drawdown ทั้ง 20 คู่เงินได้ที่ [EASY_M_DRAWDOWN_ANALYSIS.md](file:///Users/suphakorn/EA%20Market%20Place/ea-market-place/mt5_integration/EASY_M_DRAWDOWN_ANALYSIS.md)
+
+### 📌 หัวข้อที่ 1: ระบบสวิตช์เปิด-ปิดคู่เงินอิสระ (Symbol On/Off Switches)
+* **เป้าหมาย**: ให้ผู้ใช้งานและ Admin สามารถเลือกเปิดหรือปิดคู่เงินแต่ละตัวได้เองจากหน้าต่าง Inputs ของ EA โดยไม่ต้องแก้ไขโค้ด
+* **พิมพ์เขียวการทำงาน (Logic Blueprint)**:
+  1. เพิ่ม Input Parameters แบบ `bool` ครบทั้ง 20 คู่เงิน:
+     ```mql5
+     input group "==== 🌐 SYMBOL ACTIVATION SWITCHES (เปิด-ปิดรายคู่เงิน) ===="
+     input bool InpEnable_EURUSD = true;  // EURUSD (Active)
+     input bool InpEnable_GBPUSD = true;  // GBPUSD (Active)
+     input bool InpEnable_USDJPY = true;  // USDJPY (Active)
+     input bool InpEnable_USDCHF = true;  // USDCHF (Active)
+     input bool InpEnable_EURJPY = true;  // EURJPY (High Profit/High Risk)
+     input bool InpEnable_GBPJPY = true;  // GBPJPY (High Profit/High Risk)
+     input bool InpEnable_AUDCAD = false; // AUDCAD (Default OFF: High DD Drag)
+     input bool InpEnable_EURCHF = false; // EURCHF (Default OFF: 100% Hold Drag)
+     input bool InpEnable_GBPCHF = false; // GBPCHF (Default OFF: Low Profit)
+     // ... ครบทั้ง 20 คู่
+     ```
+  2. ใน `OnInit()`: นำค่า Input มากำหนดให้ `g_state[i].enabled`
+  3. **ระบบ Close-Only Graceful Shutdown**:
+     * หากสวิตช์เป็น `false` และ **ยังไม่มีไม้ค้าง**: บอทจะไม่ส่งคำสั่งเปิดไม้แรกเด็ดขาด
+     * หากสวิตช์เป็น `false` แต่ **มีไม้เดิมค้างอยู่แล้ว**: บอทยังคงดูแลแก้ไม้และรวบ TP ให้จนจบวัฏจักรนั้นอย่างปลอดภัย เมื่อปิดรอบเสร็จแล้วจะไม่เปิดรอบใหม่อีก
+
+---
+
+### 📌 หัวข้อที่ 2: การปรับคัดกรองคู่เงิน (Pair Replacement & Optimization)
+* **เป้าหมาย**: ตัด 3 คู่เงินที่เป็นตัวถ่วงพอร์ต (กำไรน้อยแต่ Drawdown สูง/ติดนาน) และนำ 3 คู่เงินที่มีคุณสมบัติ Mean-Reversion ดีกว่าเข้ามาทดแทน
+* **คู่เงินที่เสนอตัดออก**:
+  1. `AUDCAD` (ติดแก้ไม้บ่อยสุดในพอร์ต 61.5% - 100% แต่กำไรเพียง 968 USC)
+  2. `EURCHF` (ติดลากข้ามวัน 100% กราฟแคบดองเงินนาน 38 วัน แต่กำไรเพียง 1,081 USC)
+  3. `GBPCHF` (กำไรต่ำที่สุดในพอร์ต เพียง 332 USC)
+* **คู่เงินที่เสนอทดแทนให้ครบ 20 คู่**:
+  1. `AUDNZD` (คู่อันดับ 1 สำหรับระบบ Grid ทั่วโลก กราฟมีคุณสมบัติ Mean-Reversion สูงมาก แทบไม่มี Super Trend ทางเดียว)
+  2. `CADJPY` (เสริมทัพกลุ่ม JPY ที่สร้างกำไรหลักให้พอร์ต แต่ความผันผวนคุมง่ายกว่า GBPJPY)
+  3. `CADCHF` (สวิงในกรอบกว้างและชนรอบ TP ได้เร็วกว่า EURCHF)
+
+---
+
+### 📌 หัวข้อที่ 3: ระบบ Breakeven / Time-Based Bailout (ปลดล็อกไม้ดอง)
+* **เป้าหมาย**: แก้ปัญหาคู่เงินที่ติดลากข้ามเดือน (เช่น EURUSD 79 วัน, AUDUSD 67 วัน, EURJPY 84 วัน)
+* **ตรรกะการทำงาน**:
+  * หากรอบใดมีระยะเวลาถือครองเกินกว่าเกณฑ์ที่กำหนด (เช่น $> 21$ วัน หรือ $> 30$ วัน) ให้ระบบปรับลดเป้าหมายกำไร (`InpBasketTargetMoney`) ลงมาเป็น **Breakeven (เท่าทุน + ครอบคลุมค่า Swap/Commission)**
+  * เพื่อให้สามารถปิดรวบเคลียร์พอร์ตได้ทันทีเมื่อมีจังหวะย่อตัวเล็กน้อย คืน Margin ให้พอร์ตพร้อมรับรอบใหม่
 
 ---
 
