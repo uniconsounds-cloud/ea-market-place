@@ -227,7 +227,9 @@ export default function EasyMMasterDashboardPage() {
                     const customer = lic.user_id ? profileMap.get(lic.user_id) : null;
                     const adminInfo = getRootAdmin(lic.user_id);
                     const status = statusMap.get(accNum);
-
+                    const prodCurrency = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.currency || 'USC';
+                    const hasRealStatus = !!status && (Number(status.balance) > 0 || Number(status.equity) > 0 || status.last_ping != null || status.server_time != null);
+                    
                     // Start date & Active days
                     const startDateStr = portFirstDateMap.get(accNum) || lic.created_at || new Date().toISOString();
                     const startDt = new Date(startDateStr);
@@ -235,14 +237,19 @@ export default function EasyMMasterDashboardPage() {
                     const diffTime = Math.abs(now.getTime() - startDt.getTime());
                     const activeDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-                    // Check online: active ping within last 10 minutes
+                    // Check online: active ping within last 30 minutes
                     let isOnline = false;
-                    if (status?.last_ping) {
-                        const pingTime = new Date(status.last_ping).getTime();
-                        isOnline = (now.getTime() - pingTime) < 10 * 60 * 1000;
-                    } else if (status?.updated_at) {
-                        const updTime = new Date(status.updated_at).getTime();
-                        isOnline = (now.getTime() - updTime) < 10 * 60 * 1000;
+                    const pingTime = status?.last_ping ? new Date(status.last_ping).getTime() : 0;
+                    const updTime = (status?.updated_at && status?.last_ping) ? new Date(status.updated_at).getTime() : 0;
+                    const lastActive = Math.max(pingTime, updTime);
+                    if (lastActive > 0) {
+                        isOnline = (now.getTime() - lastActive) < 30 * 60 * 1000;
+                    }
+
+                    // Account type: prioritize product currency if status is empty shell or defaults to USD while product is USC
+                    let resolvedAccType = status?.account_type || prodCurrency;
+                    if (resolvedAccType === 'USD' && prodCurrency === 'USC' && (!status?.balance || status.balance === 0)) {
+                        resolvedAccType = 'USC';
                     }
 
                     const item: EasyMPortItem = {
@@ -266,7 +273,7 @@ export default function EasyMMasterDashboardPage() {
                         totalLots: status?.total_lots || 0,
                         buyCount: status?.buy_count || 0,
                         sellCount: status?.sell_count || 0,
-                        accountType: status?.account_type || 'USC',
+                        accountType: resolvedAccType,
                         isOnline,
                         lastPing: status?.last_ping || null,
                         updatedAt: status?.updated_at || null,
@@ -275,7 +282,7 @@ export default function EasyMMasterDashboardPage() {
                         eaVersion: status?.ea_version || status?.system_code || 'v1.16',
                         accumulatedProfit: portHistoryProfitMap.get(accNum) || 0,
                         isActive: lic.is_active !== false,
-                        hasTelemetry: !!status
+                        hasTelemetry: hasRealStatus
                     };
 
                     portItemsMap.set(accNum, item);

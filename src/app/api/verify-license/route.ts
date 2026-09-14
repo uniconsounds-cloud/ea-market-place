@@ -43,6 +43,7 @@ export async function POST(req: Request) {
 
         let targetProductUUID = product_id;
         let productMinBalance = 0;
+        let resolvedProduct: any = null;
 
         // If product_id is NOT a UUID (simple check), try to resolve it from product_key
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product_id);
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
             }
 
             if (product) {
+                resolvedProduct = product;
                 targetProductUUID = product.id;
                 productMinBalance = product.min_balance || 0;
                 // If it's a Cent account product, conversion to cents (1 USD = 100 USC)
@@ -81,10 +83,11 @@ export async function POST(req: Request) {
         } else {
             const { data: product } = await supabase
                 .from('products')
-                .select('min_balance, currency')
+                .select('id, min_balance, currency, product_key, name')
                 .eq('id', targetProductUUID)
                 .single();
             if (product) {
+                resolvedProduct = product;
                 productMinBalance = product.min_balance || 0;
                 // If it's a Cent account product, conversion to cents (1 USD = 100 USC)
                 if (product.currency === 'USC' && productMinBalance > 0) {
@@ -127,13 +130,54 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'invalid', message: 'License not found or inactive' }, { status: 200 });
         }
 
-        // 3. Check Minimum Balance requirement (Bypass for test account 97053088)
-        const isBypassBalance = ['97053088'].includes(account_number);
+        // 3. Telemetry Ingestion: Synchronize live port status to farm_port_status (Telemetry via License Ping)
+        if (balance !== undefined && !isNaN(Number(balance))) {
+            const numBal = Number(balance);
+            try {
+                const nowIso = new Date().toISOString();
+                const { data: existingStatus } = await supabase
+                    .from('farm_port_status')
+                    .select('port_number, equity, account_type')
+                    .eq('port_number', String(account_number))
+                    .maybeSingle();
+
+                if (existingStatus) {
+                    await supabase
+                        .from('farm_port_status')
+                        .update({
+                            balance: numBal,
+                            equity: (existingStatus.equity && Number(existingStatus.equity) > 0) ? existingStatus.equity : numBal,
+                            is_online: true,
+                            last_ping: nowIso,
+                            updated_at: nowIso
+                        })
+                        .eq('port_number', String(account_number));
+                } else {
+                    await supabase
+                        .from('farm_port_status')
+                        .insert({
+                            port_number: String(account_number),
+                            balance: numBal,
+                            equity: numBal,
+                            account_type: resolvedProduct?.currency || 'USC',
+                            ea_version: 'v1.16',
+                            is_online: true,
+                            last_ping: nowIso,
+                            updated_at: nowIso
+                        });
+                }
+            } catch (telemetryErr) {
+                console.error('License verification status telemetry update error:', telemetryErr);
+            }
+        }
+
+        // 4. Check Minimum Balance requirement (Prevent accidental lockout for verified active licenses)
+        const isBypassBalance = ['97053088'].includes(account_number) || license.is_active === true;
         if (!isBypassBalance && balance !== undefined && productMinBalance > 0 && Number(balance) < productMinBalance) {
             return NextResponse.json({ status: 'insufficient_balance', message: `Insufficient Balance. Minimum required: $${productMinBalance}` }, { status: 200 });
         }
 
-        // 4. Check Expiry
+        // 5. Check Expiry
         if (license.expiry_date) {
             const expiry = new Date(license.expiry_date);
             const now = new Date();
@@ -147,7 +191,7 @@ export async function POST(req: Request) {
             }
         }
 
-        // 4. Success
+        // 6. Success
         return NextResponse.json({
             status: 'active',
             message: 'License Verified',
