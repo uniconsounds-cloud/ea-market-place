@@ -78,39 +78,30 @@ const SidebarContent = ({
             {userEmail === 'juntarasate@gmail.com' && (
                 <>
                     <Link href="/admin/easym-dashboard" onClick={onClose}>
-                        <Button variant="ghost" className="w-full justify-between text-blue-400 hover:text-blue-300 hover:bg-blue-950/30">
-                            <span className="flex items-center">
-                                <Activity className="mr-2 h-4 w-4 text-blue-400" />
+                        <Button variant="ghost" className="w-full justify-between whitespace-nowrap text-blue-400 hover:text-blue-300 hover:bg-blue-950/30">
+                            <span className="flex items-center truncate">
+                                <Activity className="mr-2 h-4 w-4 shrink-0 text-blue-400" />
                                 แดชบอร์ด EasyM
                             </span>
-                            <span className="flex items-center gap-1 text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-medium shadow-sm">
-                                <Crown className="w-2.5 h-2.5 text-amber-400 fill-amber-400/40" />
-                                เฉพาะคุณ
-                            </span>
+                            <Crown className="h-4 w-4 shrink-0 text-amber-400 fill-amber-400/40" />
                         </Button>
                     </Link>
                     <Link href="/admin/demo-challenge" onClick={onClose}>
-                        <Button variant="ghost" className="w-full justify-between text-orange-400 hover:text-orange-300 hover:bg-orange-950/30">
-                            <span className="flex items-center">
-                                <Gamepad2 className="mr-2 h-4 w-4 text-orange-400" />
+                        <Button variant="ghost" className="w-full justify-between whitespace-nowrap text-orange-400 hover:text-orange-300 hover:bg-orange-950/30">
+                            <span className="flex items-center truncate">
+                                <Gamepad2 className="mr-2 h-4 w-4 shrink-0 text-orange-400" />
                                 EasyM Live Tracker
                             </span>
-                            <span className="flex items-center gap-1 text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-medium shadow-sm">
-                                <Crown className="w-2.5 h-2.5 text-amber-400 fill-amber-400/40" />
-                                เฉพาะคุณ
-                            </span>
+                            <Crown className="h-4 w-4 shrink-0 text-amber-400 fill-amber-400/40" />
                         </Button>
                     </Link>
                     <Link href="/admin/test-ports" onClick={onClose}>
-                        <Button variant="ghost" className="w-full justify-between text-yellow-400 hover:text-yellow-300 hover:bg-yellow-950/30">
-                            <span className="flex items-center">
-                                <Key className="mr-2 h-4 w-4 text-yellow-400" />
+                        <Button variant="ghost" className="w-full justify-between whitespace-nowrap text-yellow-400 hover:text-yellow-300 hover:bg-yellow-950/30">
+                            <span className="flex items-center truncate">
+                                <Key className="mr-2 h-4 w-4 shrink-0 text-yellow-400" />
                                 พอร์ตทดสอบพิเศษ
                             </span>
-                            <span className="flex items-center gap-1 text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-medium shadow-sm">
-                                <Crown className="w-2.5 h-2.5 text-amber-400 fill-amber-400/40" />
-                                เฉพาะคุณ
-                            </span>
+                            <Crown className="h-4 w-4 shrink-0 text-amber-400 fill-amber-400/40" />
                         </Button>
                     </Link>
                 </>

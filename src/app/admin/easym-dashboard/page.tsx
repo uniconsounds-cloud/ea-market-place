@@ -68,6 +68,8 @@ interface EasyMPortItem {
     todayClosedLots: number;
     eaVersion: string;
     accumulatedProfit: number;
+    isActive: boolean;
+    hasTelemetry: boolean;
 }
 
 interface CustomerGroup {
@@ -85,6 +87,8 @@ interface CustomerGroup {
     totalTodayPnl: number;
     totalProfit: number;
     onlineCount: number;
+    activeCount: number;
+    telemetryCount: number;
 }
 
 export default function EasyMMasterDashboardPage() {
@@ -104,6 +108,7 @@ export default function EasyMMasterDashboardPage() {
     const [selectedAdmin, setSelectedAdmin] = useState<string>('all');
     const [selectedProduct, setSelectedProduct] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
+    const [selectedLicenseStatus, setSelectedLicenseStatus] = useState<string>('all');
     const [viewMode, setViewMode] = useState<'customer' | 'table' | 'cards'>('customer');
 
     // 1. Auth Guard: Only juntarasate@gmail.com
@@ -207,62 +212,74 @@ export default function EasyMMasterDashboardPage() {
             const portItemsMap = new Map<string, EasyMPortItem>();
 
             easymLicenses.forEach(lic => {
-                const accNum = lic.account_number?.toString();
-                if (!accNum) return;
+                const rawAcc = (lic.account_number || '').trim();
+                if (!rawAcc) return;
 
-                const customer = lic.user_id ? profileMap.get(lic.user_id) : null;
-                const adminInfo = getRootAdmin(lic.user_id);
-                const status = statusMap.get(accNum);
+                // Split space/comma separated account numbers if multiple were entered in one field
+                const accList = rawAcc.split(/[\s,]+/).filter(Boolean);
+                accList.forEach((accNum: string) => {
+                    const existing = portItemsMap.get(accNum);
+                    // If account already exists and existing is active while current is inactive, keep active
+                    if (existing && existing.isActive && !lic.is_active) {
+                        return;
+                    }
 
-                // Start date & Active days
-                const startDateStr = portFirstDateMap.get(accNum) || lic.created_at || new Date().toISOString();
-                const startDt = new Date(startDateStr);
-                const now = new Date();
-                const diffTime = Math.abs(now.getTime() - startDt.getTime());
-                const activeDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+                    const customer = lic.user_id ? profileMap.get(lic.user_id) : null;
+                    const adminInfo = getRootAdmin(lic.user_id);
+                    const status = statusMap.get(accNum);
 
-                // Check online: active ping within last 10 minutes
-                let isOnline = false;
-                if (status?.last_ping) {
-                    const pingTime = new Date(status.last_ping).getTime();
-                    isOnline = (now.getTime() - pingTime) < 10 * 60 * 1000;
-                } else if (status?.updated_at) {
-                    const updTime = new Date(status.updated_at).getTime();
-                    isOnline = (now.getTime() - updTime) < 10 * 60 * 1000;
-                }
+                    // Start date & Active days
+                    const startDateStr = portFirstDateMap.get(accNum) || lic.created_at || new Date().toISOString();
+                    const startDt = new Date(startDateStr);
+                    const now = new Date();
+                    const diffTime = Math.abs(now.getTime() - startDt.getTime());
+                    const activeDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-                const item: EasyMPortItem = {
-                    portNumber: accNum,
-                    portName: lic.port_name || null,
-                    customerId: lic.user_id || null,
-                    customerName: customer?.full_name || 'ลูกค้าไม่มีชื่อ',
-                    customerEmail: customer?.email || 'ไม่ระบุอีเมล',
-                    adminName: adminInfo.name,
-                    adminEmail: adminInfo.email,
-                    productKey: (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.product_key || 'EZM-MAX',
-                    productName: (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.name || 'EasyM MAX',
-                    licenseTier: lic.license_tier || 'free',
-                    startDate: startDt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }),
-                    activeDays,
-                    balance: status?.balance || 0,
-                    equity: status?.equity || 0,
-                    floatingPnl: status?.floating_pnl || 0,
-                    maxDrawdown: status?.max_drawdown || 0,
-                    dailyMaxDrawdown: status?.daily_max_drawdown || 0,
-                    totalLots: status?.total_lots || 0,
-                    buyCount: status?.buy_count || 0,
-                    sellCount: status?.sell_count || 0,
-                    accountType: status?.account_type || 'USC',
-                    isOnline,
-                    lastPing: status?.last_ping || null,
-                    updatedAt: status?.updated_at || null,
-                    todayPnl: status?.today_pnl || 0,
-                    todayClosedLots: status?.today_closed_lots || 0,
-                    eaVersion: status?.ea_version || status?.system_code || 'v1.16',
-                    accumulatedProfit: portHistoryProfitMap.get(accNum) || 0
-                };
+                    // Check online: active ping within last 10 minutes
+                    let isOnline = false;
+                    if (status?.last_ping) {
+                        const pingTime = new Date(status.last_ping).getTime();
+                        isOnline = (now.getTime() - pingTime) < 10 * 60 * 1000;
+                    } else if (status?.updated_at) {
+                        const updTime = new Date(status.updated_at).getTime();
+                        isOnline = (now.getTime() - updTime) < 10 * 60 * 1000;
+                    }
 
-                portItemsMap.set(accNum, item);
+                    const item: EasyMPortItem = {
+                        portNumber: accNum,
+                        portName: lic.port_name || null,
+                        customerId: lic.user_id || null,
+                        customerName: customer?.full_name || 'ลูกค้าไม่มีชื่อ',
+                        customerEmail: customer?.email || 'ไม่ระบุอีเมล',
+                        adminName: adminInfo.name,
+                        adminEmail: adminInfo.email,
+                        productKey: (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.product_key || 'EZM-MAX',
+                        productName: (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.name || 'EasyM MAX',
+                        licenseTier: lic.license_tier || 'free',
+                        startDate: startDt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }),
+                        activeDays,
+                        balance: status?.balance || 0,
+                        equity: status?.equity || 0,
+                        floatingPnl: status?.floating_pnl || 0,
+                        maxDrawdown: status?.max_drawdown || 0,
+                        dailyMaxDrawdown: status?.daily_max_drawdown || 0,
+                        totalLots: status?.total_lots || 0,
+                        buyCount: status?.buy_count || 0,
+                        sellCount: status?.sell_count || 0,
+                        accountType: status?.account_type || 'USC',
+                        isOnline,
+                        lastPing: status?.last_ping || null,
+                        updatedAt: status?.updated_at || null,
+                        todayPnl: status?.today_pnl || 0,
+                        todayClosedLots: status?.today_closed_lots || 0,
+                        eaVersion: status?.ea_version || status?.system_code || 'v1.16',
+                        accumulatedProfit: portHistoryProfitMap.get(accNum) || 0,
+                        isActive: lic.is_active !== false,
+                        hasTelemetry: !!status
+                    };
+
+                    portItemsMap.set(accNum, item);
+                });
             });
 
             // Also check if there are ports in farm_port_status that have system_code like EasyM but not in licenses
@@ -308,7 +325,9 @@ export default function EasyMMasterDashboardPage() {
                             todayPnl: status.today_pnl || 0,
                             todayClosedLots: status.today_closed_lots || 0,
                             eaVersion: status.ea_version || 'v1.16',
-                            accumulatedProfit: portHistoryProfitMap.get(accNum) || 0
+                            accumulatedProfit: portHistoryProfitMap.get(accNum) || 0,
+                            isActive: true,
+                            hasTelemetry: true
                         });
                     }
                 }
@@ -384,17 +403,25 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedProduct === 'mini' && !p.productName.toLowerCase().includes('mini')) return false;
             }
 
+            // License Status filter
+            if (selectedLicenseStatus !== 'all') {
+                if (selectedLicenseStatus === 'active' && !p.isActive) return false;
+                if (selectedLicenseStatus === 'inactive' && p.isActive) return false;
+            }
+
             // Status filter
             if (selectedStatus !== 'all') {
                 if (selectedStatus === 'online' && !p.isOnline) return false;
                 if (selectedStatus === 'offline' && p.isOnline) return false;
                 if (selectedStatus === 'high_dd' && p.maxDrawdown < 10) return false;
                 if (selectedStatus === 'profit_positive' && p.todayPnl <= 0) return false;
+                if (selectedStatus === 'has_telemetry' && !p.hasTelemetry) return false;
+                if (selectedStatus === 'no_telemetry' && p.hasTelemetry) return false;
             }
 
             return true;
         });
-    }, [ports, searchQuery, selectedAdmin, selectedProduct, selectedStatus]);
+    }, [ports, searchQuery, selectedAdmin, selectedProduct, selectedStatus, selectedLicenseStatus]);
 
     // 4. Group by Customer
     const customerGroups = useMemo(() => {
@@ -417,7 +444,9 @@ export default function EasyMMasterDashboardPage() {
                     totalFloatingPnl: 0,
                     totalTodayPnl: 0,
                     totalProfit: 0,
-                    onlineCount: 0
+                    onlineCount: 0,
+                    activeCount: 0,
+                    telemetryCount: 0
                 });
             }
 
@@ -434,6 +463,8 @@ export default function EasyMMasterDashboardPage() {
             g.totalTodayPnl += p.todayPnl;
             g.totalProfit += p.accumulatedProfit;
             if (p.isOnline) g.onlineCount++;
+            if (p.isActive) g.activeCount++;
+            if (p.hasTelemetry) g.telemetryCount++;
         });
 
         return Array.from(groupMap.values()).sort((a, b) => b.ports.length - a.ports.length);
@@ -502,9 +533,9 @@ export default function EasyMMasterDashboardPage() {
     // 6. Admin Breakdown Stats
     const adminStats = useMemo(() => {
         const res = {
-            juntarasate: { name: 'สายงานพี่โจ้ (juntarasate)', ports: 0, online: 0, uscBalance: 0, owners: new Set<string>() },
-            bctutor: { name: 'สายงานครูชัย (bctutor)', ports: 0, online: 0, uscBalance: 0, owners: new Set<string>() },
-            direct: { name: 'พอร์ตระบบ / อื่นๆ', ports: 0, online: 0, uscBalance: 0, owners: new Set<string>() },
+            juntarasate: { name: 'สายงานพี่โจ้ (juntarasate)', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, owners: new Set<string>() },
+            bctutor: { name: 'สายงานครูชัย (bctutor)', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, owners: new Set<string>() },
+            direct: { name: 'พอร์ตระบบ / อื่นๆ', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, owners: new Set<string>() },
         };
 
         ports.forEach(p => {
@@ -513,6 +544,9 @@ export default function EasyMMasterDashboardPage() {
             else if (p.adminEmail.includes('bctutor')) grp = res.bctutor;
 
             grp.ports++;
+            if (p.isActive) grp.activePorts++;
+            else grp.inactivePorts++;
+            if (p.hasTelemetry) grp.telemetry++;
             if (p.isOnline) grp.online++;
             grp.uscBalance += p.accountType === 'USD' ? p.balance * 100 : p.balance;
             grp.owners.add(p.customerId || p.customerEmail);
@@ -700,7 +734,13 @@ export default function EasyMMasterDashboardPage() {
                     <CardContent className="space-y-2 text-sm">
                         <div className="flex justify-between py-1 border-b border-border/30">
                             <span className="text-muted-foreground">จำนวนพอร์ตในสาย:</span>
-                            <span className="font-bold">{adminStats.juntarasate.ports} พอร์ต ({adminStats.juntarasate.online} ออนไลน์)</span>
+                            <span className="font-bold">{adminStats.juntarasate.ports} บัญชี (Active: {adminStats.juntarasate.activePorts})</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/30">
+                            <span className="text-muted-foreground">ส่งข้อมูล MT5 (Telemetry):</span>
+                            <span className="font-semibold text-emerald-400">
+                                {adminStats.juntarasate.telemetry} / {adminStats.juntarasate.ports} บัญชี ({adminStats.juntarasate.online} ออนไลน์)
+                            </span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
                             <span className="text-muted-foreground">จำนวนลูกค้า:</span>
@@ -725,8 +765,19 @@ export default function EasyMMasterDashboardPage() {
                     <CardContent className="space-y-2 text-sm">
                         <div className="flex justify-between py-1 border-b border-border/30">
                             <span className="text-muted-foreground">จำนวนพอร์ตในสาย:</span>
-                            <span className="font-bold">{adminStats.bctutor.ports} พอร์ต ({adminStats.bctutor.online} ออนไลน์)</span>
+                            <span className="font-bold">{adminStats.bctutor.ports} บัญชี (Active: {adminStats.bctutor.activePorts})</span>
                         </div>
+                        <div className="flex justify-between py-1 border-b border-border/30">
+                            <span className="text-muted-foreground">ส่งข้อมูล MT5 (Telemetry):</span>
+                            <span className="font-semibold text-amber-400">
+                                {adminStats.bctutor.telemetry} / {adminStats.bctutor.ports} บัญชี ({adminStats.bctutor.online} ออนไลน์)
+                            </span>
+                        </div>
+                        {adminStats.bctutor.ports > adminStats.bctutor.telemetry && (
+                            <div className="text-[11px] bg-amber-500/10 text-amber-300 border border-amber-500/20 p-1.5 rounded">
+                                ⚠️ ลูกค้ายังไม่ได้ตั้ง WebRequest ตัวที่ 2 (ส่งข้อมูลพอร์ต) {adminStats.bctutor.ports - adminStats.bctutor.telemetry} บัญชี
+                            </div>
+                        )}
                         <div className="flex justify-between py-1 border-b border-border/30">
                             <span className="text-muted-foreground">จำนวนลูกค้า:</span>
                             <span className="font-semibold">{adminStats.bctutor.owners.size} ท่าน</span>
@@ -750,7 +801,11 @@ export default function EasyMMasterDashboardPage() {
                     <CardContent className="space-y-2 text-sm">
                         <div className="flex justify-between py-1 border-b border-border/30">
                             <span className="text-muted-foreground">จำนวนพอร์ตในสาย:</span>
-                            <span className="font-bold">{adminStats.direct.ports} พอร์ต ({adminStats.direct.online} ออนไลน์)</span>
+                            <span className="font-bold">{adminStats.direct.ports} บัญชี (Active: {adminStats.direct.activePorts})</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/30">
+                            <span className="text-muted-foreground">ส่งข้อมูล MT5 (Telemetry):</span>
+                            <span className="font-semibold">{adminStats.direct.telemetry} / {adminStats.direct.ports} บัญชี</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
                             <span className="text-muted-foreground">จำนวนลูกค้า:</span>
@@ -783,7 +838,7 @@ export default function EasyMMasterDashboardPage() {
 
                         {/* Admin Filter */}
                         <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
-                            <SelectTrigger className="w-full md:w-[180px] bg-background">
+                            <SelectTrigger className="w-full md:w-[170px] bg-background">
                                 <SelectValue placeholder="กรองตามแอดมิน" />
                             </SelectTrigger>
                             <SelectContent>
@@ -796,7 +851,7 @@ export default function EasyMMasterDashboardPage() {
 
                         {/* Product Filter */}
                         <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                            <SelectTrigger className="w-full md:w-[160px] bg-background">
+                            <SelectTrigger className="w-full md:w-[150px] bg-background">
                                 <SelectValue placeholder="กรองตามสินค้า" />
                             </SelectTrigger>
                             <SelectContent>
@@ -806,17 +861,31 @@ export default function EasyMMasterDashboardPage() {
                             </SelectContent>
                         </Select>
 
+                        {/* License Status Filter */}
+                        <Select value={selectedLicenseStatus} onValueChange={setSelectedLicenseStatus}>
+                            <SelectTrigger className="w-full md:w-[150px] bg-background">
+                                <SelectValue placeholder="สถานะ License" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">License ทั้งหมด</SelectItem>
+                                <SelectItem value="active">✅ เปิดใช้งาน (Active)</SelectItem>
+                                <SelectItem value="inactive">⛔ ระงับ (Inactive)</SelectItem>
+                            </SelectContent>
+                        </Select>
+
                         {/* Status Filter */}
                         <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                             <SelectTrigger className="w-full md:w-[160px] bg-background">
                                 <SelectValue placeholder="สถานะพอร์ต" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">สถานะทั้งหมด</SelectItem>
+                                <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
                                 <SelectItem value="online">🟢 ออนไลน์</SelectItem>
                                 <SelectItem value="offline">⚪ ออฟไลน์</SelectItem>
                                 <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
                                 <SelectItem value="profit_positive">📈 วันนี้บวก</SelectItem>
+                                <SelectItem value="has_telemetry">📡 มีข้อมูลสด MT5</SelectItem>
+                                <SelectItem value="no_telemetry">⚠️ ไม่ได้ส่ง WebRequest #2</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -979,15 +1048,26 @@ export default function EasyMMasterDashboardPage() {
                                                         {port.eaVersion}
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        {port.isOnline ? (
-                                                            <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
-                                                                🟢 Online
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0">
-                                                                ⚪ Offline
-                                                            </Badge>
-                                                        )}
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            {port.isOnline ? (
+                                                                <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
+                                                                    🟢 Online
+                                                                </Badge>
+                                                            ) : port.hasTelemetry ? (
+                                                                <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0">
+                                                                    ⚪ Offline
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="outline" className="text-amber-400 border-amber-500/30 bg-amber-500/10 text-[9px] px-1.5 py-0" title="ยังไม่ได้ตั้งค่า WebRequest ตัวที่ 2 (api/farm/sync)">
+                                                                    ⚠️ ไม่มี Telemetry
+                                                                </Badge>
+                                                            )}
+                                                            {!port.isActive && (
+                                                                <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
+                                                                    ⛔ Inactive
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -1023,24 +1103,31 @@ export default function EasyMMasterDashboardPage() {
                                     <TableHead className="text-right">Floating PnL</TableHead>
                                     <TableHead className="text-right">Max DD</TableHead>
                                     <TableHead className="text-right">กำไรวันนี้</TableHead>
-                                    <TableHead className="text-center">EA Version</TableHead>
+                                    <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                     <TableHead className="text-center">สถานะ</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredPorts.map(port => (
-                                    <TableRow key={port.portNumber}>
+                                    <TableRow key={port.portNumber} className="hover:bg-muted/30">
                                         <TableCell className="font-mono font-bold text-foreground">
-                                            {port.portNumber}
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{port.portNumber}</span>
+                                                {port.portName && (
+                                                    <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             <div className="font-medium text-xs">{port.customerName}</div>
                                             <div className="text-[10px] text-muted-foreground">{port.customerEmail}</div>
                                         </TableCell>
-                                        <TableCell className="text-xs text-blue-400 font-medium">
-                                            {port.adminName}
-                                        </TableCell>
                                         <TableCell className="text-xs">
+                                            <span className={`font-semibold ${port.adminEmail.includes('juntarasate') ? 'text-blue-400' : port.adminEmail.includes('bctutor') ? 'text-purple-400' : 'text-muted-foreground'}`}>
+                                                {port.adminName}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-xs text-blue-400 font-medium">
                                             {port.productName}
                                         </TableCell>
                                         <TableCell className="text-xs text-muted-foreground">
@@ -1076,15 +1163,26 @@ export default function EasyMMasterDashboardPage() {
                                             {port.eaVersion}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            {port.isOnline ? (
-                                                <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
-                                                    🟢 Online
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0">
-                                                    ⚪ Offline
-                                                </Badge>
-                                            )}
+                                            <div className="flex flex-col items-center gap-1">
+                                                {port.isOnline ? (
+                                                    <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
+                                                        🟢 Online
+                                                    </Badge>
+                                                ) : port.hasTelemetry ? (
+                                                    <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0">
+                                                        ⚪ Offline
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-amber-400 border-amber-500/30 bg-amber-500/10 text-[9px] px-1.5 py-0" title="ยังไม่ได้ตั้งค่า WebRequest ตัวที่ 2 (api/farm/sync)">
+                                                        ⚠️ ไม่มี Telemetry
+                                                    </Badge>
+                                                )}
+                                                {!port.isActive && (
+                                                    <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
+                                                        ⛔ Inactive
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -1107,9 +1205,18 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">
                                                 <Wifi className="w-2.5 h-2.5" /> Online
                                             </span>
-                                        ) : (
+                                        ) : port.hasTelemetry ? (
                                             <span className="flex items-center gap-1 text-[10px] bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-full">
                                                 <WifiOff className="w-2.5 h-2.5" /> Offline
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full" title="ยังไม่ได้ตั้งค่า WebRequest ตัวที่ 2 (api/farm/sync)">
+                                                ⚠️ ไม่มี Telemetry
+                                            </span>
+                                        )}
+                                        {!port.isActive && (
+                                            <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full">
+                                                ⛔ Inactive
                                             </span>
                                         )}
                                     </div>
