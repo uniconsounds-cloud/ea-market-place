@@ -29,6 +29,12 @@ export function HomeIbButton() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
+        if (typeof window !== 'undefined' && (window.location.search.includes('openIb=true') || window.location.search.includes('ib=true'))) {
+            setIsOpen(true);
+        }
+    }, []);
+
+    useEffect(() => {
         if (!isOpen) return; // Only fetch when opened to save queries on homepage load
 
         const fetchUserData = async () => {

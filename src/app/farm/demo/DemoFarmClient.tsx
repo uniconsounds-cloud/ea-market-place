@@ -104,6 +104,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const [leaderboardFilter, setLeaderboardFilter] = useState<'all' | number>('all');
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [hasIbMembership, setHasIbMembership] = useState<boolean | null>(null);
+    const EASYM_MAX_PRODUCT_ID = '0b5e3b69-e7cf-4aa2-8701-e62e6c3cc365';
+    const EASYM_MINI_PRODUCT_ID = 'e5784a85-50bd-48c8-8da0-4a6237b91df8';
     const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
     const [periodOffset, setPeriodOffset] = useState<number>(0);
     const [allHistoryData, setAllHistoryData] = useState<any[]>([]);
@@ -133,7 +136,26 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     useEffect(() => {
         const getCurrUser = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) setCurrentUserId(session.user.id);
+            if (session?.user) {
+                setCurrentUserId(session.user.id);
+                try {
+                    const { data } = await supabase
+                        .from('ib_memberships')
+                        .select('id, status')
+                        .eq('user_id', session.user.id);
+                    if (data && data.length > 0) {
+                        const hasValid = data.some(m => m.status === 'approved' || m.status === 'pending');
+                        setHasIbMembership(hasValid);
+                    } else {
+                        setHasIbMembership(false);
+                    }
+                } catch (e) {
+                    console.error('Error fetching IB membership:', e);
+                    setHasIbMembership(false);
+                }
+            } else {
+                setHasIbMembership(false);
+            }
         };
         getCurrUser();
     }, []);
@@ -1778,7 +1800,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                             </div>
 
                             {/* Step 3 */}
-                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
+                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2.5">
                                 <div className="flex items-center gap-2">
                                     <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
                                         3
@@ -1788,25 +1810,50 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     </div>
                                 </div>
                                 <p className="text-amber-200/70 text-[11px] leading-relaxed pl-7">
-                                    นำเลขบัญชี MT5 ที่เปิดกับ InterStellar ไปยื่นที่เมนู <b>"จัดการ License"</b> ในหน้าแดชบอร์ด ระบบจะอนุมัติและปล่อยไฟล์ติดตั้งให้ทันที
+                                    นำเลขบัญชี MT5 ที่เปิดกับ InterStellar ไปยื่นขอรับสิทธิ์ใช้งานระบบ EasyM ฟรีตลอดชีพ โดยเลือกสั่งซื้อเวอร์ชันที่ต้องการใช้งานด้านล่างนี้
                                 </p>
+
+                                {/* IB Explanation Notice */}
+                                <div className="pl-7">
+                                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200/90 leading-relaxed flex items-start gap-2">
+                                        <span className="text-base flex-shrink-0">🎁</span>
+                                        <div>
+                                            <span className="font-extrabold text-[#ffd700]">รับสิทธิ์ใช้ EA ฟรี (สมัครเป็น IB):</span>
+                                            <p className="mt-0.5 text-amber-100/80 text-[10.5px] leading-relaxed">
+                                                {hasIbMembership
+                                                    ? 'ท่านมีสิทธิ์ IB เรียบร้อยแล้ว สามารถกดสั่งซื้อเวอร์ชันที่ต้องการเพื่อกรอกเลขพอร์ตและเปิดใช้งานฟรี (0 ฿) ได้ทันที'
+                                                    : 'สมาชิกที่เปิดบัญชีผ่านสายงาน IB จะได้รับสิทธิ์ใช้งาน EA ฟรีตลอดชีพ หากท่านยังไม่เคยยื่นขอสิทธิ์ IB มาก่อน เมื่อคลิกสั่งซื้อระบบจะพาท่านไปยังหน้าขอสิทธิ์ใช้งานฟรีผ่าน IB เพื่อยืนยันสิทธิ์ก่อนสั่งซื้อครับ'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="pl-7 flex flex-wrap items-center gap-2 pt-1">
                                     <Link
-                                        href="/dashboard/licenses"
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#cfa545] hover:bg-[#dfb555] text-black font-extrabold text-xs rounded-lg shadow-sm transition-all"
+                                        href={hasIbMembership ? `/products/${EASYM_MAX_PRODUCT_ID}` : '/?openIb=true'}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#ffd700] to-[#cfa545] hover:from-[#ffe033] hover:to-[#dfb555] text-black font-extrabold text-xs rounded-lg shadow-sm transition-all"
                                     >
-                                        <span>กรอกเลขพอร์ตที่แดชบอร์ด</span>
+                                        <span>🌟 สั่งซื้อ EasyM MAX</span>
                                         <ArrowUpRight className="w-3.5 h-3.5" />
                                     </Link>
-                                    <a
-                                        href="https://eaeze.com/register?ref=REF-06A189"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-amber-200 border border-amber-500/30 text-[11px] rounded-lg transition-all"
+                                    <Link
+                                        href={hasIbMembership ? `/products/${EASYM_MINI_PRODUCT_ID}` : '/?openIb=true'}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black font-extrabold text-xs rounded-lg shadow-sm transition-all"
                                     >
-                                        <span>ยังไม่เคยสมัครสมาชิกเว็บ? คลิกสมัครที่นี่</span>
-                                        <ArrowUpRight className="w-3 h-3" />
-                                    </a>
+                                        <span>⚡ สั่งซื้อ EasyM mini</span>
+                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                    </Link>
+                                    {!currentUserId && (
+                                        <a
+                                            href="https://eaeze.com/register?ref=REF-06A189"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-amber-200 border border-amber-500/30 text-[11px] rounded-lg transition-all"
+                                        >
+                                            <span>ยังไม่เคยสมัครสมาชิกเว็บ? คลิกสมัครที่นี่</span>
+                                            <ArrowUpRight className="w-3 h-3" />
+                                        </a>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1847,15 +1894,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
                         {/* Modal Action Buttons */}
                         <div className="flex flex-col sm:flex-row items-center gap-2 pt-1 border-t border-amber-500/20">
-                            <Link
-                                href="/dashboard/licenses"
-                                className="w-full sm:flex-1 py-2.5 px-4 bg-gradient-to-r from-[#ffd700] to-[#cfa545] text-black font-black text-center text-xs sm:text-sm rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.3)] hover:scale-[1.02] transition-all"
-                            >
-                                ไปยังหน้าจัดการ License พอร์ตจริง →
-                            </Link>
                             <button
                                 onClick={() => setShowOpenRealAccountModal(false)}
-                                className="w-full sm:w-auto py-2.5 px-4 bg-white/5 hover:bg-white/10 text-amber-200/80 border border-amber-500/30 font-bold text-center text-xs rounded-xl transition-all"
+                                className="w-full py-2.5 px-4 bg-white/5 hover:bg-white/10 text-amber-200/80 border border-amber-500/30 font-bold text-center text-xs rounded-xl transition-all"
                             >
                                 ปิดหน้าต่าง
                             </button>
