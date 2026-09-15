@@ -97,6 +97,21 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const [fleetTimeframe, setFleetTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
     const [statsCurrency, setStatsCurrency] = useState<'USC' | 'USD'>('USC');
     const [showOpenRealAccountModal, setShowOpenRealAccountModal] = useState(false);
+    const fleetTimelineScrollRef = useRef<HTMLDivElement>(null);
+
+    const getFleetFarmBoxAsset = (centsOrProfit: number) => {
+        if (centsOrProfit < 0) return '/farm/base_farmbox_lose.png';
+        if (centsOrProfit > 2000) return '/farm/base_farmbox_full.png';
+        if (centsOrProfit > 1000) return '/farm/base_farmbox_mid.png';
+        if (centsOrProfit > 0) return '/farm/base_farmbox_min.png';
+        return '/farm/base_farmbox_empty.png';
+    };
+
+    useEffect(() => {
+        if (fleetTimelineScrollRef.current) {
+            fleetTimelineScrollRef.current.scrollLeft = fleetTimelineScrollRef.current.scrollWidth;
+        }
+    }, [fleetTimeframe, showFleetStats, fleetStatsData]);
 
     // Leaderboard states (retained for backward compatibility if needed)
     const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -1380,73 +1395,73 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                         </div>
 
                         {/* Modal Body with Smooth Scroll */}
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-                            {/* 1. Top Longevity & Trust Cards */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-3 text-center shadow-sm relative overflow-hidden">
-                                    <div className="text-[10px] sm:text-xs text-amber-200/60 flex items-center justify-center gap-1 mb-1">
-                                        <Clock className="w-3.5 h-3.5 text-[#cfa545]" />
+                        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3.5 sm:space-y-5">
+                            {/* 1. Top Longevity & Trust Cards (Mobile-optimized tight gaps & short single-line labels) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-2 sm:p-3 text-center shadow-sm relative overflow-hidden">
+                                    <div className="text-[10px] sm:text-xs text-amber-200/70 flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+                                        <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#cfa545]" />
                                         <span>เปิดรันมาแล้ว</span>
                                     </div>
-                                    <div className="text-xl sm:text-2xl font-black font-mono text-[#ffd700]">
-                                        {fleetStatsData?.longevity?.daysRunning || 173} <span className="text-xs sm:text-sm font-sans text-amber-300">วัน</span>
+                                    <div className="text-lg sm:text-2xl font-black font-mono text-[#ffd700]">
+                                        {fleetStatsData?.longevity?.daysRunning || 227} <span className="text-xs sm:text-sm font-sans text-amber-300">วัน</span>
                                     </div>
-                                    <div className="text-[9px] text-amber-200/50 mt-1 truncate">
-                                        ตั้งแต่ {fleetStatsData?.longevity?.startDate || '27 มี.ค. 2569'}
-                                    </div>
-                                </div>
-
-                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-3 text-center shadow-sm relative overflow-hidden">
-                                    <div className="text-[10px] sm:text-xs text-amber-200/60 flex items-center justify-center gap-1 mb-1">
-                                        <Users className="w-3.5 h-3.5 text-[#cfa545]" />
-                                        <span>พอร์ตรันอยู่จริง</span>
-                                    </div>
-                                    <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-                                        {fleetStatsData?.longevity?.activePorts || 206}+ <span className="text-xs sm:text-sm font-sans text-emerald-300">พอร์ต</span>
-                                    </div>
-                                    <div className="text-[9px] text-emerald-400/60 mt-1 truncate">
-                                        Active Real Accounts
+                                    <div className="text-[9px] text-amber-200/50 mt-0.5 truncate">
+                                        ตั้งแต่ 1 ก.พ. 69
                                     </div>
                                 </div>
 
-                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-3 text-center shadow-sm relative overflow-hidden">
-                                    <div className="text-[10px] sm:text-xs text-amber-200/60 flex items-center justify-center gap-1 mb-1">
-                                        <TrendingUp className="w-3.5 h-3.5 text-[#cfa545]" />
-                                        <span>ทุนหมุนเวียนรวม</span>
+                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-2 sm:p-3 text-center shadow-sm relative overflow-hidden">
+                                    <div className="text-[10px] sm:text-xs text-amber-200/70 flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+                                        <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#cfa545]" />
+                                        <span>พอร์ตรันจริง</span>
                                     </div>
-                                    <div className="text-base sm:text-xl font-black font-mono text-[#ffd700] truncate">
+                                    <div className="text-lg sm:text-2xl font-black font-mono text-emerald-400">
+                                        {fleetStatsData?.longevity?.activePorts || 202}+ <span className="text-xs sm:text-sm font-sans text-emerald-300">พอร์ต</span>
+                                    </div>
+                                    <div className="text-[9px] text-emerald-400/60 mt-0.5 truncate">
+                                        ทั่วประเทศ (MT5 Live)
+                                    </div>
+                                </div>
+
+                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-2 sm:p-3 text-center shadow-sm relative overflow-hidden">
+                                    <div className="text-[10px] sm:text-xs text-amber-200/70 flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+                                        <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#cfa545]" />
+                                        <span>ทุนรวมระบบ</span>
+                                    </div>
+                                    <div className="text-sm sm:text-xl font-black font-mono text-[#ffd700] truncate">
                                         {statsCurrency === 'USC' 
-                                            ? `${((fleetStatsData?.longevity?.totalFleetBalanceUSC || 25800000) / 1000000).toFixed(1)}M USC`
-                                            : `$${Math.round((fleetStatsData?.longevity?.totalFleetBalanceUSD || 258000) / 1000)}k+`}
+                                            ? `${((fleetStatsData?.longevity?.totalFleetBalanceUSC || 14131884) / 1000000).toFixed(1)}M USC`
+                                            : `$${Math.round((fleetStatsData?.longevity?.totalFleetBalanceUSD || 141319) / 1000)}k+`}
                                     </div>
-                                    <div className="text-[9px] text-amber-200/50 mt-1 truncate">
+                                    <div className="text-[9px] text-amber-200/50 mt-0.5 truncate">
                                         Fleet Capital
                                     </div>
                                 </div>
 
-                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-3 text-center shadow-sm relative overflow-hidden">
-                                    <div className="text-[10px] sm:text-xs text-amber-200/60 flex items-center justify-center gap-1 mb-1">
-                                        <Award className="w-3.5 h-3.5 text-[#cfa545]" />
+                                <div className="bg-[#1e140c]/90 border border-amber-500/25 rounded-xl p-2 sm:p-3 text-center shadow-sm relative overflow-hidden">
+                                    <div className="text-[10px] sm:text-xs text-amber-200/70 flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+                                        <Award className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#cfa545]" />
                                         <span>อัตราอยู่รอด</span>
                                     </div>
-                                    <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                                    <div className="text-lg sm:text-2xl font-black font-mono text-emerald-400">
                                         100%
                                     </div>
-                                    <div className="text-[9px] text-emerald-400/60 mt-1 truncate">
-                                        ปลอดภัย ไม่เคยล้างพอร์ต
+                                    <div className="text-[9px] text-emerald-400/80 font-bold mt-0.5 truncate">
+                                        ไม่เคยล้างพอร์ต
                                     </div>
                                 </div>
                             </div>
 
                             {/* 2. Controls & Tabs */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-black/40 p-2 rounded-xl border border-[#cfa545]/20">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-black/40 p-1.5 sm:p-2 rounded-xl border border-[#cfa545]/20">
                                 {/* Timeframe Tabs */}
                                 <div className="grid grid-cols-3 gap-1 w-full sm:w-auto">
                                     {(['daily', 'weekly', 'monthly'] as const).map(tf => (
                                         <button
                                             key={tf}
                                             onClick={() => setFleetTimeframe(tf)}
-                                            className={`py-1.5 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all ${
+                                            className={`py-1.5 px-2.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${
                                                 fleetTimeframe === tf
                                                     ? 'bg-[#cfa545] text-black shadow-[0_0_12px_rgba(207,165,69,0.4)]'
                                                     : 'text-amber-200/60 hover:text-white hover:bg-white/5'
@@ -1483,7 +1498,177 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 </div>
                             </div>
 
-                            {/* 3. Main Profit vs Drawdown Matrix Cards */}
+                            {/* 2.5 Quick Comparison Bar: Today vs Yesterday (or Latest Trading Day) */}
+                            {fleetStatsData && (
+                                <div className="bg-[#140b06] border border-[#cfa545]/25 rounded-xl p-2 sm:p-2.5 shadow-inner">
+                                    <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-amber-900/30">
+                                        <div className="flex items-center gap-1.5">
+                                            <Sparkles className="w-3 h-3 text-[#ffd700]" />
+                                            <span className="text-[10px] sm:text-xs font-extrabold text-amber-200">เปรียบเทียบผลงานล่าสุด</span>
+                                        </div>
+                                        <span className="text-[8px] sm:text-[9px] font-mono text-amber-300/60 bg-black/40 px-1.5 py-0.2 rounded border border-amber-500/20">
+                                            Today vs Yesterday
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                                        {/* Yesterday */}
+                                        <div className="bg-black/40 border border-amber-500/15 rounded-lg p-1.5 sm:p-2 flex flex-col justify-between">
+                                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-amber-200/60 mb-0.5">
+                                                <span>เมื่อวาน ({fleetStatsData?.yesterday?.dateLabel || '15 ก.ย.'})</span>
+                                                <span className="text-amber-400/80 font-mono">DD {fleetStatsData?.yesterday?.dd || 3.2}%</span>
+                                            </div>
+                                            <div className="text-xs sm:text-base font-black font-mono text-[#4de180]">
+                                                +{statsCurrency === 'USC' 
+                                                    ? `${(fleetStatsData?.yesterday?.profitUSC || 860).toLocaleString()} USC` 
+                                                    : `$${(fleetStatsData?.yesterday?.profitUSD || 8.60).toFixed(2)}`}
+                                            </div>
+                                        </div>
+
+                                        {/* Today */}
+                                        <div className="bg-gradient-to-br from-[#24170d] to-[#160c06] border border-[#ffd700]/40 rounded-lg p-1.5 sm:p-2 flex flex-col justify-between shadow-[0_0_10px_rgba(255,215,0,0.1)]">
+                                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-amber-200 mb-0.5">
+                                                <span className="font-bold text-[#ffd700] flex items-center gap-1">
+                                                    <span>วันนี้</span>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                                </span>
+                                                <span className="text-emerald-400 font-mono font-bold">DD {fleetStatsData?.today?.dd || 2.8}%</span>
+                                            </div>
+                                            <div className="text-xs sm:text-base font-black font-mono text-[#ffd700]">
+                                                +{statsCurrency === 'USC' 
+                                                    ? `${(fleetStatsData?.today?.profitUSC || 380).toLocaleString()} USC` 
+                                                    : `$${(fleetStatsData?.today?.profitUSD || 3.80).toFixed(2)}`}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 2.6 Interactive Farm Crate Visual Timeline */}
+                            {(() => {
+                                const isDaily = fleetTimeframe === 'daily';
+                                const isWeekly = fleetTimeframe === 'weekly';
+                                const isMonthly = fleetTimeframe === 'monthly';
+
+                                let timelineItems: any[] = [];
+                                let currentPeriodItem: any = null;
+
+                                if (isDaily) {
+                                    const dList = fleetStatsData?.timeline?.daily || [];
+                                    timelineItems = dList.slice(0, -1);
+                                    currentPeriodItem = fleetStatsData?.today || (dList.length > 0 ? dList[dList.length - 1] : null);
+                                } else if (isWeekly) {
+                                    const wList = fleetStatsData?.timeline?.weekly || [];
+                                    timelineItems = wList.slice(0, -1);
+                                    currentPeriodItem = wList.length > 0 ? wList[wList.length - 1] : null;
+                                } else {
+                                    const mList = fleetStatsData?.timeline?.monthly || [];
+                                    timelineItems = mList.slice(0, -1);
+                                    currentPeriodItem = mList.length > 0 ? mList[mList.length - 1] : null;
+                                }
+
+                                const currentProfit = statsCurrency === 'USC'
+                                    ? `${(currentPeriodItem?.profitUSC || 0).toLocaleString()} USC`
+                                    : `$${(currentPeriodItem?.profitUSD || 0).toFixed(2)}`;
+                                const currentDD = currentPeriodItem?.dd || 0;
+                                const currentAsset = getFleetFarmBoxAsset(currentPeriodItem?.profitUSC || 0);
+                                const currentPeriodTitle = isDaily ? 'วันนี้' : isWeekly ? 'สัปดาห์นี้' : 'เดือนนี้';
+
+                                return (
+                                    <div className="bg-[#150d08] border border-[#cfa545]/25 rounded-2xl p-2.5 sm:p-3.5 shadow-[0_0_20px_rgba(207,165,69,0.08)]">
+                                        <div className="flex items-center justify-between mb-2 px-0.5">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="text-base sm:text-lg flex-shrink-0">📦</span>
+                                                <div className="min-w-0">
+                                                    <h4 className="text-xs sm:text-sm font-extrabold text-[#ffd700] truncate">
+                                                        กราฟิกเก็บเกี่ยวผลตอบแทน (Harvest Crate Timeline)
+                                                    </h4>
+                                                    <p className="text-[9px] sm:text-[10px] text-amber-200/50 truncate">
+                                                        {isDaily ? 'ลังผลไม้ย้อนหลัง 30 วัน' : isWeekly ? 'ลังผลไม้ย้อนหลังรายสัปดาห์' : 'ลังผลไม้ย้อนหลัง 8 เดือน'} (เลื่อนดูประวัติฝั่งซ้ายได้)
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[8px] sm:text-[9px] font-mono text-amber-300/70 bg-black/40 px-1.5 py-0.5 rounded-full border border-amber-500/20 flex-shrink-0 ml-1">
+                                                {statsCurrency}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex flex-col-reverse sm:flex-row items-stretch gap-2 sm:gap-3 bg-[#0e0704] border border-amber-900/40 rounded-xl p-2 sm:p-3 relative overflow-hidden">
+                                            {/* Left side: Scrollable track of past periods */}
+                                            <div 
+                                                ref={fleetTimelineScrollRef}
+                                                className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-2.5 sm:gap-4 py-1"
+                                            >
+                                                {timelineItems.map((item: any, idx: number) => {
+                                                    const pUSC = item.profitUSC || 0;
+                                                    const pUSD = item.profitUSD || 0;
+                                                    const pLabel = statsCurrency === 'USC' ? `+${pUSC.toLocaleString()}` : `+$${pUSD.toFixed(2)}`;
+                                                    const asset = getFleetFarmBoxAsset(pUSC);
+                                                    const label = item.dateLabel || item.weekLabel || item.monthLabel || '';
+                                                    return (
+                                                        <div key={idx} className="flex items-center flex-shrink-0">
+                                                            <div className="flex flex-col items-center group relative min-w-[54px] sm:min-w-[64px]">
+                                                                {/* Profit above crate */}
+                                                                <span className="text-[9px] sm:text-[10px] font-mono font-black text-[#4de180] whitespace-nowrap mb-0.5 drop-shadow-sm">
+                                                                    {pLabel}
+                                                                </span>
+                                                                {/* Crate Image */}
+                                                                <div className="relative w-11 h-11 sm:w-14 sm:h-14 transition-transform duration-200 group-hover:scale-110 drop-shadow-md">
+                                                                    <Image src={asset} alt="Crate" fill className="object-contain" unoptimized />
+                                                                </div>
+                                                                {/* Label & DD below crate */}
+                                                                <div className="flex flex-col items-center mt-0.5">
+                                                                    <span className="text-[8px] sm:text-[9px] text-amber-200/70 font-mono tracking-tight whitespace-nowrap">
+                                                                        {label}
+                                                                    </span>
+                                                                    <span className="text-[7px] sm:text-[8px] font-mono font-bold text-amber-400 bg-black/60 px-1 py-0.2 rounded border border-amber-500/20 mt-0.5">
+                                                                        DD {item.dd}%
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Divider for weekend boundary */}
+                                                            {item.isEndOfWeek && isDaily && idx < timelineItems.length - 1 && (
+                                                                <div className="flex flex-col items-center justify-center mx-1 h-12 self-center">
+                                                                    <div className="w-[1px] h-8 bg-gradient-to-b from-amber-500/0 via-amber-500/40 to-amber-500/0"></div>
+                                                                    <span className="text-[6px] font-mono text-amber-400/50 font-bold uppercase tracking-widest mt-0.5">WK</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Vertical Divider for desktop / Horizontal for mobile */}
+                                            <div className="hidden sm:block w-[1px] bg-gradient-to-b from-transparent via-[#cfa545]/40 to-transparent flex-shrink-0" />
+                                            <div className="block sm:hidden h-[1px] w-full bg-amber-900/40 flex-shrink-0 my-0.5" />
+
+                                            {/* Right side: Large Featured Crate for Current Period */}
+                                            <div className="flex-shrink-0 bg-gradient-to-b from-[#2a1b10] via-[#1c120a] to-[#120a05] border-2 border-[#ffd700]/60 rounded-xl p-2 flex flex-col items-center justify-center min-w-[105px] sm:min-w-[130px] shadow-[0_0_20px_rgba(255,215,0,0.18)] relative">
+                                                <span className="text-[8px] sm:text-[9px] font-bold text-[#ffd700] uppercase tracking-wider bg-black/50 px-1.5 py-0.2 rounded border border-[#ffd700]/30 mb-0.5">
+                                                    ⚡ {currentPeriodTitle}
+                                                </span>
+                                                {/* Profit above large crate */}
+                                                <span className="text-xs sm:text-sm font-black font-mono text-[#4de180] mt-0.5 drop-shadow-md">
+                                                    +{currentProfit}
+                                                </span>
+                                                {/* Large Crate */}
+                                                <div className="relative w-13 h-13 sm:w-16 sm:h-16 my-0.5 transition-transform duration-300 hover:scale-110 drop-shadow-2xl">
+                                                    <Image src={currentAsset} alt="Current Crate" fill className="object-contain" unoptimized />
+                                                </div>
+                                                {/* DD below large crate */}
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <span className="text-[8px] sm:text-[9px] font-bold text-amber-200/80">ความเสี่ยง:</span>
+                                                    <span className="text-[8px] sm:text-[9px] font-mono font-bold text-amber-400 bg-black/60 px-1.5 py-0.2 rounded border border-amber-500/30">
+                                                        DD {currentDD}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* 3. Main Profit vs Drawdown Matrix Cards (with Visual Progress Bars) */}
                             {loadingFleetStats ? (
                                 <div className="py-12 text-center text-amber-200/50 animate-pulse font-mono">
                                     กำลังดึงสถิติผลงานพอร์ตจริงจากระบบ...
@@ -1499,142 +1684,211 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 const curPrefix = statsCurrency === 'USD' ? '$' : '';
 
                                 return (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Card A: Profit Performance */}
-                                        <div className="bg-gradient-to-b from-[#1c1810] to-[#140e08] border-2 border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-[0_0_25px_rgba(16,185,129,0.08)] relative overflow-hidden">
-                                            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3 mb-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xl">📈</span>
-                                                    <div>
-                                                        <h3 className="font-extrabold text-emerald-400 text-sm sm:text-base">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                                        {/* Card A: Profit Performance with Visual Gauge Bars */}
+                                        <div className="bg-gradient-to-b from-[#1c1810] to-[#140e08] border-2 border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 shadow-[0_0_25px_rgba(16,185,129,0.08)] relative overflow-hidden">
+                                            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2.5 mb-3">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-lg sm:text-xl flex-shrink-0">📈</span>
+                                                    <div className="min-w-0">
+                                                        <h3 className="font-extrabold text-emerald-400 text-xs sm:text-base truncate">
                                                             ผลงานการทำกำไร (Profit Matrix)
                                                         </h3>
-                                                        <p className="text-[10px] text-emerald-200/50">
+                                                        <p className="text-[9px] sm:text-[10px] text-emerald-200/50 truncate">
                                                             สถิติการปิดกำไรจริงในรอบ{fleetTimeframe === 'daily' ? 'วัน' : fleetTimeframe === 'weekly' ? 'สัปดาห์' : 'เดือน'}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                                                <span className="text-[9px] sm:text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 flex-shrink-0">
                                                     หน่วย {curUnit}
                                                 </span>
                                             </div>
 
-                                            <div className="space-y-3">
-                                                {/* Peak Max */}
-                                                <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-xl border border-emerald-500/20">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-emerald-300 flex items-center gap-1">
-                                                            <Sparkles className="w-3 h-3 text-[#ffd700]" />
-                                                            กำไรสูงสุด (Peak High)
+                                            <div className="space-y-2.5 sm:space-y-3">
+                                                {/* Peak Max with Gauge Bar */}
+                                                <div className="p-2 sm:p-2.5 bg-black/40 rounded-xl border border-emerald-500/20 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[11px] sm:text-xs font-bold text-emerald-300 flex items-center gap-1">
+                                                                <Sparkles className="w-3 h-3 text-[#ffd700]" />
+                                                                <span>กำไรสูงสุด (Peak High)</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-amber-200/40">วันที่ตลาดมีรอบคลื่นสวิงแรง</div>
                                                         </div>
-                                                        <div className="text-[9px] text-amber-200/40">วันที่ตลาดมีรอบคลื่นสวิงแรง</div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm sm:text-lg font-black font-mono text-[#4de180]">
+                                                                +{curPrefix}{pData.max.toLocaleString()} {curUnit}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base sm:text-lg font-black font-mono text-[#4de180]">
-                                                            +{curPrefix}{pData.max.toLocaleString()} {curUnit}
-                                                        </div>
+                                                    <div className="w-full bg-emerald-950/50 rounded-full h-1.5 sm:h-2 overflow-hidden border border-emerald-500/30">
+                                                        <div className="bg-gradient-to-r from-emerald-500 via-teal-400 to-[#ffd700] h-full rounded-full w-full animate-pulse shadow-[0_0_8px_rgba(77,225,128,0.5)]"></div>
                                                     </div>
-                                                </div>
-
-                                                {/* Average */}
-                                                <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-xl border border-emerald-500/20">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-amber-200 flex items-center gap-1">
-                                                            <span>⚖️</span>
-                                                            กำไรเฉลี่ย (Average Return)
-                                                        </div>
-                                                        <div className="text-[9px] text-amber-200/40">ผลตอบแทนเฉลี่ยต่อพอร์ต</div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base sm:text-lg font-black font-mono text-[#ffd700]">
-                                                            +{curPrefix}{pData.avg.toLocaleString()} {curUnit}
-                                                        </div>
+                                                    <div className="flex justify-between text-[8px] sm:text-[9px] text-amber-200/40">
+                                                        <span>สวิงคลื่นแรงพิเศษ</span>
+                                                        <span className="text-emerald-400 font-mono">100% Benchmark</span>
                                                     </div>
                                                 </div>
 
-                                                {/* Minimum */}
-                                                <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-xl border border-emerald-500/20">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-amber-200/80 flex items-center gap-1">
-                                                            <span>🌱</span>
-                                                            กำไรต่ำสุด (Minimum)
+                                                {/* Average Return with Gauge Bar */}
+                                                <div className="p-2 sm:p-2.5 bg-black/40 rounded-xl border border-emerald-500/20 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[11px] sm:text-xs font-bold text-amber-200 flex items-center gap-1">
+                                                                <span>⚖️</span>
+                                                                <span>กำไรเฉลี่ย (Average Return)</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-amber-200/40">ผลตอบแทนเฉลี่ยต่อพอร์ต</div>
                                                         </div>
-                                                        <div className="text-[9px] text-amber-200/40">วันที่ตลาดไซด์เวย์นิ่งสนิท</div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm sm:text-lg font-black font-mono text-[#ffd700]">
+                                                                +{curPrefix}{pData.avg.toLocaleString()} {curUnit}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base sm:text-lg font-black font-mono text-emerald-400/80">
-                                                            +{curPrefix}{pData.min.toLocaleString()} {curUnit}
+                                                    <div className="w-full bg-amber-950/40 rounded-full h-1.5 sm:h-2 overflow-hidden border border-amber-500/30">
+                                                        <div 
+                                                            className="bg-gradient-to-r from-amber-500 to-[#ffd700] h-full rounded-full"
+                                                            style={{ width: `${Math.min(100, Math.max(15, Math.round((pData.avg / (pData.max || 1)) * 100)))}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex justify-between text-[8px] sm:text-[9px] text-amber-200/40">
+                                                        <span>ผลตอบแทนมาตรฐานสม่ำเสมอ</span>
+                                                        <span className="text-[#ffd700] font-mono">{Math.round((pData.avg / (pData.max || 1)) * 100)}% ของรอบสวิง</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Minimum with Gauge Bar */}
+                                                <div className="p-2 sm:p-2.5 bg-black/40 rounded-xl border border-emerald-500/20 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[11px] sm:text-xs font-bold text-amber-200/80 flex items-center gap-1">
+                                                                <span>🌱</span>
+                                                                <span>กำไรต่ำสุด (Minimum)</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-amber-200/40">วันที่ตลาดไซด์เวย์นิ่งสนิท</div>
                                                         </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm sm:text-lg font-black font-mono text-emerald-400/80">
+                                                                +{curPrefix}{pData.min.toLocaleString()} {curUnit}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full bg-emerald-950/30 rounded-full h-1.5 sm:h-2 overflow-hidden border border-emerald-500/20">
+                                                        <div 
+                                                            className="bg-emerald-500/70 h-full rounded-full"
+                                                            style={{ width: `${Math.min(100, Math.max(8, Math.round((pData.min / (pData.max || 1)) * 100)))}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex justify-between text-[8px] sm:text-[9px] text-amber-200/40">
+                                                        <span>ไซด์เวย์นิ่งสนิท</span>
+                                                        <span className="text-emerald-400/80 font-mono">ปิดบวกต่อเนื่อง</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Card B: Drawdown Control */}
-                                        <div className="bg-gradient-to-b from-[#1c1810] to-[#140e08] border-2 border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-[0_0_25px_rgba(245,158,11,0.08)] relative overflow-hidden">
-                                            <div className="flex items-center justify-between border-b border-amber-500/20 pb-3 mb-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xl">🛡️</span>
-                                                    <div>
-                                                        <h3 className="font-extrabold text-[#ffd700] text-sm sm:text-base">
+                                        {/* Card B: Drawdown Control with Visual Gauge Bars */}
+                                        <div className="bg-gradient-to-b from-[#1c1810] to-[#140e08] border-2 border-amber-500/30 rounded-2xl p-3.5 sm:p-5 shadow-[0_0_25px_rgba(245,158,11,0.08)] relative overflow-hidden">
+                                            <div className="flex items-center justify-between border-b border-amber-500/20 pb-2.5 mb-3">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-lg sm:text-xl flex-shrink-0">🛡️</span>
+                                                    <div className="min-w-0">
+                                                        <h3 className="font-extrabold text-[#ffd700] text-xs sm:text-base truncate">
                                                             ควบคุมความเสี่ยง (Drawdown Safe)
                                                         </h3>
-                                                        <p className="text-[10px] text-amber-200/50">
+                                                        <p className="text-[9px] sm:text-[10px] text-amber-200/50 truncate">
                                                             ระบบคุม DD 3 ชั้น ป้องกันความเสี่ยงทุกสภาวะตลาด
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                                                <span className="text-[9px] sm:text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 flex-shrink-0">
                                                     Max Drawdown %
                                                 </span>
                                             </div>
 
-                                            <div className="space-y-3">
-                                                {/* Normal / Avg DD */}
-                                                <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-xl border border-amber-500/20">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-amber-300 flex items-center gap-1">
-                                                            <span>🛡️</span>
-                                                            Drawdown เฉลี่ย (Normal)
+                                            <div className="space-y-2.5 sm:space-y-3">
+                                                {/* Lowest DD */}
+                                                <div className="p-2 sm:p-2.5 bg-black/40 rounded-xl border border-amber-500/20 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[11px] sm:text-xs font-bold text-emerald-300 flex items-center gap-1">
+                                                                <span>🕊️</span>
+                                                                <span>Drawdown ต่ำสุด (Lowest Risk)</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-amber-200/40">ช่วงที่พอร์ตแทบไร้ความเสี่ยง</div>
                                                         </div>
-                                                        <div className="text-[9px] text-amber-200/40">ความเสี่ยงต่ำ คุมพอร์ตปลอดภัย</div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm sm:text-lg font-black font-mono text-emerald-400">
+                                                                {currentStats.drawdown.min}%
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base sm:text-lg font-black font-mono text-[#ffd700]">
-                                                            {currentStats.drawdown.avg}%
-                                                        </div>
+                                                    <div className="w-full bg-black/50 rounded-full h-1.5 sm:h-2 overflow-hidden border border-emerald-500/30">
+                                                        <div 
+                                                            className="bg-emerald-400 h-full rounded-full shadow-[0_0_8px_rgba(52,211,153,0.6)]"
+                                                            style={{ width: `${Math.min(100, Math.max(4, (currentStats.drawdown.min / 25) * 100))}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex justify-between text-[8px] sm:text-[9px] text-amber-200/40">
+                                                        <span>ช่วงที่พอร์ตแทบไร้ความเสี่ยง</span>
+                                                        <span className="text-emerald-400 font-mono">Ultra Safe</span>
                                                     </div>
                                                 </div>
 
-                                                {/* Lowest DD */}
-                                                <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-xl border border-amber-500/20">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-emerald-300 flex items-center gap-1">
-                                                            <span>🕊️</span>
-                                                            Drawdown ต่ำสุด (Lowest Risk)
+                                                {/* Normal / Avg DD */}
+                                                <div className="p-2 sm:p-2.5 bg-black/40 rounded-xl border border-amber-500/20 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[11px] sm:text-xs font-bold text-amber-300 flex items-center gap-1">
+                                                                <span>🛡️</span>
+                                                                <span>Drawdown เฉลี่ย (Normal)</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-amber-200/40">ความเสี่ยงต่ำ คุมพอร์ตปลอดภัย</div>
                                                         </div>
-                                                        <div className="text-[9px] text-amber-200/40">ช่วงที่พอร์ตแทบไร้ความเสี่ยง</div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm sm:text-lg font-black font-mono text-[#ffd700]">
+                                                                {currentStats.drawdown.avg}%
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base sm:text-lg font-black font-mono text-emerald-400">
-                                                            {currentStats.drawdown.min}%
-                                                        </div>
+                                                    <div className="w-full bg-black/50 rounded-full h-1.5 sm:h-2 overflow-hidden border border-amber-500/30">
+                                                        <div 
+                                                            className="bg-gradient-to-r from-emerald-400 to-[#ffd700] h-full rounded-full"
+                                                            style={{ width: `${Math.min(100, Math.max(10, (currentStats.drawdown.avg / 25) * 100))}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex justify-between text-[8px] sm:text-[9px] text-amber-200/40">
+                                                        <span>ความเสี่ยงต่ำ คุมพอร์ตปลอดภัย</span>
+                                                        <span className="text-[#ffd700] font-mono">Normal Safe</span>
                                                     </div>
                                                 </div>
 
                                                 {/* Peak Max DD */}
-                                                <div className="flex items-center justify-between p-2.5 bg-black/40 rounded-xl border border-amber-500/20">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                                                            <Zap className="w-3 h-3 text-amber-400" />
-                                                            DD สูงสุดที่เคยเจอ (Peak Max DD)
+                                                <div className="p-2 sm:p-2.5 bg-black/40 rounded-xl border border-amber-500/20 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-[11px] sm:text-xs font-bold text-amber-400 flex items-center gap-1">
+                                                                <Zap className="w-3 h-3 text-amber-400" />
+                                                                <span>DD สูงสุดที่เคยเจอ (Peak Max DD)</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-amber-200/40">ผ่านวิกฤตข่าวใหญ่มาได้ 100%</div>
                                                         </div>
-                                                        <div className="text-[9px] text-amber-200/40">ผ่านวิกฤตข่าวใหญ่มาได้ 100%</div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm sm:text-lg font-black font-mono text-amber-400">
+                                                                {currentStats.drawdown.max}%
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base sm:text-lg font-black font-mono text-amber-400">
-                                                            {currentStats.drawdown.max}%
-                                                        </div>
+                                                    <div className="w-full bg-black/50 rounded-full h-1.5 sm:h-2 overflow-hidden border border-amber-500/30">
+                                                        <div 
+                                                            className="bg-gradient-to-r from-emerald-500 via-amber-500 to-amber-600 h-full rounded-full"
+                                                            style={{ width: `${Math.min(100, Math.max(20, (currentStats.drawdown.max / 25) * 100))}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex justify-between text-[8px] sm:text-[9px] text-amber-200/40">
+                                                        <span>ผ่านวิกฤตข่าวใหญ่มาได้ 100%</span>
+                                                        <span className="text-emerald-400 font-mono font-bold">ห่างจาก Margin Call &gt; 80%</span>
                                                     </div>
                                                 </div>
                                             </div>
