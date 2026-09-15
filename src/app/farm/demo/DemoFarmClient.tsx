@@ -1682,7 +1682,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     พร้อมเปลี่ยนจากพอร์ตจำลองเป็นพอร์ตจริงหรือยัง?
                                 </div>
                                 <div className="text-[10px] text-amber-200/60">
-                                    เริ่มต้นเพียง $100 (10,000 USC) ก็รันได้เต็มระบบ
+                                    เริ่มต้นเพียง $500 (50,000 USC) ก็รันได้เต็มระบบ
                                 </div>
                             </div>
 
@@ -1698,10 +1698,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     href="https://lin.ee/U8DdhPj"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 font-bold text-xs rounded-xl transition-all shadow-sm"
-                                    title="LINE @jharvest ปรึกษาฟรี"
+                                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-[0_0_12px_rgba(16,185,129,0.3)] flex items-center justify-center gap-1.5 transition-all"
                                 >
-                                    <span>LINE @jharvest</span>
+                                    <span>💬 สอบถามแอดมิน</span>
                                     <ArrowUpRight className="w-3.5 h-3.5" />
                                 </a>
                             </div>
@@ -1778,7 +1777,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     <div className="p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-start justify-between gap-2">
                                         <div>
                                             <span className="font-bold text-[#ffd700]">🌟 EasyM MAX (พร้อมหน้า Farm UI):</span>
-                                            <span className="text-amber-200/80 ml-1">ทุนที่เหมาะสมที่สุดคือ</span>
+                                            <span className="text-amber-200/80 ml-1">ทุนที่เหมาะสม(แนะนำ)</span>
                                         </div>
                                         <span className="font-mono font-black text-emerald-400 whitespace-nowrap">
                                             100,000 cent ($1,000)
@@ -1787,7 +1786,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     <div className="p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-start justify-between gap-2">
                                         <div>
                                             <span className="font-bold text-amber-300">⚡ EasyM mini:</span>
-                                            <span className="text-amber-200/80 ml-1">ทุนเริ่มต้นแนะนำ</span>
+                                            <span className="text-amber-200/80 ml-1">ทุนเริ่มต้น</span>
                                         </div>
                                         <span className="font-mono font-black text-emerald-400 whitespace-nowrap">
                                             50,000 cent ($500)
