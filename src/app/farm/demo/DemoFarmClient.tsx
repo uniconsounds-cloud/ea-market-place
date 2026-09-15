@@ -1673,12 +1673,13 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                     <span>เปิดพอร์ตจริงรับสิทธิ์ฟรี</span>
                                 </button>
                                 <a
-                                    href="https://line.me/R/ti/p/@eaeze"
+                                    href="https://lin.ee/U8DdhPj"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 font-bold text-xs rounded-xl transition-all"
+                                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 font-bold text-xs rounded-xl transition-all shadow-sm"
+                                    title="LINE @jharvest ปรึกษาฟรี"
                                 >
-                                    <span>LINE</span>
+                                    <span>LINE @jharvest</span>
                                     <ArrowUpRight className="w-3.5 h-3.5" />
                                 </a>
                             </div>
@@ -1689,82 +1690,175 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
             {/* OPEN REAL ACCOUNT 3-STEP MODAL */}
             {showOpenRealAccountModal && (
-                <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in select-auto">
-                    <div className="bg-[#170e08] border-2 border-[#ffd700] rounded-2xl w-full max-w-lg p-5 sm:p-6 shadow-[0_0_50px_rgba(255,215,0,0.35)] relative animate-fade-in-up">
+                <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md animate-fade-in select-auto">
+                    <div className="bg-[#170e08] border-2 border-[#ffd700] rounded-2xl w-full max-w-xl p-4 sm:p-6 shadow-[0_0_60px_rgba(255,215,0,0.35)] relative animate-fade-in-up max-h-[92vh] overflow-y-auto">
                         <button 
                             onClick={() => setShowOpenRealAccountModal(false)}
-                            className="absolute top-4 right-4 p-1.5 text-amber-200/60 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                            className="absolute top-4 right-4 p-1.5 text-amber-200/60 hover:text-white hover:bg-white/10 rounded-full transition-colors z-10"
                         >
                             <X className="w-5 h-5" />
                         </button>
 
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ffd700]/30 to-[#cfa545]/10 border border-[#ffd700]/50 flex items-center justify-center text-xl">
+                        {/* Title Header */}
+                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-amber-500/20">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#ffd700]/30 to-[#cfa545]/10 border border-[#ffd700]/50 flex items-center justify-center text-2xl shadow-sm">
                                 🚀
                             </div>
                             <div>
                                 <h3 className="text-base sm:text-lg font-black text-[#ffd700]">
-                                    3 ขั้นตอนง่ายๆ ในการเปิดพอร์ตจริง
+                                    3 ขั้นตอนง่ายๆ ในการเปิดพอร์ตจริง (ฟรี 100%)
                                 </h3>
                                 <p className="text-xs text-amber-200/60">
-                                    ใช้งาน EasyM ฟรีตลอดชีพ ภายใต้สายงาน IB
+                                    ใช้งาน EasyM ฟรีตลอดชีพ ภายใต้สายงาน IB พร้อมรับเงินคืน Rebate สูงสุด $15/lot
                                 </p>
                             </div>
                         </div>
 
-                        <div className="space-y-3 text-xs text-amber-100/90 mb-5 font-sans">
-                            <div className="flex items-start gap-3 p-3 bg-black/40 rounded-xl border border-amber-500/20">
-                                <span className="w-6 h-6 rounded-full bg-[#cfa545] text-black font-black flex items-center justify-center flex-shrink-0 text-xs mt-0.5">
-                                    1
-                                </span>
-                                <div>
-                                    <div className="font-bold text-white text-sm">เปิดบัญชี Exness บัญชี Cent</div>
-                                    <div className="text-amber-200/60 text-[11px] mt-0.5">
-                                        เปิดบัญชีประเภท <b>Standard Cent (MT5)</b> ภายใต้ลิงก์พาร์ทเนอร์เพื่อรับสิทธิ์รันฟรีและส่วนแบ่ง Rebate $15/lot
+                        {/* 3 Steps */}
+                        <div className="space-y-3 text-xs text-amber-100/90 mb-4 font-sans">
+                            {/* Step 1 */}
+                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
+                                        1
+                                    </span>
+                                    <div className="font-extrabold text-white text-sm">
+                                        สมัครเปิดบัญชีเทรดกับโบรกเกอร์ InterStellar
                                     </div>
+                                </div>
+                                <p className="text-amber-200/70 text-[11px] leading-relaxed pl-7">
+                                    สมัครบัญชีเทรดภายใต้ลิงก์สายงาน เพื่อรับสิทธิ์ใช้งาน EasyM ฟรีตลอดชีพ ไม่มีค่าบริการรายเดือน และรับสิทธิ์เงินคืนค่ารีเบท
+                                </p>
+                                <div className="pl-7 pt-1">
+                                    <a
+                                        href="https://my.fisg.com/register/trader?link_id=qb9f9uqj&referrer_id=0DtW2XvtM"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-[#cfa545] hover:from-amber-400 hover:to-[#dfb555] text-black font-black text-xs rounded-lg shadow-sm transition-all"
+                                    >
+                                        <span>คลิกสมัครเปิดบัญชี InterStellar</span>
+                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                    </a>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 p-3 bg-black/40 rounded-xl border border-amber-500/20">
-                                <span className="w-6 h-6 rounded-full bg-[#cfa545] text-black font-black flex items-center justify-center flex-shrink-0 text-xs mt-0.5">
-                                    2
-                                </span>
-                                <div>
-                                    <div className="font-bold text-white text-sm">ฝากเงินเข้าพอร์ต</div>
-                                    <div className="text-amber-200/60 text-[11px] mt-0.5">
-                                        ฝากเงินเข้าพอร์ต Cent เริ่มต้นเพียง $100 (ได้ 10,000 USC) หรือ $500 เพื่อกระจายความเสี่ยงได้เต็มประสิทธิภาพ
+                            {/* Step 2 */}
+                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
+                                        2
+                                    </span>
+                                    <div className="font-extrabold text-white text-sm">
+                                        ฝากเงินเข้าพอร์ตตามขนาดที่ต้องการรัน
                                     </div>
+                                </div>
+                                <div className="pl-7 space-y-1.5 text-[11px]">
+                                    <div className="p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-start justify-between gap-2">
+                                        <div>
+                                            <span className="font-bold text-[#ffd700]">🌟 EasyM MAX (พร้อมหน้า Farm UI):</span>
+                                            <span className="text-amber-200/80 ml-1">ทุนที่เหมาะสมที่สุดคือ</span>
+                                        </div>
+                                        <span className="font-mono font-black text-emerald-400 whitespace-nowrap">
+                                            100,000 cent ($1,000)
+                                        </span>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-start justify-between gap-2">
+                                        <div>
+                                            <span className="font-bold text-amber-300">⚡ EasyM mini:</span>
+                                            <span className="text-amber-200/80 ml-1">ทุนเริ่มต้นแนะนำ</span>
+                                        </div>
+                                        <span className="font-mono font-black text-emerald-400 whitespace-nowrap">
+                                            50,000 cent ($500)
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-amber-200/50 italic">
+                                        * พอร์ต Cent ช่วยกระจายความเสี่ยงได้ 20 คู่เงินอย่างสมบูรณ์แบบและปลอดภัยสูงสุด
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 p-3 bg-black/40 rounded-xl border border-amber-500/20">
-                                <span className="w-6 h-6 rounded-full bg-[#cfa545] text-black font-black flex items-center justify-center flex-shrink-0 text-xs mt-0.5">
-                                    3
-                                </span>
-                                <div>
-                                    <div className="font-bold text-white text-sm">ยื่นเลขพอร์ตเพื่อเปิดใช้งาน License ฟรี</div>
-                                    <div className="text-amber-200/60 text-[11px] mt-0.5">
-                                        กรอกเลขบัญชี MT5 ที่เมนู <b>"จัดการ License"</b> ในหน้าแดชบอร์ด ระบบจะอนุมัติและปล่อยไฟล์ติดตั้งให้ทันที
+                            {/* Step 3 */}
+                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
+                                        3
+                                    </span>
+                                    <div className="font-extrabold text-white text-sm">
+                                        ยื่นเลขพอร์ตเพื่อเปิดใช้งาน License ฟรี
+                                    </div>
+                                </div>
+                                <p className="text-amber-200/70 text-[11px] leading-relaxed pl-7">
+                                    นำเลขบัญชี MT5 ที่เปิดกับ InterStellar ไปยื่นที่เมนู <b>"จัดการ License"</b> ในหน้าแดชบอร์ด ระบบจะอนุมัติและปล่อยไฟล์ติดตั้งให้ทันที
+                                </p>
+                                <div className="pl-7 flex flex-wrap items-center gap-2 pt-1">
+                                    <Link
+                                        href="/dashboard/licenses"
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#cfa545] hover:bg-[#dfb555] text-black font-extrabold text-xs rounded-lg shadow-sm transition-all"
+                                    >
+                                        <span>กรอกเลขพอร์ตที่แดชบอร์ด</span>
+                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                    </Link>
+                                    <a
+                                        href="https://eaeze.com/register?ref=REF-06A189"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-amber-200 border border-amber-500/30 text-[11px] rounded-lg transition-all"
+                                    >
+                                        <span>ยังไม่เคยสมัครสมาชิกเว็บ? คลิกสมัครที่นี่</span>
+                                        <ArrowUpRight className="w-3 h-3" />
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* LINE OpenChat & Consultation Box */}
+                        <div className="bg-gradient-to-r from-emerald-950/40 via-black/50 to-emerald-950/30 border border-emerald-500/30 rounded-xl p-3 sm:p-3.5 mb-4">
+                            <div className="flex items-start gap-2.5">
+                                <span className="text-2xl flex-shrink-0">💬</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-extrabold text-white text-xs sm:text-sm">
+                                            มีข้อสงสัย หรือต้องการให้แอดมินช่วยเปิดพอร์ต?
+                                        </span>
+                                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold px-1.5 py-0.2 rounded">
+                                            ปรึกษาฟรี 100%
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-200/70 mt-1 leading-relaxed">
+                                        ยินดีให้คำปรึกษา แนะนำการตั้งค่า EA และดูแลช่วยเหลือตลอดการใช้งาน เข้ามาร่วมพูดคุยสอบถามใน LINE OpenChat ได้เลยครับ
+                                    </p>
+                                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                        <a
+                                            href="https://lin.ee/U8DdhPj"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-lg shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all"
+                                        >
+                                            <span>เข้า LINE OpenChat (@jharvest)</span>
+                                            <ArrowUpRight className="w-3.5 h-3.5" />
+                                        </a>
+                                        <span className="text-[10px] text-emerald-400 font-mono">
+                                            LINE ID: @jharvest
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+                        {/* Modal Action Buttons */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2 pt-1 border-t border-amber-500/20">
                             <Link
                                 href="/dashboard/licenses"
-                                className="w-full sm:flex-1 py-3 px-4 bg-gradient-to-r from-[#ffd700] to-[#cfa545] text-black font-black text-center text-xs rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.3)] hover:scale-[1.02] transition-all"
+                                className="w-full sm:flex-1 py-2.5 px-4 bg-gradient-to-r from-[#ffd700] to-[#cfa545] text-black font-black text-center text-xs sm:text-sm rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.3)] hover:scale-[1.02] transition-all"
                             >
-                                ไปยังหน้ายื่นขอ License พอร์ตจริง →
+                                ไปยังหน้าจัดการ License พอร์ตจริง →
                             </Link>
-                            <a
-                                href="https://line.me/R/ti/p/@eaeze"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full sm:w-auto py-3 px-4 bg-white/5 hover:bg-white/10 text-amber-200 border border-amber-500/30 font-bold text-center text-xs rounded-xl transition-all"
+                            <button
+                                onClick={() => setShowOpenRealAccountModal(false)}
+                                className="w-full sm:w-auto py-2.5 px-4 bg-white/5 hover:bg-white/10 text-amber-200/80 border border-amber-500/30 font-bold text-center text-xs rounded-xl transition-all"
                             >
-                                ให้แอดมินช่วยเปิดพอร์ต
-                            </a>
+                                ปิดหน้าต่าง
+                            </button>
                         </div>
                     </div>
                 </div>
