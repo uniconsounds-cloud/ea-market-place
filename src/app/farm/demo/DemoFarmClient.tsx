@@ -1762,7 +1762,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                                             <div className="text-sm sm:text-lg font-black font-mono text-[#4de180]">
                                                                 +{curPrefix}{peakP.toLocaleString()} {curUnit}
                                                             </div>
-                                                            <span className="text-[9px] text-emerald-400/60 font-bold">Peak Performer</span>
+                                                            <span className="text-[9px] text-emerald-400/80 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                                                {isDaily ? 'อันดับ 1 วันนี้' : isWeekly ? 'อันดับ 1 สัปดาห์นี้' : 'อันดับ 1 เดือนนี้'}
+                                                            </span>
                                                         </div>
                                                         {/* Progress bar */}
                                                         <div className="w-full bg-emerald-950/40 rounded-full h-1.5 overflow-hidden border border-emerald-500/30">
