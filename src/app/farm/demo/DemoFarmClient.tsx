@@ -1494,15 +1494,15 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                 const y = fleetStatsData.yesterday || {};
                                 const t = fleetStatsData.today || {};
 
-                                const yMaxP = isUSC ? (y.maxProfitUSC || 9188) : (y.maxProfitUSD || 91.88);
-                                const yAvgP = isUSC ? (y.profitUSC || 860) : (y.profitUSD || 8.60);
-                                const yMaxDD = y.maxDD || 4.2;
-                                const yAvgDD = y.dd || 3.2;
+                                const yMaxP = isUSC ? (y.maxProfitUSC ?? 0) : (y.maxProfitUSD ?? 0);
+                                const yAvgP = isUSC ? (y.profitUSC ?? 0) : (y.profitUSD ?? 0);
+                                const yMaxDD = y.maxDD ?? 0;
+                                const yAvgDD = y.dd ?? 0;
 
-                                const tMaxP = isUSC ? (t.maxProfitUSC || 4250) : (t.maxProfitUSD || 42.50);
-                                const tAvgP = isUSC ? (t.profitUSC || 380) : (t.profitUSD || 3.80);
-                                const tMaxDD = t.maxDD || 3.5;
-                                const tAvgDD = t.dd || 2.8;
+                                const tMaxP = isUSC ? (t.maxProfitUSC ?? 0) : (t.maxProfitUSD ?? 0);
+                                const tAvgP = isUSC ? (t.profitUSC ?? 0) : (t.profitUSD ?? 0);
+                                const tMaxDD = t.maxDD ?? 0;
+                                const tAvgDD = t.dd ?? 0;
 
                                 return (
                                     <div className="space-y-1.5">
@@ -1531,13 +1531,13 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                                     </span>
                                                 </div>
 
-                                                {/* Top Performer Box (แสดงเลขท้าย 3 ตัว เช่น xxx434) */}
+                                                {/* Top Performer Box */}
                                                 <div className="bg-black/50 rounded-lg p-2 border border-[#ffd700]/20 space-y-0.5">
                                                     <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
                                                         <span className="text-amber-300 font-bold flex items-center gap-1">
                                                             <span>🏆 พอร์ตกำไรสูงสุด:</span>
                                                             <span className="font-mono text-[#ffd700] bg-amber-500/20 px-1 rounded border border-amber-500/40">
-                                                                {y.topPort || 'xxx434'}
+                                                                {y.topPort || '-'}
                                                             </span>
                                                         </span>
                                                         <span className="text-[9px] font-mono text-amber-400">
@@ -1549,7 +1549,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                                     </div>
                                                 </div>
 
-                                                {/* Fleet Average Box (ไม่ต้องแสดงเลขพอร์ต) */}
+                                                {/* Fleet Average Box */}
                                                 <div className="bg-black/30 rounded-lg p-2 border border-emerald-500/15 space-y-0.5">
                                                     <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
                                                         <span className="text-amber-200/70 font-bold">
@@ -1578,13 +1578,13 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                                                     </span>
                                                 </div>
 
-                                                {/* Top Performer Box (แสดงเลขท้าย 3 ตัว เช่น xxx892) */}
+                                                {/* Top Performer Box */}
                                                 <div className="bg-black/50 rounded-lg p-2 border border-[#ffd700]/30 space-y-0.5">
                                                     <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
                                                         <span className="text-amber-300 font-bold flex items-center gap-1">
                                                             <span>🏆 พอร์ตกำไรสูงสุด:</span>
                                                             <span className="font-mono text-[#ffd700] bg-amber-500/20 px-1 rounded border border-amber-500/40">
-                                                                {t.topPort || 'xxx892'}
+                                                                {t.topPort || '-'}
                                                             </span>
                                                         </span>
                                                         <span className="text-[9px] font-mono text-amber-400">

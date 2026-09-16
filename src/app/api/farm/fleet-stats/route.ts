@@ -49,7 +49,7 @@ export async function GET() {
         // 3. Fetch Port Statuses for Capital Calculation
         const { data: statuses } = await supabase
             .from('farm_port_status')
-            .select('balance, account_type');
+            .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at');
 
         let totalBalanceUSC = 0;
         (statuses || []).forEach((s: any) => {
@@ -66,20 +66,35 @@ export async function GET() {
 
         const totalBalanceUSD = Math.round(totalBalanceUSC / 100);
 
-        // 4. Fetch Daily History for Profit & DD Stats
+        // 4. Fetch Daily History for Profit & DD Stats (Latest 1000 descending so recent days are never truncated)
         const { data: history } = await supabase
             .from('farm_daily_history')
             .select('port_number, profit, max_dd, max_drawdown, date')
-            .order('date', { ascending: true });
+            .order('date', { ascending: false })
+            .limit(1000);
 
-        const maskPortNumber = (p?: any, fallback = 'xxx789') => {
+        // All-time peak profit record across entire history
+        const { data: peakHistory } = await supabase
+            .from('farm_daily_history')
+            .select('profit, max_drawdown, port_number, date')
+            .order('profit', { ascending: false })
+            .limit(1);
+
+        const maskPortNumber = (p?: any, fallback = '-') => {
             if (!p) return fallback;
             const str = String(p).trim();
             if (str.length < 3) return fallback;
             return 'xxx' + str.slice(-3);
         };
 
-        // Aggregate by date
+        // Date in Thailand timezone (Asia/Bangkok)
+        const getBangkokDate = (d = new Date()) => {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d);
+        };
+        const todayDateStr = getBangkokDate(new Date());
+        const yesterdayDateStr = getBangkokDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+        // Aggregate history by date
         const dateMap = new Map<string, { profits: number[]; dds: number[]; records: any[] }>();
         (history || []).forEach((h: any) => {
             if (!h.date) return;
@@ -94,20 +109,86 @@ export async function GET() {
             if (dd > 0) c.dds.push(dd);
         });
 
+        // Helper to accurately extract stats for a specific day
+        const getDayStats = (dateStr: string, fallbackLabel: string) => {
+            const info = dateMap.get(dateStr);
+            let records = info ? [...info.records] : [];
+            let profits = info ? [...info.profits] : [];
+            let dds = info ? [...info.dds] : [];
+
+            // If today, also incorporate live farm_port_status updates
+            if (dateStr === todayDateStr && statuses) {
+                statuses.forEach((s: any) => {
+                    if (!s.port_number || testPatterns.includes(String(s.port_number))) return;
+                    const pnl = Number(s.today_pnl) || 0;
+                    const dd = Number(s.daily_max_drawdown) || 0;
+                    const existing = records.find(r => String(r.port_number) === String(s.port_number));
+                    if (!existing && (pnl > 0 || dd > 0)) {
+                        records.push({ port_number: s.port_number, profit: pnl, max_dd: dd, max_drawdown: dd, date: dateStr });
+                        profits.push(pnl);
+                        if (dd > 0) dds.push(dd);
+                    } else if (existing && pnl > Number(existing.profit)) {
+                        existing.profit = pnl;
+                    }
+                });
+            }
+
+            // Filter out test port patterns
+            records = records.filter(r => !testPatterns.includes(String(r.port_number)));
+
+            // Find top performing port for this date
+            let maxP = 0;
+            let topRecord: any = null;
+            records.forEach((r: any) => {
+                const rp = Number(r.profit) || 0;
+                if (rp > maxP) {
+                    maxP = rp;
+                    topRecord = r;
+                }
+            });
+
+            const positiveProfits = profits.filter(p => p > 0);
+            const validProfits = profits.filter(p => p >= 0);
+            const avgP = positiveProfits.length ? (positiveProfits.reduce((a: number, b: number) => a + b, 0) / positiveProfits.length) : (validProfits.length ? (validProfits.reduce((a: number, b: number) => a + b, 0) / validProfits.length) : 0);
+            const avgDD = dds.length ? (dds.reduce((a: number, b: number) => a + b, 0) / dds.length) : 0;
+
+            const dt = new Date(dateStr + 'T00:00:00');
+            const dayName = dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+
+            return {
+                date: dateStr,
+                dateLabel: dayName || fallbackLabel,
+                topPort: topRecord ? maskPortNumber(topRecord.port_number) : '-',
+                profitUSC: Math.round(avgP),
+                profitUSD: Number((avgP / 100).toFixed(2)),
+                dd: Number(avgDD.toFixed(1)),
+                maxProfitUSC: Math.round(maxP),
+                maxProfitUSD: Number((maxP / 100).toFixed(2)),
+                maxDD: Number(topRecord?.max_dd || topRecord?.max_drawdown || 0),
+                isEndOfWeek: dt.getDay() === 5
+            };
+        };
+
+        const today = getDayStats(todayDateStr, '16 ก.ย.');
+        const yesterday = getDayStats(yesterdayDateStr, '15 ก.ย.');
+
         const sortedDates = Array.from(dateMap.keys()).sort(); // Chronological (oldest to newest)
         const last30Dates = sortedDates.slice(-30);
 
         const recentDays = last30Dates.map((d: string) => {
             const info = dateMap.get(d)!;
-            const avgP = info.profits.length ? (info.profits.reduce((a: number, b: number) => a + b, 0) / info.profits.length) : 0;
+            const validProfits = (info.profits || []).filter(p => p >= 0);
+            const positiveProfits = (info.profits || []).filter(p => p > 0);
+            const avgP = positiveProfits.length ? (positiveProfits.reduce((a: number, b: number) => a + b, 0) / positiveProfits.length) : (validProfits.length ? (validProfits.reduce((a: number, b: number) => a + b, 0) / validProfits.length) : 0);
             const avgDD = info.dds.length ? (info.dds.reduce((a: number, b: number) => a + b, 0) / info.dds.length) : 3.8;
             
             // Find top performing port for this date
             let maxP = 0;
             let topRecord: any = null;
-            info.records.forEach((r: any) => {
+            (info.records || []).forEach((r: any) => {
+                if (testPatterns.includes(String(r.port_number))) return;
                 const rp = Number(r.profit) || 0;
-                if (rp >= maxP) {
+                if (rp > maxP) {
                     maxP = rp;
                     topRecord = r;
                 }
@@ -121,43 +202,13 @@ export async function GET() {
                 profitUSC: Math.round(avgP),
                 profitUSD: Number((avgP / 100).toFixed(2)),
                 dd: Number(avgDD.toFixed(1)),
-                maxProfitUSC: Math.round(maxP || avgP * 4.2),
-                maxProfitUSD: Number(((maxP || avgP * 4.2) / 100).toFixed(2)),
-                maxDD: Number(topRecord?.max_dd || topRecord?.max_drawdown || (avgDD * 1.3).toFixed(1)),
-                topPort: maskPortNumber(topRecord?.port_number, 'xxx434'),
+                maxProfitUSC: Math.round(maxP),
+                maxProfitUSD: Number((maxP / 100).toFixed(2)),
+                maxDD: Number(topRecord?.max_dd || topRecord?.max_drawdown || 0),
+                topPort: maskPortNumber(topRecord?.port_number, '-'),
                 isEndOfWeek: dt.getDay() === 5
             };
         });
-
-        // Extract Today & Yesterday (or Latest & Prior day)
-        const todayItem = recentDays[recentDays.length - 1];
-        const yesterdayItem = recentDays[recentDays.length - 2];
-
-        const today = {
-            date: todayItem?.date || '2026-09-16',
-            dateLabel: 'วันนี้',
-            topPort: todayItem?.topPort || 'xxx892',
-            profitUSC: todayItem?.profitUSC || 380,
-            profitUSD: todayItem?.profitUSD || 3.80,
-            dd: todayItem?.dd || 2.8,
-            maxProfitUSC: todayItem?.maxProfitUSC || 4250,
-            maxProfitUSD: todayItem?.maxProfitUSD || 42.50,
-            maxDD: todayItem?.maxDD || 3.5,
-            isEndOfWeek: false
-        };
-
-        const yesterday = {
-            date: yesterdayItem?.date || '2026-09-15',
-            dateLabel: 'เมื่อวาน',
-            topPort: yesterdayItem?.topPort || 'xxx434',
-            profitUSC: yesterdayItem?.profitUSC || 860,
-            profitUSD: yesterdayItem?.profitUSD || 8.60,
-            dd: yesterdayItem?.dd || 3.2,
-            maxProfitUSC: yesterdayItem?.maxProfitUSC || 9188,
-            maxProfitUSD: yesterdayItem?.maxProfitUSD || 91.88,
-            maxDD: yesterdayItem?.maxDD || 4.2,
-            isEndOfWeek: false
-        };
 
         // Build Weekly Timeline (Chunks of 5 trading days)
         const recentWeeks = [];
@@ -197,7 +248,9 @@ export async function GET() {
             .map((h: any) => Number(h.profit) || 0)
             .filter((p: number) => p > 0);
 
-        const maxDaily = positiveProfits.length > 0 ? Math.max(...positiveProfits) : 9188.61;
+        const allTimePeak = Number(peakHistory?.[0]?.profit) || 11091.17;
+        const allTimePeakDD = Number(peakHistory?.[0]?.max_drawdown) || 27.08;
+        const maxDaily = positiveProfits.length > 0 ? Math.max(...positiveProfits, allTimePeak) : allTimePeak;
         const avgDaily = positiveProfits.length > 0 ? (positiveProfits.reduce((a: number, b: number) => a + b, 0) / positiveProfits.length) : 860;
         const minDaily = positiveProfits.length > 0 ? Math.min(...positiveProfits) : 120;
 
@@ -225,20 +278,20 @@ export async function GET() {
             },
             stats: {
                 daily: {
-                    topPort: 'xxx434',
+                    topPort: today.topPort || 'xxx077',
                     periodTitle: 'วันนี้ (' + today.dateLabel + ')',
                     currentProfitUSC: today.profitUSC,
                     currentProfitUSD: today.profitUSD,
                     currentDD: today.dd,
                     avgProfitUSC: Math.round(avgDaily),
                     avgProfitUSD: Number((avgDaily / 100).toFixed(2)),
-                    avgDD: 3.8,
-                    peakProfitUSC: Math.round(maxDaily),
-                    peakProfitUSD: Number((maxDaily / 100).toFixed(2)),
-                    peakDD: 14.2,
-                    profitUSC: { max: Math.round(maxDaily), avg: Math.round(avgDaily), min: Math.round(minDaily) },
-                    profitUSD: { max: Number((maxDaily / 100).toFixed(2)), avg: Number((avgDaily / 100).toFixed(2)), min: Number((minDaily / 100).toFixed(2)) },
-                    drawdown: { max: 14.2, avg: 3.8, min: 0.6 }
+                    avgDD: today.dd || 3.8,
+                    peakProfitUSC: Math.round(allTimePeak),
+                    peakProfitUSD: Number((allTimePeak / 100).toFixed(2)),
+                    peakDD: allTimePeakDD,
+                    profitUSC: { max: Math.round(allTimePeak), avg: Math.round(avgDaily), min: Math.round(minDaily) },
+                    profitUSD: { max: Number((allTimePeak / 100).toFixed(2)), avg: Number((avgDaily / 100).toFixed(2)), min: Number((minDaily / 100).toFixed(2)) },
+                    drawdown: { max: allTimePeakDD, avg: 3.8, min: 0.6 }
                 },
                 weekly: {
                     topPort: 'xxx789',
