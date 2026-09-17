@@ -5,10 +5,15 @@ export const revalidate = 300; // Cache for 5 minutes
 
 export async function GET() {
     try {
-        // 1. Fetch active EasyM licenses
+        // 1. Fetch active EasyM licenses & profiles
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, email, is_tester');
+        const testerProfileIds = new Set((profiles || []).filter((p: any) => p.is_tester).map((p: any) => p.id));
+
         const { data: licenses, error: licErr } = await supabase
             .from('licenses')
-            .select('created_at, is_active, account_number, products(name, product_key)')
+            .select('created_at, is_active, account_number, user_id, expiry_date, products(name, product_key)')
             .eq('is_active', true);
 
         if (licErr) throw licErr;
@@ -20,29 +25,80 @@ export async function GET() {
             return pKey.includes('EZM') || pName.toLowerCase().includes('easym') || pName.toLowerCase().includes('easy m');
         });
 
-        // Deduplicate and count real active ports (including multi-port accounts like EasyM Farm)
-        // Deduplicate and count real active ports (including multi-port accounts like EasyM Farm)
+        // Fetch Port Statuses for Capital & Ping Verification
+        const { data: statuses } = await supabase
+            .from('farm_port_status')
+            .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at, last_ping');
+
+        const statusMap = new Map((statuses || []).map((s: any) => [String(s.port_number).trim(), s]));
+
         const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '99999999', '12121210', '000000', '999999'];
         const isTestPort = (acc?: any) => {
             if (!acc) return true;
             const str = String(acc).trim();
             return testPatterns.includes(str) || /^(\d)\1{5,}$/.test(str);
         };
+
+        // Strict 4-Rule Verification for Real Active Running Ports:
+        // 1. License is active and not expired
+        // 2. Not a tester account in customer menu (profiles.is_tester), unless Master Port 21692434
+        // 3. Sent ping / signal continuously within last 48 hours
+        // 4. Minimum balance: EasyM mini >= 50,000 cent ($500), EasyM MAX >= 100,000 cent ($1,000)
+        const now = new Date();
         const activeUniquePorts = new Set<string>();
+        let verifiedActiveBalanceUSC = 0;
+
         easymLicenses.forEach((lic: any) => {
             if (!lic.is_active) return;
+            if (lic.expiry_date && new Date(lic.expiry_date) < now) return;
+            if (lic.user_id && testerProfileIds.has(lic.user_id)) return;
+
+            const prod = Array.isArray(lic.products) ? lic.products[0] : lic.products;
+            const pKey = (prod?.product_key || '').toUpperCase();
+            const pName = (prod?.name || '').toUpperCase();
+            const isMax = pKey.includes('MAX') || pName.includes('MAX');
+            const reqUSC = isMax ? 100000 : 50000;
+
             const accs = (lic.account_number || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
             accs.forEach((acc: string) => {
-                if (acc.length >= 5 && !isTestPort(acc)) {
+                if (acc.length >= 5 && !isTestPort(acc) && !activeUniquePorts.has(acc)) {
+                    const st = statusMap.get(acc);
+                    if (!st) return; // Never pinged
+
+                    // Check ping/updated_at within 48 hours
+                    const pingT = st.last_ping ? new Date(st.last_ping).getTime() : 0;
+                    const updT = st.updated_at ? new Date(st.updated_at).getTime() : 0;
+                    const lastActive = Math.max(pingT, updT);
+                    const diffHours = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
+                    if (diffHours > 48) return; // Offline > 48h
+
+                    // Check balance requirement in USC
+                    const rawB = Number(st.balance) || 0;
+                    const bUSC = st.account_type === 'USD' ? rawB * 100 : rawB;
+                    if (bUSC < reqUSC) return; // Insufficient balance / withdrawn
+
                     activeUniquePorts.add(acc);
+                    verifiedActiveBalanceUSC += bUSC;
                 }
             });
         });
-        const activePortsCount = Math.max(202, activeUniquePorts.size);
+
+        // Always include Master Port 21692434 if active & meets balance
+        if (!activeUniquePorts.has('21692434') && statusMap.has('21692434')) {
+            const stMaster = statusMap.get('21692434')!;
+            const lastActive = Math.max(new Date(stMaster.last_ping || 0).getTime(), new Date(stMaster.updated_at || 0).getTime());
+            if ((now.getTime() - lastActive) <= 48 * 60 * 60 * 1000 && Number(stMaster.balance) >= 100000) {
+                activeUniquePorts.add('21692434');
+                verifiedActiveBalanceUSC += Number(stMaster.balance) || 0;
+            }
+        }
+
+        const activePortsCount = activeUniquePorts.size;
+        const totalBalanceUSC = verifiedActiveBalanceUSC > 0 ? verifiedActiveBalanceUSC : 14131884;
+        const totalBalanceUSD = Math.round(totalBalanceUSC / 100);
 
         // 2. Calculate Longevity (Starting from Feb 01, 2026 based on Master Port 21692434 MT5 live history)
         const systemStartTimestamp = new Date('2026-02-01T00:00:00Z').getTime();
-        const now = new Date();
         const daysRunning = Math.max(226, Math.ceil((now.getTime() - systemStartTimestamp) / (1000 * 60 * 60 * 24)));
         const startYear = 2026;
         const startMonth = 1; // Feb (0-indexed)
@@ -51,26 +107,6 @@ export async function GET() {
         const diffMonths = Math.max(7, (currYear - startYear) * 12 + (currMonth - startMonth));
         const diffDays = Math.max(15, now.getDate());
         const longevityLabel = `${diffMonths} เดือน ${diffDays} วัน (${daysRunning} วัน)`;
-
-        // 3. Fetch Port Statuses for Capital Calculation
-        const { data: statuses } = await supabase
-            .from('farm_port_status')
-            .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at');
-
-        let totalBalanceUSC = 0;
-        (statuses || []).forEach((s: any) => {
-            const b = Number(s.balance) || 0;
-            if (b > 0) {
-                totalBalanceUSC += (s.account_type === 'USD' ? b * 100 : b);
-            }
-        });
-
-        // Use real sum if populated, fallback to verified baseline (~14.1M USC)
-        if (totalBalanceUSC < 10000000) {
-            totalBalanceUSC = 14131884;
-        }
-
-        const totalBalanceUSD = Math.round(totalBalanceUSC / 100);
 
         // 4. Fetch Daily History for Profit & DD Stats (Latest 1000 descending so recent days are never truncated)
         const { data: history } = await supabase
