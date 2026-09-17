@@ -51,6 +51,11 @@ interface EasyMPortItem {
     productName: string;
     licenseTier: string;
     startDate: string;
+    startDateRaw: string;
+    endDate: string | null;
+    endDateRaw: string | null;
+    durationDays: number;
+    lifecycleStatus: 'active' | 'dormant' | 'ended' | 'not_started';
     activeDays: number;
     balance: number;
     equity: number;
@@ -75,6 +80,19 @@ interface EasyMPortItem {
     hoursSinceLastPing: number;
     requiredBalanceUSC: number;
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license';
+}
+
+export interface MonthlyFleetStat {
+    monthKey: string;
+    monthLabel: string;
+    newPortsCount: number;
+    endedPortsCount: number;
+    netGrowth: number;
+    activePortsCount: number;
+    activeUsersCount: number;
+    activeCapitalUSC: number;
+    activeCapitalUSD: number;
+    growthRatePct: number;
 }
 
 interface CustomerGroup {
@@ -141,6 +159,7 @@ export default function EasyMMasterDashboardPage() {
     const [fleetStats, setFleetStats] = useState<FleetDailyComparison | null>(null);
     const [tableCounts, setTableCounts] = useState<{ [key: string]: number }>({});
     const [hourlyTraffic, setHourlyTraffic] = useState<number[]>(Array(24).fill(0));
+    const [monthlyStats, setMonthlyStats] = useState<MonthlyFleetStat[]>([]);
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
@@ -260,6 +279,8 @@ export default function EasyMMasterDashboardPage() {
             const portHistoryProfitMap = new Map<string, number>();
             const portWorstDDMap = new Map<string, number>();
             const portFirstDateMap = new Map<string, string>();
+            const portLastDateMap = new Map<string, string>();
+            const portActiveMonthsMap = new Map<string, Set<string>>();
             const todayHistoryRecords: any[] = [];
             const yesterdayHistoryRecords: any[] = [];
             let allTimePeakRecord: any = null;
@@ -279,6 +300,17 @@ export default function EasyMMasterDashboardPage() {
                 const curFirst = portFirstDateMap.get(port);
                 if (!curFirst || (h.date && h.date < curFirst)) {
                     portFirstDateMap.set(port, h.date);
+                }
+                const curLast = portLastDateMap.get(port);
+                if (!curLast || (h.date && h.date > curLast)) {
+                    portLastDateMap.set(port, h.date);
+                }
+                if (h.date) {
+                    const mKey = h.date.substring(0, 7);
+                    if (!portActiveMonthsMap.has(port)) {
+                        portActiveMonthsMap.set(port, new Set());
+                    }
+                    portActiveMonthsMap.get(port)!.add(mKey);
                 }
 
                 // Check all-time peak
@@ -444,6 +476,38 @@ export default function EasyMMasterDashboardPage() {
 
                     const isRealRunning = (runStatus === 'running') || (accNum === '21692434' && hoursSinceLastPing <= 48 && balUSC >= requiredBalanceUSC);
 
+                    const lastActiveDateStr = status?.last_ping 
+                        ? status.last_ping.substring(0, 10) 
+                        : (portLastDateMap.get(accNum) || (status?.updated_at ? status.updated_at.substring(0, 10) : null));
+
+                    let endDateDisplay: string | null = null;
+                    let lifecycleStatus: 'active' | 'dormant' | 'ended' | 'not_started' = 'not_started';
+
+                    if (runStatus === 'running') {
+                        lifecycleStatus = 'active';
+                        endDateDisplay = null;
+                    } else if (runStatus === 'offline_48h') {
+                        lifecycleStatus = 'dormant';
+                        if (lastActiveDateStr) {
+                            endDateDisplay = new Date(lastActiveDateStr).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+                        }
+                    } else if (runStatus === 'inactive_license') {
+                        lifecycleStatus = 'ended';
+                        if (lastActiveDateStr) {
+                            endDateDisplay = new Date(lastActiveDateStr).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+                        }
+                    } else if (runStatus === 'no_telemetry') {
+                        lifecycleStatus = 'not_started';
+                        endDateDisplay = null;
+                    } else {
+                        lifecycleStatus = 'active';
+                        endDateDisplay = null;
+                    }
+
+                    const startMs = startDt.getTime();
+                    const endMs = (endDateDisplay && lastActiveDateStr) ? new Date(lastActiveDateStr).getTime() : now.getTime();
+                    const durationDays = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)));
+
                     const item: EasyMPortItem = {
                         portNumber: accNum,
                         portName: lic.port_name || null,
@@ -456,6 +520,11 @@ export default function EasyMMasterDashboardPage() {
                         productName: prodName,
                         licenseTier: lic.license_tier || 'free',
                         startDate: startDt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }),
+                        startDateRaw: startDateStr.substring(0, 10),
+                        endDate: endDateDisplay,
+                        endDateRaw: lastActiveDateStr,
+                        durationDays,
+                        lifecycleStatus,
                         activeDays,
                         balance: status?.balance || 0,
                         equity: status?.equity || 0,
@@ -536,6 +605,11 @@ export default function EasyMMasterDashboardPage() {
                             productName: status.system_code || 'EasyM MAX',
                             licenseTier: 'pro',
                             startDate: startDt.toLocaleDateString('th-TH'),
+                            startDateRaw: (status.created_at || status.updated_at || new Date().toISOString()).substring(0, 10),
+                            endDate: isRealRunning ? null : (status.last_ping ? new Date(status.last_ping).toLocaleDateString('th-TH') : null),
+                            endDateRaw: isRealRunning ? null : (status.last_ping ? status.last_ping.substring(0, 10) : null),
+                            durationDays: activeDays,
+                            lifecycleStatus: isRealRunning ? 'active' : 'dormant',
                             activeDays,
                             balance: status.balance || 0,
                             equity: status.equity || 0,
@@ -567,6 +641,137 @@ export default function EasyMMasterDashboardPage() {
 
             const portList = Array.from(portItemsMap.values());
             setPorts(portList);
+
+            // Compute Monthly Fleet Statistics (from Feb 2026 to Current Month)
+            const formatThaiMonth = (mKey: string) => {
+                const parts = mKey.split('-');
+                if (parts.length < 2) return mKey;
+                const yearNum = parseInt(parts[0], 10);
+                const monthNum = parseInt(parts[1], 10);
+                const thaiMonths = [
+                    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+                    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+                ];
+                const thaiYear = yearNum + 543;
+                return `${thaiMonths[monthNum - 1]} ${thaiYear.toString().slice(-2)}`;
+            };
+
+            const allMonthKeys: string[] = [];
+            const startYear = 2026;
+            const startMonth = 2; // Feb 2026
+            const curDate = new Date();
+            const curYear = curDate.getFullYear();
+            const curMonth = curDate.getMonth() + 1;
+
+            let y = startYear;
+            let m = startMonth;
+            while (y < curYear || (y === curYear && m <= curMonth)) {
+                const mKey = `${y}-${m.toString().padStart(2, '0')}`;
+                allMonthKeys.push(mKey);
+                m++;
+                if (m > 12) {
+                    m = 1;
+                    y++;
+                }
+            }
+
+            const monthStatsList: MonthlyFleetStat[] = [];
+            let prevActiveCount = 0;
+
+            allMonthKeys.forEach(mKey => {
+                const thaiLabel = formatThaiMonth(mKey);
+
+                // 1. New Ports started in this month
+                const newPorts = portList.filter(p => {
+                    const startM = (p.startDateRaw || '').substring(0, 7);
+                    return startM === mKey;
+                });
+
+                // 2. Ended / Dormant Ports in this month
+                const endedPorts = portList.filter(p => {
+                    if (p.lifecycleStatus === 'active' || p.lifecycleStatus === 'not_started') return false;
+                    const endM = (p.endDateRaw || '').substring(0, 7);
+                    return endM === mKey;
+                });
+
+                // 3. Ports active in this month
+                const activePortsInMonth = portList.filter(p => {
+                    if (p.isTester && p.portNumber !== '21692434') return false;
+                    const tradedInMonth = portActiveMonthsMap.get(p.portNumber)?.has(mKey);
+                    if (tradedInMonth) return true;
+
+                    const startM = (p.startDateRaw || '').substring(0, 7);
+                    if (!startM || startM > mKey) return false;
+
+                    if (!p.endDateRaw || p.lifecycleStatus === 'active') {
+                        return true;
+                    }
+                    const endM = p.endDateRaw.substring(0, 7);
+                    return endM >= mKey;
+                });
+
+                // 4. Unique Users
+                const uniqueUsers = new Set(activePortsInMonth.map(p => p.customerId || p.customerEmail)).size;
+
+                // 5. Active Capital
+                let capUSC = 0;
+                let capUSD = 0;
+                activePortsInMonth.forEach(p => {
+                    if (p.accountType === 'USD') capUSD += p.balance;
+                    else capUSC += p.balance;
+                });
+
+                const netGrowth = newPorts.length - endedPorts.length;
+                const activeCount = activePortsInMonth.length;
+                const growthRate = prevActiveCount > 0 
+                    ? ((activeCount - prevActiveCount) / prevActiveCount) * 100 
+                    : 0;
+
+                monthStatsList.push({
+                    monthKey: mKey,
+                    monthLabel: thaiLabel,
+                    newPortsCount: newPorts.length,
+                    endedPortsCount: endedPorts.length,
+                    netGrowth,
+                    activePortsCount: activeCount,
+                    activeUsersCount: uniqueUsers,
+                    activeCapitalUSC: capUSC,
+                    activeCapitalUSD: capUSD,
+                    growthRatePct: Math.round(growthRate * 10) / 10
+                });
+
+                if (activeCount > 0) {
+                    prevActiveCount = activeCount;
+                }
+            });
+
+            setMonthlyStats(monthStatsList);
+
+            // Best-effort Snapshot update to Supabase
+            try {
+                const curMonthKey = todayDateStr.substring(0, 7);
+                const curStat = monthStatsList.find(s => s.monthKey === curMonthKey);
+                if (curStat) {
+                    await supabase.from('fleet_capital_snapshots').upsert({
+                        period_key: curMonthKey,
+                        period_type: 'monthly',
+                        active_ports_count: curStat.activePortsCount,
+                        new_ports_count: curStat.newPortsCount,
+                        ended_ports_count: curStat.endedPortsCount,
+                        net_growth_ports: curStat.netGrowth,
+                        active_users_count: curStat.activeUsersCount,
+                        active_balance_usc: curStat.activeCapitalUSC,
+                        active_balance_usd: curStat.activeCapitalUSD,
+                        stale_balance_usc: portList.filter(p => p.runStatus === 'offline_48h').reduce((sum, p) => sum + (p.accountType === 'USD' ? p.balance * 100 : p.balance), 0),
+                        stale_balance_usd: 0,
+                        snapshot_meta: {
+                            updated_at: new Date().toISOString()
+                        }
+                    }, { onConflict: 'period_key' });
+                }
+            } catch (snapErr) {
+                // Table might be pending or permission
+            }
 
             // F. Calculate 24h MT5 Traffic Pattern from updated_at / last_ping
             const trafficHours = Array(24).fill(0);
@@ -722,6 +927,12 @@ export default function EasyMMasterDashboardPage() {
 
         let totalBalanceUSC = 0;
         let totalBalanceUSD = 0;
+        let activeBalanceUSC = 0;
+        let activeBalanceUSD = 0;
+        let staleBalanceUSC = 0;
+        let staleBalanceUSD = 0;
+        let testerBalanceUSC = 0;
+        let testerBalanceUSD = 0;
         let totalEquityUSC = 0;
         let totalEquityUSD = 0;
         let totalFloating = 0;
@@ -731,13 +942,26 @@ export default function EasyMMasterDashboardPage() {
         let worstDDPort = '';
 
         filteredPorts.forEach(p => {
-            if (p.accountType === 'USD') {
+            const isUsd = p.accountType === 'USD';
+            if (isUsd) {
                 totalBalanceUSD += p.balance;
                 totalEquityUSD += p.equity;
             } else {
                 totalBalanceUSC += p.balance;
                 totalEquityUSC += p.equity;
             }
+
+            if (p.isRealRunning) {
+                if (isUsd) activeBalanceUSD += p.balance;
+                else activeBalanceUSC += p.balance;
+            } else if (p.runStatus === 'offline_48h') {
+                if (isUsd) staleBalanceUSD += p.balance;
+                else staleBalanceUSC += p.balance;
+            } else if (p.isTester) {
+                if (isUsd) testerBalanceUSD += p.balance;
+                else testerBalanceUSC += p.balance;
+            }
+
             totalFloating += p.floatingPnl;
             totalTodayProfit += p.todayPnl;
             totalAccumProfit += p.accumulatedProfit;
@@ -764,6 +988,12 @@ export default function EasyMMasterDashboardPage() {
             miniEACount,
             totalBalanceUSC,
             totalBalanceUSD,
+            activeBalanceUSC,
+            activeBalanceUSD,
+            staleBalanceUSC,
+            staleBalanceUSD,
+            testerBalanceUSC,
+            testerBalanceUSD,
             totalEquityUSC,
             totalEquityUSD,
             totalFloating,
@@ -779,9 +1009,9 @@ export default function EasyMMasterDashboardPage() {
     // 6. Admin Breakdown Stats
     const adminStats = useMemo(() => {
         const res = {
-            juntarasate: { name: 'สายงานพี่โจ้ (juntarasate)', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, owners: new Set<string>() },
-            bctutor: { name: 'สายงานครูชัย (bctutor)', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, owners: new Set<string>() },
-            direct: { name: 'พอร์ตระบบ / อื่นๆ', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, owners: new Set<string>() },
+            juntarasate: { name: 'สายงานพี่โจ้ (juntarasate)', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, activeUscBalance: 0, staleUscBalance: 0, owners: new Set<string>() },
+            bctutor: { name: 'สายงานครูชัย (bctutor)', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, activeUscBalance: 0, staleUscBalance: 0, owners: new Set<string>() },
+            direct: { name: 'พอร์ตระบบ / อื่นๆ', ports: 0, activePorts: 0, inactivePorts: 0, online: 0, telemetry: 0, uscBalance: 0, activeUscBalance: 0, staleUscBalance: 0, owners: new Set<string>() },
         };
 
         ports.forEach(p => {
@@ -789,12 +1019,20 @@ export default function EasyMMasterDashboardPage() {
             if (p.adminEmail.includes('juntarasate')) grp = res.juntarasate;
             else if (p.adminEmail.includes('bctutor')) grp = res.bctutor;
 
+            const portUSC = p.accountType === 'USD' ? p.balance * 100 : p.balance;
             grp.ports++;
-            if (p.isRealRunning) grp.activePorts++;
-            else grp.inactivePorts++;
+            if (p.isRealRunning) {
+                grp.activePorts++;
+                grp.activeUscBalance += portUSC;
+            } else {
+                grp.inactivePorts++;
+                if (p.runStatus === 'offline_48h') {
+                    grp.staleUscBalance += portUSC;
+                }
+            }
             if (p.hasTelemetry) grp.telemetry++;
             if (p.isOnline) grp.online++;
-            grp.uscBalance += p.accountType === 'USD' ? p.balance * 100 : p.balance;
+            grp.uscBalance += portUSC;
             grp.owners.add(p.customerId || p.customerEmail);
         });
 
@@ -906,20 +1144,30 @@ export default function EasyMMasterDashboardPage() {
                 <Card className="bg-card/70 border-border shadow-sm">
                     <CardContent className="p-5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">พลังเงินทุนรวม (Balance)</span>
+                            <span className="text-xs font-medium text-muted-foreground">พลังเงินทุนรันจริง (Active Balance)</span>
                             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                                 <CircleDollarSign className="w-4 h-4" />
                             </div>
                         </div>
                         <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-bold tracking-tight text-foreground">
-                                {(kpi.totalBalanceUSC / 100 + kpi.totalBalanceUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            <span className="text-2xl font-bold tracking-tight text-emerald-400 font-mono">
+                                ${(kpi.activeBalanceUSC / 100 + kpi.activeBalanceUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </span>
-                            <span className="text-xs text-muted-foreground">USD เทียบเท่า</span>
+                            <span className="text-xs text-muted-foreground">USD (สด &lt;48 ชม.)</span>
                         </div>
-                        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2">
-                            <span>Cent: {kpi.totalBalanceUSC.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC</span>
-                            <span>USD: ${kpi.totalBalanceUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                        <div className="mt-3 space-y-1 text-xs border-t border-border/40 pt-2">
+                            <div className="flex items-center justify-between text-muted-foreground">
+                                <span className="flex items-center gap-1 text-emerald-400 font-medium">⚡ รันจริง:</span>
+                                <span className="font-semibold text-emerald-400 font-mono">
+                                    {kpi.activeBalanceUSC.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-muted-foreground" title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว">
+                                <span className="flex items-center gap-1 text-amber-400/90">⏸️ ยอดค้าง (&gt;48h):</span>
+                                <span className="font-mono text-amber-400/90 font-medium">
+                                    ${(kpi.staleBalanceUSC / 100 + kpi.staleBalanceUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })} ({kpi.offline48hCount} พอร์ต)
+                                </span>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -1115,9 +1363,14 @@ export default function EasyMMasterDashboardPage() {
                             <span className="font-semibold">{adminStats.juntarasate.owners.size} ท่าน</span>
                         </div>
                         <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">พลังเงินทุนสะสม:</span>
-                            <span className="font-mono font-semibold text-emerald-400">
-                                {adminStats.juntarasate.uscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                            <span className="text-muted-foreground">พลังเงินทุนรันจริง:</span>
+                            <span className="font-mono font-semibold text-emerald-400 text-right">
+                                {adminStats.juntarasate.activeUscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                                {adminStats.juntarasate.staleUscBalance > 0 && (
+                                    <span className="text-[10px] text-amber-400/90 block font-normal font-sans">
+                                        (ค้าง &gt;48h: {adminStats.juntarasate.staleUscBalance.toLocaleString()} USC)
+                                    </span>
+                                )}
                             </span>
                         </div>
                     </CardContent>
@@ -1151,9 +1404,14 @@ export default function EasyMMasterDashboardPage() {
                             <span className="font-semibold">{adminStats.bctutor.owners.size} ท่าน</span>
                         </div>
                         <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">พลังเงินทุนสะสม:</span>
-                            <span className="font-mono font-semibold text-emerald-400">
-                                {adminStats.bctutor.uscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                            <span className="text-muted-foreground">พลังเงินทุนรันจริง:</span>
+                            <span className="font-mono font-semibold text-emerald-400 text-right">
+                                {adminStats.bctutor.activeUscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                                {adminStats.bctutor.staleUscBalance > 0 && (
+                                    <span className="text-[10px] text-amber-400/90 block font-normal font-sans">
+                                        (ค้าง &gt;48h: {adminStats.bctutor.staleUscBalance.toLocaleString()} USC)
+                                    </span>
+                                )}
                             </span>
                         </div>
                     </CardContent>
@@ -1180,14 +1438,142 @@ export default function EasyMMasterDashboardPage() {
                             <span className="font-semibold">{adminStats.direct.owners.size} ท่าน</span>
                         </div>
                         <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">พลังเงินทุนสะสม:</span>
-                            <span className="font-mono font-semibold text-emerald-400">
-                                {adminStats.direct.uscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                            <span className="text-muted-foreground">พลังเงินทุนรันจริง:</span>
+                            <span className="font-mono font-semibold text-emerald-400 text-right">
+                                {adminStats.direct.activeUscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                                {adminStats.direct.staleUscBalance > 0 && (
+                                    <span className="text-[10px] text-amber-400/90 block font-normal font-sans">
+                                        (ค้าง &gt;48h: {adminStats.direct.staleUscBalance.toLocaleString()} USC)
+                                    </span>
+                                )}
                             </span>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Monthly Fleet Evolution & Capital History Section */}
+            {monthlyStats.length > 0 && (
+                <div className="bg-card/80 border border-border rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/50 pb-3">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                                <TrendingUp className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+                                    <span>วิวัฒนาการและการเติบโตของฝูงบิน EasyM รายเดือน</span>
+                                    <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-[10px] px-1.5 py-0">
+                                        Lifecycle &amp; Retention
+                                    </Badge>
+                                </h2>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    บันทึกประวัติความเปลี่ยนแปลงของพอร์ต, ผู้ใช้งาน, การเริ่ม-หยุดรัน และพลังเงินทุนย้อนหลังตั้งแต่ ก.พ. 2569
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-mono">
+                            <span className="text-muted-foreground">บันทึกสะสม:</span>
+                            <span className="font-bold text-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/50">
+                                {monthlyStats.length} เดือน
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Evolution Summary Mini-Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-muted/20 border border-border/40 rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground">พอร์ตเริ่มใหม่สะสม</div>
+                            <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">
+                                +{monthlyStats.reduce((s, m) => s + m.newPortsCount, 0)} <span className="text-xs font-normal text-muted-foreground font-sans">บัญชี</span>
+                            </div>
+                        </div>
+                        <div className="bg-muted/20 border border-border/40 rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground">พอร์ตหยุด / ขาดติดต่อสะสม</div>
+                            <div className="text-xl font-bold text-amber-400 mt-1 font-mono">
+                                -{monthlyStats.reduce((s, m) => s + m.endedPortsCount, 0)} <span className="text-xs font-normal text-muted-foreground font-sans">บัญชี</span>
+                            </div>
+                        </div>
+                        <div className="bg-muted/20 border border-border/40 rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground">พอร์ตรันอยู่จริงปัจจุบัน</div>
+                            <div className="text-xl font-bold text-foreground mt-1 font-mono">
+                                {kpi.realRunningCount} <span className="text-xs font-normal text-muted-foreground font-sans">บัญชี</span>
+                            </div>
+                        </div>
+                        <div className="bg-muted/20 border border-border/40 rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground">พลังเงินทุนรันจริงปัจจุบัน</div>
+                            <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">
+                                ${(kpi.activeBalanceUSC / 100 + kpi.activeBalanceUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Monthly Table */}
+                    <div className="overflow-x-auto border border-border/50 rounded-lg">
+                        <Table className="text-xs">
+                            <TableHeader className="bg-muted/40">
+                                <TableRow>
+                                    <TableHead className="font-semibold">เดือน</TableHead>
+                                    <TableHead className="text-center text-emerald-400 font-semibold">เริ่มใหม่ (+)</TableHead>
+                                    <TableHead className="text-center text-amber-400 font-semibold">หยุด / ขาดติดต่อ (-)</TableHead>
+                                    <TableHead className="text-center font-semibold">สุทธิ (Net Growth)</TableHead>
+                                    <TableHead className="text-center font-semibold">พอร์ตรันจริง (Fleet)</TableHead>
+                                    <TableHead className="text-center font-semibold">ผู้ใช้งานจริง</TableHead>
+                                    <TableHead className="text-right font-semibold">พลังเงินทุนรันจริง (Capital)</TableHead>
+                                    <TableHead className="text-center font-semibold">เติบโต MoM</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {monthlyStats.slice().reverse().map(m => (
+                                    <TableRow key={m.monthKey} className="hover:bg-muted/30">
+                                        <TableCell className="font-semibold font-mono">{m.monthLabel}</TableCell>
+                                        <TableCell className="text-center font-mono text-emerald-400 font-medium">
+                                            {m.newPortsCount > 0 ? `+${m.newPortsCount}` : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono text-amber-400 font-medium">
+                                            {m.endedPortsCount > 0 ? `-${m.endedPortsCount}` : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono font-bold">
+                                            {m.netGrowth > 0 ? (
+                                                <span className="text-emerald-400">+{m.netGrowth}</span>
+                                            ) : m.netGrowth < 0 ? (
+                                                <span className="text-amber-400">{m.netGrowth}</span>
+                                            ) : (
+                                                <span className="text-muted-foreground">0</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono font-bold text-foreground">
+                                            {m.activePortsCount} บัญชี
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono text-muted-foreground">
+                                            {m.activeUsersCount} ท่าน
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono font-semibold text-emerald-400">
+                                            {(m.activeCapitalUSC / 100 + m.activeCapitalUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })} USD
+                                            <span className="text-[10px] text-muted-foreground block font-normal">
+                                                {m.activeCapitalUSC.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono">
+                                            {m.growthRatePct > 0 ? (
+                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px]">
+                                                    +{m.growthRatePct}%
+                                                </Badge>
+                                            ) : m.growthRatePct < 0 ? (
+                                                <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 text-[10px]">
+                                                    {m.growthRatePct}%
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-muted-foreground text-[10px]">-</span>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            )}
 
             {/* Filter, Search & View Modes Control Bar */}
             <Card className="border-border shadow-sm bg-card">
@@ -1290,6 +1676,52 @@ export default function EasyMMasterDashboardPage() {
                             </Button>
                         </div>
                     </div>
+
+                    {/* Quick Filter Buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
+                        <span className="text-muted-foreground font-medium mr-1 text-[11px]">ตัวกรองด่วน:</span>
+                        <Button 
+                            variant={selectedStatus === 'all' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('all')}
+                            className="h-7 text-xs px-2.5 rounded-full"
+                        >
+                            ทั้งหมด ({ports.length})
+                        </Button>
+                        <Button 
+                            variant={selectedStatus === 'real_running' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('real_running')}
+                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
+                        >
+                            ⚡ รันจริงเท่านั้น ({ports.filter(p => p.isRealRunning).length})
+                        </Button>
+                        <Button 
+                            variant={selectedStatus === 'offline_48h' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('offline_48h')}
+                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'offline_48h' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                            title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว"
+                        >
+                            ⏸️ ขาดติดต่อ &gt;48h ({ports.filter(p => p.runStatus === 'offline_48h').length})
+                        </Button>
+                        <Button 
+                            variant={selectedStatus === 'insufficient_bal' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('insufficient_bal')}
+                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'insufficient_bal' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-400 border-red-500/30 hover:bg-red-500/10'}`}
+                        >
+                            ⚠️ ทุนไม่ถึง ({ports.filter(p => p.runStatus === 'insufficient_balance').length})
+                        </Button>
+                        <Button 
+                            variant={selectedStatus === 'online' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('online')}
+                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'online' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-400 border-blue-500/30 hover:bg-blue-500/10'}`}
+                        >
+                            🟢 สด &lt;30 นาที ({ports.filter(p => p.isOnline).length})
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -1387,10 +1819,31 @@ export default function EasyMMasterDashboardPage() {
                                                     </TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">
                                                         <div>{port.startDate}</div>
-                                                        <div className="text-[10px] text-emerald-400 font-semibold">{port.activeDays} วัน</div>
+                                                        {port.endDate ? (
+                                                            <div className="text-[10px] text-amber-400/90 font-medium" title={`หยุดส่งสัญญาณเมื่อ ${port.endDate}`}>
+                                                                ถึง: {port.endDate}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-[10px] text-emerald-400 font-semibold">
+                                                                {port.activeDays} วัน (รันต่อเนื่อง)
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono font-semibold">
-                                                        {port.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {port.accountType}
+                                                        {port.runStatus === 'offline_48h' ? (
+                                                            <div className="flex flex-col items-end" title={`ขาดการติดต่อมาแล้ว ${port.hoursSinceLastPing} ชม. อาจถอนเงินออกแล้ว`}>
+                                                                <span className="text-muted-foreground/60 line-through text-xs">
+                                                                    {port.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {port.accountType}
+                                                                </span>
+                                                                <span className="text-[10px] text-amber-400 font-sans font-medium">
+                                                                    ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className={port.isRealRunning ? 'text-foreground' : 'text-muted-foreground'}>
+                                                                {port.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {port.accountType}
+                                                            </span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono">
                                                         {port.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1514,10 +1967,31 @@ export default function EasyMMasterDashboardPage() {
                                         </TableCell>
                                         <TableCell className="text-xs text-muted-foreground">
                                             <div>{port.startDate}</div>
-                                            <div className="text-[10px] text-emerald-400 font-semibold">{port.activeDays} วัน</div>
+                                            {port.endDate ? (
+                                                <div className="text-[10px] text-amber-400/90 font-medium" title={`หยุดส่งสัญญาณเมื่อ ${port.endDate}`}>
+                                                    ถึง: {port.endDate}
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px] text-emerald-400 font-semibold">
+                                                    {port.activeDays} วัน (รันต่อเนื่อง)
+                                                </div>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">
-                                            {port.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {port.accountType}
+                                            {port.runStatus === 'offline_48h' ? (
+                                                <div className="flex flex-col items-end" title={`ขาดการติดต่อมาแล้ว ${port.hoursSinceLastPing} ชม. อาจถอนเงินออกแล้ว`}>
+                                                    <span className="text-muted-foreground/60 line-through text-xs">
+                                                        {port.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {port.accountType}
+                                                    </span>
+                                                    <span className="text-[10px] text-amber-400 font-sans font-medium">
+                                                        ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className={port.isRealRunning ? 'text-foreground' : 'text-muted-foreground'}>
+                                                    {port.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {port.accountType}
+                                                </span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {port.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1624,9 +2098,20 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="grid grid-cols-2 gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40 font-mono">
                                     <div>
                                         <span className="text-[10px] text-muted-foreground block">Balance</span>
-                                        <span className="font-bold text-foreground text-sm">
-                                            {port.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })} {port.accountType}
-                                        </span>
+                                        {port.runStatus === 'offline_48h' ? (
+                                            <div>
+                                                <span className="font-bold text-muted-foreground/60 line-through text-sm">
+                                                    {port.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })} {port.accountType}
+                                                </span>
+                                                <span className="text-[10px] text-amber-400 font-sans block">
+                                                    ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="font-bold text-foreground text-sm">
+                                                {port.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })} {port.accountType}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="text-right">
                                         <span className="text-[10px] text-muted-foreground block">Equity</span>
@@ -1650,8 +2135,12 @@ export default function EasyMMasterDashboardPage() {
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">รันมาแล้ว:</span>
-                                        <span className="text-emerald-400 font-semibold">{port.activeDays} วัน (เริ่ม {port.startDate})</span>
+                                        <span className="text-muted-foreground">ช่วงเวลาใช้งาน:</span>
+                                        {port.endDate ? (
+                                            <span className="text-amber-400 font-medium">{port.startDate} ถึง {port.endDate}</span>
+                                        ) : (
+                                            <span className="text-emerald-400 font-semibold">{port.activeDays} วัน (เริ่ม {port.startDate})</span>
+                                        )}
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">สายงานแอดมิน:</span>
