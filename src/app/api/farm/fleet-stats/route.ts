@@ -21,13 +21,19 @@ export async function GET() {
         });
 
         // Deduplicate and count real active ports (including multi-port accounts like EasyM Farm)
-        const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '12121210', '000000'];
+        // Deduplicate and count real active ports (including multi-port accounts like EasyM Farm)
+        const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '99999999', '12121210', '000000', '999999'];
+        const isTestPort = (acc?: any) => {
+            if (!acc) return true;
+            const str = String(acc).trim();
+            return testPatterns.includes(str) || /^(\d)\1{5,}$/.test(str);
+        };
         const activeUniquePorts = new Set<string>();
         easymLicenses.forEach((lic: any) => {
             if (!lic.is_active) return;
             const accs = (lic.account_number || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
             accs.forEach((acc: string) => {
-                if (acc.length >= 5 && !testPatterns.includes(acc)) {
+                if (acc.length >= 5 && !isTestPort(acc)) {
                     activeUniquePorts.add(acc);
                 }
             });
@@ -81,9 +87,9 @@ export async function GET() {
             .limit(1);
 
         const maskPortNumber = (p?: any, fallback = '-') => {
-            if (!p) return fallback;
+            if (!p || p === '-') return fallback;
             const str = String(p).trim();
-            if (str.length < 3) return fallback;
+            if (str.length < 3 || isTestPort(str)) return fallback;
             return 'xxx' + str.slice(-3);
         };
 
@@ -97,7 +103,7 @@ export async function GET() {
         // Aggregate history by date
         const dateMap = new Map<string, { profits: number[]; dds: number[]; records: any[] }>();
         (history || []).forEach((h: any) => {
-            if (!h.date) return;
+            if (!h.date || isTestPort(h.port_number)) return;
             if (!dateMap.has(h.date)) {
                 dateMap.set(h.date, { profits: [], dds: [], records: [] });
             }
@@ -116,10 +122,13 @@ export async function GET() {
             let profits = info ? [...info.profits] : [];
             let dds = info ? [...info.dds] : [];
 
-            // If today, also incorporate live farm_port_status updates
+            // If today, ONLY incorporate live farm_port_status if updated_at is actually TODAY in Bangkok time
             if (dateStr === todayDateStr && statuses) {
                 statuses.forEach((s: any) => {
-                    if (!s.port_number || testPatterns.includes(String(s.port_number))) return;
+                    if (!s.port_number || isTestPort(s.port_number)) return;
+                    const bkkUpdated = s.updated_at ? getBangkokDate(new Date(s.updated_at)) : '';
+                    if (bkkUpdated !== todayDateStr) return; // Skip stale records from previous days!
+
                     const pnl = Number(s.today_pnl) || 0;
                     const dd = Number(s.daily_max_drawdown) || 0;
                     const existing = records.find(r => String(r.port_number) === String(s.port_number));
@@ -134,7 +143,7 @@ export async function GET() {
             }
 
             // Filter out test port patterns
-            records = records.filter(r => !testPatterns.includes(String(r.port_number)));
+            records = records.filter(r => !isTestPort(r.port_number));
 
             // Find top performing port for this date
             let maxP = 0;
@@ -149,8 +158,8 @@ export async function GET() {
 
             const positiveProfits = profits.filter(p => p > 0);
             const validProfits = profits.filter(p => p >= 0);
-            const avgP = positiveProfits.length ? (positiveProfits.reduce((a: number, b: number) => a + b, 0) / positiveProfits.length) : (validProfits.length ? (validProfits.reduce((a: number, b: number) => a + b, 0) / validProfits.length) : 0);
-            const avgDD = dds.length ? (dds.reduce((a: number, b: number) => a + b, 0) / dds.length) : 0;
+            const avgP = positiveProfits.length ? (positiveProfits.reduce((a, b) => a + b, 0) / positiveProfits.length) : (validProfits.length ? (validProfits.reduce((a, b) => a + b, 0) / validProfits.length) : 0);
+            const avgDD = dds.length ? (dds.reduce((a, b) => a + b, 0) / dds.length) : 0;
 
             const dt = new Date(dateStr + 'T00:00:00');
             const dayName = dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
@@ -158,7 +167,7 @@ export async function GET() {
             return {
                 date: dateStr,
                 dateLabel: dayName || fallbackLabel,
-                topPort: topRecord ? maskPortNumber(topRecord.port_number) : '-',
+                topPort: maxP > 0 && topRecord ? maskPortNumber(topRecord.port_number) : '-',
                 profitUSC: Math.round(avgP),
                 profitUSD: Number((avgP / 100).toFixed(2)),
                 dd: Number(avgDD.toFixed(1)),

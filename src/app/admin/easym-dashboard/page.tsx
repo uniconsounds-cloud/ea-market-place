@@ -244,7 +244,12 @@ export default function EasyMMasterDashboardPage() {
             };
             const todayDateStr = getBangkokDate(new Date());
             const yesterdayDateStr = getBangkokDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
-            const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '12121210', '000000', '99999999'];
+            const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '12121210', '000000', '99999999', '999999'];
+            const isTestPort = (acc?: any) => {
+                if (!acc) return true;
+                const str = String(acc).trim();
+                return testPatterns.includes(str) || /^(\d)\1{5,}$/.test(str);
+            };
 
             // Group history profit & worst DD by port
             const portHistoryProfitMap = new Map<string, number>();
@@ -272,22 +277,27 @@ export default function EasyMMasterDashboardPage() {
                 }
 
                 // Check all-time peak
-                if (!testPatterns.includes(port) && p > (allTimePeakRecord?.profit || 0)) {
+                if (!isTestPort(port) && p > (allTimePeakRecord?.profit || 0)) {
                     allTimePeakRecord = { portNumber: port, profit: p, date: h.date, maxDD: dd };
                 }
 
                 // Split Today & Yesterday
-                if (h.date === todayDateStr && !testPatterns.includes(port)) {
+                if (h.date === todayDateStr && !isTestPort(port)) {
                     todayHistoryRecords.push({ ...h, port_number: port });
-                } else if (h.date === yesterdayDateStr && !testPatterns.includes(port)) {
+                } else if (h.date === yesterdayDateStr && !isTestPort(port)) {
                     yesterdayHistoryRecords.push({ ...h, port_number: port });
                 }
             });
 
-            // Merge live farm_port_status for today
+            // Merge live farm_port_status for today ONLY if updated_at is actually today
             (portStatuses || []).forEach(s => {
                 const accNum = s.port_number?.toString();
-                if (!accNum || testPatterns.includes(accNum)) return;
+                if (!accNum || isTestPort(accNum)) return;
+                
+                // CRITICAL: Only consider farm_port_status if updated_at is actually TODAY in Bangkok time
+                const bkkUpdated = s.updated_at ? getBangkokDate(new Date(s.updated_at)) : '';
+                if (bkkUpdated !== todayDateStr) return; // Ignore stale records from previous days (e.g. 97033490 from Sept 10!)
+
                 const pnl = Number(s.today_pnl) || 0;
                 const dd = Number(s.daily_max_drawdown) || 0;
                 const existing = todayHistoryRecords.find(r => r.port_number === accNum);
@@ -326,7 +336,7 @@ export default function EasyMMasterDashboardPage() {
                 return {
                     date: dateStr,
                     dateLabel: `${label} (${dayThai})`,
-                    topPort: topR?.port_number ? String(topR.port_number) : '-',
+                    topPort: maxP > 0 && topR?.port_number ? String(topR.port_number) : '-',
                     topProfit: Number(maxP.toFixed(2)),
                     topDD: Number(topR?.max_dd || topR?.max_drawdown || 0),
                     totalProfit: Number(totalP.toFixed(2)),
@@ -919,7 +929,7 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">🏆 พอร์ตกำไรสูงสุด:</span>
                                     <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        #{fleetStats.today.topPort}
+                                        {fleetStats.today.topPort === '-' ? '-' : `#${fleetStats.today.topPort}`}
                                     </span>
                                 </div>
                                 <div className="text-xl font-black font-mono text-[#4de180]">
@@ -950,7 +960,7 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">🏆 พอร์ตกำไรสูงสุด:</span>
                                     <span className="font-mono text-amber-300/90 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        #{fleetStats.yesterday.topPort}
+                                        {fleetStats.yesterday.topPort === '-' ? '-' : `#${fleetStats.yesterday.topPort}`}
                                     </span>
                                 </div>
                                 <div className="text-xl font-black font-mono text-emerald-400/90">
