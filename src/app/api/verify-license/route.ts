@@ -171,10 +171,16 @@ export async function POST(req: Request) {
             }
         }
 
-        // 4. Check Minimum Balance requirement (Prevent accidental lockout for verified active licenses)
-        const isBypassBalance = ['97053088'].includes(account_number) || license.is_active === true;
+        // 4. Check Minimum Balance requirement (Enforce minimum balance strictly)
+        const isBypassBalance = ['97053088', '21692434'].includes(account_number);
         if (!isBypassBalance && balance !== undefined && productMinBalance > 0 && Number(balance) < productMinBalance) {
-            return NextResponse.json({ status: 'insufficient_balance', message: `Insufficient Balance. Minimum required: $${productMinBalance}` }, { status: 200 });
+            const displayMin = resolvedProduct?.currency === 'USC' 
+                ? `$${resolvedProduct.min_balance || (productMinBalance / 100)} (${productMinBalance.toLocaleString()} USC)`
+                : `$${productMinBalance}`;
+            return NextResponse.json({ 
+                status: 'insufficient_balance', 
+                message: `Insufficient Balance. Minimum required: ${displayMin}` 
+            }, { status: 200 });
         }
 
         // 5. Check Expiry
