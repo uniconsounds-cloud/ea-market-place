@@ -262,12 +262,47 @@ export default function EasyMMasterDashboardPage() {
                 histPage++;
             }
 
-            // Date in Thailand timezone (Asia/Bangkok)
-            const getBangkokDate = (d = new Date()) => {
-                return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d);
-            };
-            const todayDateStr = getBangkokDate(new Date());
-            const yesterdayDateStr = getBangkokDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+            // Forex market trading date (rolls over at 05:00 AM Bangkok time, matching FarmClient)
+            function getMarketTradingDate(date: Date): Date {
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'Asia/Bangkok',
+                    year: 'numeric',
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: 'numeric',
+                    second: 'numeric',
+                    hour12: false,
+                });
+                const parts = formatter.formatToParts(date);
+                const partMap: Record<string, string> = {};
+                for (const p of parts) {
+                    partMap[p.type] = p.value;
+                }
+                const year = parseInt(partMap.year, 10);
+                const month = parseInt(partMap.month, 10) - 1;
+                const day = parseInt(partMap.day, 10);
+                const hour = parseInt(partMap.hour, 10);
+
+                const bkkDate = new Date(year, month, day);
+                if (hour < 5) {
+                    bkkDate.setDate(bkkDate.getDate() - 1);
+                }
+                return bkkDate;
+            }
+
+            function getMarketTradingDateStr(date: Date = new Date()): string {
+                const d = getMarketTradingDate(date);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            }
+
+            const todayDateStr = getMarketTradingDateStr(new Date());
+            const yesterdayMarketDate = new Date(getMarketTradingDate(new Date()));
+            yesterdayMarketDate.setDate(yesterdayMarketDate.getDate() - 1);
+            const yesterdayDateStr = getMarketTradingDateStr(yesterdayMarketDate);
             const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '12121210', '000000', '99999999', '999999'];
             const isTestPort = (acc?: any) => {
                 if (!acc) return true;
@@ -326,13 +361,13 @@ export default function EasyMMasterDashboardPage() {
                 }
             });
 
-            // Merge live farm_port_status for today ONLY if updated_at is actually today
+            // Merge live farm_port_status for today ONLY if updated_at is within today's market session
             (portStatuses || []).forEach(s => {
                 const accNum = s.port_number?.toString();
                 if (!accNum || isTestPort(accNum)) return;
                 
-                // CRITICAL: Only consider farm_port_status if updated_at is actually TODAY in Bangkok time
-                const bkkUpdated = s.updated_at ? getBangkokDate(new Date(s.updated_at)) : '';
+                // CRITICAL: Only consider farm_port_status if updated_at is within today's market session
+                const bkkUpdated = s.updated_at ? getMarketTradingDateStr(new Date(s.updated_at)) : '';
                 if (bkkUpdated !== todayDateStr) return; // Ignore stale records from previous days (e.g. 97033490 from Sept 10!)
 
                 const pnl = Number(s.today_pnl) || 0;
@@ -373,7 +408,7 @@ export default function EasyMMasterDashboardPage() {
                 return {
                     date: dateStr,
                     dateLabel: `${label} (${dayThai})`,
-                    topPort: maxP > 0 && topR?.port_number ? String(topR.port_number) : '-',
+                    topPort: maxP > 0 && topR?.port_number ? String(topR.port_number) : (label === 'วันนี้' ? 'กำลังรอชน TP' : '-'),
                     topProfit: Number(maxP.toFixed(2)),
                     topDD: Number(topR?.max_dd || topR?.max_drawdown || 0),
                     totalProfit: Number(totalP.toFixed(2)),
@@ -1253,7 +1288,7 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">🏆 พอร์ตกำไรสูงสุด:</span>
                                     <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        {fleetStats.today.topPort === '-' ? '-' : `#${fleetStats.today.topPort}`}
+                                        {fleetStats.today.topPort === '-' ? 'กำลังรอชน TP' : (/^\d+$/.test(fleetStats.today.topPort) ? `#${fleetStats.today.topPort}` : fleetStats.today.topPort)}
                                     </span>
                                 </div>
                                 <div className="text-xl font-black font-mono text-[#4de180]">
@@ -1284,7 +1319,7 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">🏆 พอร์ตกำไรสูงสุด:</span>
                                     <span className="font-mono text-amber-300/90 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        {fleetStats.yesterday.topPort === '-' ? '-' : `#${fleetStats.yesterday.topPort}`}
+                                        {fleetStats.yesterday.topPort === '-' ? '-' : (/^\d+$/.test(fleetStats.yesterday.topPort) ? `#${fleetStats.yesterday.topPort}` : fleetStats.yesterday.topPort)}
                                     </span>
                                 </div>
                                 <div className="text-xl font-black font-mono text-emerald-400/90">

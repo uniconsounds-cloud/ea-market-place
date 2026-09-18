@@ -4,6 +4,43 @@ import { supabase } from '@/lib/supabaseClient';
 export const runtime = 'edge';
 
 
+// Calculates Forex market trading date (rolls over at 05:00 AM Bangkok)
+function getMarketTradingDate(date: Date): Date {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const partMap: Record<string, string> = {};
+    for (const p of parts) {
+        partMap[p.type] = p.value;
+    }
+    const year = parseInt(partMap.year, 10);
+    const month = parseInt(partMap.month, 10) - 1;
+    const day = parseInt(partMap.day, 10);
+    const hour = parseInt(partMap.hour, 10);
+
+    const bkkDate = new Date(year, month, day);
+    if (hour < 5) {
+        bkkDate.setDate(bkkDate.getDate() - 1);
+    }
+    return bkkDate;
+}
+
+function getMarketTradingDateStr(date: Date = new Date()): string {
+    const d = getMarketTradingDate(date);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
 export async function POST(req: Request) {
     try {
         // 1. Security Check: API Key (Optional but recommended)
@@ -134,24 +171,89 @@ export async function POST(req: Request) {
         if (balance !== undefined && !isNaN(Number(balance))) {
             const numBal = Number(balance);
             try {
-                const nowIso = new Date().toISOString();
+                const now = new Date();
+                const nowIso = now.toISOString();
+                const currentMarketDateStr = getMarketTradingDateStr(now);
+
                 const { data: existingStatus } = await supabase
                     .from('farm_port_status')
-                    .select('port_number, equity, account_type')
+                    .select('port_number, equity, account_type, balance, today_pnl, updated_at')
                     .eq('port_number', String(account_number))
                     .maybeSingle();
 
                 if (existingStatus) {
+                    const lastMarketDateStr = existingStatus.updated_at 
+                        ? getMarketTradingDateStr(new Date(existingStatus.updated_at)) 
+                        : null;
+
+                    let todayPnl = Number(existingStatus.today_pnl) || 0;
+                    let shouldSyncDailyHistory = false;
+
+                    if (lastMarketDateStr && lastMarketDateStr !== currentMarketDateStr) {
+                        // Rollover to new market trading day (started at 05:00 AM Bangkok)!
+                        // Archive yesterday's accumulated profit to farm_daily_history if not already saved
+                        if (todayPnl > 0) {
+                            try {
+                                await supabase.rpc('sync_ea_history_batch', {
+                                    p_api_key: 'KHUCHAI_SUPHAKORN',
+                                    p_port_number: String(account_number),
+                                    p_history_array: [{
+                                        date: lastMarketDateStr,
+                                        profit: todayPnl,
+                                        max_dd: 0,
+                                        lots: 0
+                                    }]
+                                });
+                            } catch (archiveErr) {
+                                console.error('Error archiving previous day history:', archiveErr);
+                            }
+                        }
+
+                        // Reset today_pnl for the new market day
+                        const prevBal = Number(existingStatus.balance) || numBal;
+                        const initialDelta = numBal - prevBal;
+                        todayPnl = initialDelta > 0 ? Number(initialDelta.toFixed(2)) : 0;
+                        if (todayPnl > 0) {
+                            shouldSyncDailyHistory = true;
+                        }
+                    } else {
+                        // Same market trading day: calculate incremental profit if balance increased
+                        const prevBal = Number(existingStatus.balance) || numBal;
+                        const delta = numBal - prevBal;
+                        if (delta > 0) {
+                            todayPnl = Number((todayPnl + delta).toFixed(2));
+                            shouldSyncDailyHistory = true;
+                        }
+                    }
+
                     await supabase
                         .from('farm_port_status')
                         .update({
                             balance: numBal,
                             equity: (existingStatus.equity && Number(existingStatus.equity) > 0) ? existingStatus.equity : numBal,
+                            today_pnl: todayPnl,
                             is_online: true,
                             last_ping: nowIso,
                             updated_at: nowIso
                         })
                         .eq('port_number', String(account_number));
+
+                    if (shouldSyncDailyHistory && todayPnl > 0) {
+                        try {
+                            await supabase.rpc('sync_ea_history_batch', {
+                                p_api_key: 'KHUCHAI_SUPHAKORN',
+                                p_port_number: String(account_number),
+                                p_history_array: [{
+                                    date: currentMarketDateStr,
+                                    profit: todayPnl,
+                                    max_dd: 0,
+                                    lots: 0
+                                }]
+                            });
+                        } catch (syncErr) {
+                            console.error('Error auto-syncing daily history via license ping:', syncErr);
+                        }
+                    }
                 } else {
                     await supabase
                         .from('farm_port_status')
@@ -159,6 +261,7 @@ export async function POST(req: Request) {
                             port_number: String(account_number),
                             balance: numBal,
                             equity: numBal,
+                            today_pnl: 0,
                             account_type: resolvedProduct?.currency || 'USC',
                             ea_version: 'v1.16',
                             is_online: true,

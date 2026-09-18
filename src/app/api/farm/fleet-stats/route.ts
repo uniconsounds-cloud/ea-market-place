@@ -129,12 +129,47 @@ export async function GET() {
             return 'xxx' + str.slice(-3);
         };
 
-        // Date in Thailand timezone (Asia/Bangkok)
-        const getBangkokDate = (d = new Date()) => {
-            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d);
-        };
-        const todayDateStr = getBangkokDate(new Date());
-        const yesterdayDateStr = getBangkokDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+        // Forex market trading date (rolls over at 05:00 AM Bangkok time, matching FarmClient)
+        function getMarketTradingDate(date: Date): Date {
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Bangkok',
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                second: 'numeric',
+                hour12: false,
+            });
+            const parts = formatter.formatToParts(date);
+            const partMap: Record<string, string> = {};
+            for (const p of parts) {
+                partMap[p.type] = p.value;
+            }
+            const year = parseInt(partMap.year, 10);
+            const month = parseInt(partMap.month, 10) - 1;
+            const day = parseInt(partMap.day, 10);
+            const hour = parseInt(partMap.hour, 10);
+
+            const bkkDate = new Date(year, month, day);
+            if (hour < 5) {
+                bkkDate.setDate(bkkDate.getDate() - 1);
+            }
+            return bkkDate;
+        }
+
+        function getMarketTradingDateStr(date: Date = new Date()): string {
+            const d = getMarketTradingDate(date);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        const todayDateStr = getMarketTradingDateStr(now);
+        const yesterdayMarketDate = new Date(getMarketTradingDate(now));
+        yesterdayMarketDate.setDate(yesterdayMarketDate.getDate() - 1);
+        const yesterdayDateStr = getMarketTradingDateStr(yesterdayMarketDate);
 
         // Aggregate history by date
         const dateMap = new Map<string, { profits: number[]; dds: number[]; records: any[] }>();
@@ -158,11 +193,11 @@ export async function GET() {
             let profits = info ? [...info.profits] : [];
             let dds = info ? [...info.dds] : [];
 
-            // If today, ONLY incorporate live farm_port_status if updated_at is actually TODAY in Bangkok time
+            // If today, incorporate live farm_port_status if updated_at is within today's market session
             if (dateStr === todayDateStr && statuses) {
                 statuses.forEach((s: any) => {
                     if (!s.port_number || isTestPort(s.port_number)) return;
-                    const bkkUpdated = s.updated_at ? getBangkokDate(new Date(s.updated_at)) : '';
+                    const bkkUpdated = s.updated_at ? getMarketTradingDateStr(new Date(s.updated_at)) : '';
                     if (bkkUpdated !== todayDateStr) return; // Skip stale records from previous days!
 
                     const pnl = Number(s.today_pnl) || 0;
@@ -203,7 +238,7 @@ export async function GET() {
             return {
                 date: dateStr,
                 dateLabel: dayName || fallbackLabel,
-                topPort: maxP > 0 && topRecord ? maskPortNumber(topRecord.port_number) : '-',
+                topPort: maxP > 0 && topRecord ? maskPortNumber(topRecord.port_number) : (dateStr === todayDateStr ? 'รอชน TP' : '-'),
                 profitUSC: Math.round(avgP),
                 profitUSD: Number((avgP / 100).toFixed(2)),
                 dd: Number(avgDD.toFixed(1)),
