@@ -143,10 +143,10 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     };
 
     useEffect(() => {
-        if (showFleetStats && !fleetStatsData) {
+        if (showFleetStats) {
             fetchFleetStats();
         }
-    }, [showFleetStats, fleetStatsData]);
+    }, [showFleetStats]);
 
     useEffect(() => {
         const getCurrUser = async () => {
