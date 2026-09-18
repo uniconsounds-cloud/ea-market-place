@@ -236,6 +236,20 @@ export default function EasyMMasterDashboardPage() {
                 return pKey.includes('EZM') || pName.toLowerCase().includes('easym') || pName.toLowerCase().includes('easy m');
             });
 
+            // Set of accounts that actually have a Gold EA license in system
+            const goldLicenseAccountSet = new Set<string>();
+            (licenses || []).forEach(l => {
+                const prod = Array.isArray(l.products) ? l.products[0] : l.products;
+                const pKey = ((prod as any)?.product_key || '').toUpperCase();
+                const pName = ((prod as any)?.name || '').toUpperCase();
+                if (pKey.includes('GOLD') || pName.includes('GOLD') || pKey.includes('EZG')) {
+                    const rawAcc = (l.account_number || '').trim();
+                    if (rawAcc) {
+                        rawAcc.split(/[\s,]+/).filter(Boolean).forEach((acc: string) => goldLicenseAccountSet.add(acc));
+                    }
+                }
+            });
+
             // C. Fetch all farm_port_status
             const { data: portStatuses, error: statusErr } = await supabase
                 .from('farm_port_status')
@@ -361,7 +375,7 @@ export default function EasyMMasterDashboardPage() {
 
                 // Split Today & Yesterday (strictly EasyM only: exclude Gold EA mismatches like 97072259)
                 const st = statusMap.get(port);
-                const isGoldPort = st?.asset_type === 'GOLD' || st?.system_code === 'EAE_GENERIC' || (st?.ea_version && st?.ea_version.startsWith('v1.'));
+                const isGoldPort = (port === '97072259') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
                 if (!isGoldPort) {
                     if (h.date === todayDateStr) {
                         todayHistoryRecords.push({ ...h, port_number: port });
@@ -378,7 +392,7 @@ export default function EasyMMasterDashboardPage() {
                 if (!accNum || !easymPortSet.has(accNum) || isTestPort(accNum)) return;
                 
                 // CRITICAL 1: Exclude Gold EA mismatches
-                const isGold = s.asset_type === 'GOLD' || s.system_code === 'EAE_GENERIC' || (s.ea_version && s.ea_version.startsWith('v1.'));
+                const isGold = (accNum === '97072259') || (goldLicenseAccountSet.has(accNum) && (s.system_code?.toLowerCase().includes('gold') || s.system_code === 'EG_FARMING'));
                 if (isGold) return;
 
                 // CRITICAL 2: Only consider farm_port_status if last_ping is within today's market session and < 24 hours
@@ -498,9 +512,8 @@ export default function EasyMMasterDashboardPage() {
                     const prodKey = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.product_key || 'EZM-MAX';
                     const prodName = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.name || 'EasyM MAX';
 
-                    const isGoldMismatch = status?.asset_type === 'GOLD' || 
-                                           status?.system_code === 'EAE_GENERIC' || 
-                                           (status?.ea_version && status?.ea_version.startsWith('v1.'));
+                    const isGoldMismatch = (accNum === '97072259') || 
+                                           (goldLicenseAccountSet.has(accNum) && (status?.system_code?.toLowerCase().includes('gold') || status?.system_code === 'EG_FARMING'));
 
                     const isTester = !!customer?.is_tester || isTestPort(accNum);
                     const isMax = prodKey.includes('MAX') || prodName.toLowerCase().includes('max');

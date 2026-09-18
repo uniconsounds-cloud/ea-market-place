@@ -40,12 +40,30 @@ export async function GET() {
             return testPatterns.includes(str) || /^(\d)\1{5,}$/.test(str);
         };
 
+        // Set of accounts that actually have a Gold EA license in system
+        const goldLicenseAccountSet = new Set<string>();
+        (licenses || []).forEach((lic: any) => {
+            const prod = Array.isArray(lic.products) ? lic.products[0] : lic.products;
+            const pKey = (prod?.product_key || '').toUpperCase();
+            const pName = (prod?.name || '').toUpperCase();
+            if (pKey.includes('GOLD') || pName.includes('GOLD') || pKey.includes('EZG')) {
+                const accs = (lic.account_number || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                accs.forEach((a: string) => goldLicenseAccountSet.add(a));
+            }
+        });
+
+        const isGoldPort = (acc: string, st?: any) => {
+            if (acc === '97072259') return true;
+            if (goldLicenseAccountSet.has(acc) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING')) return true;
+            return false;
+        };
+
         // Strict 4-Rule Verification for Real Active Running Ports:
         // 1. License is active and not expired
         // 2. Not a tester account in customer menu (profiles.is_tester), unless Master Port 21692434
         // 3. Sent ping / signal continuously within last 48 hours
         // 4. Minimum balance: EasyM mini >= 50,000 cent ($500), EasyM MAX >= 100,000 cent ($1,000)
-        // 5. Must NOT be a Gold EA (asset_type !== 'GOLD')
+        // 5. Must NOT be a Gold EA
         const now = new Date();
         const activeUniquePorts = new Set<string>();
         let verifiedActiveBalanceUSC = 0;
@@ -68,8 +86,7 @@ export async function GET() {
                     if (!st) return; // Never pinged
 
                     // Check Gold EA mismatch
-                    const isGold = st.asset_type === 'GOLD' || st.system_code === 'EAE_GENERIC' || (st.ea_version && st.ea_version.startsWith('v1.'));
-                    if (isGold) return; // Exclude Gold EAs from EasyM stats!
+                    if (isGoldPort(acc, st)) return; // Exclude Gold EAs from EasyM stats!
 
                     // Check ping within 48 hours (strictly use last_ping)
                     const lastActive = st.last_ping ? new Date(st.last_ping).getTime() : 0;
@@ -189,8 +206,7 @@ export async function GET() {
             const pStr = String(h.port_number).trim();
             if (!h.date || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
             const st = statusMap.get(pStr);
-            const isGold = st?.asset_type === 'GOLD' || st?.system_code === 'EAE_GENERIC' || (st?.ea_version && st?.ea_version.startsWith('v1.'));
-            if (isGold) return; // Skip Gold EA history
+            if (isGoldPort(pStr, st)) return; // Skip Gold EA history
 
             if (!dateMap.has(h.date)) {
                 dateMap.set(h.date, { profits: [], dds: [], records: [] });
@@ -217,8 +233,7 @@ export async function GET() {
                     if (!s.port_number || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
                     
                     // Exclude Gold EAs
-                    const isGold = s.asset_type === 'GOLD' || s.system_code === 'EAE_GENERIC' || (s.ea_version && s.ea_version.startsWith('v1.'));
-                    if (isGold) return;
+                    if (isGoldPort(pStr, s)) return;
 
                     // Strictly check last_ping
                     if (!s.last_ping) return;

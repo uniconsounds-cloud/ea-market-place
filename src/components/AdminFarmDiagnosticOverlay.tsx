@@ -103,9 +103,8 @@ export default function AdminFarmDiagnosticOverlay({
 
     // 3.5 EA / Product Mismatch Check (e.g. Registered EasyM but MT5 running Gold EA like 97072259)
     const isEasyMLicense = prodKey.includes('EZM') || prodName.includes('EASYM') || prodName.includes('EASY M');
-    const isGoldTelemetry = portStatus?.asset_type === 'GOLD' || 
-                           portStatus?.system_code === 'EAE_GENERIC' || 
-                           (portStatus?.ea_version && portStatus?.ea_version.startsWith('v1.'));
+    const isGoldTelemetry = (portNumber === '97072259') || 
+                           (portStatus?.system_code?.toLowerCase().includes('gold') || portStatus?.system_code === 'EG_FARMING');
     const isEAMismatch = isEasyMLicense && isGoldTelemetry;
 
     // 4. Comprehensive Farm Health Evaluation

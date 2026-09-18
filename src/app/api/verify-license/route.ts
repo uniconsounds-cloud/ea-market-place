@@ -238,12 +238,25 @@ export async function POST(req: Request) {
                         ? Number(equity)
                         : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal);
 
+                    const prodKeyUpper = (resolvedProduct?.product_key || '').toUpperCase();
+                    const prodNameUpper = (resolvedProduct?.name || '').toUpperCase();
+                    const prodIdUpper = String(product_id || '').toUpperCase();
+                    const isProdGold = prodKeyUpper.includes('GOLD') || 
+                                       prodNameUpper.includes('GOLD') ||
+                                       prodIdUpper.includes('GOLD') ||
+                                       prodIdUpper.includes('EZG');
+
+                    const currentAssetType = isProdGold ? 'GOLD' : 'FOREX';
+                    const currentSystemCode = resolvedProduct?.name || (isProdGold ? 'EasyGold' : 'EasyM MAX');
+
                     await supabase
                         .from('farm_port_status')
                         .update({
                             balance: numBal,
                             equity: numEquity,
                             today_pnl: todayPnl,
+                            asset_type: currentAssetType,
+                            system_code: currentSystemCode,
                             is_online: true,
                             last_ping: nowIso,
                             updated_at: nowIso
@@ -274,6 +287,17 @@ export async function POST(req: Request) {
                         ? Number(equity)
                         : numBal;
 
+                    const prodKeyUpper = (resolvedProduct?.product_key || '').toUpperCase();
+                    const prodNameUpper = (resolvedProduct?.name || '').toUpperCase();
+                    const prodIdUpper = String(product_id || '').toUpperCase();
+                    const isProdGold = prodKeyUpper.includes('GOLD') || 
+                                       prodNameUpper.includes('GOLD') ||
+                                       prodIdUpper.includes('GOLD') ||
+                                       prodIdUpper.includes('EZG');
+
+                    const currentAssetType = isProdGold ? 'GOLD' : 'FOREX';
+                    const currentSystemCode = resolvedProduct?.name || (isProdGold ? 'EasyGold' : 'EasyM MAX');
+
                     await supabase
                         .from('farm_port_status')
                         .insert({
@@ -282,6 +306,8 @@ export async function POST(req: Request) {
                             equity: numEquity,
                             today_pnl: initialTodayPnl,
                             account_type: resolvedProduct?.currency || 'USC',
+                            asset_type: currentAssetType,
+                            system_code: currentSystemCode,
                             ea_version: 'v1.16',
                             is_online: true,
                             last_ping: nowIso,
