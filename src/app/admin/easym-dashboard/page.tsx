@@ -79,9 +79,12 @@ interface EasyMPortItem {
     hasTelemetry: boolean;
     isTester: boolean;
     isRealRunning: boolean;
+    isGoldMismatch: boolean;
+    actualAssetType: string;
+    actualSystemCode: string;
     hoursSinceLastPing: number;
     requiredBalanceUSC: number;
-    runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license';
+    runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
 }
 
 export interface MonthlyFleetStat {
@@ -356,22 +359,33 @@ export default function EasyMMasterDashboardPage() {
                     allTimePeakRecord = { portNumber: port, profit: p, date: h.date, maxDD: dd };
                 }
 
-                // Split Today & Yesterday
-                if (h.date === todayDateStr) {
-                    todayHistoryRecords.push({ ...h, port_number: port });
-                } else if (h.date === yesterdayDateStr) {
-                    yesterdayHistoryRecords.push({ ...h, port_number: port });
+                // Split Today & Yesterday (strictly EasyM only: exclude Gold EA mismatches like 97072259)
+                const st = statusMap.get(port);
+                const isGoldPort = st?.asset_type === 'GOLD' || st?.system_code === 'EAE_GENERIC' || (st?.ea_version && st?.ea_version.startsWith('v1.'));
+                if (!isGoldPort) {
+                    if (h.date === todayDateStr) {
+                        todayHistoryRecords.push({ ...h, port_number: port });
+                    } else if (h.date === yesterdayDateStr) {
+                        yesterdayHistoryRecords.push({ ...h, port_number: port });
+                    }
                 }
             });
 
-            // Merge live farm_port_status for today ONLY if updated_at is within today's market session and belongs to EasyM
+            // Merge live farm_port_status for today ONLY if last_ping is within today's market session (< 24h) and belongs to genuine EasyM (not Gold)
+            const now = new Date();
             (portStatuses || []).forEach(s => {
                 const accNum = s.port_number?.toString();
                 if (!accNum || !easymPortSet.has(accNum) || isTestPort(accNum)) return;
                 
-                // CRITICAL: Only consider farm_port_status if updated_at is within today's market session
-                const bkkUpdated = s.updated_at ? getMarketTradingDateStr(new Date(s.updated_at)) : '';
-                if (bkkUpdated !== todayDateStr) return; // Ignore stale records from previous days (e.g. 97033490 from Sept 10!)
+                // CRITICAL 1: Exclude Gold EA mismatches
+                const isGold = s.asset_type === 'GOLD' || s.system_code === 'EAE_GENERIC' || (s.ea_version && s.ea_version.startsWith('v1.'));
+                if (isGold) return;
+
+                // CRITICAL 2: Only consider farm_port_status if last_ping is within today's market session and < 24 hours
+                if (!s.last_ping) return;
+                const pingBkk = getMarketTradingDateStr(new Date(s.last_ping));
+                const pingAgeHours = (now.getTime() - new Date(s.last_ping).getTime()) / (1000 * 60 * 60);
+                if (pingBkk !== todayDateStr || pingAgeHours > 24) return; // Ignore stale records from previous days or dead pings (e.g. 97033490!)
 
                 const pnl = Number(s.today_pnl) || 0;
                 const dd = Number(s.daily_max_drawdown) || 0;
@@ -481,22 +495,14 @@ export default function EasyMMasterDashboardPage() {
                         resolvedAccType = 'USC';
                     }
 
-                    // Resolve accurate today pnl and drawdowns
-                    const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
-                    const statusTodayPnl = Number(status?.today_pnl) || 0;
-                    const resolvedTodayPnl = Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
-
-                    const statusDailyDD = Number(status?.daily_max_drawdown) || 0;
-                    const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
-
-                    const statusMaxDD = Number(status?.max_drawdown) || 0;
-                    const histWorstDD = portWorstDDMap.get(accNum) || 0;
-                    const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD);
-
-                    const isTester = !!customer?.is_tester || isTestPort(accNum);
                     const prodKey = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.product_key || 'EZM-MAX';
                     const prodName = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.name || 'EasyM MAX';
 
+                    const isGoldMismatch = status?.asset_type === 'GOLD' || 
+                                           status?.system_code === 'EAE_GENERIC' || 
+                                           (status?.ea_version && status?.ea_version.startsWith('v1.'));
+
+                    const isTester = !!customer?.is_tester || isTestPort(accNum);
                     const isMax = prodKey.includes('MAX') || prodName.toLowerCase().includes('max');
                     const isMini = prodKey.includes('MIN') || prodName.toLowerCase().includes('mini');
                     const requiredBalanceUSC = isMax ? 100000 : (isMini ? 50000 : 30000);
@@ -505,11 +511,28 @@ export default function EasyMMasterDashboardPage() {
                     const balUSC = resolvedAccType === 'USD' ? rawBal * 100 : rawBal;
                     const hoursSinceLastPing = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
 
-                    let runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' = 'running';
+                    // Resolve accurate today pnl and drawdowns:
+                    // CRITICAL: Only count status.today_pnl if the port sent ping today (<24h) and is NOT running a Gold EA!
+                    const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
+                    const pingMarketDateStr = status?.last_ping ? getMarketTradingDateStr(new Date(status.last_ping)) : '';
+                    const isPingToday = pingMarketDateStr === todayDateStr && hoursSinceLastPing <= 24;
+                    const statusTodayPnl = (isPingToday && !isGoldMismatch) ? (Number(status?.today_pnl) || 0) : 0;
+                    const resolvedTodayPnl = isGoldMismatch ? 0 : Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
+
+                    const statusDailyDD = Number(status?.daily_max_drawdown) || 0;
+                    const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
+
+                    const statusMaxDD = Number(status?.max_drawdown) || 0;
+                    const histWorstDD = portWorstDDMap.get(accNum) || 0;
+                    const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD);
+
+                    let runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold' = 'running';
                     if (!lic.is_active) {
                         runStatus = 'inactive_license';
                     } else if (isTester && accNum !== '21692434') {
                         runStatus = 'tester';
+                    } else if (isGoldMismatch) {
+                        runStatus = 'mismatch_gold';
                     } else if (!hasRealStatus || lastActive === 0) {
                         runStatus = 'no_telemetry';
                     } else if (hoursSinceLastPing > 48) {
@@ -592,6 +615,9 @@ export default function EasyMMasterDashboardPage() {
                         hasTelemetry: hasRealStatus,
                         isTester,
                         isRealRunning,
+                        isGoldMismatch,
+                        actualAssetType: status?.asset_type || 'UNKNOWN',
+                        actualSystemCode: status?.system_code || 'UNKNOWN',
                         hoursSinceLastPing: Math.round(hoursSinceLastPing),
                         requiredBalanceUSC,
                         runStatus
@@ -677,6 +703,9 @@ export default function EasyMMasterDashboardPage() {
                             hasTelemetry: true,
                             isTester: !isMaster,
                             isRealRunning,
+                            isGoldMismatch: false,
+                            actualAssetType: status.asset_type || 'FOREX',
+                            actualSystemCode: status.system_code || 'EasyM MAX',
                             hoursSinceLastPing: Math.round(hoursSinceLastPing),
                             requiredBalanceUSC,
                             runStatus
@@ -729,12 +758,14 @@ export default function EasyMMasterDashboardPage() {
 
                 // 1. New Ports started in this month
                 const newPorts = portList.filter(p => {
+                    if (p.isGoldMismatch) return false;
                     const startM = (p.startDateRaw || '').substring(0, 7);
                     return startM === mKey;
                 });
 
                 // 2. Ended / Dormant Ports in this month
                 const endedPorts = portList.filter(p => {
+                    if (p.isGoldMismatch) return false;
                     if (p.lifecycleStatus === 'active' || p.lifecycleStatus === 'not_started') return false;
                     const endM = (p.endDateRaw || '').substring(0, 7);
                     return endM === mKey;
@@ -742,6 +773,7 @@ export default function EasyMMasterDashboardPage() {
 
                 // 3. Ports active in this month
                 const activePortsInMonth = portList.filter(p => {
+                    if (p.isGoldMismatch) return false;
                     if (p.isTester && p.portNumber !== '21692434') return false;
                     const tradedInMonth = portActiveMonthsMap.get(p.portNumber)?.has(mKey);
                     if (tradedInMonth) return true;
@@ -860,6 +892,37 @@ export default function EasyMMasterDashboardPage() {
         }
     };
 
+    // Toggle License Active / Inactive (e.g. for ports that stopped running or switched to other EAs)
+    const handleToggleLicenseActive = async (accountNumber: string, currentActive: boolean) => {
+        const actionLabel = currentActive ? 'ระงับสิทธิ์ EasyM (Deactivate)' : 'เปิดใช้งานสิทธิ์ EasyM (Activate)';
+        if (!window.confirm(`คุณต้องการ ${actionLabel} ของพอร์ต #${accountNumber} หรือไม่?\n\n(หากระงับ พอร์ตนี้จะไม่ถูกนับเป็นพอร์ต EasyM และจะไม่ถูกรวมในสถิติผลรวมกำไร)`)) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('licenses')
+                .update({ is_active: !currentActive })
+                .eq('account_number', accountNumber);
+
+            if (error) throw error;
+
+            // If deactivating, clear today_pnl on farm_port_status to avoid stale profit inclusion
+            if (currentActive) {
+                await supabase
+                    .from('farm_port_status')
+                    .update({ today_pnl: 0 })
+                    .eq('port_number', accountNumber);
+            }
+
+            toast.success(`${actionLabel} ของพอร์ต #${accountNumber} สำเร็จ`);
+            await loadAllDashboardData();
+        } catch (err: any) {
+            console.error('Failed to toggle license:', err);
+            toast.error('เกิดข้อผิดพลาดในการปรับสถานะ: ' + (err?.message || 'Unknown error'));
+        }
+    };
+
     // 3. Filtered Ports
     const filteredPorts = useMemo(() => {
         return ports.filter(p => {
@@ -895,6 +958,7 @@ export default function EasyMMasterDashboardPage() {
             // Status filter
             if (selectedStatus !== 'all') {
                 if (selectedStatus === 'real_running' && !p.isRealRunning) return false;
+                if (selectedStatus === 'mismatch_gold' && p.runStatus !== 'mismatch_gold') return false;
                 if (selectedStatus === 'offline_48h' && p.runStatus !== 'offline_48h') return false;
                 if (selectedStatus === 'insufficient_bal' && p.runStatus !== 'insufficient_balance') return false;
                 if (selectedStatus === 'no_telemetry' && p.runStatus !== 'no_telemetry') return false;
@@ -1846,7 +1910,8 @@ export default function EasyMMasterDashboardPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
-                                    <SelectItem value="real_running">🟢 รันจริง (&le; 48h &amp; ทุนถึง)</SelectItem>
+                                    <SelectItem value="real_running">🟢 รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
+                                    <SelectItem value="mismatch_gold">🥇 รัน EA ทองคำ (EasyGold)</SelectItem>
                                     <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
                                     <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
                                     <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
@@ -2098,6 +2163,10 @@ export default function EasyMMasterDashboardPage() {
                                                                 <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
                                                                     🟢 รันจริง {port.isOnline ? '(สด)' : '(<48h)'}
                                                                 </Badge>
+                                                            ) : port.runStatus === 'mismatch_gold' ? (
+                                                                <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/40 text-[9px] px-1.5 py-0 font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
+                                                                    🥇 รันทองคำ (EasyGold)
+                                                                </Badge>
                                                             ) : port.runStatus === 'offline_48h' ? (
                                                                 <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={`ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน`}>
                                                                     ⏸️ ขาดติดต่อ ({port.hoursSinceLastPing}h)
@@ -2119,11 +2188,20 @@ export default function EasyMMasterDashboardPage() {
                                                                     ⚪ ออฟไลน์
                                                                 </Badge>
                                                             )}
-                                                            {!port.isActive && (
+                                                            {!port.isActive ? (
                                                                 <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
                                                                     ⛔ Inactive
                                                                 </Badge>
-                                                            )}
+                                                            ) : null}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleToggleLicenseActive(port.portNumber, port.isActive)}
+                                                                className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-red-400 hover:bg-muted/50 mt-0.5"
+                                                                title={port.isActive ? "คลิกเพื่อระงับสิทธิ์ EasyM พอร์ตนี้ (ไม่นับเป็นผู้ใช้ EasyM)" : "คลิกเพื่อเปิดใช้งานสิทธิ์ EasyM พอร์ตนี้"}
+                                                            >
+                                                                {port.isActive ? "ระงับสิทธิ์" : "เปิดสิทธิ์"}
+                                                            </Button>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -2255,6 +2333,10 @@ export default function EasyMMasterDashboardPage() {
                                                     <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
                                                         🟢 รันจริง {port.isOnline ? '(สด)' : '(<48h)'}
                                                     </Badge>
+                                                ) : port.runStatus === 'mismatch_gold' ? (
+                                                    <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/40 text-[9px] px-1.5 py-0 font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
+                                                        🥇 รันทองคำ (EasyGold)
+                                                    </Badge>
                                                 ) : port.runStatus === 'offline_48h' ? (
                                                     <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={`ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน`}>
                                                         ⏸️ ขาดติดต่อ ({port.hoursSinceLastPing}h)
@@ -2276,11 +2358,20 @@ export default function EasyMMasterDashboardPage() {
                                                         ⚪ ออฟไลน์
                                                     </Badge>
                                                 )}
-                                                {!port.isActive && (
+                                                {!port.isActive ? (
                                                     <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
                                                         ⛔ Inactive
                                                     </Badge>
-                                                )}
+                                                ) : null}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleToggleLicenseActive(port.portNumber, port.isActive)}
+                                                    className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-red-400 hover:bg-muted/50 mt-0.5"
+                                                    title={port.isActive ? "คลิกเพื่อระงับสิทธิ์ EasyM พอร์ตนี้ (ไม่นับเป็นผู้ใช้ EasyM)" : "คลิกเพื่อเปิดใช้งานสิทธิ์ EasyM พอร์ตนี้"}
+                                                >
+                                                    {port.isActive ? "ระงับสิทธิ์" : "เปิดสิทธิ์"}
+                                                </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -2322,6 +2413,11 @@ export default function EasyMMasterDashboardPage() {
                                                 ⚠️ ไม่มี Telemetry
                                             </span>
                                         )}
+                                        {port.runStatus === 'mismatch_gold' && (
+                                            <span className="text-[9px] bg-amber-500/15 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
+                                                🥇 รันทองคำ (EasyGold)
+                                            </span>
+                                        )}
                                         {!port.isActive && (
                                             <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full">
                                                 ⛔ Inactive
@@ -2330,9 +2426,20 @@ export default function EasyMMasterDashboardPage() {
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-0.5">{port.customerName}</p>
                                 </div>
-                                <Badge variant="outline" className="text-xs text-blue-400 border-blue-500/30">
-                                    {port.productName}
-                                </Badge>
+                                <div className="flex flex-col items-end gap-1.5">
+                                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-500/30">
+                                        {port.productName}
+                                    </Badge>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleToggleLicenseActive(port.portNumber, port.isActive)}
+                                        className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-red-400 hover:bg-muted/50"
+                                        title={port.isActive ? "คลิกเพื่อระงับสิทธิ์ EasyM พอร์ตนี้" : "คลิกเพื่อเปิดใช้งานสิทธิ์ EasyM พอร์ตนี้"}
+                                    >
+                                        {port.isActive ? "⛔ ระงับสิทธิ์" : "✅ เปิดสิทธิ์"}
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-2 space-y-3 text-xs">
                                 <div className="grid grid-cols-2 gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40 font-mono">

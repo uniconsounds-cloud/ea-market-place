@@ -101,6 +101,13 @@ export default function AdminFarmDiagnosticOverlay({
     const hasEnoughCapital = balUSC >= requiredBalanceUSC;
     const isLicenseActive = licenseInfo?.isActive !== false;
 
+    // 3.5 EA / Product Mismatch Check (e.g. Registered EasyM but MT5 running Gold EA like 97072259)
+    const isEasyMLicense = prodKey.includes('EZM') || prodName.includes('EASYM') || prodName.includes('EASY M');
+    const isGoldTelemetry = portStatus?.asset_type === 'GOLD' || 
+                           portStatus?.system_code === 'EAE_GENERIC' || 
+                           (portStatus?.ea_version && portStatus?.ea_version.startsWith('v1.'));
+    const isEAMismatch = isEasyMLicense && isGoldTelemetry;
+
     // 4. Comprehensive Farm Health Evaluation
     type HealthGrade = 'perfect' | 'partial' | 'warning' | 'critical';
     let healthGrade: HealthGrade = 'perfect';
@@ -115,6 +122,10 @@ export default function AdminFarmDiagnosticOverlay({
         healthGrade = 'critical';
         healthTitle = 'พอร์ตขาดการติดต่อนานกว่า 48 ชั่วโมง';
         healthDescription = 'ไม่มีสัญญาณการเชื่อมต่อจาก MT5 เกิน 48 ชม. อาจเกิดจากปิด MT5, ถอดบอทออก หรือเซิร์ฟเวอร์ VPS ดับ';
+    } else if (isEAMismatch) {
+        healthGrade = 'warning';
+        healthTitle = 'ตรวจพบรัน EA ทองคำ (EA Mismatch)';
+        healthDescription = `พอร์ตนี้ขอสิทธิ์เป็น ${licenseInfo?.productName || 'EasyM'} (คู่เงิน Forex) แต่บน MT5 กำลังรัน EA ทองคำ (${portStatus?.asset_type || 'GOLD'} / ${portStatus?.system_code || 'EasyGold'}) หน้าฟาร์มจึงแสดงภาพเป็นฟาร์มทองคำตามข้อมูลจริงที่ MT5 ส่งมา`;
     } else if (!hasEnoughCapital) {
         healthGrade = 'warning';
         healthTitle = 'ทุนต่ำกว่าเกณฑ์ขั้นต่ำของบอท';
@@ -227,6 +238,22 @@ export default function AdminFarmDiagnosticOverlay({
                             <div className="text-[11px] leading-relaxed opacity-90">{healthDescription}</div>
                         </div>
                     </div>
+
+                    {/* EA Mismatch Alert Box */}
+                    {isEAMismatch && (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs space-y-1.5">
+                            <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                                <span>เหตุผลที่หน้าฟาร์มแสดงผลเป็นทองคำ (EasyGold):</span>
+                            </div>
+                            <p className="text-muted-foreground text-[11px] leading-relaxed">
+                                พอร์ตนี้ในระบบขอใช้เป็น <strong className="text-amber-200">{licenseInfo?.productName}</strong> (คู่เงิน Forex) แต่บน MT5 ผู้ใช้ได้เปิดรันบอททองคำ <strong className="text-amber-200">({portStatus?.asset_type || 'GOLD'} - {portStatus?.system_code || 'EasyGold'} {portStatus?.ea_version})</strong>
+                            </p>
+                            <p className="text-[10px] text-amber-400/90 pt-1 border-t border-amber-500/20">
+                                💡 ระบบหน้าฟาร์มจะแสดงภาพฟาร์มเป็นทองคำตามข้อมูลจริงที่ MT5 ส่งมา และแดชบอร์ด EasyM ได้แยกพอร์ตนี้ออกจากผลรวมกำไรคู่เงินเรียบร้อยแล้ว
+                            </p>
+                        </div>
+                    )}
 
                     {/* 2. Detailed Diagnostic Matrix */}
                     <div className="space-y-2 bg-black/40 border border-amber-500/15 rounded-xl p-3">

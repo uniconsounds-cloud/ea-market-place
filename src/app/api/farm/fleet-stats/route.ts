@@ -29,7 +29,7 @@ export async function GET() {
         // Fetch Port Statuses for Capital & Ping Verification
         const { data: statuses } = await supabase
             .from('farm_port_status')
-            .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at, last_ping');
+            .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at, last_ping, asset_type, system_code, ea_version');
 
         const statusMap = new Map((statuses || []).map((s: any) => [String(s.port_number).trim(), s]));
 
@@ -45,6 +45,7 @@ export async function GET() {
         // 2. Not a tester account in customer menu (profiles.is_tester), unless Master Port 21692434
         // 3. Sent ping / signal continuously within last 48 hours
         // 4. Minimum balance: EasyM mini >= 50,000 cent ($500), EasyM MAX >= 100,000 cent ($1,000)
+        // 5. Must NOT be a Gold EA (asset_type !== 'GOLD')
         const now = new Date();
         const activeUniquePorts = new Set<string>();
         let verifiedActiveBalanceUSC = 0;
@@ -66,10 +67,12 @@ export async function GET() {
                     const st = statusMap.get(acc);
                     if (!st) return; // Never pinged
 
-                    // Check ping/updated_at within 48 hours
-                    const pingT = st.last_ping ? new Date(st.last_ping).getTime() : 0;
-                    const updT = st.updated_at ? new Date(st.updated_at).getTime() : 0;
-                    const lastActive = Math.max(pingT, updT);
+                    // Check Gold EA mismatch
+                    const isGold = st.asset_type === 'GOLD' || st.system_code === 'EAE_GENERIC' || (st.ea_version && st.ea_version.startsWith('v1.'));
+                    if (isGold) return; // Exclude Gold EAs from EasyM stats!
+
+                    // Check ping within 48 hours (strictly use last_ping)
+                    const lastActive = st.last_ping ? new Date(st.last_ping).getTime() : 0;
                     const diffHours = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
                     if (diffHours > 48) return; // Offline > 48h
 
@@ -180,11 +183,15 @@ export async function GET() {
         });
         allEasymPortsSet.add('21692434');
 
-        // Aggregate history by date (strictly for EasyM ports)
+        // Aggregate history by date (strictly for genuine EasyM ports: exclude Gold EAs)
         const dateMap = new Map<string, { profits: number[]; dds: number[]; records: any[] }>();
         (history || []).forEach((h: any) => {
             const pStr = String(h.port_number).trim();
             if (!h.date || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
+            const st = statusMap.get(pStr);
+            const isGold = st?.asset_type === 'GOLD' || st?.system_code === 'EAE_GENERIC' || (st?.ea_version && st?.ea_version.startsWith('v1.'));
+            if (isGold) return; // Skip Gold EA history
+
             if (!dateMap.has(h.date)) {
                 dateMap.set(h.date, { profits: [], dds: [], records: [] });
             }
@@ -203,13 +210,21 @@ export async function GET() {
             let profits = info ? [...info.profits] : [];
             let dds = info ? [...info.dds] : [];
 
-            // If today, incorporate live farm_port_status if updated_at is within today's market session and belongs to EasyM
+            // If today, incorporate live farm_port_status ONLY if last_ping is within today's market session (< 24h) and belongs to EasyM
             if (dateStr === todayDateStr && statuses) {
                 statuses.forEach((s: any) => {
                     const pStr = String(s.port_number).trim();
                     if (!s.port_number || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
-                    const bkkUpdated = s.updated_at ? getMarketTradingDateStr(new Date(s.updated_at)) : '';
-                    if (bkkUpdated !== todayDateStr) return; // Skip stale records from previous days!
+                    
+                    // Exclude Gold EAs
+                    const isGold = s.asset_type === 'GOLD' || s.system_code === 'EAE_GENERIC' || (s.ea_version && s.ea_version.startsWith('v1.'));
+                    if (isGold) return;
+
+                    // Strictly check last_ping
+                    if (!s.last_ping) return;
+                    const pingBkk = getMarketTradingDateStr(new Date(s.last_ping));
+                    const pingAgeHours = (now.getTime() - new Date(s.last_ping).getTime()) / (1000 * 60 * 60);
+                    if (pingBkk !== todayDateStr || pingAgeHours > 24) return; // Skip stale pings from days ago (e.g. 97033490!)
 
                     const pnl = Number(s.today_pnl) || 0;
                     const dd = Number(s.daily_max_drawdown) || 0;
