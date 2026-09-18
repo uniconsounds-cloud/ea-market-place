@@ -2,18 +2,7 @@
 //|                                              EAEZE_Licensing.mqh |
 //|                                    Copyright 2026, EAEZE Systems |
 //|                                             https://eaeze.com    |
-//|                                       Update Date : 18 Sep 2026  |
-//+------------------------------------------------------------------+
-//| [บันทึกการแก้ไข / CHANGELOG - วันที่ 18 กันยายน 2026 (0918)]:
-//| 1. เพิ่มฟังก์ชัน GetEaezeTodayClosedProfit():
-//|    - คำนวณกำไรปิดจริงวันนี้ (Realized PnL) จากประวัติการปิดออเดอร์ใน MT5
-//|      โดยตรง (HistoryDeals: DEAL_PROFIT + DEAL_SWAP + DEAL_COMMISSION)
-//|    - แยกเงินฝาก (Deposit/Top-up) และเงินถอน ไม่ให้นับเป็นกำไรจากการเทรด
-//| 2. อัปเกรดข้อมูลที่ส่งผ่าน WebRequest (CheckEaezeLicense):
-//|    - ส่งค่า "equity" และ "today_profit" เพิ่มเติมจากเดิมที่มีเฉพาะ "balance"
-//|    - รูปแบบ JSON:
-//|      {"account_number":"...", "product_id":"...", "balance":..., "equity":..., "today_profit":...}
-//|    - รองรับการแสดงผลกำไรเทรดแท้จริงในหน้าแดชบอร์ด EasyM ของแอดมิน
+//|                                             update : 21 May 2026  |
 //+------------------------------------------------------------------+
 /*
 ============== 4 Steps to Integrate Licensing in EA (.mq5) ==============
@@ -76,29 +65,6 @@ const int RETRY_COOLDOWN           = 120;     // 2 minutes (120 seconds) before 
 
 // --- 3. LICENSE CHECK LOGIC ---
 
-// Helper to calculate exact closed profit for today from MT5 history deals
-double GetEaezeTodayClosedProfit() {
-    MqlDateTime mdt;
-    TimeToStruct(TimeCurrent(), mdt);
-    mdt.hour = 0; mdt.min = 0; mdt.sec = 0;
-    datetime day_start = StructToTime(mdt);
-    
-    if(!HistorySelect(day_start, TimeCurrent())) return 0.0;
-    
-    double profit = 0.0;
-    int total = HistoryDealsTotal();
-    for(int i = 0; i < total; i++) {
-        ulong ticket = HistoryDealGetTicket(i);
-        if(ticket > 0) {
-            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT || entry == DEAL_ENTRY_OUT_BY) {
-                profit += HistoryDealGetDouble(ticket, DEAL_PROFIT) + HistoryDealGetDouble(ticket, DEAL_SWAP) + HistoryDealGetDouble(ticket, DEAL_COMMISSION);
-            }
-        }
-    }
-    return profit;
-}
-
 // Main verification function (callable with optional force parameter)
 bool CheckEaezeLicense(bool force_check = false) {
     long current_account = AccountInfoInteger(ACCOUNT_LOGIN);
@@ -152,9 +118,7 @@ bool CheckEaezeLicense(bool force_check = false) {
     string result_headers;
     
     string balance_str = DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2);
-    string equity_str  = DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2);
-    string profit_str  = DoubleToString(GetEaezeTodayClosedProfit(), 2);
-    string post_data   = "{\"account_number\":\"" + account_no + "\", \"product_id\":\"" + InpProductID + "\", \"balance\":" + balance_str + ", \"equity\":" + equity_str + ", \"today_profit\":" + profit_str + "}";
+    string post_data   = "{\"account_number\":\"" + account_no + "\", \"product_id\":\"" + InpProductID + "\", \"balance\":" + balance_str + "}";
     int len = StringToCharArray(post_data, data, 0, WHOLE_ARRAY, CP_UTF8);
     if (len > 0) ArrayResize(data, len - 1);
     
