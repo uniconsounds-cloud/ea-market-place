@@ -172,10 +172,19 @@ export async function GET() {
         yesterdayMarketDate.setDate(yesterdayMarketDate.getDate() - 1);
         const yesterdayDateStr = getMarketTradingDateStr(yesterdayMarketDate);
 
-        // Aggregate history by date
+        // Collect all registered EasyM port account numbers
+        const allEasymPortsSet = new Set<string>();
+        easymLicenses.forEach((lic: any) => {
+            const accs = (lic.account_number || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+            accs.forEach((a: string) => allEasymPortsSet.add(a));
+        });
+        allEasymPortsSet.add('21692434');
+
+        // Aggregate history by date (strictly for EasyM ports)
         const dateMap = new Map<string, { profits: number[]; dds: number[]; records: any[] }>();
         (history || []).forEach((h: any) => {
-            if (!h.date || isTestPort(h.port_number)) return;
+            const pStr = String(h.port_number).trim();
+            if (!h.date || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
             if (!dateMap.has(h.date)) {
                 dateMap.set(h.date, { profits: [], dds: [], records: [] });
             }
@@ -194,10 +203,11 @@ export async function GET() {
             let profits = info ? [...info.profits] : [];
             let dds = info ? [...info.dds] : [];
 
-            // If today, incorporate live farm_port_status if updated_at is within today's market session
+            // If today, incorporate live farm_port_status if updated_at is within today's market session and belongs to EasyM
             if (dateStr === todayDateStr && statuses) {
                 statuses.forEach((s: any) => {
-                    if (!s.port_number || isTestPort(s.port_number)) return;
+                    const pStr = String(s.port_number).trim();
+                    if (!s.port_number || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
                     const bkkUpdated = s.updated_at ? getMarketTradingDateStr(new Date(s.updated_at)) : '';
                     if (bkkUpdated !== todayDateStr) return; // Skip stale records from previous days!
 

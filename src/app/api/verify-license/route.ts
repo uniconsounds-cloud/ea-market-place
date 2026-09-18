@@ -209,18 +209,15 @@ export async function POST(req: Request) {
                             }
                         }
 
-                        // Reset today_pnl for the new market day
-                        const prevBal = Number(existingStatus.balance) || numBal;
-                        const initialDelta = numBal - prevBal;
-                        todayPnl = initialDelta > 0 ? Number(initialDelta.toFixed(2)) : 0;
-                        if (todayPnl > 0) {
-                            shouldSyncDailyHistory = true;
-                        }
+                        // For the new market trading day: current balance is the day's baseline, profit starts at 0
+                        todayPnl = 0;
+                        shouldSyncDailyHistory = false;
                     } else {
                         // Same market trading day: calculate incremental profit if balance increased
                         const prevBal = Number(existingStatus.balance) || numBal;
                         const delta = numBal - prevBal;
-                        if (delta > 0) {
+                        // Guard against capital deposits/top-ups: normal trade/basket profit is <= 3,000 USC ($30)
+                        if (delta > 0 && delta <= 3000) {
                             todayPnl = Number((todayPnl + delta).toFixed(2));
                             shouldSyncDailyHistory = true;
                         }

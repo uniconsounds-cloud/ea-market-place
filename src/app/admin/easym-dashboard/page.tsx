@@ -320,9 +320,17 @@ export default function EasyMMasterDashboardPage() {
             const yesterdayHistoryRecords: any[] = [];
             let allTimePeakRecord: any = null;
 
+            // Build Set of genuine EasyM port account numbers
+            const easymPortSet = new Set<string>();
+            easymLicenses.forEach(lic => {
+                const accs = (lic.account_number || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                accs.forEach((acc: string) => easymPortSet.add(acc));
+            });
+            easymPortSet.add('21692434');
+
             allDailyHistory.forEach(h => {
                 const port = h.port_number?.toString();
-                if (!port) return;
+                if (!port || !easymPortSet.has(port) || isTestPort(port)) return;
 
                 const p = Number(h.profit) || 0;
                 const dd = Number(h.max_dd || h.max_drawdown) || 0;
@@ -349,22 +357,22 @@ export default function EasyMMasterDashboardPage() {
                 }
 
                 // Check all-time peak
-                if (!isTestPort(port) && p > (allTimePeakRecord?.profit || 0)) {
+                if (p > (allTimePeakRecord?.profit || 0)) {
                     allTimePeakRecord = { portNumber: port, profit: p, date: h.date, maxDD: dd };
                 }
 
                 // Split Today & Yesterday
-                if (h.date === todayDateStr && !isTestPort(port)) {
+                if (h.date === todayDateStr) {
                     todayHistoryRecords.push({ ...h, port_number: port });
-                } else if (h.date === yesterdayDateStr && !isTestPort(port)) {
+                } else if (h.date === yesterdayDateStr) {
                     yesterdayHistoryRecords.push({ ...h, port_number: port });
                 }
             });
 
-            // Merge live farm_port_status for today ONLY if updated_at is within today's market session
+            // Merge live farm_port_status for today ONLY if updated_at is within today's market session and belongs to EasyM
             (portStatuses || []).forEach(s => {
                 const accNum = s.port_number?.toString();
-                if (!accNum || isTestPort(accNum)) return;
+                if (!accNum || !easymPortSet.has(accNum) || isTestPort(accNum)) return;
                 
                 // CRITICAL: Only consider farm_port_status if updated_at is within today's market session
                 const bkkUpdated = s.updated_at ? getMarketTradingDateStr(new Date(s.updated_at)) : '';
