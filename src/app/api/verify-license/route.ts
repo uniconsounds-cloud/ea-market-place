@@ -53,7 +53,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', message: 'Invalid API Key' }, { status: 401 });
         }
 
-        const { account_number, product_id, balance } = await req.json();
+        const body = await req.json();
+        const { account_number, product_id, balance, equity, today_profit } = body;
 
         if (!account_number || !product_id) {
             return NextResponse.json({ status: 'error', message: 'Missing parameters' }, { status: 400 });
@@ -189,7 +190,12 @@ export async function POST(req: Request) {
                     let todayPnl = Number(existingStatus.today_pnl) || 0;
                     let shouldSyncDailyHistory = false;
 
-                    if (lastMarketDateStr && lastMarketDateStr !== currentMarketDateStr) {
+                    if (today_profit !== undefined && today_profit !== null && !isNaN(Number(today_profit))) {
+                        // Priority 1: Direct MT5 Deal History Profit (impervious to deposits/withdrawals)
+                        const exactPnl = Math.max(0, Number(Number(today_profit).toFixed(2)));
+                        todayPnl = exactPnl;
+                        shouldSyncDailyHistory = todayPnl > 0;
+                    } else if (lastMarketDateStr && lastMarketDateStr !== currentMarketDateStr) {
                         // Rollover to new market trading day (started at 05:00 AM Bangkok)!
                         // Archive yesterday's accumulated profit to farm_daily_history if not already saved
                         if (todayPnl > 0) {
@@ -216,18 +222,27 @@ export async function POST(req: Request) {
                         // Same market trading day: calculate incremental profit if balance increased
                         const prevBal = Number(existingStatus.balance) || numBal;
                         const delta = numBal - prevBal;
-                        // Guard against capital deposits/top-ups: normal trade/basket profit is <= 3,000 USC ($30)
-                        if (delta > 0 && delta <= 3000) {
+                        
+                        // Smart deposit detection without arbitrary low caps:
+                        // Normal EA trading profit can easily reach $90-$150+ (9,000-15,000+ USC).
+                        // A deposit/top-up is characterized by a disproportionate instant jump:
+                        // > 20% of account balance AND > 5,000 USC ($50), or an absolute jump > 30,000 USC ($300).
+                        const isDeposit = (delta > 0.20 * prevBal && delta > 5000) || delta > 30000;
+                        if (delta > 0 && !isDeposit) {
                             todayPnl = Number((todayPnl + delta).toFixed(2));
                             shouldSyncDailyHistory = true;
                         }
                     }
 
+                    const numEquity = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
+                        ? Number(equity)
+                        : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal);
+
                     await supabase
                         .from('farm_port_status')
                         .update({
                             balance: numBal,
-                            equity: (existingStatus.equity && Number(existingStatus.equity) > 0) ? existingStatus.equity : numBal,
+                            equity: numEquity,
                             today_pnl: todayPnl,
                             is_online: true,
                             last_ping: nowIso,
@@ -252,13 +267,20 @@ export async function POST(req: Request) {
                         }
                     }
                 } else {
+                    const initialTodayPnl = (today_profit !== undefined && today_profit !== null && !isNaN(Number(today_profit)))
+                        ? Math.max(0, Number(Number(today_profit).toFixed(2)))
+                        : 0;
+                    const numEquity = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
+                        ? Number(equity)
+                        : numBal;
+
                     await supabase
                         .from('farm_port_status')
                         .insert({
                             port_number: String(account_number),
                             balance: numBal,
-                            equity: numBal,
-                            today_pnl: 0,
+                            equity: numEquity,
+                            today_pnl: initialTodayPnl,
                             account_type: resolvedProduct?.currency || 'USC',
                             ea_version: 'v1.16',
                             is_online: true,

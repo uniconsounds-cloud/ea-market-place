@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
     Activity, 
     Crown, 
+    Trophy,
     ShieldAlert, 
     Users, 
     Database, 
@@ -114,31 +115,23 @@ interface CustomerGroup {
     telemetryCount: number;
 }
 
+export interface FleetDailyStat {
+    date: string;
+    dateLabel: string;
+    topPort: string;
+    topProfit: number;
+    topDD: number;
+    totalProfit: number;
+    avgProfit: number;
+    avgDD: number;
+    activeCount: number;
+    positiveCount: number;
+    contributingPorts: { port: string; profit: number }[];
+}
+
 export interface FleetDailyComparison {
-    today: {
-        date: string;
-        dateLabel: string;
-        topPort: string;
-        topProfit: number;
-        topDD: number;
-        totalProfit: number;
-        avgProfit: number;
-        avgDD: number;
-        activeCount: number;
-        positiveCount: number;
-    };
-    yesterday: {
-        date: string;
-        dateLabel: string;
-        topPort: string;
-        topProfit: number;
-        topDD: number;
-        totalProfit: number;
-        avgProfit: number;
-        avgDD: number;
-        activeCount: number;
-        positiveCount: number;
-    };
+    today: FleetDailyStat;
+    yesterday: FleetDailyStat;
     allTimePeak: {
         portNumber: string;
         profit: number;
@@ -389,12 +382,13 @@ export default function EasyMMasterDashboardPage() {
             });
 
             // Compute Fleet Daily Stats
-            const computeDayStats = (records: any[], dateStr: string, label: string) => {
+            const computeDayStats = (records: any[], dateStr: string, label: string): FleetDailyStat => {
                 let maxP = 0;
                 let topR: any = null;
                 let totalP = 0;
                 const dds: number[] = [];
                 let positiveCount = 0;
+                const contributingPorts: { port: string; profit: number }[] = [];
 
                 records.forEach(r => {
                     const p = Number(r.profit) || 0;
@@ -404,9 +398,15 @@ export default function EasyMMasterDashboardPage() {
                         maxP = p;
                         topR = r;
                     }
-                    if (p > 0) positiveCount++;
+                    if (p > 0) {
+                        positiveCount++;
+                        contributingPorts.push({ port: String(r.port_number), profit: Number(p.toFixed(2)) });
+                    }
                     if (dd > 0) dds.push(dd);
                 });
+
+                // Sort ports by profit descending
+                contributingPorts.sort((a, b) => b.profit - a.profit);
 
                 const dt = new Date(dateStr + 'T00:00:00');
                 const dayThai = dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
@@ -423,7 +423,8 @@ export default function EasyMMasterDashboardPage() {
                     avgProfit: Number(avgP.toFixed(2)),
                     avgDD: Number(avgDD.toFixed(1)),
                     activeCount: records.length,
-                    positiveCount
+                    positiveCount,
+                    contributingPorts
                 };
             };
 
@@ -1280,98 +1281,195 @@ export default function EasyMMasterDashboardPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-                        {/* 1. วันนี้ */}
-                        <div className="bg-black/50 border border-emerald-500/30 rounded-lg p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
-                                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                                    ⚡ {fleetStats.today.dateLabel}
-                                </span>
-                                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded">
-                                    DD เฉลี่ย {fleetStats.today.avgDD}%
-                                </span>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">🏆 พอร์ตกำไรสูงสุด:</span>
-                                    <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        {fleetStats.today.topPort === '-' ? 'กำลังรอชน TP' : (/^\d+$/.test(fleetStats.today.topPort) ? `#${fleetStats.today.topPort}` : fleetStats.today.topPort)}
+                    {/* ส่วนที่ 1: พอร์ตกำไรสูงสุดเดี่ยวประจำวัน (แสดงเฉพาะตัวเลขของพอร์ตนั้นเท่านั้น) */}
+                    <div className="space-y-2">
+                        <div className="text-xs font-semibold text-amber-400/90 flex items-center gap-1.5">
+                            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                            <span>🏆 พอร์ตกำไรสูงสุดเดี่ยวประจำวัน (แสดงเฉพาะสถิติของพอร์ตนั้นเดี่ยวๆ)</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                            {/* 1. วันนี้ */}
+                            <div className="bg-black/50 border border-emerald-500/30 rounded-lg p-3.5 space-y-2">
+                                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
+                                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                        ⚡ {fleetStats.today.dateLabel}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-emerald-300/90 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                        สถิติพอร์ตเดี่ยว
                                     </span>
                                 </div>
-                                <div className="text-xl font-black font-mono text-[#4de180]">
-                                    +{fleetStats.today.topProfit.toLocaleString()} USC
-                                </div>
-                                <div className="text-[11px] text-muted-foreground flex justify-between">
-                                    <span>Max DD: <span className="text-amber-400 font-mono font-semibold">{fleetStats.today.topDD}%</span></span>
-                                    <span>เฉลี่ยพอร์ตที่ปิด: <span className="text-emerald-400 font-mono">+{fleetStats.today.avgProfit.toLocaleString()} USC</span></span>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">พอร์ตที่กำไรสูงสุด:</span>
+                                        <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
+                                            {fleetStats.today.topPort === '-' ? 'กำลังรอชน TP' : (/^\d+$/.test(fleetStats.today.topPort) ? `#${fleetStats.today.topPort}` : fleetStats.today.topPort)}
+                                        </span>
+                                    </div>
+                                    <div className="text-2xl font-black font-mono text-[#4de180] tracking-tight">
+                                        +{fleetStats.today.topProfit.toLocaleString()} USC
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-border/20">
+                                        <span>Max DD ของพอร์ตนี้: <span className="text-amber-400 font-mono font-semibold">{fleetStats.today.topDD}%</span></span>
+                                        <span className="text-muted-foreground/80 font-mono text-[10px]">
+                                            {fleetStats.today.topProfit > 0 ? `≈ +$${(fleetStats.today.topProfit / 100).toFixed(2)} USD` : ''}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="pt-2 border-t border-border/30 flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">รวมกำไรปิดวันนี้:</span>
-                                <span className="font-mono font-bold text-emerald-400">+{fleetStats.today.totalProfit.toLocaleString()} USC</span>
+
+                            {/* 2. เมื่อวาน */}
+                            <div className="bg-black/40 border border-border/60 rounded-lg p-3.5 space-y-2">
+                                <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                                    <span className="text-xs font-bold text-amber-200/80 flex items-center gap-1.5">
+                                        📅 {fleetStats.yesterday.dateLabel}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-amber-300/80 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                        สถิติพอร์ตเดี่ยว
+                                    </span>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">พอร์ตที่กำไรสูงสุด:</span>
+                                        <span className="font-mono text-amber-300/90 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
+                                            {fleetStats.yesterday.topPort === '-' ? '-' : (/^\d+$/.test(fleetStats.yesterday.topPort) ? `#${fleetStats.yesterday.topPort}` : fleetStats.yesterday.topPort)}
+                                        </span>
+                                    </div>
+                                    <div className="text-2xl font-black font-mono text-emerald-400/90 tracking-tight">
+                                        +{fleetStats.yesterday.topProfit.toLocaleString()} USC
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-border/20">
+                                        <span>Max DD ของพอร์ตนี้: <span className="text-amber-400 font-mono font-semibold">{fleetStats.yesterday.topDD}%</span></span>
+                                        <span className="text-muted-foreground/80 font-mono text-[10px]">
+                                            {fleetStats.yesterday.topProfit > 0 ? `≈ +$${(fleetStats.yesterday.topProfit / 100).toFixed(2)} USD` : ''}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. สถิติสูงสุดตลอดกาล */}
+                            <div className="bg-black/40 border border-amber-500/20 rounded-lg p-3.5 space-y-2">
+                                <div className="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
+                                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                                        <Crown className="w-3.5 h-3.5 text-amber-400" /> สถิติสูงสุดตลอดกาล
+                                    </span>
+                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                        Survival 100%
+                                    </span>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">พอร์ตแชมป์:</span>
+                                        <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
+                                            #{fleetStats.allTimePeak.portNumber}
+                                        </span>
+                                    </div>
+                                    <div className="text-2xl font-black font-mono text-[#ffd700] tracking-tight">
+                                        +{fleetStats.allTimePeak.profit.toLocaleString()} USC
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-border/20">
+                                        <span>วันที่ทำได้: <span className="font-mono text-amber-200/80">{fleetStats.allTimePeak.date}</span></span>
+                                        <span className="font-mono text-amber-300">227 วัน (1 ก.พ. 69)</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* 2. เมื่อวาน */}
-                        <div className="bg-black/40 border border-border/60 rounded-lg p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
-                                <span className="text-xs font-bold text-amber-200/80 flex items-center gap-1.5">
-                                    📅 {fleetStats.yesterday.dateLabel}
-                                </span>
-                                <span className="text-[10px] font-mono text-amber-300/80 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                                    DD เฉลี่ย {fleetStats.yesterday.avgDD}%
-                                </span>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">🏆 พอร์ตกำไรสูงสุด:</span>
-                                    <span className="font-mono text-amber-300/90 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        {fleetStats.yesterday.topPort === '-' ? '-' : (/^\d+$/.test(fleetStats.yesterday.topPort) ? `#${fleetStats.yesterday.topPort}` : fleetStats.yesterday.topPort)}
-                                    </span>
-                                </div>
-                                <div className="text-xl font-black font-mono text-emerald-400/90">
-                                    +{fleetStats.yesterday.topProfit.toLocaleString()} USC
-                                </div>
-                                <div className="text-[11px] text-muted-foreground flex justify-between">
-                                    <span>Max DD: <span className="text-amber-400 font-mono font-semibold">{fleetStats.yesterday.topDD}%</span></span>
-                                    <span>เฉลี่ยพอร์ตที่ปิด: <span className="text-emerald-400 font-mono">+{fleetStats.yesterday.avgProfit.toLocaleString()} USC</span></span>
-                                </div>
-                            </div>
-                            <div className="pt-2 border-t border-border/30 flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">รวมกำไรปิดเมื่อวาน:</span>
-                                <span className="font-mono font-bold text-emerald-400/90">+{fleetStats.yesterday.totalProfit.toLocaleString()} USC</span>
-                            </div>
+                    {/* ส่วนที่ 2: กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ พร้อมระบุจำนวนพอร์ตที่รวมกัน) */}
+                    <div className="pt-3 border-t border-amber-500/20 space-y-2">
+                        <div className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>🌐 กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ)</span>
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                                รวมกำไรจากพอร์ตที่ปิดออเดอร์สำเร็จ
+                            </span>
                         </div>
-
-                        {/* 3. สถิติสูงสุดตลอดกาล (All-Time Peak Record) */}
-                        <div className="bg-black/40 border border-amber-500/20 rounded-lg p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
-                                <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                                    <Crown className="w-3.5 h-3.5 text-amber-400" /> สถิติสูงสุดตลอดกาล
-                                </span>
-                                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
-                                    Survival 100%
-                                </span>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">🥇 กำไรต่อวันสูงสุด:</span>
-                                    <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                        #{fleetStats.allTimePeak.portNumber}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                            {/* 2.1 รวมกำไรปิดวันนี้ */}
+                            <div className="bg-gradient-to-br from-emerald-950/40 via-black/60 to-black/80 border border-emerald-500/40 rounded-lg p-3.5 space-y-2.5">
+                                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
+                                    <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                                        ⚡ รวมกำไรปิดวันนี้ ({fleetStats.today.dateLabel})
+                                    </span>
+                                    <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                                        มาจากผลรวมของ {fleetStats.today.positiveCount} พอร์ต
                                     </span>
                                 </div>
-                                <div className="text-xl font-black font-mono text-[#ffd700]">
-                                    +{fleetStats.allTimePeak.profit.toLocaleString()} USC
+                                <div className="flex items-baseline justify-between">
+                                    <div>
+                                        <div className="text-2xl sm:text-3xl font-black font-mono text-[#4de180]">
+                                            +{fleetStats.today.totalProfit.toLocaleString()} USC
+                                        </div>
+                                        <div className="text-xs font-mono text-emerald-400/70">
+                                            ≈ +${(fleetStats.today.totalProfit / 100).toFixed(2)} USD
+                                        </div>
+                                    </div>
+                                    <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
+                                        <div>เฉลี่ยพอร์ตที่ปิด: <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.today.avgProfit.toLocaleString()} USC</span></div>
+                                        <div>DD เฉลี่ยทั้งฝูงบิน: <span className="text-amber-300 font-mono">{fleetStats.today.avgDD}%</span></div>
+                                    </div>
                                 </div>
-                                <div className="text-[11px] text-muted-foreground flex justify-between">
-                                    <span>วันที่ทำได้: <span className="font-mono text-amber-200/80">{fleetStats.allTimePeak.date}</span></span>
-                                    <span>พอร์ตหลักแอดมิน: <span className="text-[#ffd700] font-mono font-semibold">+9,188 USC</span></span>
+                                {/* Contributing ports chips */}
+                                <div className="pt-2 border-t border-emerald-500/10">
+                                    <div className="text-[10px] text-muted-foreground mb-1">พอร์ตที่สร้างกำไรวันนี้:</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {fleetStats.today.contributingPorts && fleetStats.today.contributingPorts.length > 0 ? (
+                                            fleetStats.today.contributingPorts.map(cp => (
+                                                <span key={cp.port} className="text-[11px] font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded flex items-center gap-1">
+                                                    <span className="text-muted-foreground">#{cp.port}</span>
+                                                    <span className="font-bold text-emerald-400">+{cp.profit.toLocaleString()} USC</span>
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-[11px] text-muted-foreground italic">กำลังรอพอร์ตชน TP ชุดแรกในวันนี้...</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            <div className="pt-2 border-t border-border/30 flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">รันต่อเนื่อง:</span>
-                                <span className="font-mono font-bold text-amber-300">227 วัน (ตั้งแต่ 1 ก.พ. 69)</span>
+
+                            {/* 2.2 รวมกำไรปิดเมื่อวาน */}
+                            <div className="bg-gradient-to-br from-amber-950/30 via-black/60 to-black/80 border border-border/60 rounded-lg p-3.5 space-y-2.5">
+                                <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                                    <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
+                                        📅 รวมกำไรปิดเมื่อวาน ({fleetStats.yesterday.dateLabel})
+                                    </span>
+                                    <span className="text-[11px] font-mono text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
+                                        มาจากผลรวมของ {fleetStats.yesterday.positiveCount} พอร์ต
+                                    </span>
+                                </div>
+                                <div className="flex items-baseline justify-between">
+                                    <div>
+                                        <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400/90">
+                                            +{fleetStats.yesterday.totalProfit.toLocaleString()} USC
+                                        </div>
+                                        <div className="text-xs font-mono text-emerald-400/60">
+                                            ≈ +${(fleetStats.yesterday.totalProfit / 100).toFixed(2)} USD
+                                        </div>
+                                    </div>
+                                    <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
+                                        <div>เฉลี่ยพอร์ตที่ปิด: <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.yesterday.avgProfit.toLocaleString()} USC</span></div>
+                                        <div>DD เฉลี่ยทั้งฝูงบิน: <span className="text-amber-300 font-mono">{fleetStats.yesterday.avgDD}%</span></div>
+                                    </div>
+                                </div>
+                                {/* Contributing ports chips */}
+                                <div className="pt-2 border-t border-border/30">
+                                    <div className="text-[10px] text-muted-foreground mb-1">พอร์ตที่สร้างกำไรเมื่อวาน:</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {fleetStats.yesterday.contributingPorts && fleetStats.yesterday.contributingPorts.length > 0 ? (
+                                            fleetStats.yesterday.contributingPorts.map(cp => (
+                                                <span key={cp.port} className="text-[11px] font-mono bg-black/50 border border-amber-500/20 text-amber-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                                    <span className="text-muted-foreground">#{cp.port}</span>
+                                                    <span className="font-bold text-emerald-400/90">+{cp.profit.toLocaleString()} USC</span>
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-[11px] text-muted-foreground italic">-</span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
