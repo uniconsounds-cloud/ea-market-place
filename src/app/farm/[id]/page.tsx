@@ -22,13 +22,17 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .single();
     const isAdmin = profile?.role === 'admin';
 
-    // 3. Fetch License Owner, registration date, and tier details
+    // 3. Fetch License Owner, registration date, tier, and product details
     const { data: licenses } = await supabase
         .from('licenses')
-        .select('user_id, created_at, port_name, license_tier, dashboard_skin, is_active')
+        .select('user_id, created_at, port_name, license_tier, dashboard_skin, is_active, products:product_id(id, name, product_key, min_balance, currency)')
         .eq('account_number', portNumber);
 
     const license = licenses?.find(l => l.is_active) || licenses?.[0];
+    const product = Array.isArray(license?.products) ? license?.products[0] : (license?.products as any);
+
+    const sessionEmail = session.user.email;
+    const isSuperAdmin = sessionEmail === 'juntarasate@gmail.com' || sessionEmail === 'juntatasate@gmail.com';
 
     if (!isAdmin && (!license || license.user_id !== session.user.id)) {
         return (
@@ -83,6 +87,15 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 licenseTier={license?.license_tier || 'free'}
                 dashboardSkin={license?.dashboard_skin || 'avatar_scifi'}
                 isAdmin={isAdmin}
+                isSuperAdmin={isSuperAdmin}
+                licenseInfo={license ? {
+                    isActive: license.is_active !== false,
+                    productName: product?.name || 'EasyM',
+                    productKey: product?.product_key || '',
+                    minBalance: product?.min_balance || 0,
+                    currency: product?.currency || 'USC',
+                    createdAt: license.created_at
+                } : null}
             />
         </div>
     );

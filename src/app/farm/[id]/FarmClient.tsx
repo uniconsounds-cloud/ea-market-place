@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
+import AdminFarmDiagnosticOverlay from '@/components/AdminFarmDiagnosticOverlay';
 import { toast } from 'sonner';
 
 // --- Utilities ---
@@ -73,7 +74,9 @@ export default function FarmClient({
     customName,
     licenseTier = 'free',
     dashboardSkin = 'avatar_scifi',
-    isAdmin = false
+    isAdmin = false,
+    isSuperAdmin = false,
+    licenseInfo = null
 }: { 
     portNumber: string;
     initialOrders: any[];
@@ -83,6 +86,8 @@ export default function FarmClient({
     licenseTier?: string;
     dashboardSkin?: string;
     isAdmin?: boolean;
+    isSuperAdmin?: boolean;
+    licenseInfo?: any;
 }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
@@ -997,6 +1002,14 @@ export default function FarmClient({
                     todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                     isFirstSyncLoading={forceShowEALoader}
                 />
+                {/* Admin Diagnostic Overlay for juntarasate@gmail.com */}
+                <AdminFarmDiagnosticOverlay
+                    isSuperAdmin={isSuperAdmin}
+                    portNumber={portNumber}
+                    portStatus={portStatus}
+                    ordersCount={orders.length}
+                    licenseInfo={licenseInfo}
+                />
                 {/* Visual indicator for secret toggle back */}
                 <div 
                     className="fixed top-0 left-0 w-20 h-20 z-[100] cursor-pointer opacity-0 hover:opacity-10"
@@ -1345,6 +1358,15 @@ export default function FarmClient({
                     </div>
                 </div>
             )}
+
+            {/* Admin Diagnostic Overlay for juntarasate@gmail.com */}
+            <AdminFarmDiagnosticOverlay
+                isSuperAdmin={isSuperAdmin}
+                portNumber={portNumber}
+                portStatus={portStatus}
+                ordersCount={orders.length}
+                licenseInfo={licenseInfo}
+            />
         </div>
     );
 }

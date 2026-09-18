@@ -36,7 +36,8 @@ import {
     Cpu,
     ArrowDownRight,
     CircleDollarSign,
-    UserCheck
+    UserCheck,
+    X
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -156,6 +157,7 @@ export default function EasyMMasterDashboardPage() {
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [selectedAdmin, setSelectedAdmin] = useState<string>('all');
     const [selectedProduct, setSelectedProduct] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -1303,7 +1305,22 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex items-center justify-between text-xs">
                                         <span className="text-muted-foreground">พอร์ตที่กำไรสูงสุด:</span>
                                         <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                            {fleetStats.today.topPort === '-' ? 'กำลังรอชน TP' : (/^\d+$/.test(fleetStats.today.topPort) ? `#${fleetStats.today.topPort}` : fleetStats.today.topPort)}
+                                            {fleetStats.today.topPort === '-' ? (
+                                                'กำลังรอชน TP'
+                                            ) : /^\d+$/.test(fleetStats.today.topPort) ? (
+                                                <a
+                                                    href={`/farm/${fleetStats.today.topPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="hover:underline hover:text-amber-200 inline-flex items-center gap-1"
+                                                    title={`เปิดหน้าฟาร์มพอร์ต ${fleetStats.today.topPort}`}
+                                                >
+                                                    <span>#{fleetStats.today.topPort}</span>
+                                                    <ExternalLink className="w-3 h-3 opacity-60" />
+                                                </a>
+                                            ) : (
+                                                fleetStats.today.topPort
+                                            )}
                                         </span>
                                     </div>
                                     <div className="text-2xl font-black font-mono text-[#4de180] tracking-tight">
@@ -1332,7 +1349,22 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex items-center justify-between text-xs">
                                         <span className="text-muted-foreground">พอร์ตที่กำไรสูงสุด:</span>
                                         <span className="font-mono text-amber-300/90 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                            {fleetStats.yesterday.topPort === '-' ? '-' : (/^\d+$/.test(fleetStats.yesterday.topPort) ? `#${fleetStats.yesterday.topPort}` : fleetStats.yesterday.topPort)}
+                                            {fleetStats.yesterday.topPort === '-' ? (
+                                                '-'
+                                            ) : /^\d+$/.test(fleetStats.yesterday.topPort) ? (
+                                                <a
+                                                    href={`/farm/${fleetStats.yesterday.topPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="hover:underline hover:text-amber-200 inline-flex items-center gap-1"
+                                                    title={`เปิดหน้าฟาร์มพอร์ต ${fleetStats.yesterday.topPort}`}
+                                                >
+                                                    <span>#{fleetStats.yesterday.topPort}</span>
+                                                    <ExternalLink className="w-3 h-3 opacity-60" />
+                                                </a>
+                                            ) : (
+                                                fleetStats.yesterday.topPort
+                                            )}
                                         </span>
                                     </div>
                                     <div className="text-2xl font-black font-mono text-emerald-400/90 tracking-tight">
@@ -1361,7 +1393,16 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex items-center justify-between text-xs">
                                         <span className="text-muted-foreground">พอร์ตแชมป์:</span>
                                         <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
-                                            #{fleetStats.allTimePeak.portNumber}
+                                            <a
+                                                href={`/farm/${fleetStats.allTimePeak.portNumber}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="hover:underline hover:text-amber-200 inline-flex items-center gap-1"
+                                                title={`เปิดหน้าฟาร์มพอร์ต ${fleetStats.allTimePeak.portNumber}`}
+                                            >
+                                                <span>#{fleetStats.allTimePeak.portNumber}</span>
+                                                <ExternalLink className="w-3 h-3 opacity-60" />
+                                            </a>
                                         </span>
                                     </div>
                                     <div className="text-2xl font-black font-mono text-[#ffd700] tracking-tight">
@@ -1418,10 +1459,18 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex flex-wrap gap-1.5">
                                         {fleetStats.today.contributingPorts && fleetStats.today.contributingPorts.length > 0 ? (
                                             fleetStats.today.contributingPorts.map(cp => (
-                                                <span key={cp.port} className="text-[11px] font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded flex items-center gap-1">
+                                                <a
+                                                    key={cp.port}
+                                                    href={`/farm/${cp.port}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[11px] font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-500/25 hover:border-emerald-500/50 hover:underline transition-colors"
+                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${cp.port}`}
+                                                >
                                                     <span className="text-muted-foreground">#{cp.port}</span>
                                                     <span className="font-bold text-emerald-400">+{cp.profit.toLocaleString()} USC</span>
-                                                </span>
+                                                    <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                                                </a>
                                             ))
                                         ) : (
                                             <span className="text-[11px] text-muted-foreground italic">กำลังรอพอร์ตชน TP ชุดแรกในวันนี้...</span>
@@ -1460,10 +1509,18 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex flex-wrap gap-1.5">
                                         {fleetStats.yesterday.contributingPorts && fleetStats.yesterday.contributingPorts.length > 0 ? (
                                             fleetStats.yesterday.contributingPorts.map(cp => (
-                                                <span key={cp.port} className="text-[11px] font-mono bg-black/50 border border-amber-500/20 text-amber-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                                <a
+                                                    key={cp.port}
+                                                    href={`/farm/${cp.port}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[11px] font-mono bg-black/50 border border-amber-500/20 text-amber-200 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-black/70 hover:border-amber-500/40 hover:underline transition-colors"
+                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${cp.port}`}
+                                                >
                                                     <span className="text-muted-foreground">#{cp.port}</span>
                                                     <span className="font-bold text-emerald-400/90">+{cp.profit.toLocaleString()} USC</span>
-                                                </span>
+                                                    <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                                                </a>
                                             ))
                                         ) : (
                                             <span className="text-[11px] text-muted-foreground italic">-</span>
@@ -1719,102 +1776,117 @@ export default function EasyMMasterDashboardPage() {
             {/* Filter, Search & View Modes Control Bar */}
             <Card className="border-border shadow-sm bg-card">
                 <CardContent className="p-4 space-y-3">
-                    <div className="flex flex-col md:flex-row items-center gap-3">
-                        {/* Search */}
-                        <div className="relative flex-1 w-full">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                        {/* Search Bar with auto-expansion & clear button */}
+                        <div className={`relative transition-all duration-300 w-full ${isSearchFocused || searchQuery ? 'xl:flex-1' : 'xl:w-[380px]'}`}>
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                             <Input
                                 placeholder="ค้นหาด้วยเลขพอร์ต, ชื่อลูกค้า, อีเมล, หรือชื่อพอร์ต..."
                                 value={searchQuery}
+                                onFocus={() => setIsSearchFocused(true)}
+                                onBlur={() => setIsSearchFocused(false)}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 bg-background"
+                                className="pl-9 pr-9 bg-background h-10 w-full text-sm font-sans"
                             />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-colors"
+                                    title="ล้างคำค้นหา"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
                         </div>
 
-                        {/* Admin Filter */}
-                        <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
-                            <SelectTrigger className="w-full md:w-[170px] bg-background">
-                                <SelectValue placeholder="กรองตามแอดมิน" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">แอดมินทั้งหมด</SelectItem>
-                                <SelectItem value="juntarasate">สายงานพี่โจ้</SelectItem>
-                                <SelectItem value="bctutor">สายงานครูชัย</SelectItem>
-                                <SelectItem value="other">พอร์ตระบบ / อื่นๆ</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {/* Filters and View Mode Controls */}
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            {/* Admin Filter */}
+                            <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                                <SelectTrigger className="w-full sm:w-[150px] bg-background">
+                                    <SelectValue placeholder="กรองตามแอดมิน" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">แอดมินทั้งหมด</SelectItem>
+                                    <SelectItem value="juntarasate">สายงานพี่โจ้</SelectItem>
+                                    <SelectItem value="bctutor">สายงานครูชัย</SelectItem>
+                                    <SelectItem value="other">พอร์ตระบบ / อื่นๆ</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                        {/* Product Filter */}
-                        <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                            <SelectTrigger className="w-full md:w-[150px] bg-background">
-                                <SelectValue placeholder="กรองตามสินค้า" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">สินค้าทั้งหมด</SelectItem>
-                                <SelectItem value="max">EasyM MAX</SelectItem>
-                                <SelectItem value="mini">EasyM mini</SelectItem>
-                            </SelectContent>
-                        </Select>
+                            {/* Product Filter */}
+                            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                                <SelectTrigger className="w-full sm:w-[140px] bg-background">
+                                    <SelectValue placeholder="กรองตามสินค้า" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">สินค้าทั้งหมด</SelectItem>
+                                    <SelectItem value="max">EasyM MAX</SelectItem>
+                                    <SelectItem value="mini">EasyM mini</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                        {/* License Status Filter */}
-                        <Select value={selectedLicenseStatus} onValueChange={setSelectedLicenseStatus}>
-                            <SelectTrigger className="w-full md:w-[150px] bg-background">
-                                <SelectValue placeholder="สถานะ License" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">License ทั้งหมด</SelectItem>
-                                <SelectItem value="active">✅ เปิดใช้งาน (Active)</SelectItem>
-                                <SelectItem value="inactive">⛔ ระงับ (Inactive)</SelectItem>
-                            </SelectContent>
-                        </Select>
+                            {/* License Status Filter */}
+                            <Select value={selectedLicenseStatus} onValueChange={setSelectedLicenseStatus}>
+                                <SelectTrigger className="w-full sm:w-[145px] bg-background">
+                                    <SelectValue placeholder="สถานะ License" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">License ทั้งหมด</SelectItem>
+                                    <SelectItem value="active">✅ เปิดใช้งาน (Active)</SelectItem>
+                                    <SelectItem value="inactive">⛔ ระงับ (Inactive)</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                        {/* Status Filter */}
-                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                            <SelectTrigger className="w-full md:w-[190px] bg-background">
-                                <SelectValue placeholder="สถานะพอร์ต" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
-                                <SelectItem value="real_running">🟢 รันจริง (&le; 48h &amp; ทุนถึง)</SelectItem>
-                                <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
-                                <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
-                                <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
-                                <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
-                                <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
-                                <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
-                                <SelectItem value="profit_positive">📈 วันนี้บวก</SelectItem>
-                            </SelectContent>
-                        </Select>
+                            {/* Status Filter */}
+                            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                                <SelectTrigger className="w-full sm:w-[170px] bg-background">
+                                    <SelectValue placeholder="สถานะพอร์ต" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
+                                    <SelectItem value="real_running">🟢 รันจริง (&le; 48h &amp; ทุนถึง)</SelectItem>
+                                    <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
+                                    <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
+                                    <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
+                                    <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
+                                    <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
+                                    <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
+                                    <SelectItem value="profit_positive">📈 วันนี้บวก</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                        {/* View Mode Buttons */}
-                        <div className="flex items-center gap-1 border border-border rounded-lg p-0.5 bg-background shrink-0">
-                            <Button
-                                variant={viewMode === 'customer' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('customer')}
-                                className="text-xs h-8 px-2.5"
-                            >
-                                <Users className="w-3.5 h-3.5 mr-1" />
-                                แยกตามลูกค้า
-                            </Button>
-                            <Button
-                                variant={viewMode === 'table' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('table')}
-                                className="text-xs h-8 px-2.5"
-                            >
-                                <Layers className="w-3.5 h-3.5 mr-1" />
-                                ตารางรวม
-                            </Button>
-                            <Button
-                                variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('cards')}
-                                className="text-xs h-8 px-2.5"
-                            >
-                                <BarChart3 className="w-3.5 h-3.5 mr-1" />
-                                การ์ดพอร์ต
-                            </Button>
+                            {/* View Mode Buttons */}
+                            <div className="flex items-center gap-1 border border-border rounded-lg p-0.5 bg-background shrink-0 ml-auto sm:ml-0">
+                                <Button
+                                    variant={viewMode === 'customer' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('customer')}
+                                    className="text-xs h-8 px-2.5"
+                                >
+                                    <Users className="w-3.5 h-3.5 mr-1" />
+                                    แยกตามลูกค้า
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'table' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('table')}
+                                    className="text-xs h-8 px-2.5"
+                                >
+                                    <Layers className="w-3.5 h-3.5 mr-1" />
+                                    ตารางรวม
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('cards')}
+                                    className="text-xs h-8 px-2.5"
+                                >
+                                    <BarChart3 className="w-3.5 h-3.5 mr-1" />
+                                    การ์ดพอร์ต
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
@@ -1949,7 +2021,16 @@ export default function EasyMMasterDashboardPage() {
                                                 <TableRow key={port.portNumber} className="hover:bg-muted/30">
                                                     <TableCell className="font-mono font-bold text-foreground">
                                                         <div className="flex items-center gap-1.5">
-                                                            <span>{port.portNumber}</span>
+                                                            <a
+                                                                href={`/farm/${port.portNumber}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="hover:underline hover:text-blue-400 inline-flex items-center gap-1 group transition-colors"
+                                                                title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
+                                                            >
+                                                                <span>{port.portNumber}</span>
+                                                                <ExternalLink className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                                            </a>
                                                             {port.portName && (
                                                                 <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
                                                             )}
@@ -2088,7 +2169,16 @@ export default function EasyMMasterDashboardPage() {
                                     <TableRow key={port.portNumber} className="hover:bg-muted/30">
                                         <TableCell className="font-mono font-bold text-foreground">
                                             <div className="flex items-center gap-1.5">
-                                                <span>{port.portNumber}</span>
+                                                <a
+                                                    href={`/farm/${port.portNumber}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="hover:underline hover:text-blue-400 inline-flex items-center gap-1 group transition-colors"
+                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
+                                                >
+                                                    <span>{port.portNumber}</span>
+                                                    <ExternalLink className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                                </a>
                                                 {port.portName && (
                                                     <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
                                                 )}
@@ -2209,7 +2299,16 @@ export default function EasyMMasterDashboardPage() {
                             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h4 className="font-mono font-bold text-base text-foreground">#{port.portNumber}</h4>
+                                        <a
+                                            href={`/farm/${port.portNumber}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:underline hover:text-blue-400 inline-flex items-center gap-1.5 group transition-colors"
+                                            title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
+                                        >
+                                            <h4 className="font-mono font-bold text-base text-foreground group-hover:text-blue-400">#{port.portNumber}</h4>
+                                            <ExternalLink className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                        </a>
                                         {port.isOnline ? (
                                             <span className="flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">
                                                 <Wifi className="w-2.5 h-2.5" /> Online
