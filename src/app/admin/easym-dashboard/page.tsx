@@ -148,6 +148,8 @@ export interface FleetDailyComparison {
         date: string;
         maxDD: number;
     };
+    isWeekend?: boolean;
+    holidayLabel?: string;
 }
 
 function FleetProfitBarChart({ 
@@ -467,10 +469,67 @@ export default function EasyMMasterDashboardPage() {
                 return `${yyyy}-${mm}-${dd}`;
             }
 
-            const todayDateStr = getMarketTradingDateStr(new Date());
-            const yesterdayMarketDate = new Date(getMarketTradingDate(new Date()));
-            yesterdayMarketDate.setDate(yesterdayMarketDate.getDate() - 1);
-            const yesterdayDateStr = getMarketTradingDateStr(yesterdayMarketDate);
+            const now = new Date();
+            const marketDate = getMarketTradingDate(now);
+            const marketDayOfWeek = marketDate.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+
+            let isWeekend = false;
+            let holidayLabel = '';
+            let day1Date: Date;
+            let day2Date: Date;
+            let day1Prefix: string;
+            let day2Prefix: string;
+
+            if (marketDayOfWeek === 6) {
+                // วันเสาร์ (ตลาด Forex ปิดทำการเสาร์-อาทิตย์)
+                isWeekend = true;
+                holidayLabel = 'วันนี้วันเสาร์ (วันหยุด)';
+                day1Date = new Date(marketDate);
+                day1Date.setDate(day1Date.getDate() - 1); // วันศุกร์ (วันทำการล่าสุดก่อนวันหยุด)
+                day2Date = new Date(marketDate);
+                day2Date.setDate(day2Date.getDate() - 2); // วันพฤหัสบดี (วันทำการก่อนหน้า)
+                day1Prefix = 'วันศุกร์';
+                day2Prefix = 'วันพฤหัสบดี';
+            } else if (marketDayOfWeek === 0) {
+                // วันอาทิตย์ (ตลาด Forex ปิดทำการทั้งวัน)
+                isWeekend = true;
+                holidayLabel = 'วันนี้วันอาทิตย์ (วันหยุด)';
+                day1Date = new Date(marketDate);
+                day1Date.setDate(day1Date.getDate() - 2); // วันศุกร์ (วันทำการล่าสุดก่อนวันหยุด)
+                day2Date = new Date(marketDate);
+                day2Date.setDate(day2Date.getDate() - 3); // วันพฤหัสบดี (วันทำการก่อนหน้า)
+                day1Prefix = 'วันศุกร์';
+                day2Prefix = 'วันพฤหัสบดี';
+            } else if (marketDayOfWeek === 1) {
+                // วันจันทร์ (ตลาดเปิดทำการ 05:00 น. เช้าวันจันทร์)
+                isWeekend = false;
+                holidayLabel = '';
+                day1Date = new Date(marketDate); // วันนี้ (วันจันทร์)
+                day2Date = new Date(marketDate);
+                day2Date.setDate(day2Date.getDate() - 3); // วันทำการก่อนหน้าคือวันศุกร์
+                day1Prefix = 'วันนี้';
+                day2Prefix = 'วันศุกร์';
+            } else {
+                // วันอังคาร - ศุกร์ (วันทำการปกติ)
+                isWeekend = false;
+                holidayLabel = '';
+                day1Date = new Date(marketDate);
+                day2Date = new Date(marketDate);
+                day2Date.setDate(day2Date.getDate() - 1);
+                day1Prefix = 'วันนี้';
+                day2Prefix = 'เมื่อวาน';
+            }
+
+            const formatDateStr = (d: Date) => {
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            };
+
+            const day1DateStr = formatDateStr(day1Date);
+            const day2DateStr = formatDateStr(day2Date);
+            const todayDateStr = formatDateStr(marketDate);
             const testPatterns = ['1111111', '12345678', '7777777', '8888888', '9999999', '12121210', '000000', '99999999', '999999'];
             const isTestPort = (acc?: any) => {
                 if (!acc) return true;
@@ -533,39 +592,40 @@ export default function EasyMMasterDashboardPage() {
                 const st = statusMap.get(port);
                 const isGoldPort = (port === '97072259') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
                 if (!isGoldPort) {
-                    if (h.date === todayDateStr) {
+                    if (h.date === day1DateStr) {
                         todayHistoryRecords.push({ ...h, port_number: port });
-                    } else if (h.date === yesterdayDateStr) {
+                    } else if (h.date === day2DateStr) {
                         yesterdayHistoryRecords.push({ ...h, port_number: port });
                     }
                 }
             });
 
-            // Merge live farm_port_status for today ONLY if last_ping is within today's market session (< 24h) and belongs to genuine EasyM (not Gold)
-            const now = new Date();
-            (portStatuses || []).forEach(s => {
-                const accNum = s.port_number?.toString();
-                if (!accNum || !easymPortSet.has(accNum) || isTestPort(accNum)) return;
-                
-                // CRITICAL 1: Exclude Gold EA mismatches
-                const isGold = (accNum === '97072259') || (goldLicenseAccountSet.has(accNum) && (s.system_code?.toLowerCase().includes('gold') || s.system_code === 'EG_FARMING'));
-                if (isGold) return;
+            // Merge live farm_port_status for today ONLY if not weekend, last_ping is within today's market session (< 24h) and belongs to genuine EasyM (not Gold)
+            if (!isWeekend) {
+                (portStatuses || []).forEach(s => {
+                    const accNum = s.port_number?.toString();
+                    if (!accNum || !easymPortSet.has(accNum) || isTestPort(accNum)) return;
+                    
+                    // CRITICAL 1: Exclude Gold EA mismatches
+                    const isGold = (accNum === '97072259') || (goldLicenseAccountSet.has(accNum) && (s.system_code?.toLowerCase().includes('gold') || s.system_code === 'EG_FARMING'));
+                    if (isGold) return;
 
-                // CRITICAL 2: Only consider farm_port_status if last_ping is within today's market session and < 24 hours
-                if (!s.last_ping) return;
-                const pingBkk = getMarketTradingDateStr(new Date(s.last_ping));
-                const pingAgeHours = (now.getTime() - new Date(s.last_ping).getTime()) / (1000 * 60 * 60);
-                if (pingBkk !== todayDateStr || pingAgeHours > 24) return; // Ignore stale records from previous days or dead pings (e.g. 97033490!)
+                    // CRITICAL 2: Only consider farm_port_status if last_ping is within today's market session and < 24 hours
+                    if (!s.last_ping) return;
+                    const pingBkk = getMarketTradingDateStr(new Date(s.last_ping));
+                    const pingAgeHours = (now.getTime() - new Date(s.last_ping).getTime()) / (1000 * 60 * 60);
+                    if (pingBkk !== day1DateStr || pingAgeHours > 24) return; // Ignore stale records from previous days or dead pings (e.g. 97033490!)
 
-                const pnl = Number(s.today_pnl) || 0;
-                const dd = Number(s.daily_max_drawdown) || 0;
-                const existing = todayHistoryRecords.find(r => r.port_number === accNum);
-                if (!existing && (pnl > 0 || dd > 0)) {
-                    todayHistoryRecords.push({ port_number: accNum, profit: pnl, max_dd: dd, max_drawdown: dd, date: todayDateStr });
-                } else if (existing && pnl > Number(existing.profit)) {
-                    existing.profit = pnl;
-                }
-            });
+                    const pnl = Number(s.today_pnl) || 0;
+                    const dd = Number(s.daily_max_drawdown) || 0;
+                    const existing = todayHistoryRecords.find(r => r.port_number === accNum);
+                    if (!existing && (pnl > 0 || dd > 0)) {
+                        todayHistoryRecords.push({ port_number: accNum, profit: pnl, max_dd: dd, max_drawdown: dd, date: day1DateStr });
+                    } else if (existing && pnl > Number(existing.profit)) {
+                        existing.profit = pnl;
+                    }
+                });
+            }
 
             // Compute Fleet Daily Stats
             const computeDayStats = (records: any[], dateStr: string, label: string): FleetDailyStat => {
@@ -660,9 +720,11 @@ export default function EasyMMasterDashboardPage() {
             };
 
             const computedFleetStats: FleetDailyComparison = {
-                today: computeDayStats(todayHistoryRecords, todayDateStr, 'วันนี้'),
-                yesterday: computeDayStats(yesterdayHistoryRecords, yesterdayDateStr, 'เมื่อวาน'),
-                allTimePeak: allTimePeakRecord || { portNumber: '97037173', profit: 11091.17, date: '2026-07-30', maxDD: 0 }
+                today: computeDayStats(todayHistoryRecords, day1DateStr, day1Prefix),
+                yesterday: computeDayStats(yesterdayHistoryRecords, day2DateStr, day2Prefix),
+                allTimePeak: allTimePeakRecord || { portNumber: '97037173', profit: 11091.17, date: '2026-07-30', maxDD: 0 },
+                isWeekend,
+                holidayLabel
             };
             setFleetStats(computedFleetStats);
 
@@ -726,10 +788,10 @@ export default function EasyMMasterDashboardPage() {
                     const hoursSinceLastPing = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
 
                     // Resolve accurate today pnl and drawdowns:
-                    // CRITICAL: Only count status.today_pnl if the port sent ping today (<24h) and is NOT running a Gold EA!
+                    // CRITICAL: Only count status.today_pnl if not weekend, port sent ping today (<24h), and is NOT running a Gold EA!
                     const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
                     const pingMarketDateStr = status?.last_ping ? getMarketTradingDateStr(new Date(status.last_ping)) : '';
-                    const isPingToday = pingMarketDateStr === todayDateStr && hoursSinceLastPing <= 24;
+                    const isPingToday = !isWeekend && pingMarketDateStr === day1DateStr && hoursSinceLastPing <= 24;
                     const statusTodayPnl = (isPingToday && !isGoldMismatch) ? (Number(status?.today_pnl) || 0) : 0;
                     const resolvedTodayPnl = isGoldMismatch ? 0 : Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
 
@@ -1612,6 +1674,20 @@ export default function EasyMMasterDashboardPage() {
                                 สถิติรายพอร์ตเดี่ยวแบบเจาะลึก
                             </span>
                         </div>
+                        {/* Holiday Notification Banner */}
+                        {fleetStats.holidayLabel && (
+                            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg px-3.5 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-sm backdrop-blur-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base">🏖️</span>
+                                    <span className="font-bold text-amber-200">{fleetStats.holidayLabel}</span>
+                                    <span className="text-amber-300/80 hidden sm:inline">• ตลาด Forex ปิดทำการ ระบบแสดงข้อมูล 2 วันทำการล่าสุดก่อนวันหยุด</span>
+                                    <span className="text-amber-300/80 sm:hidden">• แสดง 2 วันล่าสุดก่อนวันหยุด</span>
+                                </div>
+                                <div className="text-[11px] font-mono text-amber-400/90 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded">
+                                    ตลาดเปิดทำการ: วันจันทร์ 05:00 น.
+                                </div>
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                             {/* 1. วันนี้ */}
                             <div className="bg-black/50 border border-emerald-500/30 rounded-lg p-3.5 space-y-2.5">
@@ -1619,6 +1695,11 @@ export default function EasyMMasterDashboardPage() {
                                     <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                                         ⚡ {fleetStats.today.dateLabel}
+                                        {fleetStats.isWeekend && (
+                                            <span className="text-[9px] font-mono font-normal text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                                                วันทำการล่าสุด
+                                            </span>
+                                        )}
                                     </span>
                                     <span className="text-[10px] font-mono text-emerald-300/90 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                                         <span className="hidden sm:inline">พอร์ตกำไร: </span>
@@ -1778,6 +1859,11 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
                                     <span className="text-xs font-bold text-amber-200/80 flex items-center gap-1.5">
                                         📅 {fleetStats.yesterday.dateLabel}
+                                        {fleetStats.isWeekend && (
+                                            <span className="text-[9px] font-mono font-normal text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                                วันทำการก่อนหน้า
+                                            </span>
+                                        )}
                                     </span>
                                     <span className="text-[10px] font-mono text-amber-300/80 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
                                         <span className="hidden sm:inline">พอร์ตกำไร: </span>
@@ -2018,11 +2104,17 @@ export default function EasyMMasterDashboardPage() {
 
                     {/* ส่วนที่ 2: กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ พร้อมระบุจำนวนพอร์ตที่รวมกัน และกราฟแท่งกระจายกำไร) */}
                     <div className="pt-3 border-t border-amber-500/20 space-y-2">
-                        <div className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                        <div className="text-xs font-semibold text-emerald-400 flex flex-wrap items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                                <Layers className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                                 <span className="hidden sm:inline">🌐 กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ)</span>
                                 <span className="sm:hidden">🌐 รวมกำไรฟลีท (Total Fleet PnL)</span>
+                                {fleetStats.holidayLabel && (
+                                    <span className="bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1">
+                                        <span>🏖️</span>
+                                        <span>{fleetStats.holidayLabel}</span>
+                                    </span>
+                                )}
                             </span>
                             <span className="text-[10px] text-muted-foreground font-mono">
                                 <span className="hidden sm:inline">รวมกำไรจากพอร์ตที่ปิดออเดอร์สำเร็จ</span>
@@ -2034,8 +2126,8 @@ export default function EasyMMasterDashboardPage() {
                             <div className="bg-gradient-to-br from-emerald-950/40 via-black/60 to-black/80 border border-emerald-500/40 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
                                     <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                                        <span className="hidden sm:inline">⚡ รวมกำไรปิดวันนี้ ({fleetStats.today.dateLabel})</span>
-                                        <span className="sm:hidden">⚡ กำไรวันนี้ ({fleetStats.today.dateLabel})</span>
+                                        <span className="hidden sm:inline">⚡ รวมกำไรปิด{fleetStats.isWeekend ? fleetStats.today.dateLabel : `วันนี้ (${fleetStats.today.dateLabel})`}</span>
+                                        <span className="sm:hidden">⚡ กำไร{fleetStats.isWeekend ? fleetStats.today.dateLabel : `วันนี้ (${fleetStats.today.dateLabel})`}</span>
                                     </span>
                                     <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
                                         <span className="hidden sm:inline">มาจากผลรวมของ {fleetStats.today.positiveCount} พอร์ต</span>
@@ -2073,8 +2165,8 @@ export default function EasyMMasterDashboardPage() {
                             <div className="bg-gradient-to-br from-amber-950/30 via-black/60 to-black/80 border border-border/60 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
                                     <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
-                                        <span className="hidden sm:inline">📅 รวมกำไรปิดเมื่อวาน ({fleetStats.yesterday.dateLabel})</span>
-                                        <span className="sm:hidden">📅 กำไรเมื่อวาน ({fleetStats.yesterday.dateLabel})</span>
+                                        <span className="hidden sm:inline">📅 รวมกำไรปิด{fleetStats.isWeekend ? fleetStats.yesterday.dateLabel : `เมื่อวาน (${fleetStats.yesterday.dateLabel})`}</span>
+                                        <span className="sm:hidden">📅 กำไร{fleetStats.isWeekend ? fleetStats.yesterday.dateLabel : `เมื่อวาน (${fleetStats.yesterday.dateLabel})`}</span>
                                     </span>
                                     <span className="text-[11px] font-mono text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
                                         <span className="hidden sm:inline">มาจากผลรวมของ {fleetStats.yesterday.positiveCount} พอร์ต</span>
@@ -2473,7 +2565,7 @@ export default function EasyMMasterDashboardPage() {
                                     <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
                                     <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
                                     <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
-                                    <SelectItem value="profit_positive">📈 วันนี้บวก</SelectItem>
+                                    <SelectItem value="profit_positive">{fleetStats?.isWeekend ? `📈 กำไร (${fleetStats.today.dateLabel})` : '📈 วันนี้บวก'}</SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -2637,7 +2729,7 @@ export default function EasyMMasterDashboardPage() {
                                                 <TableHead className="text-right">Equity</TableHead>
                                                 <TableHead className="text-right">Floating PnL</TableHead>
                                                 <TableHead className="text-right">Drawdown</TableHead>
-                                                <TableHead className="text-right">กำไรวันนี้</TableHead>
+                                                <TableHead className="text-right">{fleetStats?.isWeekend ? `กำไร (${fleetStats.today.dateLabel})` : 'กำไรวันนี้'}</TableHead>
                                                 <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                                 <TableHead className="text-center">สถานะ</TableHead>
                                             </TableRow>
@@ -2798,7 +2890,7 @@ export default function EasyMMasterDashboardPage() {
                                     <TableHead className="text-right">Equity</TableHead>
                                     <TableHead className="text-right">Floating PnL</TableHead>
                                     <TableHead className="text-right">Max DD</TableHead>
-                                    <TableHead className="text-right">กำไรวันนี้</TableHead>
+                                    <TableHead className="text-right">{fleetStats?.isWeekend ? `กำไร (${fleetStats.today.dateLabel})` : 'กำไรวันนี้'}</TableHead>
                                     <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                     <TableHead className="text-center">สถานะ</TableHead>
                                 </TableRow>

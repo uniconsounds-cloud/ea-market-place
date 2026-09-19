@@ -187,7 +187,62 @@ export async function GET() {
             return `${yyyy}-${mm}-${dd}`;
         }
 
-        const todayDateStr = getMarketTradingDateStr(now);
+        const marketDate = getMarketTradingDate(now);
+        const marketDayOfWeek = marketDate.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+
+        let isWeekend = false;
+        let holidayLabel = '';
+        let day1Date: Date;
+        let day2Date: Date;
+        let day1Prefix: string;
+        let day2Prefix: string;
+
+        if (marketDayOfWeek === 6) {
+            isWeekend = true;
+            holidayLabel = 'วันนี้วันเสาร์ (วันหยุด)';
+            day1Date = new Date(marketDate);
+            day1Date.setDate(day1Date.getDate() - 1);
+            day2Date = new Date(marketDate);
+            day2Date.setDate(day2Date.getDate() - 2);
+            day1Prefix = 'วันศุกร์';
+            day2Prefix = 'วันพฤหัสบดี';
+        } else if (marketDayOfWeek === 0) {
+            isWeekend = true;
+            holidayLabel = 'วันนี้วันอาทิตย์ (วันหยุด)';
+            day1Date = new Date(marketDate);
+            day1Date.setDate(day1Date.getDate() - 2);
+            day2Date = new Date(marketDate);
+            day2Date.setDate(day2Date.getDate() - 3);
+            day1Prefix = 'วันศุกร์';
+            day2Prefix = 'วันพฤหัสบดี';
+        } else if (marketDayOfWeek === 1) {
+            isWeekend = false;
+            holidayLabel = '';
+            day1Date = new Date(marketDate);
+            day2Date = new Date(marketDate);
+            day2Date.setDate(day2Date.getDate() - 3);
+            day1Prefix = 'วันนี้';
+            day2Prefix = 'วันศุกร์';
+        } else {
+            isWeekend = false;
+            holidayLabel = '';
+            day1Date = new Date(marketDate);
+            day2Date = new Date(marketDate);
+            day2Date.setDate(day2Date.getDate() - 1);
+            day1Prefix = 'วันนี้';
+            day2Prefix = 'เมื่อวาน';
+        }
+
+        const formatDateStr = (d: Date) => {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+
+        const day1DateStr = formatDateStr(day1Date);
+        const day2DateStr = formatDateStr(day2Date);
+        const todayDateStr = formatDateStr(marketDate);
         const yesterdayMarketDate = new Date(getMarketTradingDate(now));
         yesterdayMarketDate.setDate(yesterdayMarketDate.getDate() - 1);
         const yesterdayDateStr = getMarketTradingDateStr(yesterdayMarketDate);
@@ -226,8 +281,8 @@ export async function GET() {
             let profits = info ? [...info.profits] : [];
             let dds = info ? [...info.dds] : [];
 
-            // If today, incorporate live farm_port_status ONLY if last_ping is within today's market session (< 24h) and belongs to EasyM
-            if (dateStr === todayDateStr && statuses) {
+            // If today, incorporate live farm_port_status ONLY if not weekend, last_ping is within today's market session (< 24h) and belongs to EasyM
+            if (!isWeekend && dateStr === day1DateStr && statuses) {
                 statuses.forEach((s: any) => {
                     const pStr = String(s.port_number).trim();
                     if (!s.port_number || !allEasymPortsSet.has(pStr) || isTestPort(pStr)) return;
@@ -239,7 +294,7 @@ export async function GET() {
                     if (!s.last_ping) return;
                     const pingBkk = getMarketTradingDateStr(new Date(s.last_ping));
                     const pingAgeHours = (now.getTime() - new Date(s.last_ping).getTime()) / (1000 * 60 * 60);
-                    if (pingBkk !== todayDateStr || pingAgeHours > 24) return; // Skip stale pings from days ago (e.g. 97033490!)
+                    if (pingBkk !== day1DateStr || pingAgeHours > 24) return; // Skip stale pings from days ago (e.g. 97033490!)
 
                     const pnl = Number(s.today_pnl) || 0;
                     const dd = Number(s.daily_max_drawdown) || 0;
@@ -278,8 +333,8 @@ export async function GET() {
 
             return {
                 date: dateStr,
-                dateLabel: dayName || fallbackLabel,
-                topPort: maxP > 0 && topRecord ? maskPortNumber(topRecord.port_number) : (dateStr === todayDateStr ? 'รอชน TP' : '-'),
+                dateLabel: fallbackLabel || dayName,
+                topPort: maxP > 0 && topRecord ? maskPortNumber(topRecord.port_number) : (dateStr === day1DateStr && !isWeekend ? 'รอชน TP' : '-'),
                 profitUSC: Math.round(avgP),
                 profitUSD: Number((avgP / 100).toFixed(2)),
                 dd: Number(avgDD.toFixed(1)),
@@ -290,8 +345,16 @@ export async function GET() {
             };
         };
 
-        const today = getDayStats(todayDateStr, '16 ก.ย.');
-        const yesterday = getDayStats(yesterdayDateStr, '15 ก.ย.');
+        const dt1 = new Date(day1DateStr + 'T00:00:00');
+        const dayThai1 = dt1.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        const day1Label = `${day1Prefix} (${dayThai1})`;
+
+        const dt2 = new Date(day2DateStr + 'T00:00:00');
+        const dayThai2 = dt2.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        const day2Label = `${day2Prefix} (${dayThai2})`;
+
+        const today = getDayStats(day1DateStr, day1Label);
+        const yesterday = getDayStats(day2DateStr, day2Label);
 
         const sortedDates = Array.from(dateMap.keys()).sort(); // Chronological (oldest to newest)
         const last30Dates = sortedDates.slice(-30);
@@ -379,6 +442,8 @@ export async function GET() {
         const payload = {
             success: true,
             updatedAt: now.toISOString(),
+            isWeekend,
+            holidayLabel,
             longevity: {
                 daysRunning,
                 monthsRunning: diffMonths,
