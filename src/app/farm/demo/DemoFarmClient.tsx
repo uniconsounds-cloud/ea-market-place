@@ -19,9 +19,9 @@ function seededRandom(seed: number) {
  * Market day begins at 05:00 AM Thailand time (Asia/Bangkok).
  * Before 05:00 AM (00:00:00 - 04:59:59), it retains the previous day's date.
  */
-function getMarketTradingDate(date: Date): Date {
+function getMarketTradingDate(date: Date = new Date()): Date {
     const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Bangkok',
+        timeZone: 'America/New_York',
         year: 'numeric',
         month: 'numeric',
         day: 'numeric',
@@ -40,11 +40,12 @@ function getMarketTradingDate(date: Date): Date {
     const day = parseInt(partMap.day, 10);
     const hour = parseInt(partMap.hour, 10);
 
-    const bkkDate = new Date(year, month, day);
-    if (hour < 5) {
-        bkkDate.setDate(bkkDate.getDate() - 1);
+    // Forex daily candle closes at 17:00 (5:00 PM) New York time (EDT: 04:00 BKK, EST: 05:00 BKK)
+    const marketDate = new Date(year, month, day);
+    if (hour >= 17) {
+        marketDate.setDate(marketDate.getDate() + 1);
     }
-    return bkkDate;
+    return marketDate;
 }
 
 // ==========================================

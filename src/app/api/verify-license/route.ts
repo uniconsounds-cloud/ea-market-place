@@ -5,9 +5,9 @@ export const runtime = 'edge';
 
 
 // Calculates Forex market trading date (rolls over at 05:00 AM Bangkok)
-function getMarketTradingDate(date: Date): Date {
+function getMarketTradingDate(date: Date = new Date()): Date {
     const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Bangkok',
+        timeZone: 'America/New_York',
         year: 'numeric',
         month: 'numeric',
         day: 'numeric',
@@ -26,11 +26,12 @@ function getMarketTradingDate(date: Date): Date {
     const day = parseInt(partMap.day, 10);
     const hour = parseInt(partMap.hour, 10);
 
-    const bkkDate = new Date(year, month, day);
-    if (hour < 5) {
-        bkkDate.setDate(bkkDate.getDate() - 1);
+    // Forex daily candle closes at 17:00 (5:00 PM) New York time (EDT: 04:00 BKK, EST: 05:00 BKK)
+    const marketDate = new Date(year, month, day);
+    if (hour >= 17) {
+        marketDate.setDate(marketDate.getDate() + 1);
     }
-    return bkkDate;
+    return marketDate;
 }
 
 function getMarketTradingDateStr(date: Date = new Date()): string {

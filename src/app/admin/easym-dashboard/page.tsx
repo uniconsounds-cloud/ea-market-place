@@ -150,6 +150,7 @@ export interface FleetDailyComparison {
     };
     isWeekend?: boolean;
     holidayLabel?: string;
+    marketOpenHour?: number;
 }
 
 function FleetProfitBarChart({ 
@@ -432,10 +433,10 @@ export default function EasyMMasterDashboardPage() {
                 histPage++;
             }
 
-            // Forex market trading date (rolls over at 05:00 AM Bangkok time, matching FarmClient)
-            function getMarketTradingDate(date: Date): Date {
+            // Forex market trading date (rolls over dynamically at 17:00 New York time, handling US Daylight Saving Time automatically)
+            function getMarketTradingDate(date: Date = new Date()): Date {
                 const formatter = new Intl.DateTimeFormat('en-US', {
-                    timeZone: 'Asia/Bangkok',
+                    timeZone: 'America/New_York',
                     year: 'numeric',
                     month: 'numeric',
                     day: 'numeric',
@@ -454,11 +455,24 @@ export default function EasyMMasterDashboardPage() {
                 const day = parseInt(partMap.day, 10);
                 const hour = parseInt(partMap.hour, 10);
 
-                const bkkDate = new Date(year, month, day);
-                if (hour < 5) {
-                    bkkDate.setDate(bkkDate.getDate() - 1);
+                // Forex daily candle closes at 17:00 (5:00 PM) New York time (EDT: 04:00 BKK, EST: 05:00 BKK)
+                // At/after 17:00 NY, the session advances to the next trading day
+                const marketDate = new Date(year, month, day);
+                if (hour >= 17) {
+                    marketDate.setDate(marketDate.getDate() + 1);
                 }
-                return bkkDate;
+                return marketDate;
+            }
+
+            // Detect current Bangkok market open hour based on US Daylight Saving Time (EDT: 04:00, EST: 05:00)
+            function getMarketOpenHourBangkok(date: Date = new Date()): number {
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'America/New_York',
+                    timeZoneName: 'short'
+                });
+                const parts = formatter.formatToParts(date);
+                const tzName = parts.find(p => p.type === 'timeZoneName')?.value;
+                return tzName === 'EDT' ? 4 : 5;
             }
 
             function getMarketTradingDateStr(date: Date = new Date()): string {
@@ -724,7 +738,8 @@ export default function EasyMMasterDashboardPage() {
                 yesterday: computeDayStats(yesterdayHistoryRecords, day2DateStr, day2Prefix),
                 allTimePeak: allTimePeakRecord || { portNumber: '97037173', profit: 11091.17, date: '2026-07-30', maxDD: 0 },
                 isWeekend,
-                holidayLabel
+                holidayLabel,
+                marketOpenHour: getMarketOpenHourBangkok()
             };
             setFleetStats(computedFleetStats);
 
@@ -1684,7 +1699,7 @@ export default function EasyMMasterDashboardPage() {
                                     <span className="text-amber-300/80 sm:hidden">• แสดง 2 วันล่าสุดก่อนวันหยุด</span>
                                 </div>
                                 <div className="text-[11px] font-mono text-amber-400/90 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded">
-                                    ตลาดเปิดทำการ: วันจันทร์ 05:00 น.
+                                    ตลาดเปิดทำการ: วันจันทร์ {String(fleetStats.marketOpenHour || 5).padStart(2, '0')}:00 น.
                                 </div>
                             </div>
                         )}
