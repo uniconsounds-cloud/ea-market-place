@@ -43,6 +43,8 @@ export default function AdminUsersPage() {
     const [selectedTargetAdminId, setSelectedTargetAdminId] = useState<string>('');
     const [transferLoading, setTransferLoading] = useState(false);
 
+    const isSuperAdmin = currentUser?.email === 'juntarasate@gmail.com';
+
     useEffect(() => {
         fetchUsers();
         fetchCurrentUser();
@@ -78,8 +80,28 @@ export default function AdminUsersPage() {
             const isSourceAdmin = currentUser && req.source_admin_id === currentUser.id;
             const isTargetAdmin = currentUser && req.target_admin_id === currentUser.id;
 
-            if (!isSourceAdmin && !isTargetAdmin) {
+            if (!isSuperAdmin && !isSourceAdmin && !isTargetAdmin) {
                 toast.error("คุณไม่มีสิทธิ์ในการอนุมัติคำขอนี้");
+                return;
+            }
+
+            if (isSuperAdmin) {
+                const res = await fetch('/api/admin/users/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customerId: req.customer_id, targetAdminId: req.target_admin_id }),
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Failed to transfer user');
+
+                await supabase
+                    .from('admin_transfer_requests')
+                    .update({ source_approved: true, target_approved: true, status: 'completed' })
+                    .eq('id', req.id);
+
+                toast.success("อนุมัติและย้ายสายงานสำเร็จทันทีโดยสิทธิ์ Super Admin!");
+                fetchTransferRequests();
+                fetchUsers();
                 return;
             }
 
@@ -329,7 +351,7 @@ export default function AdminUsersPage() {
                             {transferRequests.map((req) => {
                                 const isSourceAdmin = currentUser && req.source_admin_id === currentUser.id;
                                 const isTargetAdmin = currentUser && req.target_admin_id === currentUser.id;
-                                const needsMyApproval = (isSourceAdmin && !req.source_approved) || (isTargetAdmin && !req.target_approved);
+                                const needsMyApproval = isSuperAdmin || (isSourceAdmin && !req.source_approved) || (isTargetAdmin && !req.target_approved);
 
                                 return (
                                     <div key={req.id} className="bg-card p-4 rounded-xl border border-border/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -367,7 +389,8 @@ export default function AdminUsersPage() {
                                                     className="h-9 bg-gold hover:bg-gold/85 text-black font-bold shadow-md shadow-gold/10"
                                                     onClick={() => handleApproveTransfer(req)}
                                                 >
-                                                    <Check className="w-3.5 h-3.5 mr-1" /> ยืนยันสลับสายงาน
+                                                    <Check className="w-3.5 h-3.5 mr-1" />
+                                                    {isSuperAdmin ? "⚡️ อนุมัติย้ายทันที (Super Admin)" : "ยืนยันสลับสายงาน"}
                                                 </Button>
                                             </div>
                                         ) : (
@@ -574,9 +597,19 @@ export default function AdminUsersPage() {
             <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
                 <DialogContent className="sm:max-w-md bg-background border-border shadow-2xl">
                     <DialogHeader>
-                        <DialogTitle className="text-lg font-bold">ขอเปลี่ยนสายงานลูกค้า (Transfer Line)</DialogTitle>
+                        <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                            {isSuperAdmin ? (
+                                <>
+                                    <span className="text-gold">⚡️</span> ย้ายสายงานลูกค้าทันที (Super Admin)
+                                </>
+                            ) : (
+                                "ขอเปลี่ยนสายงานลูกค้า (Transfer Line)"
+                            )}
+                        </DialogTitle>
                         <DialogDescription className="text-muted-foreground text-xs">
-                            การเปลี่ยนสายงานจะเกิดขึ้นก็ต่อเมื่อได้รับการอนุมัติแบบคู่ (Double Confirmation) จากทั้งแอดมินต้นสายและแอดมินปลายสายเรียบร้อยแล้ว
+                            {isSuperAdmin 
+                                ? "ในฐานะ Super Admin (พี่โจ้) ท่านสามารถเลือกแอดมินปลายทางและกดย้ายสายงานได้ทันที 100% โดยไม่ต้องรอการอนุมัติสองฝ่าย"
+                                : "การเปลี่ยนสายงานจะเกิดขึ้นก็ต่อเมื่อได้รับการอนุมัติแบบคู่ (Double Confirmation) จากทั้งแอดมินต้นสายและแอดมินปลายสายเรียบร้อยแล้ว"}
                         </DialogDescription>
                     </DialogHeader>
                     {selectedUserForTransfer && (
@@ -614,10 +647,16 @@ export default function AdminUsersPage() {
                                 <Button 
                                     onClick={handleCreateTransferRequest} 
                                     disabled={transferLoading || !selectedTargetAdminId}
-                                    className="bg-gold hover:bg-gold/85 text-black font-bold"
+                                    className="bg-gold hover:bg-gold/85 text-black font-bold shadow-md shadow-gold/20"
                                 >
-                                    {transferLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <GitPullRequest className="w-4 h-4 mr-2" />}
-                                    ส่งคำขอยืนยัน
+                                    {transferLoading ? (
+                                        <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                                    ) : isSuperAdmin ? (
+                                        <Check className="w-4 h-4 mr-2" />
+                                    ) : (
+                                        <GitPullRequest className="w-4 h-4 mr-2" />
+                                    )}
+                                    {isSuperAdmin ? "⚡️ ย้ายสายงานทันที" : "ส่งคำขอยืนยัน"}
                                 </Button>
                             </div>
                         </div>
