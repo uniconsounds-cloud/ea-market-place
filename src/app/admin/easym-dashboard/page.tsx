@@ -157,7 +157,21 @@ function FleetProfitBarChart({
     ports: { port: string; profit: number; dd: number }[]; 
     theme?: 'emerald' | 'amber';
 }) {
-    const [hoveredPort, setHoveredPort] = useState<{ port: string; profit: number; dd: number } | null>(null);
+    // Default to top #1 profitable port of the day so the banner is always populated
+    const [selectedPort, setSelectedPort] = useState<{ port: string; profit: number; dd: number } | null>(
+        ports && ports.length > 0 ? ports[0] : null
+    );
+
+    // Keep selectedPort synchronized if ports array updates
+    useEffect(() => {
+        if (ports && ports.length > 0) {
+            setSelectedPort(prev => {
+                if (!prev) return ports[0];
+                const match = ports.find(p => p.port === prev.port);
+                return match || ports[0];
+            });
+        }
+    }, [ports]);
 
     if (!ports || ports.length === 0) {
         return (
@@ -170,96 +184,112 @@ function FleetProfitBarChart({
 
     const maxProfit = Math.max(...ports.map(p => p.profit), 1);
 
+    const formatBarValue = (val: number) => {
+        if (val >= 100000) return `${(val / 1000).toFixed(0)}k`;
+        if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
+        if (val >= 100) return Math.round(val).toString();
+        if (val > 0) return val.toFixed(0);
+        return '0';
+    };
+
+    const activePort = selectedPort || ports[0];
+    const activeRank = ports.findIndex(p => p.port === activePort.port) + 1;
+
     return (
-        <div className="space-y-2 pt-2 border-t border-border/30">
+        <div className="space-y-2.5 pt-2 border-t border-border/30">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 font-medium">
                     <BarChart3 className={`w-3.5 h-3.5 ${theme === 'emerald' ? 'text-emerald-400' : 'text-amber-400'}`} />
-                    <span className="hidden sm:inline">การกระจายกำไร ({ports.length} พอร์ต):</span>
+                    <span className="hidden sm:inline">การกระจายกำไรรายพอร์ต ({ports.length} พอร์ต):</span>
                     <span className="sm:hidden">กราฟกำไร ({ports.length} พอร์ต):</span>
                 </span>
                 <span className="text-[10px] font-mono text-muted-foreground/80">
-                    <span className="hidden sm:inline">คลิกแท่งเพื่อเปิดดูหน้าฟาร์ม</span>
-                    <span className="sm:hidden">แตะแท่งดูฟาร์ม</span>
+                    <span className="hidden sm:inline">เลื่อนเมาส์ชี้ดูข้อมูล / คลิกแท่งเพื่อเปิดหน้าฟาร์ม</span>
+                    <span className="sm:hidden">แตะแท่งดูข้อมูล / ฟาร์ม</span>
                 </span>
             </div>
 
-            {/* Hover / Selected Info Banner */}
-            {hoveredPort ? (
-                <div className="flex items-center justify-between bg-black/80 border border-emerald-500/40 px-2.5 py-1 rounded text-xs animate-in fade-in duration-100">
-                    <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-amber-300">#{hoveredPort.port}</span>
-                        <span className="font-mono text-emerald-400 font-semibold">+{hoveredPort.profit.toLocaleString()} USC</span>
-                        <span className="text-[10px] text-muted-foreground hidden sm:inline">(≈ +${(hoveredPort.profit / 100).toFixed(2)})</span>
-                        <span className="text-[10px] text-amber-400/90 font-mono">Max DD: {hoveredPort.dd}%</span>
-                    </div>
-                    <a
-                        href={`/farm/${hoveredPort.port}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-emerald-300 hover:text-emerald-200 underline flex items-center gap-0.5"
-                    >
-                        <span>เปิดฟาร์ม</span>
-                        <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
+            {/* Pinned Info Banner (Does NOT disappear when mouse leaves) */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs shadow-md transition-all duration-150 ${
+                theme === 'emerald'
+                    ? 'bg-gradient-to-r from-emerald-950/90 via-black/80 to-black/90 border-emerald-500/50'
+                    : 'bg-gradient-to-r from-amber-950/90 via-black/80 to-black/90 border-amber-500/50'
+            }`}>
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <span className="font-mono font-black text-amber-300 text-sm">
+                        #{activePort.port}
+                    </span>
+                    <span className="font-mono text-emerald-400 font-extrabold text-sm sm:text-base">
+                        +{activePort.profit.toLocaleString()} USC
+                    </span>
+                    <span className="text-[11px] text-muted-foreground/90 font-mono">
+                        (≈ +${(activePort.profit / 100).toFixed(2)} USD)
+                    </span>
+                    <span className="text-[11px] text-amber-300 font-mono bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                        Max DD: {activePort.dd}%
+                    </span>
+                    {activeRank > 0 && activeRank <= 3 && (
+                        <span className="text-[10px] bg-amber-500/25 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-500/40">
+                            🏆 อันดับ {activeRank}
+                        </span>
+                    )}
                 </div>
-            ) : null}
+                <a
+                    href={`/farm/${activePort.port}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="self-end sm:self-center text-xs font-semibold text-emerald-300 hover:text-emerald-100 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 px-3 py-1 rounded-md flex items-center gap-1.5 transition-colors shrink-0"
+                >
+                    <span>เปิดฟาร์มพอร์ตนี้</span>
+                    <ExternalLink className="w-3 h-3" />
+                </a>
+            </div>
 
             {/* Vertical Bars Container */}
-            <div className="bg-black/50 rounded-lg p-2.5 border border-border/40 relative">
+            <div className="bg-black/60 rounded-lg p-3 border border-border/40 relative">
                 {/* Horizontal Baseline */}
-                <div className="absolute left-2.5 right-2.5 bottom-6 h-px bg-border/40 pointer-events-none" />
+                <div className="absolute left-3 right-3 bottom-8 h-px bg-border/40 pointer-events-none" />
 
-                <div className="flex items-end gap-1.5 sm:gap-2 overflow-x-auto pb-1 pt-6 scrollbar-thin">
+                <div className="flex items-end gap-1.5 sm:gap-2 overflow-x-auto pb-1 pt-2 scrollbar-thin">
                     {ports.map((p, idx) => {
-                        const heightPct = Math.max(12, Math.min(100, Math.round((p.profit / maxProfit) * 100)));
+                        const heightPct = Math.max(14, Math.min(100, Math.round((p.profit / maxProfit) * 100)));
                         const isTop3 = idx < 3;
+                        const isSelected = activePort.port === p.port;
                         return (
                             <div
                                 key={p.port}
                                 className="group relative flex flex-col items-center flex-shrink-0 cursor-pointer"
-                                onMouseEnter={() => setHoveredPort(p)}
-                                onMouseLeave={() => setHoveredPort(null)}
-                                onClick={() => window.open(`/farm/${p.port}`, '_blank')}
-                                title={`คลิกเปิดฟาร์มพอร์ต #${p.port}`}
+                                onMouseEnter={() => setSelectedPort(p)}
+                                onClick={() => {
+                                    setSelectedPort(p);
+                                    window.open(`/farm/${p.port}`, '_blank');
+                                }}
                             >
-                                {/* Floating Tooltip */}
-                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none z-30 flex flex-col items-center whitespace-nowrap">
-                                    <div className="bg-slate-950/95 text-white border border-emerald-500/50 rounded-md px-2.5 py-1.5 shadow-xl text-[11px] font-mono backdrop-blur-sm space-y-0.5">
-                                        <div className="font-bold text-amber-300 flex items-center justify-between gap-3">
-                                            <span>#{p.port}</span>
-                                            {isTop3 && <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded">Top {idx + 1}</span>}
-                                        </div>
-                                        <div className="text-emerald-400 font-bold">+{p.profit.toLocaleString()} USC</div>
-                                        <div className="text-muted-foreground text-[10px]">≈ +${(p.profit / 100).toFixed(2)} USD</div>
-                                        <div className="text-amber-400/90 text-[10px]">Max DD: {p.dd}%</div>
-                                        <div className="text-[9px] text-emerald-300/80 pt-0.5 border-t border-border/40 flex items-center gap-1">
-                                            <ExternalLink className="w-2.5 h-2.5" />
-                                            <span>คลิกเปิดหน้าฟาร์ม</span>
-                                        </div>
-                                    </div>
-                                    <div className="w-2 h-2 bg-slate-950 border-r border-b border-emerald-500/50 transform rotate-45 -mt-1" />
-                                </div>
-
-                                {/* Vertical Bar with Glow */}
-                                <div className="h-16 flex items-end">
+                                {/* Vertical Bar */}
+                                <div className="h-20 flex items-end">
                                     <div
                                         style={{ height: `${heightPct}%` }}
-                                        className={`w-3 sm:w-3.5 rounded-t-sm transition-all duration-150 group-hover:scale-y-110 group-hover:brightness-125 ${
-                                            theme === 'emerald'
-                                                ? isTop3
-                                                    ? 'bg-gradient-to-t from-emerald-600 via-emerald-400 to-amber-300 shadow-[0_0_8px_rgba(52,211,153,0.5)]'
-                                                    : 'bg-gradient-to-t from-emerald-700 via-emerald-500 to-emerald-400'
-                                                : isTop3
-                                                    ? 'bg-gradient-to-t from-amber-700 via-amber-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.5)]'
-                                                    : 'bg-gradient-to-t from-amber-800 via-amber-600 to-amber-400'
+                                        className={`w-3.5 sm:w-4 rounded-t transition-all duration-150 group-hover:scale-y-110 ${
+                                            isSelected
+                                                ? 'bg-gradient-to-t from-amber-500 via-amber-300 to-yellow-200 ring-2 ring-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)] brightness-125'
+                                                : theme === 'emerald'
+                                                    ? isTop3
+                                                        ? 'bg-gradient-to-t from-emerald-600 via-emerald-400 to-amber-300 shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                                                        : 'bg-gradient-to-t from-emerald-700 via-emerald-500 to-emerald-400'
+                                                    : isTop3
+                                                        ? 'bg-gradient-to-t from-amber-700 via-amber-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+                                                        : 'bg-gradient-to-t from-amber-800 via-amber-600 to-amber-400'
                                         }`}
                                     />
                                 </div>
 
-                                {/* Port last 3 digits label */}
-                                <span className="text-[9px] font-mono text-muted-foreground/70 group-hover:text-amber-300 mt-1 select-none">
-                                    {p.port.slice(-3)}
+                                {/* Profit Value Label below bar */}
+                                <span className={`text-[9px] font-mono mt-1.5 select-none font-semibold whitespace-nowrap transition-colors ${
+                                    isSelected
+                                        ? 'text-amber-300 font-bold scale-110'
+                                        : 'text-emerald-400/80 group-hover:text-amber-300'
+                                }`}>
+                                    +{formatBarValue(p.profit)}
                                 </span>
                             </div>
                         );
