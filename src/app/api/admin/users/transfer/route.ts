@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -29,18 +30,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "customerId and targetAdminId are required" }, { status: 400 });
         }
 
-        // Get target admin's referral code
-        const { data: targetAdmin } = await supabase
-            .from("profiles")
-            .select("id, referral_code")
-            .eq("id", targetAdminId)
-            .single();
+        const dbClient = process.env.SUPABASE_SERVICE_ROLE_KEY
+            ? createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+                process.env.SUPABASE_SERVICE_ROLE_KEY
+            )
+            : supabase;
 
-        const { error: updateError } = await supabase
+        const { error: updateError } = await dbClient
             .from("profiles")
             .update({
-                referred_by: targetAdminId,
-                referred_by_code: targetAdmin?.referral_code || null
+                referred_by: targetAdminId
             })
             .eq("id", customerId);
 
@@ -49,10 +49,25 @@ export async function POST(request: Request) {
         }
 
         // Update demo_challenges if exists
-        await supabase
+        await dbClient
             .from("demo_challenges")
             .update({ referrer_id: targetAdminId })
             .eq("user_id", customerId);
+
+        // Auto-approve and complete any pending admin_transfer_requests for this customer
+        try {
+            await dbClient
+                .from("admin_transfer_requests")
+                .update({
+                    source_approved: true,
+                    target_approved: true,
+                    status: 'completed'
+                })
+                .eq("customer_id", customerId)
+                .eq("status", "pending");
+        } catch (_) {
+            // Ignore if error
+        }
 
         return NextResponse.json({ success: true, message: "User transfer successful" });
     } catch (error: any) {

@@ -55,8 +55,7 @@ export async function GET(request: Request) {
                             await supabase
                                 .from('profiles')
                                 .update({
-                                    referred_by: referrer.id,
-                                    referred_by_code: referrer.referral_code || refCode
+                                    referred_by: referrer.id
                                 })
                                 .eq('id', data.user.id);
 
