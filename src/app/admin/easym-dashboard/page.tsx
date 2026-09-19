@@ -125,12 +125,18 @@ export interface FleetDailyStat {
     topPort: string;
     topProfit: number;
     topDD: number;
+    minProfit: number;
+    minProfitPort: string;
     totalProfit: number;
     avgProfit: number;
+    maxDD: number;
+    maxDDPort: string;
+    minDD: number;
+    minDDPort: string;
     avgDD: number;
     activeCount: number;
     positiveCount: number;
-    contributingPorts: { port: string; profit: number }[];
+    contributingPorts: { port: string; profit: number; dd: number }[];
 }
 
 export interface FleetDailyComparison {
@@ -142,6 +148,126 @@ export interface FleetDailyComparison {
         date: string;
         maxDD: number;
     };
+}
+
+function FleetProfitBarChart({ 
+    ports, 
+    theme = 'emerald' 
+}: { 
+    ports: { port: string; profit: number; dd: number }[]; 
+    theme?: 'emerald' | 'amber';
+}) {
+    const [hoveredPort, setHoveredPort] = useState<{ port: string; profit: number; dd: number } | null>(null);
+
+    if (!ports || ports.length === 0) {
+        return (
+            <div className="py-3 text-center text-xs text-muted-foreground italic bg-black/20 rounded border border-border/20">
+                <span className="hidden sm:inline">กำลังรอพอร์ตชน TP ชุดแรกในวันนี้...</span>
+                <span className="sm:hidden">รอปิดกำไรชุดแรก...</span>
+            </div>
+        );
+    }
+
+    const maxProfit = Math.max(...ports.map(p => p.profit), 1);
+
+    return (
+        <div className="space-y-2 pt-2 border-t border-border/30">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="flex items-center gap-1 font-medium">
+                    <BarChart3 className={`w-3.5 h-3.5 ${theme === 'emerald' ? 'text-emerald-400' : 'text-amber-400'}`} />
+                    <span className="hidden sm:inline">การกระจายกำไร ({ports.length} พอร์ต):</span>
+                    <span className="sm:hidden">กราฟกำไร ({ports.length} พอร์ต):</span>
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground/80">
+                    <span className="hidden sm:inline">คลิกแท่งเพื่อเปิดดูหน้าฟาร์ม</span>
+                    <span className="sm:hidden">แตะแท่งดูฟาร์ม</span>
+                </span>
+            </div>
+
+            {/* Hover / Selected Info Banner */}
+            {hoveredPort ? (
+                <div className="flex items-center justify-between bg-black/80 border border-emerald-500/40 px-2.5 py-1 rounded text-xs animate-in fade-in duration-100">
+                    <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-amber-300">#{hoveredPort.port}</span>
+                        <span className="font-mono text-emerald-400 font-semibold">+{hoveredPort.profit.toLocaleString()} USC</span>
+                        <span className="text-[10px] text-muted-foreground hidden sm:inline">(≈ +${(hoveredPort.profit / 100).toFixed(2)})</span>
+                        <span className="text-[10px] text-amber-400/90 font-mono">Max DD: {hoveredPort.dd}%</span>
+                    </div>
+                    <a
+                        href={`/farm/${hoveredPort.port}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-emerald-300 hover:text-emerald-200 underline flex items-center gap-0.5"
+                    >
+                        <span>เปิดฟาร์ม</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                </div>
+            ) : null}
+
+            {/* Vertical Bars Container */}
+            <div className="bg-black/50 rounded-lg p-2.5 border border-border/40 relative">
+                {/* Horizontal Baseline */}
+                <div className="absolute left-2.5 right-2.5 bottom-6 h-px bg-border/40 pointer-events-none" />
+
+                <div className="flex items-end gap-1.5 sm:gap-2 overflow-x-auto pb-1 pt-6 scrollbar-thin">
+                    {ports.map((p, idx) => {
+                        const heightPct = Math.max(12, Math.min(100, Math.round((p.profit / maxProfit) * 100)));
+                        const isTop3 = idx < 3;
+                        return (
+                            <div
+                                key={p.port}
+                                className="group relative flex flex-col items-center flex-shrink-0 cursor-pointer"
+                                onMouseEnter={() => setHoveredPort(p)}
+                                onMouseLeave={() => setHoveredPort(null)}
+                                onClick={() => window.open(`/farm/${p.port}`, '_blank')}
+                                title={`คลิกเปิดฟาร์มพอร์ต #${p.port}`}
+                            >
+                                {/* Floating Tooltip */}
+                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none z-30 flex flex-col items-center whitespace-nowrap">
+                                    <div className="bg-slate-950/95 text-white border border-emerald-500/50 rounded-md px-2.5 py-1.5 shadow-xl text-[11px] font-mono backdrop-blur-sm space-y-0.5">
+                                        <div className="font-bold text-amber-300 flex items-center justify-between gap-3">
+                                            <span>#{p.port}</span>
+                                            {isTop3 && <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded">Top {idx + 1}</span>}
+                                        </div>
+                                        <div className="text-emerald-400 font-bold">+{p.profit.toLocaleString()} USC</div>
+                                        <div className="text-muted-foreground text-[10px]">≈ +${(p.profit / 100).toFixed(2)} USD</div>
+                                        <div className="text-amber-400/90 text-[10px]">Max DD: {p.dd}%</div>
+                                        <div className="text-[9px] text-emerald-300/80 pt-0.5 border-t border-border/40 flex items-center gap-1">
+                                            <ExternalLink className="w-2.5 h-2.5" />
+                                            <span>คลิกเปิดหน้าฟาร์ม</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-2 h-2 bg-slate-950 border-r border-b border-emerald-500/50 transform rotate-45 -mt-1" />
+                                </div>
+
+                                {/* Vertical Bar with Glow */}
+                                <div className="h-16 flex items-end">
+                                    <div
+                                        style={{ height: `${heightPct}%` }}
+                                        className={`w-3 sm:w-3.5 rounded-t-sm transition-all duration-150 group-hover:scale-y-110 group-hover:brightness-125 ${
+                                            theme === 'emerald'
+                                                ? isTop3
+                                                    ? 'bg-gradient-to-t from-emerald-600 via-emerald-400 to-amber-300 shadow-[0_0_8px_rgba(52,211,153,0.5)]'
+                                                    : 'bg-gradient-to-t from-emerald-700 via-emerald-500 to-emerald-400'
+                                                : isTop3
+                                                    ? 'bg-gradient-to-t from-amber-700 via-amber-400 to-yellow-300 shadow-[0_0_8px_rgba(251,191,36,0.5)]'
+                                                    : 'bg-gradient-to-t from-amber-800 via-amber-600 to-amber-400'
+                                        }`}
+                                    />
+                                </div>
+
+                                {/* Port last 3 digits label */}
+                                <span className="text-[9px] font-mono text-muted-foreground/70 group-hover:text-amber-300 mt-1 select-none">
+                                    {p.port.slice(-3)}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export default function EasyMMasterDashboardPage() {
@@ -415,33 +541,72 @@ export default function EasyMMasterDashboardPage() {
             const computeDayStats = (records: any[], dateStr: string, label: string): FleetDailyStat => {
                 let maxP = 0;
                 let topR: any = null;
+                let minP = Infinity;
+                let minPR: any = null;
                 let totalP = 0;
-                const dds: number[] = [];
+                const dds: { port: string; dd: number }[] = [];
                 let positiveCount = 0;
-                const contributingPorts: { port: string; profit: number }[] = [];
+                const contributingPorts: { port: string; profit: number; dd: number }[] = [];
 
                 records.forEach(r => {
                     const p = Number(r.profit) || 0;
                     const dd = Number(r.max_dd || r.max_drawdown) || 0;
+                    const portStr = String(r.port_number || '');
                     totalP += p;
+
                     if (p > maxP) {
                         maxP = p;
                         topR = r;
                     }
                     if (p > 0) {
                         positiveCount++;
-                        contributingPorts.push({ port: String(r.port_number), profit: Number(p.toFixed(2)) });
+                        if (p < minP) {
+                            minP = p;
+                            minPR = r;
+                        }
+                        contributingPorts.push({ 
+                            port: portStr, 
+                            profit: Number(p.toFixed(2)),
+                            dd: Number(dd.toFixed(1))
+                        });
                     }
-                    if (dd > 0) dds.push(dd);
+                    if (portStr) {
+                        dds.push({ port: portStr, dd });
+                    }
                 });
 
                 // Sort ports by profit descending
                 contributingPorts.sort((a, b) => b.profit - a.profit);
 
+                // DD metrics across ports
+                let maxDD = 0;
+                let maxDDPort = '-';
+                let minDD = Infinity;
+                let minDDPort = '-';
+                let sumDD = 0;
+
+                if (dds.length > 0) {
+                    dds.forEach(item => {
+                        sumDD += item.dd;
+                        if (item.dd > maxDD) {
+                            maxDD = item.dd;
+                            maxDDPort = item.port;
+                        }
+                        if (item.dd < minDD && item.dd > 0) {
+                            minDD = item.dd;
+                            minDDPort = item.port;
+                        }
+                    });
+                }
+                if (minDD === Infinity) {
+                    minDD = 0;
+                    minDDPort = dds.length > 0 ? dds[0].port : '-';
+                }
+
                 const dt = new Date(dateStr + 'T00:00:00');
                 const dayThai = dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
                 const avgP = positiveCount > 0 ? (totalP / positiveCount) : (records.length ? totalP / records.length : 0);
-                const avgDD = dds.length ? (dds.reduce((a, b) => a + b, 0) / dds.length) : 0;
+                const avgDD = dds.length ? (sumDD / dds.length) : 0;
 
                 return {
                     date: dateStr,
@@ -449,8 +614,14 @@ export default function EasyMMasterDashboardPage() {
                     topPort: maxP > 0 && topR?.port_number ? String(topR.port_number) : (label === 'วันนี้' ? 'กำลังรอชน TP' : '-'),
                     topProfit: Number(maxP.toFixed(2)),
                     topDD: Number(topR?.max_dd || topR?.max_drawdown || 0),
+                    minProfit: minP !== Infinity ? Number(minP.toFixed(2)) : 0,
+                    minProfitPort: minPR?.port_number ? String(minPR.port_number) : '-',
                     totalProfit: Number(totalP.toFixed(2)),
                     avgProfit: Number(avgP.toFixed(2)),
+                    maxDD: Number(maxDD.toFixed(1)),
+                    maxDDPort: maxDDPort !== '-' ? maxDDPort : (topR?.port_number ? String(topR.port_number) : '-'),
+                    minDD: Number(minDD.toFixed(1)),
+                    minDDPort,
                     avgDD: Number(avgDD.toFixed(1)),
                     activeCount: records.length,
                     positiveCount,
@@ -1235,9 +1406,12 @@ export default function EasyMMasterDashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. Total Fleet Count */}
                 <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-5">
+                    <CardContent className="p-4 sm:p-5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">ฝูงบิน EasyM ทั้งหมด</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                <span className="hidden sm:inline">ฝูงบิน EasyM ทั้งหมด</span>
+                                <span className="sm:hidden">ฝูงบิน EasyM (Total)</span>
+                            </span>
                             <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
                                 <Layers className="w-4 h-4" />
                             </div>
@@ -1246,18 +1420,27 @@ export default function EasyMMasterDashboardPage() {
                             <span className="text-3xl font-bold tracking-tight text-foreground">{kpi.totalCount}</span>
                             <span className="text-xs text-muted-foreground">พอร์ต</span>
                             <span className="ml-auto text-xs font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                ⚡ รันจริง {kpi.realRunningCount}
+                                <span className="hidden sm:inline">⚡ รันจริง </span>
+                                <span className="sm:hidden">⚡ รัน </span>
+                                {kpi.realRunningCount}
                             </span>
                         </div>
                         <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[11px]">
                             <span className="flex items-center gap-1 text-emerald-400 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                <Wifi className="w-3 h-3" /> {kpi.onlineCount} สด &lt;30น.
+                                <Wifi className="w-3 h-3" />
+                                {kpi.onlineCount}
+                                <span className="hidden sm:inline"> สด &lt;30น.</span>
+                                <span className="sm:hidden"> สด</span>
                             </span>
                             <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded" title="ไม่มีสัญญาณเกิน 48 ชม.">
-                                ⏸️ ขาดติดต่อ {kpi.offline48hCount}
+                                <span className="hidden sm:inline">⏸️ ขาดติดต่อ </span>
+                                <span className="sm:hidden">⏸️ ค้าง </span>
+                                {kpi.offline48hCount}
                             </span>
                             <span className="flex items-center gap-1 text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded" title="ยังไม่เคยเปิดรัน">
-                                ⚪ ยังไม่เริ่ม {kpi.noTelemetryCount}
+                                <span className="hidden sm:inline">⚪ ยังไม่เริ่ม </span>
+                                <span className="sm:hidden">⚪ ไม่เริ่ม </span>
+                                {kpi.noTelemetryCount}
                             </span>
                         </div>
                     </CardContent>
@@ -1265,9 +1448,12 @@ export default function EasyMMasterDashboardPage() {
 
                 {/* 2. Total Fleet Balance */}
                 <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-5">
+                    <CardContent className="p-4 sm:p-5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">พลังเงินทุนรันจริง (Active Balance)</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                <span className="hidden sm:inline">พลังเงินทุนรันจริง (Active Balance)</span>
+                                <span className="sm:hidden">เงินทุนรันจริง (Active Bal)</span>
+                            </span>
                             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                                 <CircleDollarSign className="w-4 h-4" />
                             </div>
@@ -1276,17 +1462,26 @@ export default function EasyMMasterDashboardPage() {
                             <span className="text-2xl font-bold tracking-tight text-emerald-400 font-mono">
                                 ${(kpi.activeBalanceUSC / 100 + kpi.activeBalanceUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </span>
-                            <span className="text-xs text-muted-foreground">USD (สด &lt;48 ชม.)</span>
+                            <span className="text-xs text-muted-foreground">
+                                <span className="hidden sm:inline">USD (สด &lt;48 ชม.)</span>
+                                <span className="sm:hidden">USD (&lt;48h)</span>
+                            </span>
                         </div>
                         <div className="mt-3 space-y-1 text-xs border-t border-border/40 pt-2">
                             <div className="flex items-center justify-between text-muted-foreground">
-                                <span className="flex items-center gap-1 text-emerald-400 font-medium">⚡ รันจริง:</span>
+                                <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                                    <span className="hidden sm:inline">⚡ รันจริง:</span>
+                                    <span className="sm:hidden">⚡ รัน:</span>
+                                </span>
                                 <span className="font-semibold text-emerald-400 font-mono">
                                     {kpi.activeBalanceUSC.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-muted-foreground" title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว">
-                                <span className="flex items-center gap-1 text-amber-400/90">⏸️ ยอดค้าง (&gt;48h):</span>
+                                <span className="flex items-center gap-1 text-amber-400/90">
+                                    <span className="hidden sm:inline">⏸️ ยอดค้าง (&gt;48h):</span>
+                                    <span className="sm:hidden">⏸️ ค้าง (&gt;48h):</span>
+                                </span>
                                 <span className="font-mono text-amber-400/90 font-medium">
                                     ${(kpi.staleBalanceUSC / 100 + kpi.staleBalanceUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })} ({kpi.offline48hCount} พอร์ต)
                                 </span>
@@ -1297,9 +1492,12 @@ export default function EasyMMasterDashboardPage() {
 
                 {/* 3. Floating PnL & Today Profit */}
                 <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-5">
+                    <CardContent className="p-4 sm:p-5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">กำไรลอยตัว & วันนี้</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                <span className="hidden sm:inline">กำไรลอยตัว & วันนี้</span>
+                                <span className="sm:hidden">Floating & Today</span>
+                            </span>
                             <div className={`p-2 rounded-lg ${kpi.totalFloating >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                                 {kpi.totalFloating >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                             </div>
@@ -1312,7 +1510,10 @@ export default function EasyMMasterDashboardPage() {
                         </div>
                         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2">
                             <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                                <ArrowUpRight className="w-3 h-3" /> วันนี้: +{kpi.totalTodayProfit.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                                <ArrowUpRight className="w-3 h-3" />
+                                <span className="hidden sm:inline">วันนี้: </span>
+                                <span className="sm:hidden">วันนี้: </span>
+                                +{kpi.totalTodayProfit.toLocaleString('en-US', { maximumFractionDigits: 1 })}
                             </span>
                             <span>MAX: {kpi.maxEACount} | mini: {kpi.miniEACount}</span>
                         </div>
@@ -1321,19 +1522,28 @@ export default function EasyMMasterDashboardPage() {
 
                 {/* 4. Owners & Risk Radar */}
                 <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-5">
+                    <CardContent className="p-4 sm:p-5">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">เจ้าของพอร์ต & Drawdown สูงสุด</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                <span className="hidden sm:inline">เจ้าของพอร์ต & Drawdown สูงสุด</span>
+                                <span className="sm:hidden">Owners & Max DD</span>
+                            </span>
                             <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
                                 <Users className="w-4 h-4" />
                             </div>
                         </div>
                         <div className="mt-2 flex items-baseline gap-2">
                             <span className="text-2xl font-bold tracking-tight text-foreground">{kpi.uniqueOwners}</span>
-                            <span className="text-xs text-muted-foreground">ท่าน (เฉลี่ย {kpi.avgPortsPerOwner} บัญชี/คน)</span>
+                            <span className="text-xs text-muted-foreground">
+                                <span className="hidden sm:inline">ท่าน (เฉลี่ย {kpi.avgPortsPerOwner} บัญชี/คน)</span>
+                                <span className="sm:hidden">คน ({kpi.avgPortsPerOwner}/คน)</span>
+                            </span>
                         </div>
                         <div className="mt-3 flex items-center justify-between text-xs border-t border-border/40 pt-2">
-                            <span className="text-muted-foreground">Max DD ตอนนี้:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">Max DD ตอนนี้:</span>
+                                <span className="sm:hidden">Max DD:</span>
+                            </span>
                             <span className={`font-semibold ${kpi.worstDD > 20 ? 'text-red-400' : kpi.worstDD > 10 ? 'text-amber-400' : 'text-emerald-400'}`}>
                                 {kpi.worstDD.toFixed(1)}% {kpi.worstDDPort ? `(#${kpi.worstDDPort})` : ''}
                             </span>
@@ -1360,27 +1570,41 @@ export default function EasyMMasterDashboardPage() {
                         </div>
                     </div>
 
-                    {/* ส่วนที่ 1: พอร์ตกำไรสูงสุดเดี่ยวประจำวัน (แสดงเฉพาะตัวเลขของพอร์ตนั้นเท่านั้น) */}
+                    {/* ส่วนที่ 1: พอร์ตกำไรสูงสุดเดี่ยวประจำวัน (แสดงสถิติเชิงลึก จัดสัดส่วนสวยงาม) */}
                     <div className="space-y-2">
-                        <div className="text-xs font-semibold text-amber-400/90 flex items-center gap-1.5">
-                            <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                            <span>🏆 พอร์ตกำไรสูงสุดเดี่ยวประจำวัน (แสดงเฉพาะสถิติของพอร์ตนั้นเดี่ยวๆ)</span>
+                        <div className="text-xs font-semibold text-amber-400/90 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                                <span className="hidden sm:inline">🏆 สถิติผลงานเดี่ยวประจำวัน (Daily Highs & Deep Stats)</span>
+                                <span className="sm:hidden">🏆 สถิติเดี่ยวรายวัน (Daily Stats)</span>
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono hidden sm:inline">
+                                สถิติรายพอร์ตเดี่ยวแบบเจาะลึก
+                            </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                             {/* 1. วันนี้ */}
-                            <div className="bg-black/50 border border-emerald-500/30 rounded-lg p-3.5 space-y-2">
+                            <div className="bg-black/50 border border-emerald-500/30 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
                                     <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                                         ⚡ {fleetStats.today.dateLabel}
                                     </span>
                                     <span className="text-[10px] font-mono text-emerald-300/90 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                        สถิติพอร์ตเดี่ยว
+                                        <span className="hidden sm:inline">พอร์ตกำไร: </span>
+                                        <span className="sm:hidden">Win: </span>
+                                        <span className="font-bold text-emerald-400">{fleetStats.today.positiveCount}</span>
+                                        <span className="text-muted-foreground">/{fleetStats.today.activeCount}</span>
                                     </span>
                                 </div>
+
+                                {/* Headline: พอร์ตกำไรสูงสุด */}
                                 <div className="space-y-1">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">พอร์ตที่กำไรสูงสุด:</span>
+                                        <span className="text-muted-foreground">
+                                            <span className="hidden sm:inline">พอร์ตกำไรสูงสุด (Max):</span>
+                                            <span className="sm:hidden">Max Profit:</span>
+                                        </span>
                                         <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
                                             {fleetStats.today.topPort === '-' ? (
                                                 'กำลังรอชน TP'
@@ -1400,31 +1624,146 @@ export default function EasyMMasterDashboardPage() {
                                             )}
                                         </span>
                                     </div>
-                                    <div className="text-2xl font-black font-mono text-[#4de180] tracking-tight">
-                                        +{fleetStats.today.topProfit.toLocaleString()} USC
-                                    </div>
-                                    <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-border/20">
-                                        <span>Max DD ของพอร์ตนี้: <span className="text-amber-400 font-mono font-semibold">{fleetStats.today.topDD}%</span></span>
-                                        <span className="text-muted-foreground/80 font-mono text-[10px]">
+                                    <div className="flex items-baseline justify-between">
+                                        <div className="text-2xl font-black font-mono text-[#4de180] tracking-tight">
+                                            +{fleetStats.today.topProfit.toLocaleString()} USC
+                                        </div>
+                                        <div className="text-muted-foreground/80 font-mono text-[10px]">
                                             {fleetStats.today.topProfit > 0 ? `≈ +$${(fleetStats.today.topProfit / 100).toFixed(2)} USD` : ''}
-                                        </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Deep Stats Grid: กำไรเฉลี่ย, กำไรต่ำสุด, พอร์ตกำไร, DD สูงสุด, DD ต่ำสุด, DD เฉลี่ย */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-2 border-t border-emerald-500/20 text-xs">
+                                    {/* Avg Profit */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">กำไรเฉลี่ย:</span>
+                                            <span className="sm:hidden">Avg PnL:</span>
+                                        </div>
+                                        <div className="font-mono font-bold text-emerald-400 truncate">
+                                            +{fleetStats.today.avgProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Min Profit */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                                            <span>
+                                                <span className="hidden sm:inline">กำไรต่ำสุด:</span>
+                                                <span className="sm:hidden">Min PnL:</span>
+                                            </span>
+                                            {fleetStats.today.minProfitPort !== '-' && (
+                                                <a
+                                                    href={`/farm/${fleetStats.today.minProfitPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-mono text-amber-300 hover:underline text-[9px]"
+                                                    title={`เปิดหน้าฟาร์ม #${fleetStats.today.minProfitPort}`}
+                                                >
+                                                    #{fleetStats.today.minProfitPort.slice(-3)}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="font-mono font-bold text-emerald-400/90 truncate">
+                                            +{fleetStats.today.minProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Profitable Ports */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">พอร์ตมีกำไร:</span>
+                                            <span className="sm:hidden">Win Ports:</span>
+                                        </div>
+                                        <div className="font-mono font-bold text-amber-300">
+                                            {fleetStats.today.positiveCount} <span className="text-[8px] text-muted-foreground font-normal">พอร์ต</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Max DD */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                                            <span>
+                                                <span className="hidden sm:inline">DD สูงสุด:</span>
+                                                <span className="sm:hidden">Max DD:</span>
+                                            </span>
+                                            {fleetStats.today.maxDDPort !== '-' && (
+                                                <a
+                                                    href={`/farm/${fleetStats.today.maxDDPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-mono text-amber-300 hover:underline text-[9px]"
+                                                    title={`เปิดหน้าฟาร์ม #${fleetStats.today.maxDDPort}`}
+                                                >
+                                                    #{fleetStats.today.maxDDPort.slice(-3)}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className={`font-mono font-bold ${fleetStats.today.maxDD > 15 ? 'text-red-400' : 'text-amber-400'}`}>
+                                            {fleetStats.today.maxDD}%
+                                        </div>
+                                    </div>
+
+                                    {/* Min DD */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                                            <span>
+                                                <span className="hidden sm:inline">DD ต่ำสุด:</span>
+                                                <span className="sm:hidden">Min DD:</span>
+                                            </span>
+                                            {fleetStats.today.minDDPort !== '-' && (
+                                                <a
+                                                    href={`/farm/${fleetStats.today.minDDPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-mono text-amber-300 hover:underline text-[9px]"
+                                                    title={`เปิดหน้าฟาร์ม #${fleetStats.today.minDDPort}`}
+                                                >
+                                                    #{fleetStats.today.minDDPort.slice(-3)}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="font-mono font-bold text-emerald-400">
+                                            {fleetStats.today.minDD}%
+                                        </div>
+                                    </div>
+
+                                    {/* Avg DD */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">DD เฉลี่ย:</span>
+                                            <span className="sm:hidden">Avg DD:</span>
+                                        </div>
+                                        <div className="font-mono font-bold text-amber-300">
+                                            {fleetStats.today.avgDD}%
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* 2. เมื่อวาน */}
-                            <div className="bg-black/40 border border-border/60 rounded-lg p-3.5 space-y-2">
+                            <div className="bg-black/40 border border-border/60 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
                                     <span className="text-xs font-bold text-amber-200/80 flex items-center gap-1.5">
                                         📅 {fleetStats.yesterday.dateLabel}
                                     </span>
                                     <span className="text-[10px] font-mono text-amber-300/80 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                                        สถิติพอร์ตเดี่ยว
+                                        <span className="hidden sm:inline">พอร์ตกำไร: </span>
+                                        <span className="sm:hidden">Win: </span>
+                                        <span className="font-bold text-amber-300">{fleetStats.yesterday.positiveCount}</span>
+                                        <span className="text-muted-foreground">/{fleetStats.yesterday.activeCount}</span>
                                     </span>
                                 </div>
+
+                                {/* Headline: พอร์ตกำไรสูงสุด */}
                                 <div className="space-y-1">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">พอร์ตที่กำไรสูงสุด:</span>
+                                        <span className="text-muted-foreground">
+                                            <span className="hidden sm:inline">พอร์ตกำไรสูงสุด (Max):</span>
+                                            <span className="sm:hidden">Max Profit:</span>
+                                        </span>
                                         <span className="font-mono text-amber-300/90 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
                                             {fleetStats.yesterday.topPort === '-' ? (
                                                 '-'
@@ -1444,31 +1783,144 @@ export default function EasyMMasterDashboardPage() {
                                             )}
                                         </span>
                                     </div>
-                                    <div className="text-2xl font-black font-mono text-emerald-400/90 tracking-tight">
-                                        +{fleetStats.yesterday.topProfit.toLocaleString()} USC
-                                    </div>
-                                    <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-border/20">
-                                        <span>Max DD ของพอร์ตนี้: <span className="text-amber-400 font-mono font-semibold">{fleetStats.yesterday.topDD}%</span></span>
-                                        <span className="text-muted-foreground/80 font-mono text-[10px]">
+                                    <div className="flex items-baseline justify-between">
+                                        <div className="text-2xl font-black font-mono text-emerald-400/90 tracking-tight">
+                                            +{fleetStats.yesterday.topProfit.toLocaleString()} USC
+                                        </div>
+                                        <div className="text-muted-foreground/80 font-mono text-[10px]">
                                             {fleetStats.yesterday.topProfit > 0 ? `≈ +$${(fleetStats.yesterday.topProfit / 100).toFixed(2)} USD` : ''}
-                                        </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Deep Stats Grid: กำไรเฉลี่ย, กำไรต่ำสุด, พอร์ตกำไร, DD สูงสุด, DD ต่ำสุด, DD เฉลี่ย */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-2 border-t border-border/30 text-xs">
+                                    {/* Avg Profit */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">กำไรเฉลี่ย:</span>
+                                            <span className="sm:hidden">Avg PnL:</span>
+                                        </div>
+                                        <div className="font-mono font-bold text-emerald-400/90 truncate">
+                                            +{fleetStats.yesterday.avgProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Min Profit */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                                            <span>
+                                                <span className="hidden sm:inline">กำไรต่ำสุด:</span>
+                                                <span className="sm:hidden">Min PnL:</span>
+                                            </span>
+                                            {fleetStats.yesterday.minProfitPort !== '-' && (
+                                                <a
+                                                    href={`/farm/${fleetStats.yesterday.minProfitPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-mono text-amber-300 hover:underline text-[9px]"
+                                                    title={`เปิดหน้าฟาร์ม #${fleetStats.yesterday.minProfitPort}`}
+                                                >
+                                                    #{fleetStats.yesterday.minProfitPort.slice(-3)}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="font-mono font-bold text-emerald-400/80 truncate">
+                                            +{fleetStats.yesterday.minProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Profitable Ports */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">พอร์ตมีกำไร:</span>
+                                            <span className="sm:hidden">Win Ports:</span>
+                                        </div>
+                                        <div className="font-mono font-bold text-amber-300">
+                                            {fleetStats.yesterday.positiveCount} <span className="text-[8px] text-muted-foreground font-normal">พอร์ต</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Max DD */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                                            <span>
+                                                <span className="hidden sm:inline">DD สูงสุด:</span>
+                                                <span className="sm:hidden">Max DD:</span>
+                                            </span>
+                                            {fleetStats.yesterday.maxDDPort !== '-' && (
+                                                <a
+                                                    href={`/farm/${fleetStats.yesterday.maxDDPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-mono text-amber-300 hover:underline text-[9px]"
+                                                    title={`เปิดหน้าฟาร์ม #${fleetStats.yesterday.maxDDPort}`}
+                                                >
+                                                    #{fleetStats.yesterday.maxDDPort.slice(-3)}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className={`font-mono font-bold ${fleetStats.yesterday.maxDD > 15 ? 'text-red-400' : 'text-amber-400'}`}>
+                                            {fleetStats.yesterday.maxDD}%
+                                        </div>
+                                    </div>
+
+                                    {/* Min DD */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                                            <span>
+                                                <span className="hidden sm:inline">DD ต่ำสุด:</span>
+                                                <span className="sm:hidden">Min DD:</span>
+                                            </span>
+                                            {fleetStats.yesterday.minDDPort !== '-' && (
+                                                <a
+                                                    href={`/farm/${fleetStats.yesterday.minDDPort}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-mono text-amber-300 hover:underline text-[9px]"
+                                                    title={`เปิดหน้าฟาร์ม #${fleetStats.yesterday.minDDPort}`}
+                                                >
+                                                    #{fleetStats.yesterday.minDDPort.slice(-3)}
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="font-mono font-bold text-emerald-400">
+                                            {fleetStats.yesterday.minDD}%
+                                        </div>
+                                    </div>
+
+                                    {/* Avg DD */}
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">DD เฉลี่ย:</span>
+                                            <span className="sm:hidden">Avg DD:</span>
+                                        </div>
+                                        <div className="font-mono font-bold text-amber-300">
+                                            {fleetStats.yesterday.avgDD}%
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* 3. สถิติสูงสุดตลอดกาล */}
-                            <div className="bg-black/40 border border-amber-500/20 rounded-lg p-3.5 space-y-2">
+                            <div className="bg-black/40 border border-amber-500/20 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
                                     <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                                        <Crown className="w-3.5 h-3.5 text-amber-400" /> สถิติสูงสุดตลอดกาล
+                                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                                        <span className="hidden sm:inline">สถิติสูงสุดตลอดกาล (Peak)</span>
+                                        <span className="sm:hidden">สูงสุดตลอดกาล (Peak)</span>
                                     </span>
                                     <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
                                         Survival 100%
                                     </span>
                                 </div>
+
                                 <div className="space-y-1">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">พอร์ตแชมป์:</span>
+                                        <span className="text-muted-foreground">
+                                            <span className="hidden sm:inline">พอร์ตแชมป์:</span>
+                                            <span className="sm:hidden">Top Port:</span>
+                                        </span>
                                         <span className="font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/40">
                                             <a
                                                 href={`/farm/${fleetStats.allTimePeak.portNumber}`}
@@ -1482,27 +1934,69 @@ export default function EasyMMasterDashboardPage() {
                                             </a>
                                         </span>
                                     </div>
-                                    <div className="text-2xl font-black font-mono text-[#ffd700] tracking-tight">
-                                        +{fleetStats.allTimePeak.profit.toLocaleString()} USC
+                                    <div className="flex items-baseline justify-between">
+                                        <div className="text-2xl font-black font-mono text-[#ffd700] tracking-tight">
+                                            +{fleetStats.allTimePeak.profit.toLocaleString()} USC
+                                        </div>
+                                        <div className="text-muted-foreground/80 font-mono text-[10px]">
+                                            ≈ +${(fleetStats.allTimePeak.profit / 100).toFixed(2)} USD
+                                        </div>
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-border/20">
-                                        <span>วันที่ทำได้: <span className="font-mono text-amber-200/80">{fleetStats.allTimePeak.date}</span></span>
-                                        <span className="font-mono text-amber-300">227 วัน (1 ก.พ. 69)</span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-amber-500/20 text-xs">
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">วันที่ทำได้:</span>
+                                            <span className="sm:hidden">Date:</span>
+                                        </div>
+                                        <div className="font-mono text-amber-200/90 font-bold truncate">
+                                            {fleetStats.allTimePeak.date}
+                                        </div>
+                                    </div>
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">ระยะเวลารัน:</span>
+                                            <span className="sm:hidden">Runtime:</span>
+                                        </div>
+                                        <div className="font-mono text-amber-300 font-bold truncate">
+                                            227 วัน (1 ก.พ. 69)
+                                        </div>
+                                    </div>
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">Max DD พอร์ตนี้:</span>
+                                            <span className="sm:hidden">Max DD:</span>
+                                        </div>
+                                        <div className="font-mono text-emerald-400 font-bold">
+                                            0.0%
+                                        </div>
+                                    </div>
+                                    <div className="bg-black/40 rounded p-1.5 border border-border/20">
+                                        <div className="text-[10px] text-muted-foreground">
+                                            <span className="hidden sm:inline">สถานะระบบ:</span>
+                                            <span className="sm:hidden">Status:</span>
+                                        </div>
+                                        <div className="font-mono text-emerald-400 font-bold text-[11px]">
+                                            🟢 EasyM MAX
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* ส่วนที่ 2: กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ พร้อมระบุจำนวนพอร์ตที่รวมกัน) */}
+                    {/* ส่วนที่ 2: กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ พร้อมระบุจำนวนพอร์ตที่รวมกัน และกราฟแท่งกระจายกำไร) */}
                     <div className="pt-3 border-t border-amber-500/20 space-y-2">
                         <div className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
                                 <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>🌐 กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ)</span>
+                                <span className="hidden sm:inline">🌐 กำไรรวมของทุกพอร์ตในฟลีท EasyM (ผลรวมทั้งระบบ)</span>
+                                <span className="sm:hidden">🌐 รวมกำไรฟลีท (Total Fleet PnL)</span>
                             </span>
                             <span className="text-[10px] text-muted-foreground font-mono">
-                                รวมกำไรจากพอร์ตที่ปิดออเดอร์สำเร็จ
+                                <span className="hidden sm:inline">รวมกำไรจากพอร์ตที่ปิดออเดอร์สำเร็จ</span>
+                                <span className="sm:hidden">พอร์ตที่ปิดบวก</span>
                             </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -1510,10 +2004,12 @@ export default function EasyMMasterDashboardPage() {
                             <div className="bg-gradient-to-br from-emerald-950/40 via-black/60 to-black/80 border border-emerald-500/40 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
                                     <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                                        ⚡ รวมกำไรปิดวันนี้ ({fleetStats.today.dateLabel})
+                                        <span className="hidden sm:inline">⚡ รวมกำไรปิดวันนี้ ({fleetStats.today.dateLabel})</span>
+                                        <span className="sm:hidden">⚡ กำไรวันนี้ ({fleetStats.today.dateLabel})</span>
                                     </span>
                                     <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
-                                        มาจากผลรวมของ {fleetStats.today.positiveCount} พอร์ต
+                                        <span className="hidden sm:inline">มาจากผลรวมของ {fleetStats.today.positiveCount} พอร์ต</span>
+                                        <span className="sm:hidden">รวม {fleetStats.today.positiveCount} พอร์ต</span>
                                     </span>
                                 </div>
                                 <div className="flex items-baseline justify-between">
@@ -1526,44 +2022,33 @@ export default function EasyMMasterDashboardPage() {
                                         </div>
                                     </div>
                                     <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
-                                        <div>เฉลี่ยพอร์ตที่ปิด: <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.today.avgProfit.toLocaleString()} USC</span></div>
-                                        <div>DD เฉลี่ยทั้งฝูงบิน: <span className="text-amber-300 font-mono">{fleetStats.today.avgDD}%</span></div>
+                                        <div>
+                                            <span className="hidden sm:inline">เฉลี่ยพอร์ตที่ปิด: </span>
+                                            <span className="sm:hidden">เฉลี่ย: </span>
+                                            <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.today.avgProfit.toLocaleString()} USC</span>
+                                        </div>
+                                        <div>
+                                            <span className="hidden sm:inline">DD เฉลี่ยทั้งฝูงบิน: </span>
+                                            <span className="sm:hidden">DD เฉลี่ย: </span>
+                                            <span className="text-amber-300 font-mono">{fleetStats.today.avgDD}%</span>
+                                        </div>
                                     </div>
                                 </div>
-                                {/* Contributing ports chips */}
-                                <div className="pt-2 border-t border-emerald-500/10">
-                                    <div className="text-[10px] text-muted-foreground mb-1">พอร์ตที่สร้างกำไรวันนี้:</div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {fleetStats.today.contributingPorts && fleetStats.today.contributingPorts.length > 0 ? (
-                                            fleetStats.today.contributingPorts.map(cp => (
-                                                <a
-                                                    key={cp.port}
-                                                    href={`/farm/${cp.port}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[11px] font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-500/25 hover:border-emerald-500/50 hover:underline transition-colors"
-                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${cp.port}`}
-                                                >
-                                                    <span className="text-muted-foreground">#{cp.port}</span>
-                                                    <span className="font-bold text-emerald-400">+{cp.profit.toLocaleString()} USC</span>
-                                                    <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                                                </a>
-                                            ))
-                                        ) : (
-                                            <span className="text-[11px] text-muted-foreground italic">กำลังรอพอร์ตชน TP ชุดแรกในวันนี้...</span>
-                                        )}
-                                    </div>
-                                </div>
+
+                                {/* Mini Bar Chart */}
+                                <FleetProfitBarChart ports={fleetStats.today.contributingPorts} theme="emerald" />
                             </div>
 
                             {/* 2.2 รวมกำไรปิดเมื่อวาน */}
                             <div className="bg-gradient-to-br from-amber-950/30 via-black/60 to-black/80 border border-border/60 rounded-lg p-3.5 space-y-2.5">
                                 <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
                                     <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
-                                        📅 รวมกำไรปิดเมื่อวาน ({fleetStats.yesterday.dateLabel})
+                                        <span className="hidden sm:inline">📅 รวมกำไรปิดเมื่อวาน ({fleetStats.yesterday.dateLabel})</span>
+                                        <span className="sm:hidden">📅 กำไรเมื่อวาน ({fleetStats.yesterday.dateLabel})</span>
                                     </span>
                                     <span className="text-[11px] font-mono text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
-                                        มาจากผลรวมของ {fleetStats.yesterday.positiveCount} พอร์ต
+                                        <span className="hidden sm:inline">มาจากผลรวมของ {fleetStats.yesterday.positiveCount} พอร์ต</span>
+                                        <span className="sm:hidden">รวม {fleetStats.yesterday.positiveCount} พอร์ต</span>
                                     </span>
                                 </div>
                                 <div className="flex items-baseline justify-between">
@@ -1576,34 +2061,21 @@ export default function EasyMMasterDashboardPage() {
                                         </div>
                                     </div>
                                     <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
-                                        <div>เฉลี่ยพอร์ตที่ปิด: <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.yesterday.avgProfit.toLocaleString()} USC</span></div>
-                                        <div>DD เฉลี่ยทั้งฝูงบิน: <span className="text-amber-300 font-mono">{fleetStats.yesterday.avgDD}%</span></div>
+                                        <div>
+                                            <span className="hidden sm:inline">เฉลี่ยพอร์ตที่ปิด: </span>
+                                            <span className="sm:hidden">เฉลี่ย: </span>
+                                            <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.yesterday.avgProfit.toLocaleString()} USC</span>
+                                        </div>
+                                        <div>
+                                            <span className="hidden sm:inline">DD เฉลี่ยทั้งฝูงบิน: </span>
+                                            <span className="sm:hidden">DD เฉลี่ย: </span>
+                                            <span className="text-amber-300 font-mono">{fleetStats.yesterday.avgDD}%</span>
+                                        </div>
                                     </div>
                                 </div>
-                                {/* Contributing ports chips */}
-                                <div className="pt-2 border-t border-border/30">
-                                    <div className="text-[10px] text-muted-foreground mb-1">พอร์ตที่สร้างกำไรเมื่อวาน:</div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {fleetStats.yesterday.contributingPorts && fleetStats.yesterday.contributingPorts.length > 0 ? (
-                                            fleetStats.yesterday.contributingPorts.map(cp => (
-                                                <a
-                                                    key={cp.port}
-                                                    href={`/farm/${cp.port}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[11px] font-mono bg-black/50 border border-amber-500/20 text-amber-200 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-black/70 hover:border-amber-500/40 hover:underline transition-colors"
-                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${cp.port}`}
-                                                >
-                                                    <span className="text-muted-foreground">#{cp.port}</span>
-                                                    <span className="font-bold text-emerald-400/90">+{cp.profit.toLocaleString()} USC</span>
-                                                    <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
-                                                </a>
-                                            ))
-                                        ) : (
-                                            <span className="text-[11px] text-muted-foreground italic">-</span>
-                                        )}
-                                    </div>
-                                </div>
+
+                                {/* Mini Bar Chart */}
+                                <FleetProfitBarChart ports={fleetStats.yesterday.contributingPorts} theme="amber" />
                             </div>
                         </div>
                     </div>
@@ -1624,21 +2096,33 @@ export default function EasyMMasterDashboardPage() {
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">จำนวนพอร์ตในสาย:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">จำนวนพอร์ตในสาย:</span>
+                                <span className="sm:hidden">พอร์ตในสาย:</span>
+                            </span>
                             <span className="font-bold">{adminStats.juntarasate.ports} บัญชี (Active: {adminStats.juntarasate.activePorts})</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">ส่งข้อมูล MT5 (Telemetry):</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">ส่งข้อมูล MT5 (Telemetry):</span>
+                                <span className="sm:hidden">MT5 Telemetry:</span>
+                            </span>
                             <span className="font-semibold text-emerald-400">
                                 {adminStats.juntarasate.telemetry} / {adminStats.juntarasate.ports} บัญชี ({adminStats.juntarasate.online} ออนไลน์)
                             </span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">จำนวนลูกค้า:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">จำนวนลูกค้า:</span>
+                                <span className="sm:hidden">ลูกค้า:</span>
+                            </span>
                             <span className="font-semibold">{adminStats.juntarasate.owners.size} ท่าน</span>
                         </div>
                         <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">พลังเงินทุนรันจริง:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">พลังเงินทุนรันจริง:</span>
+                                <span className="sm:hidden">เงินทุนรันจริง:</span>
+                            </span>
                             <span className="font-mono font-semibold text-emerald-400 text-right">
                                 {adminStats.juntarasate.activeUscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
                                 {adminStats.juntarasate.staleUscBalance > 0 && (
@@ -1660,11 +2144,17 @@ export default function EasyMMasterDashboardPage() {
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">จำนวนพอร์ตในสาย:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">จำนวนพอร์ตในสาย:</span>
+                                <span className="sm:hidden">พอร์ตในสาย:</span>
+                            </span>
                             <span className="font-bold">{adminStats.bctutor.ports} บัญชี (Active: {adminStats.bctutor.activePorts})</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">ส่งข้อมูล MT5 (Telemetry):</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">ส่งข้อมูล MT5 (Telemetry):</span>
+                                <span className="sm:hidden">MT5 Telemetry:</span>
+                            </span>
                             <span className="font-semibold text-amber-400">
                                 {adminStats.bctutor.telemetry} / {adminStats.bctutor.ports} บัญชี ({adminStats.bctutor.online} ออนไลน์)
                             </span>
@@ -1675,11 +2165,17 @@ export default function EasyMMasterDashboardPage() {
                             </div>
                         )}
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">จำนวนลูกค้า:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">จำนวนลูกค้า:</span>
+                                <span className="sm:hidden">ลูกค้า:</span>
+                            </span>
                             <span className="font-semibold">{adminStats.bctutor.owners.size} ท่าน</span>
                         </div>
                         <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">พลังเงินทุนรันจริง:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">พลังเงินทุนรันจริง:</span>
+                                <span className="sm:hidden">เงินทุนรันจริง:</span>
+                            </span>
                             <span className="font-mono font-semibold text-emerald-400 text-right">
                                 {adminStats.bctutor.activeUscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
                                 {adminStats.bctutor.staleUscBalance > 0 && (
@@ -1701,19 +2197,31 @@ export default function EasyMMasterDashboardPage() {
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">จำนวนพอร์ตในสาย:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">จำนวนพอร์ตในสาย:</span>
+                                <span className="sm:hidden">พอร์ตในสาย:</span>
+                            </span>
                             <span className="font-bold">{adminStats.direct.ports} บัญชี (Active: {adminStats.direct.activePorts})</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">ส่งข้อมูล MT5 (Telemetry):</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">ส่งข้อมูล MT5 (Telemetry):</span>
+                                <span className="sm:hidden">MT5 Telemetry:</span>
+                            </span>
                             <span className="font-semibold">{adminStats.direct.telemetry} / {adminStats.direct.ports} บัญชี</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/30">
-                            <span className="text-muted-foreground">จำนวนลูกค้า:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">จำนวนลูกค้า:</span>
+                                <span className="sm:hidden">ลูกค้า:</span>
+                            </span>
                             <span className="font-semibold">{adminStats.direct.owners.size} ท่าน</span>
                         </div>
                         <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">พลังเงินทุนรันจริง:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">พลังเงินทุนรันจริง:</span>
+                                <span className="sm:hidden">เงินทุนรันจริง:</span>
+                            </span>
                             <span className="font-mono font-semibold text-emerald-400 text-right">
                                 {adminStats.direct.activeUscBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
                                 {adminStats.direct.staleUscBalance > 0 && (
@@ -1737,7 +2245,8 @@ export default function EasyMMasterDashboardPage() {
                             </div>
                             <div>
                                 <h2 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
-                                    <span>วิวัฒนาการและการเติบโตของฝูงบิน EasyM รายเดือน</span>
+                                    <span className="hidden sm:inline">วิวัฒนาการและการเติบโตของฝูงบิน EasyM รายเดือน</span>
+                                    <span className="sm:hidden">การเติบโตรายเดือน (Monthly Stats)</span>
                                     <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-[10px] px-1.5 py-0">
                                         Lifecycle &amp; Retention
                                     </Badge>
@@ -1748,7 +2257,10 @@ export default function EasyMMasterDashboardPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2 text-xs font-mono">
-                            <span className="text-muted-foreground">บันทึกสะสม:</span>
+                            <span className="text-muted-foreground">
+                                <span className="hidden sm:inline">บันทึกสะสม:</span>
+                                <span className="sm:hidden">สะสม:</span>
+                            </span>
                             <span className="font-bold text-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/50">
                                 {monthlyStats.length} เดือน
                             </span>
@@ -1944,7 +2456,8 @@ export default function EasyMMasterDashboardPage() {
                                     className="text-xs h-8 px-2.5"
                                 >
                                     <Users className="w-3.5 h-3.5 mr-1" />
-                                    แยกตามลูกค้า
+                                    <span className="hidden sm:inline">แยกตามลูกค้า</span>
+                                    <span className="sm:hidden">ลูกค้า</span>
                                 </Button>
                                 <Button
                                     variant={viewMode === 'table' ? 'default' : 'ghost'}
@@ -1953,7 +2466,8 @@ export default function EasyMMasterDashboardPage() {
                                     className="text-xs h-8 px-2.5"
                                 >
                                     <Layers className="w-3.5 h-3.5 mr-1" />
-                                    ตารางรวม
+                                    <span className="hidden sm:inline">ตารางรวม</span>
+                                    <span className="sm:hidden">ตาราง</span>
                                 </Button>
                                 <Button
                                     variant={viewMode === 'cards' ? 'default' : 'ghost'}
@@ -1962,7 +2476,8 @@ export default function EasyMMasterDashboardPage() {
                                     className="text-xs h-8 px-2.5"
                                 >
                                     <BarChart3 className="w-3.5 h-3.5 mr-1" />
-                                    การ์ดพอร์ต
+                                    <span className="hidden sm:inline">การ์ดพอร์ต</span>
+                                    <span className="sm:hidden">การ์ด</span>
                                 </Button>
                             </div>
                         </div>
@@ -1970,7 +2485,10 @@ export default function EasyMMasterDashboardPage() {
 
                     {/* Quick Filter Buttons */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
-                        <span className="text-muted-foreground font-medium mr-1 text-[11px]">ตัวกรองด่วน:</span>
+                        <span className="text-muted-foreground font-medium mr-1 text-[11px]">
+                            <span className="hidden sm:inline">ตัวกรองด่วน:</span>
+                            <span className="sm:hidden">กรอง:</span>
+                        </span>
                         <Button 
                             variant={selectedStatus === 'all' ? 'default' : 'outline'} 
                             size="sm" 
