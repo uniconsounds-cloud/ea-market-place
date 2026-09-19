@@ -386,10 +386,10 @@ export default function AdminUsersPage() {
                                                 </Button>
                                                 <Button 
                                                     size="sm" 
-                                                    className="h-9 bg-gold hover:bg-gold/85 text-black font-bold shadow-md shadow-gold/10"
+                                                    className="h-9 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black shadow-md shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
                                                     onClick={() => handleApproveTransfer(req)}
                                                 >
-                                                    <Check className="w-3.5 h-3.5 mr-1" />
+                                                    <Check className="w-3.5 h-3.5 mr-1 stroke-[3]" />
                                                     {isSuperAdmin ? "⚡️ อนุมัติย้ายทันที (Super Admin)" : "ยืนยันสลับสายงาน"}
                                                 </Button>
                                             </div>
@@ -647,12 +647,12 @@ export default function AdminUsersPage() {
                                 <Button 
                                     onClick={handleCreateTransferRequest} 
                                     disabled={transferLoading || !selectedTargetAdminId}
-                                    className="bg-gold hover:bg-gold/85 text-black font-bold shadow-md shadow-gold/20"
+                                    className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black shadow-lg shadow-amber-500/25 px-5 py-2.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                 >
                                     {transferLoading ? (
                                         <Loader2 className="animate-spin w-4 h-4 mr-2" />
                                     ) : isSuperAdmin ? (
-                                        <Check className="w-4 h-4 mr-2" />
+                                        <Check className="w-4 h-4 mr-2 stroke-[3]" />
                                     ) : (
                                         <GitPullRequest className="w-4 h-4 mr-2" />
                                     )}
