@@ -142,6 +142,22 @@ export default function AdminUsersPage() {
                 return;
             }
 
+            // Direct Super Admin immediate transfer
+            if (currentUser?.email === 'juntarasate@gmail.com') {
+                const res = await fetch('/api/admin/users/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customerId, targetAdminId }),
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Failed to transfer user');
+
+                toast.success("ย้ายสายงานลูกค้าสำเร็จทันทีโดยสิทธิ์ Super Admin!");
+                setIsTransferOpen(false);
+                fetchUsers();
+                return;
+            }
+
             const { error } = await supabase
                 .from('admin_transfer_requests')
                 .insert([{

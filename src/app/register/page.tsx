@@ -144,7 +144,7 @@ function RegisterContent() {
 
     const handleGoogleLogin = async () => {
         try {
-            // Extract referral code from cookie if it exists
+            // Extract referral code from state, cookie, or localStorage
             const getCookie = (name: string) => {
                 const value = `; ${document.cookie}`;
                 const parts = value.split(`; ${name}=`);
@@ -152,15 +152,16 @@ function RegisterContent() {
                 return null;
             };
 
-            const refCode = getCookie('affiliate_ref') || localStorage.getItem('affiliate_ref');
+            const refCode = (referralData?.code || selectedAdmin || refParam || getCookie('affiliate_ref') || (typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null) || '').trim();
 
-            // To pass metadata with OAuth, we have to store it locally before redirect
-            // or pass it via queryParams (though Supabase strips some custom params).
-            // A more reliable way is to let the callback process the cookie, OR pass it here:
-            if (refCode) {
-                // We'll set a local storage item just in case the cookie is lost
+            if (refCode && typeof window !== 'undefined') {
+                localStorage.setItem('affiliate_ref', refCode);
                 localStorage.setItem('pending_affiliate_ref', refCode);
+                document.cookie = `affiliate_ref=${refCode};path=/;max-age=2592000;SameSite=Lax`;
             }
+
+            const refQueryStr = refCode ? `&ref=${encodeURIComponent(refCode)}` : '';
+            const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirectUrl)}${refQueryStr}`;
 
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -169,7 +170,7 @@ function RegisterContent() {
                         access_type: 'offline',
                         prompt: 'consent',
                     },
-                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirectUrl)}`,
+                    redirectTo: callbackUrl,
                 },
             });
             if (error) throw error;

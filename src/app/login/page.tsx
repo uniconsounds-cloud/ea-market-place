@@ -72,6 +72,17 @@ function LoginContent() {
 
     const handleGoogleLogin = async () => {
         try {
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+                return null;
+            };
+
+            const refCode = (refParam || getCookie('affiliate_ref') || (typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null) || '').trim();
+            const refParamStr = refCode ? `&ref=${encodeURIComponent(refCode)}` : '';
+            const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirectUrl)}${refParamStr}`;
+
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -79,7 +90,7 @@ function LoginContent() {
                         access_type: 'offline',
                         prompt: 'consent',
                     },
-                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirectUrl)}`,
+                    redirectTo: callbackUrl,
                 },
             });
             if (error) throw error;
