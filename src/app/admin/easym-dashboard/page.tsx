@@ -1697,59 +1697,235 @@ export default function EasyMMasterDashboardPage() {
             {/* 2. MT5 Network Traffic & Hourly Density Monitor */}
             <Card className="border-border shadow-sm bg-card/60">
                 <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                             <CardTitle className="text-base font-bold flex items-center gap-2">
                                 <Server className="w-5 h-5 text-blue-400" />
                                 การจราจรข้อมูล MT5 Sync (24-Hour Traffic Pattern)
                             </CardTitle>
                             <CardDescription>
-                                ความหนาแน่นของคำขอ WebRequest จาก MT5 ตลอด 24 ชั่วโมง (เวลาไทย)
+                                ความหนาแน่นของคำขอ WebRequest จาก MT5 ตลอด 24 ชั่วโมง พร้อมขีดระดับความปลอดภัย 3 ระดับ
                             </CardDescription>
                         </div>
-                        <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-xs">
-                            Live Ingestion
-                        </Badge>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-xs">
+                                Live Ingestion
+                            </Badge>
+                            <Badge variant="outline" className="text-amber-400 border-amber-500/30 text-xs">
+                                3-Tier Threshold
+                            </Badge>
+                        </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                    {/* 24h Bar Distribution Chart */}
-                    <div className="bg-muted/20 p-3.5 rounded-lg border border-border/40">
-                        <div className="text-xs text-muted-foreground mb-3 flex items-center justify-between">
-                            <span>ช่วงเวลา 00:00 - 23:00 น.</span>
-                            <span className="text-amber-400 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" /> Peak: 14:00-17:00 น. &amp; 19:00-23:00 น.
-                            </span>
+                <CardContent className="space-y-4">
+                    {/* 24h Bar Distribution Chart with 3-Level Threshold Indicators */}
+                    <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
+                        {/* Header & Legend of 3 Threshold Levels */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-border/40 pb-2.5">
+                            <div className="text-muted-foreground">
+                                <span>ช่วงเวลา 00:00 - 23:00 น. (เวลาไทย)</span>
+                            </div>
+                            {/* 3 Threshold Badges/Legend */}
+                            <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
+                                <span className="flex items-center gap-1 text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
+                                    <span className="w-2 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.8)]"></span>
+                                    🏆 สูงสุดที่เคยเป็น (100%)
+                                </span>
+                                <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
+                                    <span className="w-2 h-0.5 bg-red-400 inline-block shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
+                                    🚨 เริ่มมีปัญหา (&gt;85%)
+                                </span>
+                                <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                                    <span className="w-2 h-0.5 bg-amber-400 inline-block"></span>
+                                    ⚠️ เริ่มต้องสนใจ (&gt;65%)
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex items-end gap-1 h-28 pt-2">
-                            {hourlyTraffic.map((count, hour) => {
-                                const maxVal = Math.max(...hourlyTraffic, 1);
-                                const heightPct = Math.max(8, Math.round((count / maxVal) * 100));
-                                const isPeak = heightPct > 65;
-                                return (
-                                    <div key={hour} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
-                                        <div 
-                                            className={`w-full rounded-t transition-all ${
-                                                isPeak 
-                                                    ? 'bg-amber-500 hover:bg-amber-400' 
-                                                    : 'bg-blue-500/60 hover:bg-blue-400'
-                                            }`}
-                                            style={{ height: `${heightPct}%` }}
-                                        />
-                                        <span className="text-[8px] text-muted-foreground/60 font-mono">
-                                            {hour % 3 === 0 ? hour : ''}
-                                        </span>
-                                        {/* Tooltip on hover */}
-                                        <div className="absolute bottom-full mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow border whitespace-nowrap">
-                                            {hour}:00 น. : {count} requests
+
+                        {/* Chart Area with 3 Horizontal Reference Lines */}
+                        <div className="relative h-44 pt-4 pb-6">
+                            {/* Line 1: ขีดสูงสุดที่เคยเป็น (100%) */}
+                            <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
+                                <div className="w-full border-b-2 border-dashed border-amber-300/60"></div>
+                                <span className="absolute right-0 -top-3 text-[9px] font-mono font-bold text-amber-300 bg-background/90 px-1.5 py-0.5 rounded border border-amber-400/50 shadow-sm">
+                                    100% พีคสูงสุด
+                                </span>
+                            </div>
+
+                            {/* Line 2: ขีดระดับที่เริ่มมีปัญหาต้องจัดการ (85%) */}
+                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '23%' }}>
+                                <div className="w-full border-b border-dashed border-red-500/70"></div>
+                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/90 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm">
+                                    85% ต้องจัดการ
+                                </span>
+                            </div>
+
+                            {/* Line 3: ขีดระดับที่เริ่มต้องสนใจเป็นพิเศษ (65%) */}
+                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '43%' }}>
+                                <div className="w-full border-b border-dashed border-amber-400/50"></div>
+                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/90 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm">
+                                    65% ต้องสนใจ
+                                </span>
+                            </div>
+
+                            {/* Bars Container */}
+                            <div className="flex items-end gap-1 h-full relative z-10">
+                                {hourlyTraffic.map((count, hour) => {
+                                    const maxVal = Math.max(...hourlyTraffic, 1);
+                                    const heightPct = Math.max(6, Math.round((count / maxVal) * 100));
+                                    const isCritical = heightPct >= 85;
+                                    const isWatch = heightPct >= 65 && heightPct < 85;
+                                    const isPeak = heightPct >= 65;
+
+                                    return (
+                                        <div key={hour} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative cursor-pointer">
+                                            {/* Bar */}
+                                            <div 
+                                                className={`w-full rounded-t relative transition-all duration-200 ${
+                                                    isCritical
+                                                        ? 'bg-gradient-to-t from-amber-600 via-amber-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                                                        : isWatch
+                                                        ? 'bg-gradient-to-t from-amber-600/90 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
+                                                        : 'bg-blue-500/60 hover:bg-blue-400'
+                                                }`}
+                                                style={{ height: `${heightPct}%` }}
+                                            >
+                                                {/* ขีดบนแท่งสีเหลือง: 3 ระดับ */}
+                                                {isPeak && (
+                                                    <>
+                                                        {/* ขีด 1: ขีดระดับสูงสุดบนหัวแท่ง */}
+                                                        <div className="absolute top-0 inset-x-0 h-1 bg-amber-200 rounded-t shadow-[0_0_4px_rgba(253,230,138,0.9)]" />
+
+                                                        {/* ขีด 2: ขีดระดับวิกฤต (>85%) หากแท่งถึงระดับวิกฤต */}
+                                                        {isCritical && (
+                                                            <div 
+                                                                className="absolute inset-x-0 h-0.5 bg-red-500 shadow-[0_0_4px_rgba(239,68,68,1)]"
+                                                                style={{ bottom: `${Math.min(100, Math.round((85 / heightPct) * 100))}%` }}
+                                                                title="ขีดระดับเริ่มมีปัญหา (85%)"
+                                                            />
+                                                        )}
+
+                                                        {/* ขีด 3: ขีดระดับที่เริ่มต้องสนใจ (>65%) */}
+                                                        <div 
+                                                            className="absolute inset-x-0 h-0.5 bg-amber-400/90"
+                                                            style={{ bottom: `${Math.min(100, Math.round((65 / heightPct) * 100))}%` }}
+                                                            title="ขีดเริ่มต้องสนใจพิเศษ (65%)"
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Hour Label */}
+                                            <span className={`text-[8px] font-mono transition-colors ${
+                                                isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-muted-foreground/60'
+                                            }`}>
+                                                {hour % 3 === 0 ? `${hour}h` : ''}
+                                            </span>
+
+                                            {/* Rich Tooltip on hover */}
+                                            <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[200px] pointer-events-none">
+                                                <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
+                                                    <span>⏰ เวลา {hour}:00 น.</span>
+                                                    <span className="font-mono text-xs">{count} คำขอ</span>
+                                                </div>
+                                                <div className="space-y-1 font-mono text-[10px]">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">ความหนาแน่น:</span>
+                                                        <span className="font-bold">{heightPct}% ของจุดพีค</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-0.5">
+                                                        <span className="text-muted-foreground">สถานะ:</span>
+                                                        {isCritical ? (
+                                                            <span className="text-red-400 font-bold bg-red-500/15 px-1.5 py-0.2 rounded border border-red-500/30">
+                                                                🚨 เริ่มมีปัญหาต้องจัดการ
+                                                            </span>
+                                                        ) : isWatch ? (
+                                                            <span className="text-amber-400 font-bold bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
+                                                                ⚠️ เริ่มต้องสนใจพิเศษ
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-emerald-400 font-medium">
+                                                                🟢 ระดับปกติ
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {isCritical && (
+                                                    <div className="mt-1.5 pt-1 border-t border-red-500/30 text-[10px] text-red-300 font-sans">
+                                                        💡 แนะนำ: ปรับ Interval 30-45s หรือเปิด PgBouncer
+                                                    </div>
+                                                )}
+                                                {isWatch && (
+                                                    <div className="mt-1.5 pt-1 border-t border-amber-500/30 text-[10px] text-amber-300 font-sans">
+                                                        💡 แนะนำ: ตรวจสอบ Jitter สุ่มหน่วงเวลา 0-300s
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-xs">
+                    {/* Actionable Recommendations Guide Box */}
+                    <div className="space-y-2 pt-1">
+                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span>เกณฑ์ระดับขีดความจุของทราฟฟิก MT5 Sync &amp; คำแนะนำการบริหารจัดการ</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+                            {/* Level 1: Peak */}
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-amber-300 flex items-center gap-1">
+                                        🏆 ขีดสูงสุดที่เคยเป็น (100% Peak)
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/40 px-1.5 py-0">
+                                        สถิติพีค
+                                    </Badge>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    จุดที่คำขอ WebRequest เข้ามาหนาแน่นที่สุดในรอบ 24 ชม. (ช่วงเวลาตลาดลอนดอน &amp; นิวยอร์ก 14:00-17:00 และ 19:00-23:00 น.)
+                                </p>
+                            </div>
+
+                            {/* Level 2: Watch */}
+                            <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-amber-400 flex items-center gap-1">
+                                        ⚠️ ขีดเริ่มต้องสนใจพิเศษ (&gt;65%)
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 px-1.5 py-0">
+                                        เฝ้าระวัง
+                                    </Badge>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    <strong>คำแนะนำ:</strong> ตรวจสอบว่าพอร์ตในสายงานเปิดระบบ <strong>Jitter (0-300s)</strong> เพื่อสุ่มหน่วงเวลา หลีกเลี่ยงคำขอยิงตรงกันในวินาทีเดียวกัน และตรวจเช็ค CPU Database ไม่ให้เกิน 60%
+                                </p>
+                            </div>
+
+                            {/* Level 3: Critical */}
+                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-red-400 flex items-center gap-1">
+                                        🚨 ขีดเริ่มมีปัญหาต้องจัดการ (&gt;85%)
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px] text-red-300 border-red-500/40 px-1.5 py-0">
+                                        ต้องดำเนินการ
+                                    </Badge>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
+                                    <strong className="text-red-300">แนวทางแก้ไขเร่งด่วน:</strong>
+                                    <p>1. ขยายรอบส่งข้อมูล (Interval) ของ EA จาก 20s เป็น <strong>30-45 วินาที</strong></p>
+                                    <p>2. เปิดใช้ <strong>Connection Pooling (PgBouncer)</strong> ใน Supabase</p>
+                                    <p>3. หากฝูงบินเกิน 150+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs pt-1">
                         <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
                             <span className="text-muted-foreground block text-[11px]">ช่วงเวลาตลาดหนาแน่น:</span>
                             <span className="font-semibold text-foreground">ช่วงตลาดลอนดอน &amp; นิวยอร์ก</span>
