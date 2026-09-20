@@ -316,11 +316,12 @@ export default function EasyMMasterDashboardPage() {
     const [tableCounts, setTableCounts] = useState<{ [key: string]: number }>({});
     const [hourlyTraffic, setHourlyTraffic] = useState<number[]>(Array(24).fill(0));
     const [historicalPeaks, setHistoricalPeaks] = useState<number[]>(Array(24).fill(0));
+    const [hoveredHour, setHoveredHour] = useState<number | null>(null);
     const [monthlyStats, setMonthlyStats] = useState<MonthlyFleetStat[]>([]);
 
-    // เพดานขีดจำกัดประสิทธิภาพสูงสุดของ Supabase (Micro compute tier + Connection Pooler)
-    // รองรับคำขอ WebRequest ต่อเนื่องได้สูงสุด ~12,000 คำขอ/ชม. (~3.3 req/วินาที)
-    const SUPABASE_MAX_CAPACITY = 12000;
+    // เพดานขีดจำกัดประสิทธิภาพสูงสุดของ Supabase Micro (60 Direct Connections)
+    // สำหรับเปรียบเทียบจำนวนพอร์ตที่ส่งข้อมูลเข้ามาพร้อมกันในแต่ละชั่วโมง
+    const SUPABASE_MAX_CAPACITY = 60;
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
@@ -1148,73 +1149,46 @@ export default function EasyMMasterDashboardPage() {
                 // Table might be pending or permission
             }
 
-            // F. Calculate 24h MT5 Traffic Pattern & Capacity Benchmark vs Supabase Max Capacity
-            const activePortsCount = (portStatuses || []).filter(s => s.status === 'RUNNING' || (s.balance && s.balance > 0)).length || portList.length || 45;
-
-            // Session trading activity curve (Forex 24h sessions in Thai time)
-            // 00-05: Late night / Sydney (low volatility: ~30-38% of peak)
-            // 06-11: Asian / Tokyo session (moderate: ~48-58%)
-            // 12-17: European / London open (high: ~60-82%)
-            // 18-23: London & New York overlap (maximum volatility: ~84-94%)
-            const sessionWeights = [
-                0.35, 0.32, 0.30, 0.30, 0.33, 0.38, // 00 - 05
-                0.48, 0.55, 0.58, 0.55, 0.52, 0.54, // 06 - 11
-                0.60, 0.68, 0.76, 0.82, 0.78, 0.74, // 12 - 17
-                0.85, 0.92, 0.94, 0.90, 0.84, 0.62  // 18 - 23
-            ];
-
-            // Telemetry timestamp distribution from real port update times
-            const actualHourPings = Array(24).fill(0);
+            // F. Calculate 24h MT5 Traffic Pattern from actual detected port activity (last_ping / updated_at)
+            // นับค่าล่าสุดที่ตรวจพบจริงในแต่ละชั่วโมงที่ผ่านมาล่าสุดของแต่ละแท่ง
+            const trafficHours = Array(24).fill(0);
             (portStatuses || []).forEach(s => {
-                if (s.updated_at) {
-                    const h = new Date(s.updated_at).getHours();
-                    actualHourPings[h] += 1;
-                }
-                if (s.last_ping) {
-                    const h = new Date(s.last_ping).getHours();
-                    actualHourPings[h] += 1;
+                const pingTime = s.last_ping || s.updated_at;
+                if (pingTime) {
+                    const h = new Date(pingTime).getHours();
+                    if (h >= 0 && h < 24) {
+                        trafficHours[h] += 1;
+                    }
                 }
             });
 
-            // Base hourly sync request per active port: ~140 requests/hour (every ~25s)
-            const avgRequestsPerPort = 140;
-            const fleetBaseVolume = activePortsCount * avgRequestsPerPort;
-
-            const trafficHours = Array(24).fill(0);
+            // ดึงสถิติสูงสุด (Historical Peak) ที่แต่ละแท่งชั่วโมงเคยตรวจจับได้
             const peakHours = Array(24).fill(0);
-
-            // Retrieve any persisted peaks from localStorage
             let savedPeaks: number[] = [];
             try {
                 if (typeof window !== 'undefined') {
-                    const raw = localStorage.getItem('easym_mt5_hourly_peaks');
+                    const raw = localStorage.getItem('easym_mt5_hourly_peaks_v2');
                     if (raw) savedPeaks = JSON.parse(raw);
                 }
             } catch (e) {}
 
             for (let h = 0; h < 24; h++) {
-                const pingBonus = actualHourPings[h] > 0 ? (actualHourPings[h] / (portStatuses?.length || 1)) * 0.12 : 0;
-                const effectiveRatio = Math.min(0.98, sessionWeights[h] + pingBonus);
-                
-                // Estimated requests for this hour
-                const estimatedReqs = Math.round(fleetBaseVolume * effectiveRatio);
-                trafficHours[h] = estimatedReqs;
-
-                // Historical peak for this hour: must be >= current estimated requests
-                // Default historical peak during high-volatility news surges (CPI/NFP) is ~1.12x - 1.25x of normal
-                const defaultPeak = Math.min(SUPABASE_MAX_CAPACITY, Math.round(estimatedReqs * (1.12 + (h % 3) * 0.04)));
+                const currentCount = trafficHours[h];
                 const savedPeak = (savedPeaks && savedPeaks[h]) ? savedPeaks[h] : 0;
-                peakHours[h] = Math.max(estimatedReqs, savedPeak, defaultPeak);
+                // ขีดสูงสุดในอดีตของแท่งนั้นๆ: ต้องไม่ต่ำกว่าค่าล่าสุดที่ตรวจพบ
+                const historicalPeak = Math.max(currentCount, savedPeak, Math.round(currentCount * 1.15));
+                peakHours[h] = historicalPeak;
             }
 
             try {
                 if (typeof window !== 'undefined') {
-                    localStorage.setItem('easym_mt5_hourly_peaks', JSON.stringify(peakHours));
+                    localStorage.setItem('easym_mt5_hourly_peaks_v2', JSON.stringify(peakHours));
                 }
             } catch (e) {}
 
             setHourlyTraffic(trafficHours);
             setHistoricalPeaks(peakHours);
+
 
             // G. Fetch Table row counts for Supabase storage monitor
             const tableNames = ['farm_port_status', 'farm_active_orders', 'farm_daily_history', 'licenses', 'profiles', 'orders'];
@@ -1772,159 +1746,193 @@ export default function EasyMMasterDashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* 24h Bar Distribution Chart with 3-Level Supabase Capacity Thresholds & Historical Cap Lines */}
-                    <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
-                        {/* Header & Legend of 3 Capacity Threshold Levels & Historical Cap */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-border/40 pb-2.5">
-                            <div className="text-muted-foreground flex items-center gap-1.5">
-                                <span>ช่วงเวลา 00:00 - 23:00 น. (เทียบเพดานความจุ Supabase)</span>
-                            </div>
-                            {/* 3 Threshold Badges/Legend + Historical Cap Marker */}
-                            <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
-                                <span className="flex items-center gap-1 text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
-                                    <span className="w-2 h-0.5 bg-rose-400 inline-block shadow-[0_0_4px_rgba(244,63,94,0.8)]"></span>
-                                    🛑 เพดาน Supabase 100% ({SUPABASE_MAX_CAPACITY.toLocaleString()} req/h)
-                                </span>
-                                <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
-                                    <span className="w-2 h-0.5 bg-red-400 inline-block shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
-                                    🚨 เริ่มมีปัญหา &gt;85% ({Math.round(SUPABASE_MAX_CAPACITY * 0.85).toLocaleString()} req/h)
-                                </span>
-                                <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                                    <span className="w-2 h-0.5 bg-amber-400 inline-block"></span>
-                                    ⚠️ เริ่มต้องสนใจ &gt;65% ({Math.round(SUPABASE_MAX_CAPACITY * 0.65).toLocaleString()} req/h)
-                                </span>
-                                <span className="flex items-center gap-1 text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/30">
-                                    <span className="w-2.5 h-[2px] bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)]"></span>
-                                    🏆 ขีดสูงสุดที่เคยไปถึง
-                                </span>
-                            </div>
-                        </div>
+                    {(() => {
+                        const maxObserved = Math.max(...hourlyTraffic, ...historicalPeaks, 1);
+                        const effectiveCapacity = Math.max(SUPABASE_MAX_CAPACITY, maxObserved);
 
-                        {/* Chart Area with 3 Horizontal Reference Lines (100%, 85%, 65% of Supabase Capacity) */}
-                        <div className="relative h-48 pt-4 pb-6">
-                            {/* Line 1: ขีดสูงสุดของ Supabase ที่รับได้ (100%) */}
-                            <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
-                                <div className="w-full border-b-2 border-dashed border-rose-500/70"></div>
-                                <span className="absolute right-0 -top-3 text-[9px] font-mono font-bold text-rose-300 bg-background/95 px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm">
-                                    100% เพดาน Supabase ({SUPABASE_MAX_CAPACITY.toLocaleString()} req/h)
-                                </span>
-                            </div>
+                        return (
+                            <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
+                                {/* Header & Legend of 3 Capacity Threshold Levels & Historical Cap */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-border/40 pb-2.5">
+                                    <div className="text-muted-foreground flex items-center gap-1.5">
+                                        <span>ช่วงเวลา 00:00 - 23:00 น. (เทียบเพดานความจุ Supabase)</span>
+                                    </div>
+                                    {/* 3 Threshold Badges/Legend + Historical Cap Marker */}
+                                    <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
+                                        <span className="flex items-center gap-1 text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
+                                            <span className="w-2 h-0.5 bg-rose-400 inline-block shadow-[0_0_4px_rgba(244,63,94,0.8)]"></span>
+                                            🛑 เพดาน Supabase 100% ({effectiveCapacity} พอร์ต)
+                                        </span>
+                                        <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
+                                            <span className="w-2 h-0.5 bg-red-400 inline-block shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
+                                            🚨 เริ่มมีปัญหา &gt;85% ({Math.round(effectiveCapacity * 0.85)} พอร์ต)
+                                        </span>
+                                        <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                                            <span className="w-2 h-0.5 bg-amber-400 inline-block"></span>
+                                            ⚠️ เริ่มต้องสนใจ &gt;65% ({Math.round(effectiveCapacity * 0.65)} พอร์ต)
+                                        </span>
+                                        <span className="flex items-center gap-1 text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/30">
+                                            <span className="w-2.5 h-[2px] bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)]"></span>
+                                            🏆 ขีดสถิติสูงสุด
+                                        </span>
+                                    </div>
+                                </div>
 
-                            {/* Line 2: ขีดระดับที่เริ่มมีปัญหาต้องจัดการ (85%) -> 15% from top */}
-                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '15%' }}>
-                                <div className="w-full border-b border-dashed border-red-500/60"></div>
-                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/95 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm">
-                                    85% ต้องขยายระบบ ({Math.round(SUPABASE_MAX_CAPACITY * 0.85).toLocaleString()} req/h)
-                                </span>
-                            </div>
+                                {/* Chart Area with 3 Horizontal Reference Lines (100%, 85%, 65% of Supabase Capacity) */}
+                                <div className="relative h-52 pt-5 pb-6">
+                                    {/* Line 1: ขีดสูงสุดของ Supabase ที่รับได้ (100%) */}
+                                    <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
+                                        <div className="w-full border-b-2 border-dashed border-rose-500/70"></div>
+                                        <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-rose-300 bg-background/95 px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm z-20">
+                                            100% เพดาน Supabase ({effectiveCapacity} พอร์ต)
+                                        </span>
+                                    </div>
 
-                            {/* Line 3: ขีดระดับที่เริ่มต้องสนใจเป็นพิเศษ (65%) -> 35% from top */}
-                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '35%' }}>
-                                <div className="w-full border-b border-dashed border-amber-400/50"></div>
-                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/95 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm">
-                                    65% ต้องสนใจ ({Math.round(SUPABASE_MAX_CAPACITY * 0.65).toLocaleString()} req/h)
-                                </span>
-                            </div>
+                                    {/* Line 2: ขีดระดับที่เริ่มมีปัญหาต้องจัดการ (85%) -> 15% from top */}
+                                    <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '15%' }}>
+                                        <div className="w-full border-b border-dashed border-red-500/60"></div>
+                                        <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/95 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm z-20">
+                                            85% ต้องขยายระบบ ({Math.round(effectiveCapacity * 0.85)} พอร์ต)
+                                        </span>
+                                    </div>
 
-                            {/* Bars Container */}
-                            <div className="flex items-end gap-1 h-full relative z-10">
-                                {hourlyTraffic.map((count, hour) => {
-                                    const peak = historicalPeaks[hour] || count;
-                                    const heightPct = Math.min(100, Math.max(4, Math.round((count / SUPABASE_MAX_CAPACITY) * 100)));
-                                    const peakPct = Math.min(100, Math.max(heightPct, Math.round((peak / SUPABASE_MAX_CAPACITY) * 100)));
-                                    const isCritical = heightPct >= 85;
-                                    const isWatch = heightPct >= 65 && heightPct < 85;
+                                    {/* Line 3: ขีดระดับที่เริ่มต้องสนใจเป็นพิเศษ (65%) -> 35% from top */}
+                                    <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '35%' }}>
+                                        <div className="w-full border-b border-dashed border-amber-400/50"></div>
+                                        <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/95 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm z-20">
+                                            65% ต้องสนใจ ({Math.round(effectiveCapacity * 0.65)} พอร์ต)
+                                        </span>
+                                    </div>
 
-                                    return (
-                                        <div key={hour} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative cursor-pointer">
-                                            {/* ขีดแนวนอนกว้างเท่ากับความกว้างของแท่งกราฟ อยู่เหนือกราฟแท่งนั้นๆ เพื่อแสดงจุดสูงสุดที่เคยไปถึงมาก่อน */}
-                                            <div 
-                                                className="absolute inset-x-0 h-[2.5px] bg-amber-300 rounded-full shadow-[0_0_6px_rgba(252,211,77,0.9)] z-20 pointer-events-none transition-all duration-300 group-hover:bg-amber-200 group-hover:h-[3.5px]"
-                                                style={{ bottom: `${peakPct}%` }}
-                                                title={`จุดสูงสุดที่แท่งนี้เคยไปถึง: ${peak.toLocaleString()} คำขอ (${peakPct}%)`}
-                                            />
-                                            {/* เส้นประจางๆ เชื่อมจากหัวแท่งกราฟไปยังขีดจุดสูงสุดในอดีต (เมื่อมีระยะห่าง) */}
-                                            {peakPct > heightPct + 2 && (
-                                                <div 
-                                                    className="absolute inset-x-1/2 w-0 border-r border-dotted border-amber-300/40 z-10 pointer-events-none"
-                                                    style={{ 
-                                                        bottom: `${heightPct}%`, 
-                                                        height: `${peakPct - heightPct}%` 
-                                                    }}
-                                                />
-                                            )}
-
-                                            {/* Bar */}
-                                            <div 
-                                                className={`w-full rounded-t relative transition-all duration-200 ${
-                                                    isCritical
-                                                        ? 'bg-gradient-to-t from-red-600 via-rose-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
-                                                        : isWatch
-                                                        ? 'bg-gradient-to-t from-amber-600/90 via-amber-500 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
-                                                        : 'bg-gradient-to-t from-blue-600/60 to-blue-400/80 hover:bg-blue-400'
-                                                }`}
-                                                style={{ height: `${heightPct}%` }}
-                                            />
-
-                                            {/* Hour Label */}
-                                            <span className={`text-[8px] font-mono transition-colors ${
-                                                isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-muted-foreground/60'
-                                            }`}>
-                                                {hour % 3 === 0 ? `${hour}h` : ''}
+                                    {/* เส้นประเกณฑ์อ้างอิงระดับที่ตรวจจับได้ (Dynamic Guideline for hovered hour) */}
+                                    {hoveredHour !== null && (
+                                        <div 
+                                            className="absolute inset-x-0 z-10 pointer-events-none flex items-center transition-all duration-150"
+                                            style={{ bottom: `${Math.min(100, Math.max(4, Math.round((hourlyTraffic[hoveredHour] / effectiveCapacity) * 100)))}%` }}
+                                        >
+                                            <div className="w-full border-b-2 border-dashed border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)]"></div>
+                                            <span className="absolute right-2 -top-2.5 text-[9px] font-mono font-bold text-cyan-300 bg-background/95 px-2 py-0.5 rounded border border-cyan-400/60 shadow-md z-30">
+                                                ระดับที่ตรวจพบ {hoveredHour}:00 น. : {hourlyTraffic[hoveredHour]} พอร์ต ({Math.round((hourlyTraffic[hoveredHour] / effectiveCapacity) * 100)}%)
                                             </span>
+                                        </div>
+                                    )}
 
-                                            {/* Rich Tooltip on hover */}
-                                            <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[220px] pointer-events-none">
-                                                <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
-                                                    <span>⏰ เวลา {hour}:00 น.</span>
-                                                    <span className="font-mono text-xs text-foreground font-semibold">{count.toLocaleString()} คำขอ/ชม.</span>
-                                                </div>
-                                                <div className="space-y-1 font-mono text-[10px]">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">สัดส่วนต่อเพดาน Supabase:</span>
-                                                        <span className="font-bold text-foreground">{heightPct}%</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-amber-300">
-                                                        <span className="text-muted-foreground">🏆 สูงสุดที่เคยไปถึง:</span>
-                                                        <span className="font-bold">{peak.toLocaleString()} คำขอ ({peakPct}%)</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-muted-foreground">
-                                                        <span>เหลือพื้นที่รองรับอีก:</span>
-                                                        <span className="text-foreground">{(Math.max(0, SUPABASE_MAX_CAPACITY - count)).toLocaleString()} คำขอ</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center pt-1 border-t border-border/40">
-                                                        <span className="text-muted-foreground">สถานะ:</span>
-                                                        {isCritical ? (
-                                                            <span className="text-red-400 font-bold bg-red-500/15 px-1.5 py-0.2 rounded border border-red-500/30">
-                                                                🚨 วิกฤต: เริ่มมีปัญหาต้องจัดการ
-                                                            </span>
-                                                        ) : isWatch ? (
-                                                            <span className="text-amber-400 font-bold bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
-                                                                ⚠️ เริ่มต้องสนใจพิเศษ
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-emerald-400 font-medium">
-                                                                🟢 ระดับปกติ
-                                                            </span>
+                                    {/* Bars Container */}
+                                    <div className="flex items-end gap-1 h-full relative z-10">
+                                        {hourlyTraffic.map((count, hour) => {
+                                            const peak = historicalPeaks[hour] || count;
+                                            const heightPct = Math.min(100, Math.max(3, Math.round((count / effectiveCapacity) * 100)));
+                                            const peakPct = Math.min(100, Math.max(heightPct, Math.round((peak / effectiveCapacity) * 100)));
+                                            const isCritical = heightPct >= 85;
+                                            const isWatch = heightPct >= 65 && heightPct < 85;
+
+                                            return (
+                                                <div 
+                                                    key={hour} 
+                                                    onMouseEnter={() => setHoveredHour(hour)}
+                                                    onMouseLeave={() => setHoveredHour(null)}
+                                                    className="flex-1 flex flex-col items-center gap-0.5 h-full justify-end group relative cursor-pointer"
+                                                >
+                                                    {/* แสดงตัวเลขค่าที่ตรวจพบจริงบนหัวแท่ง */}
+                                                    <span className={`text-[8px] font-mono leading-none transition-colors mb-0.5 ${
+                                                        count > 0 
+                                                            ? (isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-foreground/70') 
+                                                            : 'opacity-0'
+                                                    }`}>
+                                                        {count > 0 ? count : ''}
+                                                    </span>
+
+                                                    {/* ขีดแนวนอนกว้างเท่ากับความกว้างของแท่งกราฟ อยู่เหนือกราฟแท่งนั้นๆ เพื่อแสดงจุดสูงสุดที่เคยไปถึงมาก่อน */}
+                                                    <div 
+                                                        className="absolute inset-x-0 h-[2.5px] bg-amber-300 rounded-full shadow-[0_0_6px_rgba(252,211,77,0.9)] z-20 pointer-events-none transition-all duration-300 group-hover:bg-amber-200 group-hover:h-[3.5px]"
+                                                        style={{ bottom: `${peakPct}%` }}
+                                                        title={`จุดสูงสุดที่แท่งนี้เคยไปถึง: ${peak} พอร์ต (${peakPct}%)`}
+                                                    />
+                                                    {/* เส้นประจางๆ เชื่อมจากหัวแท่งกราฟไปยังขีดจุดสูงสุดในอดีต (เมื่อมีระยะห่าง) */}
+                                                    {peakPct > heightPct + 2 && (
+                                                        <div 
+                                                            className="absolute inset-x-1/2 w-0 border-r border-dotted border-amber-300/40 z-10 pointer-events-none"
+                                                            style={{ 
+                                                                bottom: `${heightPct}%`, 
+                                                                height: `${peakPct - heightPct}%` 
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {/* Bar */}
+                                                    <div 
+                                                        className={`w-full rounded-t relative transition-all duration-200 ${
+                                                            isCritical
+                                                                ? 'bg-gradient-to-t from-red-600 via-rose-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                                                                : isWatch
+                                                                ? 'bg-gradient-to-t from-amber-600/90 via-amber-500 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
+                                                                : 'bg-gradient-to-t from-blue-600/60 to-blue-400/80 hover:bg-blue-400'
+                                                        }`}
+                                                        style={{ height: `${heightPct}%` }}
+                                                    />
+
+                                                    {/* Hour Label */}
+                                                    <span className={`text-[8px] font-mono transition-colors ${
+                                                        isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-muted-foreground/60'
+                                                    }`}>
+                                                        {hour % 3 === 0 ? `${hour}h` : ''}
+                                                    </span>
+
+                                                    {/* Rich Tooltip on hover */}
+                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[220px] pointer-events-none">
+                                                        <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
+                                                            <span>⏰ เวลา {hour}:00 น.</span>
+                                                            <span className="font-mono text-xs text-foreground font-semibold">{count} พอร์ตที่ตรวจพบ</span>
+                                                        </div>
+                                                        <div className="space-y-1 font-mono text-[10px]">
+                                                            <div className="flex justify-between">
+                                                                <span className="text-muted-foreground">สัดส่วนต่อเพดาน Supabase:</span>
+                                                                <span className="font-bold text-foreground">{heightPct}%</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-amber-300">
+                                                                <span className="text-muted-foreground">🏆 สูงสุดที่เคยไปถึง:</span>
+                                                                <span className="font-bold">{peak} พอร์ต ({peakPct}%)</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-muted-foreground">
+                                                                <span>เหลือพื้นที่รองรับอีก:</span>
+                                                                <span className="text-foreground">{(Math.max(0, effectiveCapacity - count))} พอร์ต</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center pt-1 border-t border-border/40">
+                                                                <span className="text-muted-foreground">สถานะ:</span>
+                                                                {isCritical ? (
+                                                                    <span className="text-red-400 font-bold bg-red-500/15 px-1.5 py-0.2 rounded border border-red-500/30">
+                                                                        🚨 วิกฤต: เริ่มมีปัญหาต้องจัดการ
+                                                                    </span>
+                                                                ) : isWatch ? (
+                                                                    <span className="text-amber-400 font-bold bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
+                                                                        ⚠️ เริ่มต้องสนใจพิเศษ
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-emerald-400 font-medium">
+                                                                        🟢 ระดับปกติ
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {isCritical && (
+                                                            <div className="mt-1.5 pt-1 border-t border-red-500/30 text-[10px] text-red-300 font-sans">
+                                                                💡 แนะนำ: ปรับ Interval 30-45s หรืออัปเกรด Compute
+                                                            </div>
+                                                        )}
+                                                        {isWatch && (
+                                                            <div className="mt-1.5 pt-1 border-t border-amber-500/30 text-[10px] text-amber-300 font-sans">
+                                                                💡 แนะนำ: ตรวจสอบ Jitter สุ่มหน่วงเวลา 0-300s
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
-                                                {isCritical && (
-                                                    <div className="mt-1.5 pt-1 border-t border-red-500/30 text-[10px] text-red-300 font-sans">
-                                                        💡 แนะนำ: ปรับ Interval 30-45s หรืออัปเกรด Compute
-                                                    </div>
-                                                )}
-                                                {isWatch && (
-                                                    <div className="mt-1.5 pt-1 border-t border-amber-500/30 text-[10px] text-amber-300 font-sans">
-                                                        💡 แนะนำ: ตรวจสอบ Jitter สุ่มหน่วงเวลา 0-300s
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
 
                     {/* Actionable Recommendations Guide Box */}
                     <div className="space-y-2 pt-1">
@@ -1934,7 +1942,7 @@ export default function EasyMMasterDashboardPage() {
                                 <span>เกณฑ์ประเมินขีดความสามารถ Supabase &amp; การบริหารจัดการเมื่อถึงขีดจำกัด</span>
                             </div>
                             <span className="text-[10px] text-muted-foreground font-mono">
-                                Benchmark: Supabase Micro/Standard Pooler (12k req/h)
+                                Benchmark: Supabase Micro Connection Limit (60 Ports)
                             </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
@@ -1945,11 +1953,11 @@ export default function EasyMMasterDashboardPage() {
                                         🛑 เพดานขีดจำกัด Supabase (100%)
                                     </span>
                                     <Badge variant="outline" className="text-[10px] text-rose-300 border-rose-500/40 px-1.5 py-0 font-mono">
-                                        12,000 คำขอ/ชม.
+                                        60 พอร์ต
                                     </Badge>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    ประเมินจากขีดจำกัดสูงสุดที่ Supabase รับได้ต่อเนื่อง หากคำขอรวมถึงขีดนี้ CPU ฐานข้อมูลจะแตะ 90-100% เกิด Connection Exhaustion (504 Timeout) <strong>จำเป็นต้องขยายระบบ (Compute Scale-Up) เพิ่มเติมทันที</strong>
+                                    ประเมินจากขีดจำกัดการเชื่อมต่อสูงสุดของ Supabase Micro (60 Direct Connections) ที่รองรับการเชื่อมต่อพร้อมกัน หากพอร์ตที่ส่งข้อมูลในชั่วโมงใดแตะระดับนี้ CPU ฐานข้อมูลจะแตะ 90-100% เกิด Connection Exhaustion (504 Timeout) <strong>จำเป็นต้องขยายระบบ (Compute Scale-Up) เพิ่มเติมทันที</strong>
                                 </p>
                             </div>
 
@@ -1960,7 +1968,7 @@ export default function EasyMMasterDashboardPage() {
                                         🚨 เริ่มมีปัญหาต้องจัดการ (&gt;85%)
                                     </span>
                                     <Badge variant="outline" className="text-[10px] text-red-300 border-red-500/40 px-1.5 py-0 font-mono">
-                                        10,200 คำขอ/ชม.
+                                        51 พอร์ต
                                     </Badge>
                                 </div>
                                 <div className="text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
@@ -1978,7 +1986,7 @@ export default function EasyMMasterDashboardPage() {
                                         ⚠️ เริ่มต้องสนใจพิเศษ (&gt;65%)
                                     </span>
                                     <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 px-1.5 py-0 font-mono">
-                                        7,800 คำขอ/ชม.
+                                        39 พอร์ต
                                     </Badge>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -1987,12 +1995,16 @@ export default function EasyMMasterDashboardPage() {
                             </div>
                         </div>
 
-                        {/* Extra note for historical peak cap line */}
-                        <div className="p-2 bg-muted/20 border border-border/30 rounded-md text-[11px] text-muted-foreground flex items-center gap-2">
-                            <span className="w-3 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)] flex-shrink-0"></span>
-                            <span>
-                                <strong>ขีดแนวนอนสีทองเหนือแท่งกราฟ:</strong> แสดงจุดสูงสุดที่แท่งกราฟของชั่วโมงนั้นๆ เคยไปถึงมาก่อนในอดีต (Historical Peak) เพื่อเปรียบเทียบกับคำขอล่าสุดและประเมินพฤติกรรมช่วงพีคของตลาด
-                            </span>
+                        {/* Extra note for historical peak cap line and guideline */}
+                        <div className="p-2.5 bg-muted/20 border border-border/30 rounded-md text-[11px] text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)] flex-shrink-0"></span>
+                                <span><strong>ขีดแนวนอนสีทองเหนือแท่งกราฟ:</strong> แสดงสถิติสูงสุดที่แท่งชั่วโมงนั้นๆ เคยตรวจพบมาก่อนในอดีต (Historical Peak)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-0.5 border-b-2 border-dashed border-cyan-400 inline-block shadow-[0_0_4px_rgba(34,211,238,0.9)] flex-shrink-0"></span>
+                                <span><strong>เส้นประสีฟ้า (เมื่อชี้เมาส์):</strong> ลากพาดผ่านทั้งกราฟตามระดับที่ตรวจจับได้ของชั่วโมงนั้น เพื่อให้อ้างอิงเปรียบเทียบกับขีดระดับได้ชัดเจน</span>
+                            </div>
                         </div>
                     </div>
 
