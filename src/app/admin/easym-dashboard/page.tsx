@@ -325,6 +325,7 @@ export default function EasyMMasterDashboardPage() {
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [selectedLicenseStatus, setSelectedLicenseStatus] = useState<string>('all');
     const [viewMode, setViewMode] = useState<'customer' | 'table' | 'cards'>('customer');
+    const [activeTab, setActiveTab] = useState<'performance' | 'ports' | 'team-analytics'>('performance');
 
     // 1. Auth Guard: Only juntarasate@gmail.com
     useEffect(() => {
@@ -1473,6 +1474,296 @@ export default function EasyMMasterDashboardPage() {
         );
     }
 
+    // KPI Stat Cards element (displayed inside Tab 2 between Filter Bar and Port Lists)
+    const kpiCardsElement = (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Total Fleet Count */}
+            <Card className="bg-card/70 border-border shadow-sm">
+                <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            <span className="hidden sm:inline">ฝูงบิน EasyM ทั้งหมด</span>
+                            <span className="sm:hidden">ฝูงบิน EasyM (Total)</span>
+                        </span>
+                        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                            <Layers className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-3xl font-bold tracking-tight text-foreground">{kpi.totalCount}</span>
+                        <span className="text-xs text-muted-foreground">พอร์ต</span>
+                        <span className="ml-auto text-xs font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                            <span className="hidden sm:inline">⚡ รันจริง </span>
+                            <span className="sm:hidden">⚡ รัน </span>
+                            {kpi.realRunningCount}
+                        </span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[11px]">
+                        <span className="flex items-center gap-1 text-emerald-400 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                            <Wifi className="w-3 h-3" />
+                            {kpi.onlineCount}
+                            <span className="hidden sm:inline"> สด &lt;30น.</span>
+                            <span className="sm:hidden"> สด</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded" title="ไม่มีสัญญาณเกิน 48 ชม.">
+                            <span className="hidden sm:inline">⏸️ ขาดติดต่อ </span>
+                            <span className="sm:hidden">⏸️ ค้าง </span>
+                            {kpi.offline48hCount}
+                        </span>
+                        <span className="flex items-center gap-1 text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded" title="ยังไม่เคยเปิดรัน">
+                            <span className="hidden sm:inline">⚪ ยังไม่เริ่ม </span>
+                            <span className="sm:hidden">⚪ ไม่เริ่ม </span>
+                            {kpi.noTelemetryCount}
+                        </span>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* 2. Total Fleet Balance */}
+            <Card className="bg-card/70 border-border shadow-sm">
+                <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            <span className="hidden sm:inline">พลังเงินทุนรันจริง (Active Balance)</span>
+                            <span className="sm:hidden">เงินทุนรันจริง (Active Bal)</span>
+                        </span>
+                        <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                            <CircleDollarSign className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-bold tracking-tight text-emerald-400 font-mono">
+                            ${(kpi.activeBalanceUSC / 100 + kpi.activeBalanceUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            <span className="hidden sm:inline">USD (สด &lt;48 ชม.)</span>
+                            <span className="sm:hidden">USD (&lt;48h)</span>
+                        </span>
+                    </div>
+                    <div className="mt-3 space-y-1 text-xs border-t border-border/40 pt-2">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                                <span className="hidden sm:inline">⚡ รันจริง:</span>
+                                <span className="sm:hidden">⚡ รัน:</span>
+                            </span>
+                            <span className="font-semibold text-emerald-400 font-mono">
+                                {kpi.activeBalanceUSC.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between text-muted-foreground" title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว">
+                            <span className="flex items-center gap-1 text-amber-400/90">
+                                <span className="hidden sm:inline">⏸️ ยอดค้าง (&gt;48h):</span>
+                                <span className="sm:hidden">⏸️ ค้าง (&gt;48h):</span>
+                            </span>
+                            <span className="font-mono text-amber-400/90 font-medium">
+                                ${(kpi.staleBalanceUSC / 100 + kpi.staleBalanceUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })} ({kpi.offline48hCount} พอร์ต)
+                            </span>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* 3. Floating PnL & Today Profit */}
+            <Card className="bg-card/70 border-border shadow-sm">
+                <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            <span className="hidden sm:inline">กำไรลอยตัว & วันนี้</span>
+                            <span className="sm:hidden">Floating & Today</span>
+                        </span>
+                        <div className={`p-2 rounded-lg ${kpi.totalFloating >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                            {kpi.totalFloating >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className={`text-2xl font-bold tracking-tight ${kpi.totalFloating >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {kpi.totalFloating >= 0 ? '+' : ''}{kpi.totalFloating.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Floating USC</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2">
+                        <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                            <ArrowUpRight className="w-3 h-3" />
+                            <span className="hidden sm:inline">วันนี้: </span>
+                            <span className="sm:hidden">วันนี้: </span>
+                            +{kpi.totalTodayProfit.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                        </span>
+                        <span>MAX: {kpi.maxEACount} | mini: {kpi.miniEACount}</span>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* 4. Owners & Risk Radar */}
+            <Card className="bg-card/70 border-border shadow-sm">
+                <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            <span className="hidden sm:inline">เจ้าของพอร์ต & Drawdown สูงสุด</span>
+                            <span className="sm:hidden">Owners & Max DD</span>
+                        </span>
+                        <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                            <Users className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-bold tracking-tight text-foreground">{kpi.uniqueOwners}</span>
+                        <span className="text-xs text-muted-foreground">
+                            <span className="hidden sm:inline">ท่าน (เฉลี่ย {kpi.avgPortsPerOwner} บัญชี/คน)</span>
+                            <span className="sm:hidden">คน ({kpi.avgPortsPerOwner}/คน)</span>
+                        </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs border-t border-border/40 pt-2">
+                        <span className="text-muted-foreground">
+                            <span className="hidden sm:inline">Max DD ตอนนี้:</span>
+                            <span className="sm:hidden">Max DD:</span>
+                        </span>
+                        <span className={`font-semibold ${kpi.worstDD > 20 ? 'text-red-400' : kpi.worstDD > 10 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {kpi.worstDD.toFixed(1)}% {kpi.worstDDPort ? `(#${kpi.worstDDPort})` : ''}
+                        </span>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+
+    // Supabase Storage Usage & MT5 Network Traffic Monitoring Element (displayed at the end of Tab 3)
+    const databaseAndTrafficElement = (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+            {/* 1. Supabase Storage Usage & Table Stats */}
+            <Card className="border-border shadow-sm bg-card/60">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                <Database className="w-5 h-5 text-emerald-400" />
+                                สถิติฐานข้อมูล Supabase (Table Row Counts)
+                            </CardTitle>
+                            <CardDescription>
+                                ปริมาณข้อมูลในแต่ละตารางเพื่อใช้ประเมินภาระงานและบริหารพื้นที่จัดเก็บ
+                            </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 text-xs">
+                            Healthy
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
+                            <span className="text-xs text-muted-foreground block">farm_port_status</span>
+                            <span className="text-xl font-bold font-mono text-foreground">{tableCounts['farm_port_status'] || 0}</span>
+                            <span className="text-[10px] text-muted-foreground block">พอร์ตทั้งหมด</span>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
+                            <span className="text-xs text-muted-foreground block">farm_active_orders</span>
+                            <span className="text-xl font-bold font-mono text-foreground">{tableCounts['farm_active_orders'] || 0}</span>
+                            <span className="text-[10px] text-muted-foreground block">ออเดอร์ Realtime</span>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
+                            <span className="text-xs text-muted-foreground block">farm_daily_history</span>
+                            <span className="text-xl font-bold font-mono text-foreground">{tableCounts['farm_daily_history'] || 0}</span>
+                            <span className="text-[10px] text-muted-foreground block">บันทึกรายวัน</span>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
+                            <span className="text-xs text-muted-foreground block">licenses</span>
+                            <span className="text-xl font-bold font-mono text-foreground">{tableCounts['licenses'] || 0}</span>
+                            <span className="text-[10px] text-muted-foreground block">ใบอนุญาตทั้งหมด</span>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
+                            <span className="text-xs text-muted-foreground block">profiles</span>
+                            <span className="text-xl font-bold font-mono text-foreground">{tableCounts['profiles'] || 0}</span>
+                            <span className="text-[10px] text-muted-foreground block">ผู้ใช้งานในระบบ</span>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
+                            <span className="text-xs text-muted-foreground block">Total Records</span>
+                            <span className="text-xl font-bold font-mono text-emerald-400">
+                                {Object.values(tableCounts).reduce((a, b) => a + b, 0).toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block">เรคคอร์ดสะสม</span>
+                        </div>
+                    </div>
+
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-muted-foreground space-y-1">
+                        <p className="font-semibold text-blue-400 flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5" /> ข้อแนะนำการดูแลฐานข้อมูล:
+                        </p>
+                        <p>
+                            ตาราง <code>farm_active_orders</code> มีระบบ Auto-Cleanup ลบออเดอร์ที่ปิดแล้วโดยอัตโนมัติ ทำให้ฐานข้อมูลไม่บวมและอ่านเขียนรวดเร็วในระดับ O(1)
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* 2. MT5 Network Traffic & Hourly Density Monitor */}
+            <Card className="border-border shadow-sm bg-card/60">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                <Server className="w-5 h-5 text-blue-400" />
+                                การจราจรข้อมูล MT5 Sync (24-Hour Traffic Pattern)
+                            </CardTitle>
+                            <CardDescription>
+                                ความหนาแน่นของคำขอ WebRequest จาก MT5 ตลอด 24 ชั่วโมง (เวลาไทย)
+                            </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-xs">
+                            Live Ingestion
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {/* 24h Bar Distribution Chart */}
+                    <div className="bg-muted/20 p-3.5 rounded-lg border border-border/40">
+                        <div className="text-xs text-muted-foreground mb-3 flex items-center justify-between">
+                            <span>ช่วงเวลา 00:00 - 23:00 น.</span>
+                            <span className="text-amber-400 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" /> Peak: 14:00-17:00 น. &amp; 19:00-23:00 น.
+                            </span>
+                        </div>
+                        <div className="flex items-end gap-1 h-28 pt-2">
+                            {hourlyTraffic.map((count, hour) => {
+                                const maxVal = Math.max(...hourlyTraffic, 1);
+                                const heightPct = Math.max(8, Math.round((count / maxVal) * 100));
+                                const isPeak = heightPct > 65;
+                                return (
+                                    <div key={hour} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
+                                        <div 
+                                            className={`w-full rounded-t transition-all ${
+                                                isPeak 
+                                                    ? 'bg-amber-500 hover:bg-amber-400' 
+                                                    : 'bg-blue-500/60 hover:bg-blue-400'
+                                            }`}
+                                            style={{ height: `${heightPct}%` }}
+                                        />
+                                        <span className="text-[8px] text-muted-foreground/60 font-mono">
+                                            {hour % 3 === 0 ? hour : ''}
+                                        </span>
+                                        {/* Tooltip on hover */}
+                                        <div className="absolute bottom-full mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow border whitespace-nowrap">
+                                            {hour}:00 น. : {count} requests
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
+                            <span className="text-muted-foreground block text-[11px]">ช่วงเวลาตลาดหนาแน่น:</span>
+                            <span className="font-semibold text-foreground">ช่วงตลาดลอนดอน &amp; นิวยอร์ก</span>
+                        </div>
+                        <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
+                            <span className="text-muted-foreground block text-[11px]">รอบการส่งข้อมูล (Interval):</span>
+                            <span className="font-semibold text-foreground">20 วินาที / พอร์ต (Jitter 0-300s)</span>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+
     return (
         <div className="space-y-6 pb-12">
             {/* Header with Super Admin Tag & Refresh Button */}
@@ -1509,158 +1800,70 @@ export default function EasyMMasterDashboardPage() {
                 </div>
             </div>
 
-            {/* KPI Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Total Fleet Count */}
-                <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-4 sm:p-5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">
-                                <span className="hidden sm:inline">ฝูงบิน EasyM ทั้งหมด</span>
-                                <span className="sm:hidden">ฝูงบิน EasyM (Total)</span>
-                            </span>
-                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                                <Layers className="w-4 h-4" />
-                            </div>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-3xl font-bold tracking-tight text-foreground">{kpi.totalCount}</span>
-                            <span className="text-xs text-muted-foreground">พอร์ต</span>
-                            <span className="ml-auto text-xs font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                <span className="hidden sm:inline">⚡ รันจริง </span>
-                                <span className="sm:hidden">⚡ รัน </span>
-                                {kpi.realRunningCount}
-                            </span>
-                        </div>
-                        <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[11px]">
-                            <span className="flex items-center gap-1 text-emerald-400 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                <Wifi className="w-3 h-3" />
-                                {kpi.onlineCount}
-                                <span className="hidden sm:inline"> สด &lt;30น.</span>
-                                <span className="sm:hidden"> สด</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded" title="ไม่มีสัญญาณเกิน 48 ชม.">
-                                <span className="hidden sm:inline">⏸️ ขาดติดต่อ </span>
-                                <span className="sm:hidden">⏸️ ค้าง </span>
-                                {kpi.offline48hCount}
-                            </span>
-                            <span className="flex items-center gap-1 text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded" title="ยังไม่เคยเปิดรัน">
-                                <span className="hidden sm:inline">⚪ ยังไม่เริ่ม </span>
-                                <span className="sm:hidden">⚪ ไม่เริ่ม </span>
-                                {kpi.noTelemetryCount}
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* Main Tabs Navigation Bar */}
+            <div className="flex items-center gap-2 border-b border-border/60 pb-2 overflow-x-auto no-scrollbar">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('performance')}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'performance'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-card/70 text-muted-foreground hover:text-foreground hover:bg-accent border border-border/50'
+                    }`}
+                >
+                    <Trophy className="w-4 h-4 text-amber-400" />
+                    <span>สถิติผลงานฝูงบิน (วันนี้ vs เมื่อวาน)</span>
+                    {fleetStats && (
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                            activeTab === 'performance' ? 'bg-blue-700/80 text-blue-100' : 'bg-muted text-muted-foreground'
+                        }`}>
+                            {fleetStats.isWeekend ? 'วันหยุด' : 'Live'}
+                        </span>
+                    )}
+                </button>
 
-                {/* 2. Total Fleet Balance */}
-                <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-4 sm:p-5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">
-                                <span className="hidden sm:inline">พลังเงินทุนรันจริง (Active Balance)</span>
-                                <span className="sm:hidden">เงินทุนรันจริง (Active Bal)</span>
-                            </span>
-                            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                                <CircleDollarSign className="w-4 h-4" />
-                            </div>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-bold tracking-tight text-emerald-400 font-mono">
-                                ${(kpi.activeBalanceUSC / 100 + kpi.activeBalanceUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                <span className="hidden sm:inline">USD (สด &lt;48 ชม.)</span>
-                                <span className="sm:hidden">USD (&lt;48h)</span>
-                            </span>
-                        </div>
-                        <div className="mt-3 space-y-1 text-xs border-t border-border/40 pt-2">
-                            <div className="flex items-center justify-between text-muted-foreground">
-                                <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                                    <span className="hidden sm:inline">⚡ รันจริง:</span>
-                                    <span className="sm:hidden">⚡ รัน:</span>
-                                </span>
-                                <span className="font-semibold text-emerald-400 font-mono">
-                                    {kpi.activeBalanceUSC.toLocaleString('en-US', { maximumFractionDigits: 0 })} USC
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-muted-foreground" title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว">
-                                <span className="flex items-center gap-1 text-amber-400/90">
-                                    <span className="hidden sm:inline">⏸️ ยอดค้าง (&gt;48h):</span>
-                                    <span className="sm:hidden">⏸️ ค้าง (&gt;48h):</span>
-                                </span>
-                                <span className="font-mono text-amber-400/90 font-medium">
-                                    ${(kpi.staleBalanceUSC / 100 + kpi.staleBalanceUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })} ({kpi.offline48hCount} พอร์ต)
-                                </span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('ports')}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'ports'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-card/70 text-muted-foreground hover:text-foreground hover:bg-accent border border-border/50'
+                    }`}
+                >
+                    <Search className="w-4 h-4 text-blue-400" />
+                    <span>ค้นหาและรายการพอร์ต</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                        activeTab === 'ports' ? 'bg-blue-700/80 text-blue-100' : 'bg-muted text-muted-foreground'
+                    }`}>
+                        {filteredPorts.length}
+                    </span>
+                </button>
 
-                {/* 3. Floating PnL & Today Profit */}
-                <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-4 sm:p-5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">
-                                <span className="hidden sm:inline">กำไรลอยตัว & วันนี้</span>
-                                <span className="sm:hidden">Floating & Today</span>
-                            </span>
-                            <div className={`p-2 rounded-lg ${kpi.totalFloating >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                                {kpi.totalFloating >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                            </div>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className={`text-2xl font-bold tracking-tight ${kpi.totalFloating >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {kpi.totalFloating >= 0 ? '+' : ''}{kpi.totalFloating.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                            <span className="text-xs text-muted-foreground">Floating USC</span>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2">
-                            <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                                <ArrowUpRight className="w-3 h-3" />
-                                <span className="hidden sm:inline">วันนี้: </span>
-                                <span className="sm:hidden">วันนี้: </span>
-                                +{kpi.totalTodayProfit.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                            </span>
-                            <span>MAX: {kpi.maxEACount} | mini: {kpi.miniEACount}</span>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* 4. Owners & Risk Radar */}
-                <Card className="bg-card/70 border-border shadow-sm">
-                    <CardContent className="p-4 sm:p-5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">
-                                <span className="hidden sm:inline">เจ้าของพอร์ต & Drawdown สูงสุด</span>
-                                <span className="sm:hidden">Owners & Max DD</span>
-                            </span>
-                            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                                <Users className="w-4 h-4" />
-                            </div>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-bold tracking-tight text-foreground">{kpi.uniqueOwners}</span>
-                            <span className="text-xs text-muted-foreground">
-                                <span className="hidden sm:inline">ท่าน (เฉลี่ย {kpi.avgPortsPerOwner} บัญชี/คน)</span>
-                                <span className="sm:hidden">คน ({kpi.avgPortsPerOwner}/คน)</span>
-                            </span>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-xs border-t border-border/40 pt-2">
-                            <span className="text-muted-foreground">
-                                <span className="hidden sm:inline">Max DD ตอนนี้:</span>
-                                <span className="sm:hidden">Max DD:</span>
-                            </span>
-                            <span className={`font-semibold ${kpi.worstDD > 20 ? 'text-red-400' : kpi.worstDD > 10 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                {kpi.worstDD.toFixed(1)}% {kpi.worstDDPort ? `(#${kpi.worstDDPort})` : ''}
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('team-analytics')}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'team-analytics'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-card/70 text-muted-foreground hover:text-foreground hover:bg-accent border border-border/50'
+                    }`}
+                >
+                    <Users className="w-4 h-4 text-purple-400" />
+                    <span>สายงาน &amp; วิวัฒนาการ &amp; ระบบหลังบ้าน</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                        activeTab === 'team-analytics' ? 'bg-blue-700/80 text-blue-100' : 'bg-muted text-muted-foreground'
+                    }`}>
+                        3 ส่วน
+                    </span>
+                </button>
             </div>
 
-            {/* Fleet Performance & Telemetry Accuracy Section (Verified Live Data) */}
-            {fleetStats && (
+            {/* TAB 1: สถิติผลงานฝูงบิน EasyM วันนี้ vs เมื่อวาน */}
+            {activeTab === 'performance' && (
+                <div className="space-y-6">
+                    {/* Fleet Performance & Telemetry Accuracy Section (Verified Live Data) */}
+                    {fleetStats && (
                 <div className="bg-gradient-to-br from-[#1c1209] via-[#140b05] to-[#0a0502] border border-amber-500/30 rounded-xl p-4 sm:p-5 space-y-4 shadow-lg relative overflow-hidden">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/20 pb-3">
                         <div className="flex items-center gap-2">
@@ -2218,9 +2421,14 @@ export default function EasyMMasterDashboardPage() {
                     </div>
                 </div>
             )}
+                </div>
+            )}
 
-            {/* Admin Breakdown Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* TAB 3: ข้อมูลสายงานพี่โจ้,ครูชัยและอื่นๆ, วิวัฒนาการ และสถิติฐานข้อมูล/ทราฟฟิก MT5 */}
+            {activeTab === 'team-analytics' && (
+                <div className="space-y-6">
+                    {/* Admin Breakdown Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="border-blue-500/30 bg-blue-950/10 shadow-sm">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-semibold flex items-center justify-between text-blue-400">
@@ -2499,9 +2707,18 @@ export default function EasyMMasterDashboardPage() {
                 </div>
             )}
 
-            {/* Filter, Search & View Modes Control Bar */}
-            <Card className="border-border shadow-sm bg-card">
-                <CardContent className="p-4 space-y-3">
+                    {/* ปิดท้ายด้วย: สถิติฐานข้อมูลและข้อมูลการจราจรข้อมูล MT5 Sync */}
+                    {databaseAndTrafficElement}
+                </div>
+            )}
+
+            {/* TAB 2: ค้นหาและรายการพอร์ตฝูงบิน */}
+            {activeTab === 'ports' && (
+                <div className="space-y-6">
+                    {/* ส่วนบน: แถบค้นหาและตัวกรองต่างๆ */}
+                    {/* Filter, Search & View Modes Control Bar */}
+                    <Card className="border-border shadow-sm bg-card">
+                        <CardContent className="p-4 space-y-3">
                     <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
                         {/* Search Bar with auto-expansion & clear button */}
                         <div className={`relative transition-all duration-300 w-full ${isSearchFocused || searchQuery ? 'xl:flex-1' : 'xl:w-[380px]'}`}>
@@ -2671,6 +2888,10 @@ export default function EasyMMasterDashboardPage() {
                 </CardContent>
             </Card>
 
+            {/* คั่นด้วย: ข้อมูลแถวบนสุดเดิม (จำนวนฝูงบินทั้งหมด, พลังทุน, กำไรลอยตัว, เจ้าของพอร์ต) */}
+            {kpiCardsElement}
+
+            {/* ผลของการกรองและค้นหา */}
             {/* View Mode 1: Grouped By Customer */}
             {viewMode === 'customer' && (
                 <div className="space-y-4">
@@ -3167,142 +3388,8 @@ export default function EasyMMasterDashboardPage() {
                     ))}
                 </div>
             )}
-
-            {/* Supabase Storage Usage & MT5 Network Traffic Monitoring Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-border/50">
-                {/* 1. Supabase Storage Usage & Table Stats */}
-                <Card className="border-border shadow-sm bg-card/60">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-base font-bold flex items-center gap-2">
-                                    <Database className="w-5 h-5 text-emerald-400" />
-                                    สถิติฐานข้อมูล Supabase (Table Row Counts)
-                                </CardTitle>
-                                <CardDescription>
-                                    ปริมาณข้อมูลในแต่ละตารางเพื่อใช้ประเมินภาระงานและบริหารพื้นที่จัดเก็บ
-                                </CardDescription>
-                            </div>
-                            <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 text-xs">
-                                Healthy
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
-                                <span className="text-xs text-muted-foreground block">farm_port_status</span>
-                                <span className="text-xl font-bold font-mono text-foreground">{tableCounts['farm_port_status'] || 0}</span>
-                                <span className="text-[10px] text-muted-foreground block">พอร์ตทั้งหมด</span>
-                            </div>
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
-                                <span className="text-xs text-muted-foreground block">farm_active_orders</span>
-                                <span className="text-xl font-bold font-mono text-foreground">{tableCounts['farm_active_orders'] || 0}</span>
-                                <span className="text-[10px] text-muted-foreground block">ออเดอร์ Realtime</span>
-                            </div>
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
-                                <span className="text-xs text-muted-foreground block">farm_daily_history</span>
-                                <span className="text-xl font-bold font-mono text-foreground">{tableCounts['farm_daily_history'] || 0}</span>
-                                <span className="text-[10px] text-muted-foreground block">บันทึกรายวัน</span>
-                            </div>
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
-                                <span className="text-xs text-muted-foreground block">licenses</span>
-                                <span className="text-xl font-bold font-mono text-foreground">{tableCounts['licenses'] || 0}</span>
-                                <span className="text-[10px] text-muted-foreground block">ใบอนุญาตทั้งหมด</span>
-                            </div>
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
-                                <span className="text-xs text-muted-foreground block">profiles</span>
-                                <span className="text-xl font-bold font-mono text-foreground">{tableCounts['profiles'] || 0}</span>
-                                <span className="text-[10px] text-muted-foreground block">ผู้ใช้งานในระบบ</span>
-                            </div>
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/40 text-center">
-                                <span className="text-xs text-muted-foreground block">Total Records</span>
-                                <span className="text-xl font-bold font-mono text-emerald-400">
-                                    {Object.values(tableCounts).reduce((a, b) => a + b, 0).toLocaleString()}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground block">เรคคอร์ดสะสม</span>
-                            </div>
-                        </div>
-
-                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-muted-foreground space-y-1">
-                            <p className="font-semibold text-blue-400 flex items-center gap-1">
-                                <Sparkles className="w-3.5 h-3.5" /> ข้อแนะนำการดูแลฐานข้อมูล:
-                            </p>
-                            <p>
-                                ตาราง <code>farm_active_orders</code> มีระบบ Auto-Cleanup ลบออเดอร์ที่ปิดแล้วโดยอัตโนมัติ ทำให้ฐานข้อมูลไม่บวมและอ่านเขียนรวดเร็วในระดับ O(1)
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* 2. MT5 Network Traffic & Hourly Density Monitor */}
-                <Card className="border-border shadow-sm bg-card/60">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-base font-bold flex items-center gap-2">
-                                    <Server className="w-5 h-5 text-blue-400" />
-                                    การจราจรข้อมูล MT5 Sync (24-Hour Traffic Pattern)
-                                </CardTitle>
-                                <CardDescription>
-                                    ความหนาแน่นของคำขอ WebRequest จาก MT5 ตลอด 24 ชั่วโมง (เวลาไทย)
-                                </CardDescription>
-                            </div>
-                            <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-xs">
-                                Live Ingestion
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {/* 24h Bar Distribution Chart */}
-                        <div className="bg-muted/20 p-3.5 rounded-lg border border-border/40">
-                            <div className="text-xs text-muted-foreground mb-3 flex items-center justify-between">
-                                <span>ช่วงเวลา 00:00 - 23:00 น.</span>
-                                <span className="text-amber-400 flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3" /> Peak: 14:00-17:00 น. &amp; 19:00-23:00 น.
-                                </span>
-                            </div>
-                            <div className="flex items-end gap-1 h-28 pt-2">
-                                {hourlyTraffic.map((count, hour) => {
-                                    const maxVal = Math.max(...hourlyTraffic, 1);
-                                    const heightPct = Math.max(8, Math.round((count / maxVal) * 100));
-                                    const isPeak = heightPct > 65;
-                                    return (
-                                        <div key={hour} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
-                                            <div 
-                                                className={`w-full rounded-t transition-all ${
-                                                    isPeak 
-                                                        ? 'bg-amber-500 hover:bg-amber-400' 
-                                                        : 'bg-blue-500/60 hover:bg-blue-400'
-                                                }`}
-                                                style={{ height: `${heightPct}%` }}
-                                            />
-                                            <span className="text-[8px] text-muted-foreground/60 font-mono">
-                                                {hour % 3 === 0 ? hour : ''}
-                                            </span>
-                                            {/* Tooltip on hover */}
-                                            <div className="absolute bottom-full mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow border whitespace-nowrap">
-                                                {hour}:00 น. : {count} requests
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
-                                <span className="text-muted-foreground block text-[11px]">ช่วงเวลาตลาดหนาแน่น:</span>
-                                <span className="font-semibold text-foreground">ช่วงตลาดลอนดอน &amp; นิวยอร์ก</span>
-                            </div>
-                            <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
-                                <span className="text-muted-foreground block text-[11px]">รอบการส่งข้อมูล (Interval):</span>
-                                <span className="font-semibold text-foreground">20 วินาที / พอร์ต (Jitter 0-300s)</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                </div>
+            )}
         </div>
     );
 }
