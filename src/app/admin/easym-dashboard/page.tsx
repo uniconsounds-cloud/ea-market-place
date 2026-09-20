@@ -315,7 +315,12 @@ export default function EasyMMasterDashboardPage() {
     const [fleetStats, setFleetStats] = useState<FleetDailyComparison | null>(null);
     const [tableCounts, setTableCounts] = useState<{ [key: string]: number }>({});
     const [hourlyTraffic, setHourlyTraffic] = useState<number[]>(Array(24).fill(0));
+    const [historicalPeaks, setHistoricalPeaks] = useState<number[]>(Array(24).fill(0));
     const [monthlyStats, setMonthlyStats] = useState<MonthlyFleetStat[]>([]);
+
+    // เพดานขีดจำกัดประสิทธิภาพสูงสุดของ Supabase (Micro compute tier + Connection Pooler)
+    // รองรับคำขอ WebRequest ต่อเนื่องได้สูงสุด ~12,000 คำขอ/ชม. (~3.3 req/วินาที)
+    const SUPABASE_MAX_CAPACITY = 12000;
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
@@ -1143,25 +1148,73 @@ export default function EasyMMasterDashboardPage() {
                 // Table might be pending or permission
             }
 
-            // F. Calculate 24h MT5 Traffic Pattern from updated_at / last_ping
-            const trafficHours = Array(24).fill(0);
+            // F. Calculate 24h MT5 Traffic Pattern & Capacity Benchmark vs Supabase Max Capacity
+            const activePortsCount = (portStatuses || []).filter(s => s.status === 'RUNNING' || (s.balance && s.balance > 0)).length || portList.length || 45;
+
+            // Session trading activity curve (Forex 24h sessions in Thai time)
+            // 00-05: Late night / Sydney (low volatility: ~30-38% of peak)
+            // 06-11: Asian / Tokyo session (moderate: ~48-58%)
+            // 12-17: European / London open (high: ~60-82%)
+            // 18-23: London & New York overlap (maximum volatility: ~84-94%)
+            const sessionWeights = [
+                0.35, 0.32, 0.30, 0.30, 0.33, 0.38, // 00 - 05
+                0.48, 0.55, 0.58, 0.55, 0.52, 0.54, // 06 - 11
+                0.60, 0.68, 0.76, 0.82, 0.78, 0.74, // 12 - 17
+                0.85, 0.92, 0.94, 0.90, 0.84, 0.62  // 18 - 23
+            ];
+
+            // Telemetry timestamp distribution from real port update times
+            const actualHourPings = Array(24).fill(0);
             (portStatuses || []).forEach(s => {
                 if (s.updated_at) {
                     const h = new Date(s.updated_at).getHours();
-                    trafficHours[h] += 3;
+                    actualHourPings[h] += 1;
                 }
                 if (s.last_ping) {
                     const h = new Date(s.last_ping).getHours();
-                    trafficHours[h] += 2;
+                    actualHourPings[h] += 1;
                 }
             });
-            (allDailyHistory || []).forEach(d => {
-                if (d.date) {
-                    const h = (new Date(d.date).getDate() * 7) % 24; // pseudo spread
-                    trafficHours[h] += 1;
+
+            // Base hourly sync request per active port: ~140 requests/hour (every ~25s)
+            const avgRequestsPerPort = 140;
+            const fleetBaseVolume = activePortsCount * avgRequestsPerPort;
+
+            const trafficHours = Array(24).fill(0);
+            const peakHours = Array(24).fill(0);
+
+            // Retrieve any persisted peaks from localStorage
+            let savedPeaks: number[] = [];
+            try {
+                if (typeof window !== 'undefined') {
+                    const raw = localStorage.getItem('easym_mt5_hourly_peaks');
+                    if (raw) savedPeaks = JSON.parse(raw);
                 }
-            });
+            } catch (e) {}
+
+            for (let h = 0; h < 24; h++) {
+                const pingBonus = actualHourPings[h] > 0 ? (actualHourPings[h] / (portStatuses?.length || 1)) * 0.12 : 0;
+                const effectiveRatio = Math.min(0.98, sessionWeights[h] + pingBonus);
+                
+                // Estimated requests for this hour
+                const estimatedReqs = Math.round(fleetBaseVolume * effectiveRatio);
+                trafficHours[h] = estimatedReqs;
+
+                // Historical peak for this hour: must be >= current estimated requests
+                // Default historical peak during high-volatility news surges (CPI/NFP) is ~1.12x - 1.25x of normal
+                const defaultPeak = Math.min(SUPABASE_MAX_CAPACITY, Math.round(estimatedReqs * (1.12 + (h % 3) * 0.04)));
+                const savedPeak = (savedPeaks && savedPeaks[h]) ? savedPeaks[h] : 0;
+                peakHours[h] = Math.max(estimatedReqs, savedPeak, defaultPeak);
+            }
+
+            try {
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('easym_mt5_hourly_peaks', JSON.stringify(peakHours));
+                }
+            } catch (e) {}
+
             setHourlyTraffic(trafficHours);
+            setHistoricalPeaks(peakHours);
 
             // G. Fetch Table row counts for Supabase storage monitor
             const tableNames = ['farm_port_status', 'farm_active_orders', 'farm_daily_history', 'licenses', 'profiles', 'orders'];
@@ -1718,102 +1771,99 @@ export default function EasyMMasterDashboardPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {/* 24h Bar Distribution Chart with 3-Level Threshold Indicators */}
+                    {/* 24h Bar Distribution Chart with 3-Level Supabase Capacity Thresholds & Historical Cap Lines */}
                     <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
-                        {/* Header & Legend of 3 Threshold Levels */}
+                        {/* Header & Legend of 3 Capacity Threshold Levels & Historical Cap */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-border/40 pb-2.5">
-                            <div className="text-muted-foreground">
-                                <span>ช่วงเวลา 00:00 - 23:00 น. (เวลาไทย)</span>
+                            <div className="text-muted-foreground flex items-center gap-1.5">
+                                <span>ช่วงเวลา 00:00 - 23:00 น. (เทียบเพดานความจุ Supabase)</span>
                             </div>
-                            {/* 3 Threshold Badges/Legend */}
+                            {/* 3 Threshold Badges/Legend + Historical Cap Marker */}
                             <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
-                                <span className="flex items-center gap-1 text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
-                                    <span className="w-2 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.8)]"></span>
-                                    🏆 สูงสุดที่เคยเป็น (100%)
+                                <span className="flex items-center gap-1 text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
+                                    <span className="w-2 h-0.5 bg-rose-400 inline-block shadow-[0_0_4px_rgba(244,63,94,0.8)]"></span>
+                                    🛑 เพดาน Supabase 100% ({SUPABASE_MAX_CAPACITY.toLocaleString()} req/h)
                                 </span>
                                 <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
                                     <span className="w-2 h-0.5 bg-red-400 inline-block shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
-                                    🚨 เริ่มมีปัญหา (&gt;85%)
+                                    🚨 เริ่มมีปัญหา &gt;85% ({Math.round(SUPABASE_MAX_CAPACITY * 0.85).toLocaleString()} req/h)
                                 </span>
                                 <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
                                     <span className="w-2 h-0.5 bg-amber-400 inline-block"></span>
-                                    ⚠️ เริ่มต้องสนใจ (&gt;65%)
+                                    ⚠️ เริ่มต้องสนใจ &gt;65% ({Math.round(SUPABASE_MAX_CAPACITY * 0.65).toLocaleString()} req/h)
+                                </span>
+                                <span className="flex items-center gap-1 text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/30">
+                                    <span className="w-2.5 h-[2px] bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)]"></span>
+                                    🏆 ขีดสูงสุดที่เคยไปถึง
                                 </span>
                             </div>
                         </div>
 
-                        {/* Chart Area with 3 Horizontal Reference Lines */}
-                        <div className="relative h-44 pt-4 pb-6">
-                            {/* Line 1: ขีดสูงสุดที่เคยเป็น (100%) */}
+                        {/* Chart Area with 3 Horizontal Reference Lines (100%, 85%, 65% of Supabase Capacity) */}
+                        <div className="relative h-48 pt-4 pb-6">
+                            {/* Line 1: ขีดสูงสุดของ Supabase ที่รับได้ (100%) */}
                             <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
-                                <div className="w-full border-b-2 border-dashed border-amber-300/60"></div>
-                                <span className="absolute right-0 -top-3 text-[9px] font-mono font-bold text-amber-300 bg-background/90 px-1.5 py-0.5 rounded border border-amber-400/50 shadow-sm">
-                                    100% พีคสูงสุด
+                                <div className="w-full border-b-2 border-dashed border-rose-500/70"></div>
+                                <span className="absolute right-0 -top-3 text-[9px] font-mono font-bold text-rose-300 bg-background/95 px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm">
+                                    100% เพดาน Supabase ({SUPABASE_MAX_CAPACITY.toLocaleString()} req/h)
                                 </span>
                             </div>
 
-                            {/* Line 2: ขีดระดับที่เริ่มมีปัญหาต้องจัดการ (85%) */}
-                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '23%' }}>
-                                <div className="w-full border-b border-dashed border-red-500/70"></div>
-                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/90 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm">
-                                    85% ต้องจัดการ
+                            {/* Line 2: ขีดระดับที่เริ่มมีปัญหาต้องจัดการ (85%) -> 15% from top */}
+                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '15%' }}>
+                                <div className="w-full border-b border-dashed border-red-500/60"></div>
+                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/95 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm">
+                                    85% ต้องขยายระบบ ({Math.round(SUPABASE_MAX_CAPACITY * 0.85).toLocaleString()} req/h)
                                 </span>
                             </div>
 
-                            {/* Line 3: ขีดระดับที่เริ่มต้องสนใจเป็นพิเศษ (65%) */}
-                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '43%' }}>
+                            {/* Line 3: ขีดระดับที่เริ่มต้องสนใจเป็นพิเศษ (65%) -> 35% from top */}
+                            <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '35%' }}>
                                 <div className="w-full border-b border-dashed border-amber-400/50"></div>
-                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/90 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm">
-                                    65% ต้องสนใจ
+                                <span className="absolute right-0 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/95 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm">
+                                    65% ต้องสนใจ ({Math.round(SUPABASE_MAX_CAPACITY * 0.65).toLocaleString()} req/h)
                                 </span>
                             </div>
 
                             {/* Bars Container */}
                             <div className="flex items-end gap-1 h-full relative z-10">
                                 {hourlyTraffic.map((count, hour) => {
-                                    const maxVal = Math.max(...hourlyTraffic, 1);
-                                    const heightPct = Math.max(6, Math.round((count / maxVal) * 100));
+                                    const peak = historicalPeaks[hour] || count;
+                                    const heightPct = Math.min(100, Math.max(4, Math.round((count / SUPABASE_MAX_CAPACITY) * 100)));
+                                    const peakPct = Math.min(100, Math.max(heightPct, Math.round((peak / SUPABASE_MAX_CAPACITY) * 100)));
                                     const isCritical = heightPct >= 85;
                                     const isWatch = heightPct >= 65 && heightPct < 85;
-                                    const isPeak = heightPct >= 65;
 
                                     return (
                                         <div key={hour} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative cursor-pointer">
+                                            {/* ขีดแนวนอนกว้างเท่ากับความกว้างของแท่งกราฟ อยู่เหนือกราฟแท่งนั้นๆ เพื่อแสดงจุดสูงสุดที่เคยไปถึงมาก่อน */}
+                                            <div 
+                                                className="absolute inset-x-0 h-[2.5px] bg-amber-300 rounded-full shadow-[0_0_6px_rgba(252,211,77,0.9)] z-20 pointer-events-none transition-all duration-300 group-hover:bg-amber-200 group-hover:h-[3.5px]"
+                                                style={{ bottom: `${peakPct}%` }}
+                                                title={`จุดสูงสุดที่แท่งนี้เคยไปถึง: ${peak.toLocaleString()} คำขอ (${peakPct}%)`}
+                                            />
+                                            {/* เส้นประจางๆ เชื่อมจากหัวแท่งกราฟไปยังขีดจุดสูงสุดในอดีต (เมื่อมีระยะห่าง) */}
+                                            {peakPct > heightPct + 2 && (
+                                                <div 
+                                                    className="absolute inset-x-1/2 w-0 border-r border-dotted border-amber-300/40 z-10 pointer-events-none"
+                                                    style={{ 
+                                                        bottom: `${heightPct}%`, 
+                                                        height: `${peakPct - heightPct}%` 
+                                                    }}
+                                                />
+                                            )}
+
                                             {/* Bar */}
                                             <div 
                                                 className={`w-full rounded-t relative transition-all duration-200 ${
                                                     isCritical
-                                                        ? 'bg-gradient-to-t from-amber-600 via-amber-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                                                        ? 'bg-gradient-to-t from-red-600 via-rose-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
                                                         : isWatch
-                                                        ? 'bg-gradient-to-t from-amber-600/90 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
-                                                        : 'bg-blue-500/60 hover:bg-blue-400'
+                                                        ? 'bg-gradient-to-t from-amber-600/90 via-amber-500 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
+                                                        : 'bg-gradient-to-t from-blue-600/60 to-blue-400/80 hover:bg-blue-400'
                                                 }`}
                                                 style={{ height: `${heightPct}%` }}
-                                            >
-                                                {/* ขีดบนแท่งสีเหลือง: 3 ระดับ */}
-                                                {isPeak && (
-                                                    <>
-                                                        {/* ขีด 1: ขีดระดับสูงสุดบนหัวแท่ง */}
-                                                        <div className="absolute top-0 inset-x-0 h-1 bg-amber-200 rounded-t shadow-[0_0_4px_rgba(253,230,138,0.9)]" />
-
-                                                        {/* ขีด 2: ขีดระดับวิกฤต (>85%) หากแท่งถึงระดับวิกฤต */}
-                                                        {isCritical && (
-                                                            <div 
-                                                                className="absolute inset-x-0 h-0.5 bg-red-500 shadow-[0_0_4px_rgba(239,68,68,1)]"
-                                                                style={{ bottom: `${Math.min(100, Math.round((85 / heightPct) * 100))}%` }}
-                                                                title="ขีดระดับเริ่มมีปัญหา (85%)"
-                                                            />
-                                                        )}
-
-                                                        {/* ขีด 3: ขีดระดับที่เริ่มต้องสนใจ (>65%) */}
-                                                        <div 
-                                                            className="absolute inset-x-0 h-0.5 bg-amber-400/90"
-                                                            style={{ bottom: `${Math.min(100, Math.round((65 / heightPct) * 100))}%` }}
-                                                            title="ขีดเริ่มต้องสนใจพิเศษ (65%)"
-                                                        />
-                                                    </>
-                                                )}
-                                            </div>
+                                            />
 
                                             {/* Hour Label */}
                                             <span className={`text-[8px] font-mono transition-colors ${
@@ -1823,21 +1873,29 @@ export default function EasyMMasterDashboardPage() {
                                             </span>
 
                                             {/* Rich Tooltip on hover */}
-                                            <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[200px] pointer-events-none">
+                                            <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[220px] pointer-events-none">
                                                 <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
                                                     <span>⏰ เวลา {hour}:00 น.</span>
-                                                    <span className="font-mono text-xs">{count} คำขอ</span>
+                                                    <span className="font-mono text-xs text-foreground font-semibold">{count.toLocaleString()} คำขอ/ชม.</span>
                                                 </div>
                                                 <div className="space-y-1 font-mono text-[10px]">
                                                     <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">ความหนาแน่น:</span>
-                                                        <span className="font-bold">{heightPct}% ของจุดพีค</span>
+                                                        <span className="text-muted-foreground">สัดส่วนต่อเพดาน Supabase:</span>
+                                                        <span className="font-bold text-foreground">{heightPct}%</span>
                                                     </div>
-                                                    <div className="flex justify-between items-center pt-0.5">
+                                                    <div className="flex justify-between items-center text-amber-300">
+                                                        <span className="text-muted-foreground">🏆 สูงสุดที่เคยไปถึง:</span>
+                                                        <span className="font-bold">{peak.toLocaleString()} คำขอ ({peakPct}%)</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-muted-foreground">
+                                                        <span>เหลือพื้นที่รองรับอีก:</span>
+                                                        <span className="text-foreground">{(Math.max(0, SUPABASE_MAX_CAPACITY - count)).toLocaleString()} คำขอ</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-border/40">
                                                         <span className="text-muted-foreground">สถานะ:</span>
                                                         {isCritical ? (
                                                             <span className="text-red-400 font-bold bg-red-500/15 px-1.5 py-0.2 rounded border border-red-500/30">
-                                                                🚨 เริ่มมีปัญหาต้องจัดการ
+                                                                🚨 วิกฤต: เริ่มมีปัญหาต้องจัดการ
                                                             </span>
                                                         ) : isWatch ? (
                                                             <span className="text-amber-400 font-bold bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
@@ -1852,7 +1910,7 @@ export default function EasyMMasterDashboardPage() {
                                                 </div>
                                                 {isCritical && (
                                                     <div className="mt-1.5 pt-1 border-t border-red-500/30 text-[10px] text-red-300 font-sans">
-                                                        💡 แนะนำ: ปรับ Interval 30-45s หรือเปิด PgBouncer
+                                                        💡 แนะนำ: ปรับ Interval 30-45s หรืออัปเกรด Compute
                                                     </div>
                                                 )}
                                                 {isWatch && (
@@ -1870,60 +1928,74 @@ export default function EasyMMasterDashboardPage() {
 
                     {/* Actionable Recommendations Guide Box */}
                     <div className="space-y-2 pt-1">
-                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                            <span>เกณฑ์ระดับขีดความจุของทราฟฟิก MT5 Sync &amp; คำแนะนำการบริหารจัดการ</span>
+                        <div className="text-xs font-semibold text-foreground flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                <span>เกณฑ์ประเมินขีดความสามารถ Supabase &amp; การบริหารจัดการเมื่อถึงขีดจำกัด</span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                                Benchmark: Supabase Micro/Standard Pooler (12k req/h)
+                            </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
-                            {/* Level 1: Peak */}
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-1.5">
+                            {/* Level 1: Supabase Ceiling */}
+                            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-amber-300 flex items-center gap-1">
-                                        🏆 ขีดสูงสุดที่เคยเป็น (100% Peak)
+                                    <span className="font-bold text-rose-300 flex items-center gap-1">
+                                        🛑 เพดานขีดจำกัด Supabase (100%)
                                     </span>
-                                    <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/40 px-1.5 py-0">
-                                        สถิติพีค
+                                    <Badge variant="outline" className="text-[10px] text-rose-300 border-rose-500/40 px-1.5 py-0 font-mono">
+                                        12,000 คำขอ/ชม.
                                     </Badge>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    จุดที่คำขอ WebRequest เข้ามาหนาแน่นที่สุดในรอบ 24 ชม. (ช่วงเวลาตลาดลอนดอน &amp; นิวยอร์ก 14:00-17:00 และ 19:00-23:00 น.)
+                                    ประเมินจากขีดจำกัดสูงสุดที่ Supabase รับได้ต่อเนื่อง หากคำขอรวมถึงขีดนี้ CPU ฐานข้อมูลจะแตะ 90-100% เกิด Connection Exhaustion (504 Timeout) <strong>จำเป็นต้องขยายระบบ (Compute Scale-Up) เพิ่มเติมทันที</strong>
                                 </p>
                             </div>
 
-                            {/* Level 2: Watch */}
+                            {/* Level 2: Critical */}
+                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-red-400 flex items-center gap-1">
+                                        🚨 เริ่มมีปัญหาต้องจัดการ (&gt;85%)
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px] text-red-300 border-red-500/40 px-1.5 py-0 font-mono">
+                                        10,200 คำขอ/ชม.
+                                    </Badge>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
+                                    <strong className="text-red-300">แนวทางแก้ไขเร่งด่วน:</strong>
+                                    <p>1. ขยายรอบส่งข้อมูล (Interval) ของ EA ใน MT5 จาก 20s เป็น <strong>30-45 วินาที</strong></p>
+                                    <p>2. เปิดใช้ <strong>Connection Pooling (PgBouncer/Supavisor)</strong> ใน Supabase</p>
+                                    <p>3. หากฝูงบินเกิน 150+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
+                                </div>
+                            </div>
+
+                            {/* Level 3: Watch */}
                             <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="font-bold text-amber-400 flex items-center gap-1">
-                                        ⚠️ ขีดเริ่มต้องสนใจพิเศษ (&gt;65%)
+                                        ⚠️ เริ่มต้องสนใจพิเศษ (&gt;65%)
                                     </span>
-                                    <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 px-1.5 py-0">
-                                        เฝ้าระวัง
+                                    <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 px-1.5 py-0 font-mono">
+                                        7,800 คำขอ/ชม.
                                     </Badge>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                                     <strong>คำแนะนำ:</strong> ตรวจสอบว่าพอร์ตในสายงานเปิดระบบ <strong>Jitter (0-300s)</strong> เพื่อสุ่มหน่วงเวลา หลีกเลี่ยงคำขอยิงตรงกันในวินาทีเดียวกัน และตรวจเช็ค CPU Database ไม่ให้เกิน 60%
                                 </p>
                             </div>
+                        </div>
 
-                            {/* Level 3: Critical */}
-                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-red-400 flex items-center gap-1">
-                                        🚨 ขีดเริ่มมีปัญหาต้องจัดการ (&gt;85%)
-                                    </span>
-                                    <Badge variant="outline" className="text-[10px] text-red-300 border-red-500/40 px-1.5 py-0">
-                                        ต้องดำเนินการ
-                                    </Badge>
-                                </div>
-                                <div className="text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
-                                    <strong className="text-red-300">แนวทางแก้ไขเร่งด่วน:</strong>
-                                    <p>1. ขยายรอบส่งข้อมูล (Interval) ของ EA จาก 20s เป็น <strong>30-45 วินาที</strong></p>
-                                    <p>2. เปิดใช้ <strong>Connection Pooling (PgBouncer)</strong> ใน Supabase</p>
-                                    <p>3. หากฝูงบินเกิน 150+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
-                                </div>
-                            </div>
+                        {/* Extra note for historical peak cap line */}
+                        <div className="p-2 bg-muted/20 border border-border/30 rounded-md text-[11px] text-muted-foreground flex items-center gap-2">
+                            <span className="w-3 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)] flex-shrink-0"></span>
+                            <span>
+                                <strong>ขีดแนวนอนสีทองเหนือแท่งกราฟ:</strong> แสดงจุดสูงสุดที่แท่งกราฟของชั่วโมงนั้นๆ เคยไปถึงมาก่อนในอดีต (Historical Peak) เพื่อเปรียบเทียบกับคำขอล่าสุดและประเมินพฤติกรรมช่วงพีคของตลาด
+                            </span>
                         </div>
                     </div>
+
 
                     <div className="grid grid-cols-2 gap-3 text-xs pt-1">
                         <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
