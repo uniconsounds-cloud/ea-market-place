@@ -25,11 +25,23 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     // 3. Fetch License Owner, registration date, tier, and product details
     const { data: licenses } = await supabase
         .from('licenses')
-        .select('user_id, created_at, port_name, license_tier, dashboard_skin, is_active, products:product_id(id, name, product_key, min_balance, currency)')
+        .select('id, user_id, created_at, port_name, license_tier, dashboard_skin, is_active, products:product_id(id, name, product_key, min_balance, currency)')
         .eq('account_number', portNumber);
 
     const license = licenses?.find(l => l.is_active) || licenses?.[0];
     const product = Array.isArray(license?.products) ? license?.products[0] : (license?.products as any);
+
+    const prodKey = (product?.product_key || '').toUpperCase();
+    const prodName = (product?.name || '').toLowerCase();
+    const isEasyM = prodKey.includes('EZM') || prodName.includes('easym') || prodName.includes('easy m');
+
+    // For EasyM / EasyM MAX products, ensure licenseTier defaults to 'pro' for full 2.5D tree farm access
+    const effectiveLicenseTier = (isEasyM && license?.license_tier === 'free') ? 'pro' : (license?.license_tier || 'free');
+
+    // Asynchronously ensure the license tier is updated in DB if needed
+    if (license?.id && isEasyM && license.license_tier !== 'pro') {
+        supabase.from('licenses').update({ license_tier: 'pro' }).eq('id', license.id).then();
+    }
 
     const sessionEmail = session.user.email;
     const isSuperAdmin = sessionEmail === 'juntarasate@gmail.com' || sessionEmail === 'juntatasate@gmail.com';
@@ -84,7 +96,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 initialPortStatus={portStatus || null}
                 licenseCreatedAt={license?.created_at || null}
                 customName={license?.port_name || null}
-                licenseTier={license?.license_tier || 'free'}
+                licenseTier={effectiveLicenseTier}
                 dashboardSkin={license?.dashboard_skin || 'avatar_scifi'}
                 isAdmin={isAdmin}
                 isSuperAdmin={isSuperAdmin}

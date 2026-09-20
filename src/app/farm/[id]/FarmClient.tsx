@@ -109,8 +109,32 @@ export default function FarmClient({
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
     const lastDayRef = useRef('');
+
+    // Determine product & asset types for default theme & behavior
+    const prodKey = (licenseInfo?.productKey || '').toUpperCase();
+    const prodName = (licenseInfo?.productName || '').toLowerCase();
+    const sysCode = (initialPortStatus?.system_code || portStatus?.system_code || '').toLowerCase();
+    const rawAsset = portStatus?.asset_type || (prodName.includes('gold') || prodKey.includes('GOLD') || prodKey.includes('EZG') ? 'GOLD' : 'FOREX');
+    const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
+
+    const isEasyM = prodKey.includes('EZM') || 
+                    prodName.includes('easym') || 
+                    prodName.includes('easy m') ||
+                    sysCode.includes('easym') ||
+                    sysCode.includes('easy m') ||
+                    assetType === 'FOREX';
+
+    const isEasyGold = !isEasyM && (
+        prodKey.includes('GOLD') || 
+        prodKey.includes('EZG') || 
+        prodName.includes('gold') ||
+        sysCode.includes('gold') ||
+        sysCode.includes('eg_farming') ||
+        assetType === 'GOLD'
+    );
+
     const [viewMode, setViewMode] = useState<'farm' | 'spaceship'>(
-        licenseTier === 'free' ? 'spaceship' : 'farm'
+        isEasyGold ? 'spaceship' : 'farm'
     );
     const [clickCount, setClickCount] = useState(0);
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -201,9 +225,10 @@ export default function FarmClient({
     const currentViewMode = useMemo(() => {
         if (activePreviewSkin === 'farm') return 'farm';
         if (activePreviewSkin === 'spaceship') return 'spaceship';
+        if (isEasyM) return viewMode;
         if (activeTier === 'free') return 'spaceship';
         return viewMode;
-    }, [activePreviewSkin, activeTier, viewMode]);
+    }, [activePreviewSkin, activeTier, isEasyM, viewMode]);
 
     const canActivateLimit = (key: string, limit: number = 3): boolean => {
         if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
@@ -266,7 +291,7 @@ export default function FarmClient({
             return;
         }
         if (skin === 'farm') {
-            if (licenseTier !== 'free' || isTrialActive) {
+            if (isEasyM || licenseTier !== 'free' || isTrialActive) {
                 setViewMode('farm');
                 return;
             }
@@ -482,8 +507,6 @@ export default function FarmClient({
     }, [portNumber, isTabVisible, isIdle]);
 
     // --- Dynamic Theming ---
-    const rawAsset = portStatus?.asset_type || 'GOLD';
-    const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
     const theme = useMemo(() => ({
         open: assetType === 'FOREX' ? '/farm/asset_a_lily.png' : '/farm/asset_a_lotus.png',
         profit: assetType === 'FOREX' ? '/farm/asset_b_orange.png' : '/farm/asset_b_apple.png',
@@ -940,7 +963,7 @@ export default function FarmClient({
             console.log(`[EAEZE] Secret Click Count: ${nextCount}/5`);
             
             if (nextCount >= 5) {
-                if (activeTier === 'free' && !isAdmin) {
+                if (!isEasyM && activeTier === 'free' && !isAdmin) {
                     toast.info("กรุณาอัปเกรดเป็นสิทธิ์ Pro หรือ Max เพื่อเปิดใช้งานระบบฟาร์ม 2.5D");
                     return 0;
                 }
