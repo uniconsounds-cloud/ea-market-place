@@ -319,9 +319,10 @@ export default function EasyMMasterDashboardPage() {
     const [hoveredHour, setHoveredHour] = useState<number | null>(null);
     const [monthlyStats, setMonthlyStats] = useState<MonthlyFleetStat[]>([]);
 
-    // เพดานขีดจำกัดประสิทธิภาพสูงสุดของ Supabase Micro (60 Direct Connections)
+    // เพดานขีดจำกัดประสิทธิภาพสูงสุดของ Supabase Compute & Connection Pooler (500 พอร์ตพร้อมกัน หรือ ~60,000 req/ชม.)
     // สำหรับเปรียบเทียบจำนวนพอร์ตที่ส่งข้อมูลเข้ามาพร้อมกันในแต่ละชั่วโมง
-    const SUPABASE_MAX_CAPACITY = 60;
+    const SUPABASE_MAX_CAPACITY = 500;
+    const REQ_PER_PORT_HOUR = 120; // 1 พอร์ตส่งเฉลี่ย ~120 requests/ชั่วโมง (ส่งทุก 30 วินาที)
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
@@ -1749,6 +1750,7 @@ export default function EasyMMasterDashboardPage() {
                     {(() => {
                         const maxObserved = Math.max(...hourlyTraffic, ...historicalPeaks, 1);
                         const effectiveCapacity = Math.max(SUPABASE_MAX_CAPACITY, maxObserved);
+                        const formatReq = (p: number) => `~${(p * REQ_PER_PORT_HOUR).toLocaleString()} req/ชม.`;
 
                         return (
                             <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
@@ -1761,15 +1763,15 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
                                         <span className="flex items-center gap-1 text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
                                             <span className="w-2 h-0.5 bg-rose-400 inline-block shadow-[0_0_4px_rgba(244,63,94,0.8)]"></span>
-                                            🛑 เพดาน Supabase 100% ({effectiveCapacity} พอร์ต)
+                                            🛑 เพดาน Supabase 100% ({effectiveCapacity} พอร์ต ({formatReq(effectiveCapacity)}))
                                         </span>
                                         <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
                                             <span className="w-2 h-0.5 bg-red-400 inline-block shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
-                                            🚨 เริ่มมีปัญหา &gt;85% ({Math.round(effectiveCapacity * 0.85)} พอร์ต)
+                                            🚨 เริ่มมีปัญหา &gt;85% ({Math.round(effectiveCapacity * 0.85)} พอร์ต ({formatReq(Math.round(effectiveCapacity * 0.85))}))
                                         </span>
                                         <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
                                             <span className="w-2 h-0.5 bg-amber-400 inline-block"></span>
-                                            ⚠️ เริ่มต้องสนใจ &gt;65% ({Math.round(effectiveCapacity * 0.65)} พอร์ต)
+                                            ⚠️ เริ่มต้องสนใจ &gt;65% ({Math.round(effectiveCapacity * 0.65)} พอร์ต ({formatReq(Math.round(effectiveCapacity * 0.65))}))
                                         </span>
                                         <span className="flex items-center gap-1 text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/30">
                                             <span className="w-2.5 h-[2px] bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)]"></span>
@@ -1784,7 +1786,7 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
                                         <div className="w-full border-b-2 border-dashed border-rose-500/70"></div>
                                         <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-rose-300 bg-background/95 px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm z-20">
-                                            100% เพดาน Supabase ({effectiveCapacity} พอร์ต)
+                                            100% เพดาน Supabase ({effectiveCapacity} พอร์ต | {formatReq(effectiveCapacity)})
                                         </span>
                                     </div>
 
@@ -1792,7 +1794,7 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '15%' }}>
                                         <div className="w-full border-b border-dashed border-red-500/60"></div>
                                         <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/95 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm z-20">
-                                            85% ต้องขยายระบบ ({Math.round(effectiveCapacity * 0.85)} พอร์ต)
+                                            85% ต้องขยายระบบ ({Math.round(effectiveCapacity * 0.85)} พอร์ต | {formatReq(Math.round(effectiveCapacity * 0.85))})
                                         </span>
                                     </div>
 
@@ -1800,7 +1802,7 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '35%' }}>
                                         <div className="w-full border-b border-dashed border-amber-400/50"></div>
                                         <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/95 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm z-20">
-                                            65% ต้องสนใจ ({Math.round(effectiveCapacity * 0.65)} พอร์ต)
+                                            65% เริ่มต้องสนใจ ({Math.round(effectiveCapacity * 0.65)} พอร์ต | {formatReq(Math.round(effectiveCapacity * 0.65))})
                                         </span>
                                     </div>
 
@@ -1812,7 +1814,7 @@ export default function EasyMMasterDashboardPage() {
                                         >
                                             <div className="w-full border-b-2 border-dashed border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)]"></div>
                                             <span className="absolute right-2 -top-2.5 text-[9px] font-mono font-bold text-cyan-300 bg-background/95 px-2 py-0.5 rounded border border-cyan-400/60 shadow-md z-30">
-                                                ระดับที่ตรวจพบ {hoveredHour}:00 น. : {hourlyTraffic[hoveredHour]} พอร์ต ({Math.round((hourlyTraffic[hoveredHour] / effectiveCapacity) * 100)}%)
+                                                ระดับที่ตรวจพบ {hoveredHour}:00 น. : {hourlyTraffic[hoveredHour]} พอร์ต ({formatReq(hourlyTraffic[hoveredHour])}) - {Math.round((hourlyTraffic[hoveredHour] / effectiveCapacity) * 100)}%
                                             </span>
                                         </div>
                                     )}
@@ -1821,7 +1823,7 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex items-end gap-1 h-full relative z-10">
                                         {hourlyTraffic.map((count, hour) => {
                                             const peak = historicalPeaks[hour] || count;
-                                            const heightPct = Math.min(100, Math.max(3, Math.round((count / effectiveCapacity) * 100)));
+                                            const heightPct = Math.min(100, Math.max(count > 0 ? 3 : 0, Math.round((count / effectiveCapacity) * 100)));
                                             const peakPct = Math.min(100, Math.max(heightPct, Math.round((peak / effectiveCapacity) * 100)));
                                             const isCritical = heightPct >= 85;
                                             const isWatch = heightPct >= 65 && heightPct < 85;
@@ -1846,12 +1848,12 @@ export default function EasyMMasterDashboardPage() {
                                                     <div 
                                                         className="absolute inset-x-0 h-[2.5px] bg-amber-300 rounded-full shadow-[0_0_6px_rgba(252,211,77,0.9)] z-20 pointer-events-none transition-all duration-300 group-hover:bg-amber-200 group-hover:h-[3.5px]"
                                                         style={{ bottom: `${peakPct}%` }}
-                                                        title={`จุดสูงสุดที่แท่งนี้เคยไปถึง: ${peak} พอร์ต (${peakPct}%)`}
+                                                        title={`จุดสูงสุดที่แท่งนี้เคยไปถึง: ${peak} พอร์ต (${formatReq(peak)}) - ${peakPct}%`}
                                                     />
                                                     {/* เส้นประจางๆ เชื่อมจากหัวแท่งกราฟไปยังขีดจุดสูงสุดในอดีต (เมื่อมีระยะห่าง) */}
                                                     {peakPct > heightPct + 2 && (
                                                         <div 
-                                                            className="absolute inset-x-1/2 w-0 border-r border-dotted border-amber-300/40 z-10 pointer-events-none"
+                                                             className="absolute inset-x-1/2 w-0 border-r border-dotted border-amber-300/40 z-10 pointer-events-none"
                                                             style={{ 
                                                                 bottom: `${heightPct}%`, 
                                                                 height: `${peakPct - heightPct}%` 
@@ -1879,10 +1881,12 @@ export default function EasyMMasterDashboardPage() {
                                                     </span>
 
                                                     {/* Rich Tooltip on hover */}
-                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[220px] pointer-events-none">
+                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[240px] pointer-events-none">
                                                         <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
                                                             <span>⏰ เวลา {hour}:00 น.</span>
-                                                            <span className="font-mono text-xs text-foreground font-semibold">{count} พอร์ตที่ตรวจพบ</span>
+                                                            <span className="font-mono text-xs text-foreground font-semibold">
+                                                                {count} พอร์ต <span className="text-muted-foreground font-normal text-[10px]">({formatReq(count)})</span>
+                                                            </span>
                                                         </div>
                                                         <div className="space-y-1 font-mono text-[10px]">
                                                             <div className="flex justify-between">
@@ -1891,11 +1895,11 @@ export default function EasyMMasterDashboardPage() {
                                                             </div>
                                                             <div className="flex justify-between items-center text-amber-300">
                                                                 <span className="text-muted-foreground">🏆 สูงสุดที่เคยไปถึง:</span>
-                                                                <span className="font-bold">{peak} พอร์ต ({peakPct}%)</span>
+                                                                <span className="font-bold">{peak} พอร์ต ({formatReq(peak)}) [{peakPct}%]</span>
                                                             </div>
                                                             <div className="flex justify-between text-muted-foreground">
                                                                 <span>เหลือพื้นที่รองรับอีก:</span>
-                                                                <span className="text-foreground">{(Math.max(0, effectiveCapacity - count))} พอร์ต</span>
+                                                                <span className="text-foreground">{(Math.max(0, effectiveCapacity - count))} พอร์ต ({formatReq(Math.max(0, effectiveCapacity - count))})</span>
                                                             </div>
                                                             <div className="flex justify-between items-center pt-1 border-t border-border/40">
                                                                 <span className="text-muted-foreground">สถานะ:</span>
@@ -1942,7 +1946,7 @@ export default function EasyMMasterDashboardPage() {
                                 <span>เกณฑ์ประเมินขีดความสามารถ Supabase &amp; การบริหารจัดการเมื่อถึงขีดจำกัด</span>
                             </div>
                             <span className="text-[10px] text-muted-foreground font-mono">
-                                Benchmark: Supabase Micro Connection Limit (60 Ports)
+                                Benchmark: Supabase Pooled Capacity (500 Ports / ~60,000 req/ชม.)
                             </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
@@ -1953,11 +1957,11 @@ export default function EasyMMasterDashboardPage() {
                                         🛑 เพดานขีดจำกัด Supabase (100%)
                                     </span>
                                     <Badge variant="outline" className="text-[10px] text-rose-300 border-rose-500/40 px-1.5 py-0 font-mono">
-                                        60 พอร์ต
+                                        500 พอร์ต (~60,000 req/ชม.)
                                     </Badge>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    ประเมินจากขีดจำกัดการเชื่อมต่อสูงสุดของ Supabase Micro (60 Direct Connections) ที่รองรับการเชื่อมต่อพร้อมกัน หากพอร์ตที่ส่งข้อมูลในชั่วโมงใดแตะระดับนี้ CPU ฐานข้อมูลจะแตะ 90-100% เกิด Connection Exhaustion (504 Timeout) <strong>จำเป็นต้องขยายระบบ (Compute Scale-Up) เพิ่มเติมทันที</strong>
+                                    ประเมินจากขีดจำกัดประสิทธิภาพของ Supabase Compute ร่วมกับ Connection Pooler (Supavisor) ที่รองรับ Throughput ได้เฉลี่ย ~16.6 requests/วินาที หรือประมาณ 60,000 req/ชม. (เทียบเท่าประมาณ 500 พอร์ตที่ส่งข้อมูลทุก 30 วินาที) หากพอร์ตหรือคำขอแตะระดับนี้ CPU ฐานข้อมูลจะแตะ 90-100% เกิด Connection Exhaustion (504 Timeout) <strong>จำเป็นต้องขยายระบบ (Compute Scale-Up) เพิ่มเติมทันที</strong>
                                 </p>
                             </div>
 
@@ -1968,14 +1972,14 @@ export default function EasyMMasterDashboardPage() {
                                         🚨 เริ่มมีปัญหาต้องจัดการ (&gt;85%)
                                     </span>
                                     <Badge variant="outline" className="text-[10px] text-red-300 border-red-500/40 px-1.5 py-0 font-mono">
-                                        51 พอร์ต
+                                        425 พอร์ต (~51,000 req/ชม.)
                                     </Badge>
                                 </div>
                                 <div className="text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
-                                    <strong className="text-red-300">แนวทางแก้ไขเร่งด่วน:</strong>
+                                    <strong className="text-red-300">แนวทางแก้ไขเร่งด่วนเมื่อใกล้ถึงลิมิต:</strong>
                                     <p>1. ขยายรอบส่งข้อมูล (Interval) ของ EA ใน MT5 จาก 20s เป็น <strong>30-45 วินาที</strong></p>
-                                    <p>2. เปิดใช้ <strong>Connection Pooling (PgBouncer/Supavisor)</strong> ใน Supabase</p>
-                                    <p>3. หากฝูงบินเกิน 150+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
+                                    <p>2. เปิดใช้ <strong>Connection Pooling (Supavisor)</strong> ใน Supabase เพื่อลดภาระ Connection</p>
+                                    <p>3. หากฝูงบินเกิน 400+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
                                 </div>
                             </div>
 
@@ -1986,7 +1990,7 @@ export default function EasyMMasterDashboardPage() {
                                         ⚠️ เริ่มต้องสนใจพิเศษ (&gt;65%)
                                     </span>
                                     <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 px-1.5 py-0 font-mono">
-                                        39 พอร์ต
+                                        325 พอร์ต (~39,000 req/ชม.)
                                     </Badge>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -1995,18 +1999,24 @@ export default function EasyMMasterDashboardPage() {
                             </div>
                         </div>
 
-                        {/* Extra note for historical peak cap line and guideline */}
-                        <div className="p-2.5 bg-muted/20 border border-border/30 rounded-md text-[11px] text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <span className="w-3 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)] flex-shrink-0"></span>
-                                <span><strong>ขีดแนวนอนสีทองเหนือแท่งกราฟ:</strong> แสดงสถิติสูงสุดที่แท่งชั่วโมงนั้นๆ เคยตรวจพบมาก่อนในอดีต (Historical Peak)</span>
+                        {/* Extra note for historical peak cap line, guideline & hybrid formula */}
+                        <div className="p-2.5 bg-muted/20 border border-border/30 rounded-md text-[11px] text-muted-foreground space-y-1.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/20 pb-1.5">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)] flex-shrink-0"></span>
+                                    <span><strong>ขีดแนวนอนสีทองเหนือแท่ง:</strong> สถิติสูงสุดที่ชั่วโมงนั้นๆ เคยตรวจพบในอดีต (Historical Peak)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-0.5 border-b-2 border-dashed border-cyan-400 inline-block shadow-[0_0_4px_rgba(34,211,238,0.9)] flex-shrink-0"></span>
+                                    <span><strong>เส้นประสีฟ้า (เมื่อชี้เมาส์):</strong> ลากพาดผ่านกราฟตามระดับที่ตรวจจับได้ของชั่วโมงนั้น เพื่อให้อ้างอิงเปรียบเทียบกับขีดระดับได้ชัดเจน</span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-3 h-0.5 border-b-2 border-dashed border-cyan-400 inline-block shadow-[0_0_4px_rgba(34,211,238,0.9)] flex-shrink-0"></span>
-                                <span><strong>เส้นประสีฟ้า (เมื่อชี้เมาส์):</strong> ลากพาดผ่านทั้งกราฟตามระดับที่ตรวจจับได้ของชั่วโมงนั้น เพื่อให้อ้างอิงเปรียบเทียบกับขีดระดับได้ชัดเจน</span>
+                            <div className="flex items-center gap-1.5 text-muted-foreground/80">
+                                <span>ℹ️ <strong>สูตรคำนวณแบบผสม:</strong> แสดงจำนวนพอร์ตที่ตรวจจับได้เป็นหลัก ควบคู่กับประมาณการคำขอ (Requests/ชม.) ในวงเล็บ (อิงค่าเฉลี่ยพอร์ตส่ง sync ทุก 30 วินาที = ~120 req/ชม./พอร์ต)</span>
                             </div>
                         </div>
                     </div>
+
 
 
                     <div className="grid grid-cols-2 gap-3 text-xs pt-1">
