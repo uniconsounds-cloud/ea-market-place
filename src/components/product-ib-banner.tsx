@@ -239,73 +239,78 @@ export function ProductIbBanner({ productId }: { productId: string }) {
                         </Button>
                     </DialogTrigger>
                     {user ? (
-                        <DialogContent className="sm:max-w-md">
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
+                        <DialogContent className="sm:max-w-md max-h-[92dvh] flex flex-col p-0 overflow-hidden">
+                            <DialogHeader className="p-4 sm:p-6 pb-2 shrink-0 border-b border-border/40">
+                                <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                                     <Gift className="w-5 h-5 text-primary" />
                                     ลงทะเบียนรับสิทธิ์ใช้งานฟรี (IB)
                                 </DialogTitle>
-                                <DialogDescription>
+                                <DialogDescription className="text-xs sm:text-sm">
                                     เลือกโบรกเกอร์ที่คุณสมัครผ่านลิงก์ของเรา และกรอกข้อมูลเพื่อแสดงตัวตน
                                 </DialogDescription>
                             </DialogHeader>
-                            <form onSubmit={handleApplyIb} className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label>เลือกโบรกเกอร์</Label>
-                                    <Select value={selectedBroker} onValueChange={setSelectedBroker} required>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="-- เลือกโบรกเกอร์ --" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableBrokers.map((b) => (
-                                                <SelectItem key={b.id} value={b.id}>
-                                                    {b.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {selectedBroker && (
-                                    <div className="p-3 bg-muted/50 border border-border rounded-md text-sm">
-                                        <div className="font-semibold mb-1 flex items-center gap-1.5">
-                                            <LinkIcon className="w-3.5 h-3.5" /> ลิงก์สมัคร (IB Link)
-                                        </div>
-                                        <a
-                                            href={availableBrokers.find(b => b.id === selectedBroker)?.ib_link}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-primary hover:underline break-all"
-                                        >
-                                            {availableBrokers.find(b => b.id === selectedBroker)?.ib_link}
-                                        </a>
+                            <form onSubmit={handleApplyIb} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs sm:text-sm">เลือกโบรกเกอร์</Label>
+                                        <Select value={selectedBroker} onValueChange={setSelectedBroker} required>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="-- เลือกโบรกเกอร์ --" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableBrokers.map((b) => (
+                                                    <SelectItem key={b.id} value={b.id}>
+                                                        {b.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
-                                )}
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="ib-account">เลขพอร์ต หรือ อีเมล (สำหรับการยืนยันตัวตนกับโบรกเกอร์)</Label>
-                                    <Input
-                                        id="ib-account"
-                                        placeholder="เช่น 12345678 หรือ youremail@gmail.com"
-                                        value={verificationData}
-                                        onChange={(e) => setVerificationData(e.target.value)}
-                                        required
-                                        className="font-mono"
-                                    />
-                                    <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                                        ทีมงานจะใช้ข้อมูลนี้เพื่อตรวจสอบในระบบหลังบ้านของโบรกเกอร์เท่านั้น
-                                        *คุณจะสามารถกรอกหมายเลขบัญชีเทรดที่จะใช้ผูกกับ EA ได้ในขั้นตอนถัดไป*
-                                    </p>
+                                    {selectedBroker && (
+                                        <div className="p-3 bg-muted/50 border border-border rounded-md text-xs sm:text-sm animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="font-semibold mb-1 flex items-center gap-1.5 text-xs">
+                                                <LinkIcon className="w-3.5 h-3.5" /> ลิงก์สมัคร (IB Link)
+                                            </div>
+                                            <a
+                                                href={availableBrokers.find(b => b.id === selectedBroker)?.ib_link}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-primary hover:underline break-all text-xs block"
+                                            >
+                                                {availableBrokers.find(b => b.id === selectedBroker)?.ib_link}
+                                            </a>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="ib-account" className="text-xs sm:text-sm">เลขพอร์ต หรือ อีเมล (สำหรับการยืนยันตัวตนกับโบรกเกอร์)</Label>
+                                        <Input
+                                            id="ib-account"
+                                            placeholder="เช่น 12345678 หรือ youremail@gmail.com"
+                                            value={verificationData}
+                                            onChange={(e) => setVerificationData(e.target.value)}
+                                            required
+                                            className="font-mono"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                                            ทีมงานจะใช้ข้อมูลนี้เพื่อตรวจสอบในระบบหลังบ้านของโบรกเกอร์เท่านั้น
+                                            *คุณจะสามารถกรอกหมายเลขบัญชีเทรดที่จะใช้ผูกกับ EA ได้ในขั้นตอนถัดไป*
+                                        </p>
+                                    </div>
+
+                                    <div className="bg-blue-500/10 text-blue-800 dark:text-blue-300 p-2.5 rounded-md text-xs flex gap-2 items-start mt-2">
+                                        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+                                        <p>หลังจากส่งข้อมูลแล้ว ทีมงานจะตรวจสอบว่าคุณอยู่ภายใต้ IB ของเราหรือไม่ และจะอนุมัติสิทธิ์ให้ภายใน 24 ชั่วโมง</p>
+                                    </div>
                                 </div>
 
-                                <div className="bg-blue-500/10 text-blue-800 dark:text-blue-300 p-3 rounded-md text-xs flex gap-2 items-start mt-4">
-                                    <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                                    <p>หลังจากส่งข้อมูลแล้ว ทีมงานจะตรวจสอบว่าคุณอยู่ภายใต้ IB ของเราหรือไม่ และจะอนุมัติสิทธิ์ให้ภายใน 24 ชั่วโมง</p>
+                                {/* Fixed footer submit button */}
+                                <div className="p-4 sm:p-6 pt-3 pb-4 border-t border-border/40 bg-background/95 backdrop-blur shrink-0">
+                                    <Button type="submit" className="w-full shadow-md text-sm h-10" disabled={isSubmitting}>
+                                        {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> กำลังส่งข้อมูล...</> : "ส่งคำขอรับสิทธิ์"}
+                                    </Button>
                                 </div>
-
-                                <Button type="submit" className="w-full mt-4" disabled={isSubmitting}>
-                                    {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> กำลังส่งข้อมูล...</> : "ส่งคำขอรับสิทธิ์"}
-                                </Button>
                             </form>
                         </DialogContent>
                     ) : (
