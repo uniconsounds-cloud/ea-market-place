@@ -278,6 +278,14 @@ export async function POST(req: Request) {
                         })
                         .eq('port_number', String(account_number));
 
+                    // Opportunistically record last_license_check (if column exists)
+                    try {
+                        await supabase
+                            .from('farm_port_status')
+                            .update({ last_license_check: nowIso })
+                            .eq('port_number', String(account_number));
+                    } catch {}
+
                     if (shouldSyncDailyHistory && todayPnl > 0) {
                         try {
                             await supabase.rpc('sync_ea_history_batch', {
@@ -337,6 +345,13 @@ export async function POST(req: Request) {
                             last_ping: nowIso,
                             updated_at: nowIso
                         });
+
+                    try {
+                        await supabase
+                            .from('farm_port_status')
+                            .update({ last_license_check: nowIso })
+                            .eq('port_number', String(account_number));
+                    } catch {}
                 }
 
             } catch (telemetryErr) {

@@ -37,6 +37,7 @@ import {
     ArrowDownRight,
     CircleDollarSign,
     UserCheck,
+    KeyRound,
     X
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -70,6 +71,7 @@ interface EasyMPortItem {
     accountType: string;
     isOnline: boolean;
     lastPing: string | null;
+    lastLicenseCheck: string | null;
     updatedAt: string | null;
     todayPnl: number;
     todayClosedLots: number;
@@ -86,6 +88,132 @@ interface EasyMPortItem {
     requiredBalanceUSC: number;
     telemetryType: 'full_sync' | 'license_only' | 'none';
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
+}
+
+export interface LicenseCheckDisplayInfo {
+    lastCheckStr: string;
+    nextCheckStr: string;
+    countdownText: string;
+    badgeClass: string;
+    isDue: boolean;
+    isOverdue: boolean;
+    fullTooltip: string;
+}
+
+export function getLicenseCheckInfo(lastCheckIso: string | null, nowMs: number): LicenseCheckDisplayInfo {
+    if (!lastCheckIso) {
+        return {
+            lastCheckStr: 'ไม่มีข้อมูล',
+            nextCheckStr: '-',
+            countdownText: 'ยังไม่เคยเช็ค',
+            badgeClass: 'text-muted-foreground bg-muted/40 border-border',
+            isDue: false,
+            isOverdue: false,
+            fullTooltip: 'ยังไม่มีประวัติการส่ง WebRequest ตรวจเช็คสิทธิ์'
+        };
+    }
+
+    const lastCheckDate = new Date(lastCheckIso);
+    const lastCheckMs = lastCheckDate.getTime();
+    if (isNaN(lastCheckMs)) {
+        return {
+            lastCheckStr: 'ไม่มีข้อมูล',
+            nextCheckStr: '-',
+            countdownText: 'รูปแบบผิดพลาด',
+            badgeClass: 'text-muted-foreground bg-muted/40 border-border',
+            isDue: false,
+            isOverdue: false,
+            fullTooltip: 'รูปแบบวันที่ไม่ถูกต้อง'
+        };
+    }
+
+    // 12 hours check interval in MT5 EA (43,200 seconds)
+    const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+    const nextCheckMs = lastCheckMs + CHECK_INTERVAL_MS;
+    const nextCheckDate = new Date(nextCheckMs);
+    const diffMs = nextCheckMs - nowMs;
+
+    const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' };
+    const dateOptions: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' };
+
+    const lastCheckTimeStr = lastCheckDate.toLocaleTimeString('th-TH', timeOptions);
+    const lastCheckDateStr = lastCheckDate.toLocaleDateString('th-TH', dateOptions);
+
+    const nowDate = new Date(nowMs);
+    const nowBangkokDateStr = nowDate.toLocaleDateString('th-TH', dateOptions);
+    const isToday = lastCheckDateStr === nowBangkokDateStr;
+
+    const lastCheckFormatted = isToday ? `วันนี้ ${lastCheckTimeStr}` : `${lastCheckDateStr} ${lastCheckTimeStr}`;
+    const nextCheckTimeStr = nextCheckDate.toLocaleTimeString('th-TH', timeOptions);
+    const nextCheckDateStr = nextCheckDate.toLocaleDateString('th-TH', dateOptions);
+    const isNextToday = nextCheckDateStr === nowBangkokDateStr;
+    const nextCheckFormatted = isNextToday ? `วันนี้ ${nextCheckTimeStr}` : `${nextCheckDateStr} ${nextCheckTimeStr}`;
+
+    const fullTooltip = `ตรวจเช็คสิทธิ์ล่าสุด: ${lastCheckDate.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} น.\nรอบตรวจถัดไป: ${nextCheckDate.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} น. (รอบปกติทุก 12 ชม.)`;
+
+    if (diffMs > 0) {
+        const totalMinutes = Math.floor(diffMs / (60 * 1000));
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+
+        let countdownText = '';
+        if (hours > 0) {
+            countdownText = `อีก ${hours} ชม. ${mins} น.`;
+        } else {
+            countdownText = `อีก ${mins} นาที`;
+        }
+
+        let badgeClass = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25';
+        if (hours === 0 && mins <= 30) {
+            badgeClass = 'text-sky-400 bg-sky-500/15 border-sky-500/35 animate-pulse';
+        }
+
+        return {
+            lastCheckStr: lastCheckFormatted,
+            nextCheckStr: nextCheckFormatted,
+            countdownText,
+            badgeClass,
+            isDue: false,
+            isOverdue: false,
+            fullTooltip
+        };
+    } else {
+        const overdueMinutes = Math.floor(Math.abs(diffMs) / (60 * 1000));
+        const overdueHours = Math.floor(overdueMinutes / 60);
+        const overdueDays = Math.floor(overdueHours / 24);
+
+        if (overdueHours < 1) {
+            return {
+                lastCheckStr: lastCheckFormatted,
+                nextCheckStr: nextCheckFormatted,
+                countdownText: '🔔 ถึงรอบตรวจแล้ว',
+                badgeClass: 'text-amber-400 bg-amber-500/15 border-amber-500/30',
+                isDue: true,
+                isOverdue: false,
+                fullTooltip: `${fullTooltip}\n⚠️ ถึงกำหนดรอบตรวจ 12 ชม. แล้ว (กำลังรอ EA ส่ง WebRequest)`
+            };
+        } else if (overdueDays < 2) {
+            return {
+                lastCheckStr: lastCheckFormatted,
+                nextCheckStr: nextCheckFormatted,
+                countdownText: `⚠️ เลยกำหนด ${overdueHours} ชม.`,
+                badgeClass: 'text-amber-500 bg-amber-500/10 border-amber-500/30',
+                isDue: false,
+                isOverdue: true,
+                fullTooltip: `${fullTooltip}\n⚠️ เลยรอบตรวจเช็คมาแล้ว ${overdueHours} ชม. (อาจปิด MT5 หรือขาดการเชื่อมต่อ)`
+            };
+        } else {
+            return {
+                lastCheckStr: lastCheckFormatted,
+                nextCheckStr: nextCheckFormatted,
+                countdownText: `⏸️ ขาดตรวจ (${overdueDays} วัน)`,
+                badgeClass: 'text-muted-foreground bg-muted/40 border-border',
+                isDue: false,
+                isOverdue: true,
+                fullTooltip: `${fullTooltip}\n⏸️ ไม่ได้ส่งการตรวจเช็คมาแล้ว ${overdueDays} วัน`
+            };
+        }
+    }
 }
 
 export interface MonthlyFleetStat {
@@ -334,6 +462,15 @@ export default function EasyMMasterDashboardPage() {
     const [selectedLicenseStatus, setSelectedLicenseStatus] = useState<string>('all');
     const [viewMode, setViewMode] = useState<'customer' | 'table' | 'cards'>('customer');
     const [activeTab, setActiveTab] = useState<'performance' | 'ports' | 'team-analytics'>('performance');
+    const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+
+    // Timer to update countdown every 10 seconds
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 10000);
+        return () => clearInterval(timer);
+    }, []);
 
     // 1. Auth Guard: Only juntarasate@gmail.com
     useEffect(() => {
@@ -924,6 +1061,7 @@ export default function EasyMMasterDashboardPage() {
                         accountType: resolvedAccType,
                         isOnline,
                         lastPing: status?.last_ping || null,
+                        lastLicenseCheck: (status as any)?.last_license_check || status?.last_ping || null,
                         updatedAt: status?.updated_at || null,
                         todayPnl: resolvedTodayPnl,
                         todayClosedLots: status?.today_closed_lots || 0,
@@ -1030,6 +1168,7 @@ export default function EasyMMasterDashboardPage() {
                             accountType: status.account_type || 'USC',
                             isOnline,
                             lastPing: status.last_ping || null,
+                            lastLicenseCheck: (status as any)?.last_license_check || status.last_ping || null,
                             updatedAt: status.updated_at || null,
                             todayPnl: resolvedTodayPnl,
                             todayClosedLots: status.today_closed_lots || 0,
@@ -3298,6 +3437,7 @@ export default function EasyMMasterDashboardPage() {
                                                 <TableHead className="text-right">Floating PnL</TableHead>
                                                 <TableHead className="text-right">Drawdown</TableHead>
                                                 <TableHead className="text-right">{fleetStats?.isWeekend ? `กำไร (${fleetStats.today.dateLabel})` : 'กำไรวันนี้'}</TableHead>
+                                                <TableHead className="text-center w-[155px]">เช็คสิทธิ์ล่าสุด / ถัดไป</TableHead>
                                                 <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                                 <TableHead className="text-center">สถานะ</TableHead>
                                             </TableRow>
@@ -3375,6 +3515,23 @@ export default function EasyMMasterDashboardPage() {
                                                             <span className="text-muted-foreground">0.00</span>
                                                         )}
                                                     </TableCell>
+                                                    {(() => {
+                                                        const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
+                                                        return (
+                                                            <TableCell className="text-center font-mono">
+                                                                <div className="flex flex-col items-center gap-0.5" title={checkInfo.fullTooltip}>
+                                                                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
+                                                                        <KeyRound className="w-3 h-3 text-amber-400 shrink-0" />
+                                                                        <span>{checkInfo.lastCheckStr}</span>
+                                                                    </div>
+                                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-sans px-1.5 py-0.5 rounded border whitespace-nowrap ${checkInfo.badgeClass}`}>
+                                                                        <Clock className="w-2.5 h-2.5 shrink-0" />
+                                                                        {checkInfo.countdownText}
+                                                                    </span>
+                                                                </div>
+                                                            </TableCell>
+                                                        );
+                                                    })()}
                                                     <TableCell className="text-center font-mono text-xs text-muted-foreground">
                                                         {port.eaVersion}
                                                     </TableCell>
@@ -3469,6 +3626,7 @@ export default function EasyMMasterDashboardPage() {
                                     <TableHead className="text-right">Floating PnL</TableHead>
                                     <TableHead className="text-right">Max DD</TableHead>
                                     <TableHead className="text-right">{fleetStats?.isWeekend ? `กำไร (${fleetStats.today.dateLabel})` : 'กำไรวันนี้'}</TableHead>
+                                    <TableHead className="text-center w-[155px]">เช็คสิทธิ์ล่าสุด / ถัดไป</TableHead>
                                     <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                     <TableHead className="text-center">สถานะ</TableHead>
                                 </TableRow>
@@ -3555,6 +3713,23 @@ export default function EasyMMasterDashboardPage() {
                                                 <span className="text-muted-foreground">0.00</span>
                                             )}
                                         </TableCell>
+                                        {(() => {
+                                            const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
+                                            return (
+                                                <TableCell className="text-center font-mono">
+                                                    <div className="flex flex-col items-center gap-0.5" title={checkInfo.fullTooltip}>
+                                                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
+                                                            <KeyRound className="w-3 h-3 text-amber-400 shrink-0" />
+                                                            <span>{checkInfo.lastCheckStr}</span>
+                                                        </div>
+                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-sans px-1.5 py-0.5 rounded border whitespace-nowrap ${checkInfo.badgeClass}`}>
+                                                            <Clock className="w-2.5 h-2.5 shrink-0" />
+                                                            {checkInfo.countdownText}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                            );
+                                        })()}
                                         <TableCell className="text-center font-mono text-xs text-muted-foreground">
                                             {port.eaVersion}
                                         </TableCell>
@@ -3742,6 +3917,28 @@ export default function EasyMMasterDashboardPage() {
                                         <span className="text-muted-foreground">สายงานแอดมิน:</span>
                                         <span className="text-blue-400">{port.adminName}</span>
                                     </div>
+
+                                    {(() => {
+                                        const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
+                                        return (
+                                            <div className="pt-2 border-t border-border/40 space-y-1.5" title={checkInfo.fullTooltip}>
+                                                <div className="flex items-center justify-between text-[11px]">
+                                                    <span className="text-muted-foreground flex items-center gap-1">
+                                                        <KeyRound className="w-3 h-3 text-amber-400 shrink-0" /> ตรวจสิทธิ์ล่าสุด:
+                                                    </span>
+                                                    <span className="font-mono text-foreground font-medium">{checkInfo.lastCheckStr}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[11px]">
+                                                    <span className="text-muted-foreground flex items-center gap-1">
+                                                        <Clock className="w-3 h-3 text-sky-400 shrink-0" /> รอบถัดไป:
+                                                    </span>
+                                                    <span className={`inline-flex items-center gap-1 font-mono px-1.5 py-0.5 rounded border text-[10px] ${checkInfo.badgeClass}`}>
+                                                        {checkInfo.countdownText}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </CardContent>
                         </Card>
