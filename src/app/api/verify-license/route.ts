@@ -179,7 +179,7 @@ export async function POST(req: Request) {
 
                 const { data: existingStatus } = await supabase
                     .from('farm_port_status')
-                    .select('port_number, equity, account_type, balance, today_pnl, updated_at')
+                    .select('port_number, equity, account_type, balance, today_pnl, updated_at, daily_max_drawdown, max_drawdown, floating_pnl')
                     .eq('port_number', String(account_number))
                     .maybeSingle();
 
@@ -190,6 +190,21 @@ export async function POST(req: Request) {
 
                     let todayPnl = Number(existingStatus.today_pnl) || 0;
                     let shouldSyncDailyHistory = false;
+
+                    const numEquity = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
+                        ? Number(equity)
+                        : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal);
+
+                    // Automatic calculation of Floating PnL & Drawdowns from Balance & Equity
+                    const calculatedFloatingPnl = Number((numEquity - numBal).toFixed(2));
+                    let currentDD = 0;
+                    if (numBal > 0 && numEquity < numBal) {
+                        currentDD = Number((((numBal - numEquity) / numBal) * 100).toFixed(1));
+                    }
+                    const existingDailyDD = Number(existingStatus.daily_max_drawdown) || 0;
+                    const existingMaxDD = Number(existingStatus.max_drawdown) || 0;
+                    const resolvedDailyDD = Math.max(existingDailyDD, currentDD);
+                    const resolvedMaxDD = Math.max(existingMaxDD, currentDD);
 
                     if (today_profit !== undefined && today_profit !== null && !isNaN(Number(today_profit))) {
                         // Priority 1: Direct MT5 Deal History Profit (impervious to deposits/withdrawals)
@@ -207,7 +222,7 @@ export async function POST(req: Request) {
                                     p_history_array: [{
                                         date: lastMarketDateStr,
                                         profit: todayPnl,
-                                        max_dd: 0,
+                                        max_dd: resolvedDailyDD,
                                         lots: 0
                                     }]
                                 });
@@ -220,7 +235,7 @@ export async function POST(req: Request) {
                         todayPnl = 0;
                         shouldSyncDailyHistory = false;
                     } else {
-                        // Same market trading day: calculate incremental profit if balance increased
+                        // Same market trading day: calculate incremental profit if balance increased (e.g. basket closed)
                         const prevBal = Number(existingStatus.balance) || numBal;
                         const delta = numBal - prevBal;
                         
@@ -234,10 +249,6 @@ export async function POST(req: Request) {
                             shouldSyncDailyHistory = true;
                         }
                     }
-
-                    const numEquity = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
-                        ? Number(equity)
-                        : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal);
 
                     const prodKeyUpper = (resolvedProduct?.product_key || '').toUpperCase();
                     const prodNameUpper = (resolvedProduct?.name || '').toUpperCase();
@@ -255,6 +266,9 @@ export async function POST(req: Request) {
                         .update({
                             balance: numBal,
                             equity: numEquity,
+                            floating_pnl: calculatedFloatingPnl,
+                            daily_max_drawdown: resolvedDailyDD,
+                            max_drawdown: resolvedMaxDD,
                             today_pnl: todayPnl,
                             asset_type: currentAssetType,
                             system_code: currentSystemCode,
@@ -272,7 +286,7 @@ export async function POST(req: Request) {
                                 p_history_array: [{
                                     date: currentMarketDateStr,
                                     profit: todayPnl,
-                                    max_dd: 0,
+                                    max_dd: resolvedDailyDD,
                                     lots: 0
                                 }]
                             });
@@ -287,6 +301,12 @@ export async function POST(req: Request) {
                     const numEquity = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
                         ? Number(equity)
                         : numBal;
+
+                    const calculatedFloatingPnl = Number((numEquity - numBal).toFixed(2));
+                    let currentDD = 0;
+                    if (numBal > 0 && numEquity < numBal) {
+                        currentDD = Number((((numBal - numEquity) / numBal) * 100).toFixed(1));
+                    }
 
                     const prodKeyUpper = (resolvedProduct?.product_key || '').toUpperCase();
                     const prodNameUpper = (resolvedProduct?.name || '').toUpperCase();
@@ -305,6 +325,9 @@ export async function POST(req: Request) {
                             port_number: String(account_number),
                             balance: numBal,
                             equity: numEquity,
+                            floating_pnl: calculatedFloatingPnl,
+                            daily_max_drawdown: currentDD,
+                            max_drawdown: currentDD,
                             today_pnl: initialTodayPnl,
                             account_type: resolvedProduct?.currency || 'USC',
                             asset_type: currentAssetType,
@@ -315,6 +338,7 @@ export async function POST(req: Request) {
                             updated_at: nowIso
                         });
                 }
+
             } catch (telemetryErr) {
                 console.error('License verification status telemetry update error:', telemetryErr);
             }

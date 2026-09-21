@@ -84,6 +84,7 @@ interface EasyMPortItem {
     actualSystemCode: string;
     hoursSinceLastPing: number;
     requiredBalanceUSC: number;
+    telemetryType: 'full_sync' | 'license_only' | 'none';
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
 }
 
@@ -818,12 +819,30 @@ export default function EasyMMasterDashboardPage() {
                     const statusTodayPnl = (isPingToday && !isGoldMismatch) ? (Number(status?.today_pnl) || 0) : 0;
                     const resolvedTodayPnl = isGoldMismatch ? 0 : Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
 
-                    const statusDailyDD = Number(status?.daily_max_drawdown) || 0;
+                    // Fallback Floating PnL & DD if status has equity & balance but floating_pnl is 0
+                    const rawBalVal = Number(status?.balance) || 0;
+                    const rawEqVal = Number(status?.equity) || 0;
+                    let resolvedFloatingPnl = Number(status?.floating_pnl) || 0;
+                    if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
+                        resolvedFloatingPnl = Number((rawEqVal - rawBalVal).toFixed(2));
+                    }
+
+                    let calculatedDD = 0;
+                    if (rawBalVal > 0 && rawEqVal > 0 && rawEqVal < rawBalVal) {
+                        calculatedDD = Number((((rawBalVal - rawEqVal) / rawBalVal) * 100).toFixed(1));
+                    }
+                    const statusDailyDD = Math.max(Number(status?.daily_max_drawdown) || 0, calculatedDD);
                     const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
 
-                    const statusMaxDD = Number(status?.max_drawdown) || 0;
+                    const statusMaxDD = Math.max(Number(status?.max_drawdown) || 0, calculatedDD);
                     const histWorstDD = portWorstDDMap.get(accNum) || 0;
-                    const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD);
+                    const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
+
+                    // Telemetry type: full_sync (2 URLs) vs license_only (1 URL) vs none
+                    const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
+                    const telemetryType: 'full_sync' | 'license_only' | 'none' = hasUniversalTelemetry 
+                        ? 'full_sync' 
+                        : (hasRealStatus ? 'license_only' : 'none');
 
                     let runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold' = 'running';
                     if (!lic.is_active) {
@@ -896,7 +915,7 @@ export default function EasyMMasterDashboardPage() {
                         activeDays,
                         balance: status?.balance || 0,
                         equity: status?.equity || 0,
-                        floatingPnl: status?.floating_pnl || 0,
+                        floatingPnl: resolvedFloatingPnl,
                         maxDrawdown: resolvedMaxDD,
                         dailyMaxDrawdown: resolvedDailyDD,
                         totalLots: status?.total_lots || 0,
@@ -919,8 +938,10 @@ export default function EasyMMasterDashboardPage() {
                         actualSystemCode: status?.system_code || 'UNKNOWN',
                         hoursSinceLastPing: Math.round(hoursSinceLastPing),
                         requiredBalanceUSC,
+                        telemetryType,
                         runStatus
                     };
+
 
                     portItemsMap.set(accNum, item);
                 });
@@ -948,12 +969,28 @@ export default function EasyMMasterDashboardPage() {
                         const statusTodayPnl = Number(status.today_pnl) || 0;
                         const resolvedTodayPnl = Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
 
-                        const statusDailyDD = Number(status.daily_max_drawdown) || 0;
+                        const rawBalVal = Number(status.balance) || 0;
+                        const rawEqVal = Number(status.equity) || 0;
+                        let resolvedFloatingPnl = Number(status.floating_pnl) || 0;
+                        if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
+                            resolvedFloatingPnl = Number((rawEqVal - rawBalVal).toFixed(2));
+                        }
+
+                        let calculatedDD = 0;
+                        if (rawBalVal > 0 && rawEqVal > 0 && rawEqVal < rawBalVal) {
+                            calculatedDD = Number((((rawBalVal - rawEqVal) / rawBalVal) * 100).toFixed(1));
+                        }
+                        const statusDailyDD = Math.max(Number(status.daily_max_drawdown) || 0, calculatedDD);
                         const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
 
-                        const statusMaxDD = Number(status.max_drawdown) || 0;
+                        const statusMaxDD = Math.max(Number(status.max_drawdown) || 0, calculatedDD);
                         const histWorstDD = portWorstDDMap.get(accNum) || 0;
-                        const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD);
+                        const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
+
+                        const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
+                        const telemetryType: 'full_sync' | 'license_only' | 'none' = hasUniversalTelemetry 
+                            ? 'full_sync' 
+                            : ((status?.last_ping || status?.updated_at) ? 'license_only' : 'none');
 
                         const hoursSinceLastPing = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
                         const isMax = sc.includes('max');
@@ -984,7 +1021,7 @@ export default function EasyMMasterDashboardPage() {
                             activeDays,
                             balance: status.balance || 0,
                             equity: status.equity || 0,
-                            floatingPnl: status.floating_pnl || 0,
+                            floatingPnl: resolvedFloatingPnl,
                             maxDrawdown: resolvedMaxDD,
                             dailyMaxDrawdown: resolvedDailyDD,
                             totalLots: status.total_lots || 0,
@@ -1007,8 +1044,10 @@ export default function EasyMMasterDashboardPage() {
                             actualSystemCode: status.system_code || 'EasyM MAX',
                             hoursSinceLastPing: Math.round(hoursSinceLastPing),
                             requiredBalanceUSC,
+                            telemetryType,
                             runStatus
                         });
+
                     }
                 }
             });
@@ -1288,6 +1327,8 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedStatus === 'high_dd' && p.maxDrawdown < 10) return false;
                 if (selectedStatus === 'profit_positive' && p.todayPnl <= 0) return false;
                 if (selectedStatus === 'has_telemetry' && !p.hasTelemetry) return false;
+                if (selectedStatus === 'full_sync' && p.telemetryType !== 'full_sync') return false;
+                if (selectedStatus === 'license_only' && p.telemetryType !== 'license_only') return false;
             }
 
             return true;
@@ -3066,6 +3107,8 @@ export default function EasyMMasterDashboardPage() {
                                     <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
                                     <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
                                     <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
+                                    <SelectItem value="full_sync">📡 2 URLs (Full WebSync)</SelectItem>
+                                    <SelectItem value="license_only">🔑 1 URL (License Only)</SelectItem>
                                     <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
                                     <SelectItem value="profit_positive">{fleetStats?.isWeekend ? `📈 กำไร (${fleetStats.today.dateLabel})` : '📈 วันนี้บวก'}</SelectItem>
                                 </SelectContent>
@@ -3130,6 +3173,24 @@ export default function EasyMMasterDashboardPage() {
                             ⚡ รันจริงเท่านั้น ({ports.filter(p => p.isRealRunning).length})
                         </Button>
                         <Button 
+                            variant={selectedStatus === 'full_sync' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('full_sync')}
+                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'full_sync' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
+                            title="พอร์ตที่มีการตั้งค่า WebRequest ครบทั้ง 2 URLs (ส่งออเดอร์, กำไร และ DD ครบถ้วน)"
+                        >
+                            📡 2 URLs (Full) ({ports.filter(p => p.telemetryType === 'full_sync').length})
+                        </Button>
+                        <Button 
+                            variant={selectedStatus === 'license_only' ? 'default' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setSelectedStatus('license_only')}
+                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'license_only' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                            title="พอร์ตที่มี WebRequest ตัวเดียว (เช็คสิทธิ์อย่างเดียว) แนะนำเพิ่ม URL Supabase ใน MT5"
+                        >
+                            🔑 1 URL (License) ({ports.filter(p => p.telemetryType === 'license_only').length})
+                        </Button>
+                        <Button 
                             variant={selectedStatus === 'offline_48h' ? 'default' : 'outline'} 
                             size="sm" 
                             onClick={() => setSelectedStatus('offline_48h')}
@@ -3155,6 +3216,7 @@ export default function EasyMMasterDashboardPage() {
                             🟢 สด &lt;30 นาที ({ports.filter(p => p.isOnline).length})
                         </Button>
                     </div>
+
                 </CardContent>
             </Card>
 
@@ -3352,6 +3414,15 @@ export default function EasyMMasterDashboardPage() {
                                                                     ⛔ Inactive
                                                                 </Badge>
                                                             ) : null}
+                                                            {port.telemetryType === 'full_sync' ? (
+                                                                <span className="inline-flex items-center gap-1 text-[8px] text-sky-400 font-mono bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"></span> 2 URLs (Full)
+                                                                </span>
+                                                            ) : port.telemetryType === 'license_only' ? (
+                                                                <span className="inline-flex items-center gap-1 text-[8px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): แนะนำเพิ่ม URL Supabase ใน MT5 เพื่อรับข้อมูล Full Telemetry">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> 1 URL (License)
+                                                                </span>
+                                                            ) : null}
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
@@ -3361,6 +3432,7 @@ export default function EasyMMasterDashboardPage() {
                                                             >
                                                                 {port.isActive ? "ระงับสิทธิ์" : "เปิดสิทธิ์"}
                                                             </Button>
+
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -3522,6 +3594,15 @@ export default function EasyMMasterDashboardPage() {
                                                         ⛔ Inactive
                                                     </Badge>
                                                 ) : null}
+                                                {port.telemetryType === 'full_sync' ? (
+                                                    <span className="inline-flex items-center gap-1 text-[8px] text-sky-400 font-mono bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"></span> 2 URLs (Full)
+                                                    </span>
+                                                ) : port.telemetryType === 'license_only' ? (
+                                                    <span className="inline-flex items-center gap-1 text-[8px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): คำนวณ DD/กำไรจาก Balance แนะนำเพิ่ม URL Supabase ใน MT5 เพื่อรับข้อมูล Telemetry แบบเรียลไทม์">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> 1 URL (License)
+                                                    </span>
+                                                ) : null}
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
@@ -3572,6 +3653,15 @@ export default function EasyMMasterDashboardPage() {
                                                 ⚠️ ไม่มี Telemetry
                                             </span>
                                         )}
+                                        {port.telemetryType === 'full_sync' ? (
+                                            <span className="flex items-center gap-1 text-[9px] bg-sky-500/10 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full font-medium" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span> 2 URLs (Full Sync)
+                                            </span>
+                                        ) : port.telemetryType === 'license_only' ? (
+                                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-medium" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): คำนวณ DD/กำไรจาก Balance แนะนำเพิ่ม URL Supabase ใน MT5 เพื่อรับข้อมูล Full Telemetry">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 1 URL (License Only)
+                                            </span>
+                                        ) : null}
                                         {port.runStatus === 'mismatch_gold' && (
                                             <span className="text-[9px] bg-amber-500/15 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
                                                 🥇 รันทองคำ (EasyGold)
