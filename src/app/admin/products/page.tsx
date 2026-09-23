@@ -58,53 +58,86 @@ export default function AdminProductsPage() {
             .order('created_at', { ascending: false });
 
         if (data) {
-            // Compute stats for each product
-            const { data: licenses } = await supabase
-                .from('licenses')
-                .select('product_id, account_number, is_active, user_id')
-                .eq('is_active', true);
+            // Compute stats for each product with full pagination (>1000 rows supported)
+            let allLicenses: any[] = [];
+            let from = 0;
+            const batchSize = 1000;
+            while (true) {
+                const { data: batch, error: batchErr } = await supabase
+                    .from('licenses')
+                    .select('id, product_id, account_number, is_active, user_id, type, is_ib_request, ib_broker_name')
+                    .eq('is_active', true)
+                    .range(from, from + batchSize - 1);
 
-            const userIds = Array.from(new Set(licenses?.map(l => l.user_id).filter(Boolean)));
+                if (batchErr) {
+                    console.error('Error fetching licenses batch:', batchErr);
+                    break;
+                }
+                if (batch) allLicenses = allLicenses.concat(batch);
+                if (!batch || batch.length < batchSize) break;
+                from += batchSize;
+            }
+
+            const userIds = Array.from(new Set(allLicenses.map(l => l.user_id).filter(Boolean)));
+            let profilesMap: Record<string, any> = {};
             let ibMembershipsMap: Record<string, string[]> = {};
 
             if (userIds.length > 0) {
-                const { data: ibMemberships } = await supabase
-                    .from('ib_memberships')
-                    .select('user_id, verification_data')
-                    .in('user_id', userIds)
-                    .eq('status', 'approved');
+                // Chunk queries to avoid URL length issues
+                for (let i = 0; i < userIds.length; i += 100) {
+                    const chunk = userIds.slice(i, i + 100);
+                    const [ibRes, profRes] = await Promise.all([
+                        supabase
+                            .from('ib_memberships')
+                            .select('user_id, verification_data')
+                            .in('user_id', chunk)
+                            .eq('status', 'approved'),
+                        supabase
+                            .from('profiles')
+                            .select('id, ib_account_number, is_tester')
+                            .in('id', chunk)
+                    ]);
 
-                const { data: profiles } = await supabase
-                    .from('profiles')
-                    .select('id, ib_account_number')
-                    .in('id', userIds);
-
-                if (ibMemberships) {
-                    ibMemberships.forEach(ib => {
-                        if (!ibMembershipsMap[ib.user_id]) ibMembershipsMap[ib.user_id] = [];
-                        ibMembershipsMap[ib.user_id].push(ib.verification_data);
-                    });
-                }
-
-                if (profiles) {
-                    profiles.forEach(p => {
-                        if (p.ib_account_number) {
-                            if (!ibMembershipsMap[p.id]) ibMembershipsMap[p.id] = [];
-                            if (!ibMembershipsMap[p.id].includes(p.ib_account_number)) {
-                                ibMembershipsMap[p.id].push(p.ib_account_number);
+                    if (ibRes.data) {
+                        ibRes.data.forEach(ib => {
+                            if (!ibMembershipsMap[ib.user_id]) ibMembershipsMap[ib.user_id] = [];
+                            const val = ib.verification_data?.trim();
+                            if (val && !ibMembershipsMap[ib.user_id].includes(val)) {
+                                ibMembershipsMap[ib.user_id].push(val);
                             }
-                        }
-                    });
+                        });
+                    }
+
+                    if (profRes.data) {
+                        profRes.data.forEach(p => {
+                            profilesMap[p.id] = p;
+                            if (p.ib_account_number) {
+                                const val = p.ib_account_number.trim();
+                                if (!ibMembershipsMap[p.id]) ibMembershipsMap[p.id] = [];
+                                if (val && !ibMembershipsMap[p.id].includes(val)) {
+                                    ibMembershipsMap[p.id].push(val);
+                                }
+                            }
+                        });
+                    }
                 }
             }
 
             const productsWithStats = data.map(product => {
-                const productLicenses = licenses?.filter(l => l.product_id === product.id) || [];
+                // Filter licenses for this product, excluding test accounts to match admin/licenses
+                const productLicenses = allLicenses.filter(l => l.product_id === product.id && !profilesMap[l.user_id]?.is_tester);
                 let regularCount = 0;
                 let ibCount = 0;
 
                 productLicenses.forEach(l => {
-                    const isIb = l.user_id && l.account_number && ibMembershipsMap[l.user_id]?.includes(l.account_number);
+                    const port = l.account_number?.trim();
+                    const isIb =
+                        l.type === 'ib' ||
+                        Boolean(l.is_ib_request) ||
+                        Boolean(l.ib_broker_name) ||
+                        (l.user_id && port && ibMembershipsMap[l.user_id]?.includes(port)) ||
+                        (l.user_id && profilesMap[l.user_id]?.ib_account_number?.trim() === port);
+
                     if (isIb) {
                         ibCount++;
                     } else {

@@ -26,18 +26,27 @@ export default async function AdminLicensesPage() {
         .lt('expiry_date', nowISO)
         .eq('is_active', true);
 
-    // Fetch all licenses joined with products
-    const { data: rawLicenses, error } = await supabase
-        .from('licenses')
-        .select(`
-            *,
-            products ( name, asset_class, platform )
-        `)
-        .order('created_at', { ascending: false });
+    // Fetch all licenses joined with products (with pagination for >1000 records)
+    let rawLicenses: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    while (true) {
+        const { data: batch, error } = await supabase
+            .from('licenses')
+            .select(`
+                *,
+                products ( name, asset_class, platform )
+            `)
+            .order('created_at', { ascending: false })
+            .range(from, from + batchSize - 1);
 
-    if (error) {
-        console.error("Error fetching licenses:", error);
-        return <div className="p-8 text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูล: {error.message}</div>;
+        if (error) {
+            console.error("Error fetching licenses batch:", error);
+            break;
+        }
+        if (batch) rawLicenses = rawLicenses.concat(batch);
+        if (!batch || batch.length < batchSize) break;
+        from += batchSize;
     }
 
     // Manual Join: Fetch Profiles
@@ -46,47 +55,48 @@ export default async function AdminLicensesPage() {
     let ibMembershipsMap: Record<string, any[]> = {};
 
     if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, email, full_name, ib_account_number, is_tester')
-            .in('id', userIds);
+        // Chunk userIds to avoid URL length issues
+        for (let i = 0; i < userIds.length; i += 100) {
+            const chunk = userIds.slice(i, i + 100);
+            const [profilesRes, ibRes] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('id, email, full_name, ib_account_number, is_tester')
+                    .in('id', chunk),
+                supabase
+                    .from('ib_memberships')
+                    .select('user_id, verification_data, status, brokers(name)')
+                    .in('user_id', chunk)
+                    .eq('status', 'approved')
+            ]);
 
-        if (profiles) {
-            profilesMap = profiles.reduce((acc: any, p: any) => {
-                acc[p.id] = p;
-                return acc;
-            }, {});
-        }
-
-        // Fetch IB Memberships for these users
-        const { data: ibMemberships } = await supabase
-            .from('ib_memberships')
-            .select('user_id, verification_data, status, brokers(name)')
-            .in('user_id', userIds)
-            .eq('status', 'approved');
-
-        if (ibMemberships) {
-            // Group by user_id
-            ibMemberships.forEach(ib => {
-                if (!ibMembershipsMap[ib.user_id]) {
-                    ibMembershipsMap[ib.user_id] = [];
-                }
-                
-                // Extraction logic to handle brokers object or array
-                let bName = 'IB Account';
-                if (ib.brokers) {
-                    if (Array.isArray(ib.brokers)) {
-                        bName = ib.brokers[0]?.name || 'IB Account';
-                    } else {
-                        bName = (ib.brokers as any).name || 'IB Account';
-                    }
-                }
-
-                ibMembershipsMap[ib.user_id].push({
-                    account_number: ib.verification_data?.trim(),
-                    broker_name: bName
+            if (profilesRes.data) {
+                profilesRes.data.forEach((p: any) => {
+                    profilesMap[p.id] = p;
                 });
-            });
+            }
+
+            if (ibRes.data) {
+                ibRes.data.forEach((ib: any) => {
+                    if (!ibMembershipsMap[ib.user_id]) {
+                        ibMembershipsMap[ib.user_id] = [];
+                    }
+
+                    let bName = 'IB Account';
+                    if (ib.brokers) {
+                        if (Array.isArray(ib.brokers)) {
+                            bName = ib.brokers[0]?.name || 'IB Account';
+                        } else {
+                            bName = (ib.brokers as any).name || 'IB Account';
+                        }
+                    }
+
+                    ibMembershipsMap[ib.user_id].push({
+                        account_number: ib.verification_data?.trim(),
+                        broker_name: bName
+                    });
+                });
+            }
         }
     }
 
@@ -113,7 +123,7 @@ export default async function AdminLicensesPage() {
             }
         }
 
-        const isIbLicense = l.type === 'ib' || Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number?.trim() === port);
+        const isIbLicense = l.type === 'ib' || Boolean(l.is_ib_request) || Boolean(l.ib_broker_name) || Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number?.trim() === port);
 
         return {
             ...l,

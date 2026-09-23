@@ -5,7 +5,7 @@
 ---
 
 ## 📌 สารบัญเวอร์ชัน (Version Index)
-- [🚀 แผนการปรับปรุงในเวอร์ชันถัดไป (Upcoming Roadmap - v1.17)](#-แผนการปรับปรุงในเวอร์ชันถัดไป-upcoming-roadmap---v117) : สวิตช์เปิด-ปิด 20 คู่เงิน, คัดกรองคู่เงิน Drawdown สูง, ปรับปรุงการแก้ไม้
+- [v1.17 (0922) - 2026-09-22](#v117-0922---2026-09-22) : The Resilience & Rescue Edition (Quarantine Mode, Auto-Hedge Lock, Profit Slicing, Table E Alert Bar, Cluster Limits, Switches)
 - [v1.16 (0904) - 2026-09-04](#v116-0904---2026-09-04) : ปรับปรุงระบบปิดทำกำไร (Continuous Basket Exit & Trade Filling)
 - [v1.15 (0820) - 2026-08-20](#v115-0820---2026-08-20) : ซิงค์ประวัติรายวันอัตโนมัติเมื่อขึ้นวันใหม่ (Anti-Spike History Sync)
 - [v1.14 (0810) - 2026-08-10](#v114-0810---2026-08-10) : ระบบ Staggered Boot Delay & Auto Self-Healing 7 วัน
@@ -15,54 +15,52 @@
 
 ---
 
-## 🚀 แผนการปรับปรุงในเวอร์ชันถัดไป (Upcoming Roadmap - v1.17)
-> **สถานะ**: จัดทำแบบพิมพ์เขียว (Blueprint) และเก็บสถิติเรียบร้อยแล้ว — **พร้อมดำเนินการโค้ดทันทีเมื่อสั่งเริ่มงาน**  
-> **เอกสารสถิติอ้างอิง**: ดูรายละเอียดการคำนวณ Drawdown ทั้ง 20 คู่เงินได้ที่ [EASY_M_DRAWDOWN_ANALYSIS.md](file:///Users/suphakorn/EA%20Market%20Place/ea-market-place/mt5_integration/EASY_M_DRAWDOWN_ANALYSIS.md)
+## [v1.17 0922] - 2026-09-22
+### 🎯 เป้าหมาย: The Resilience & Rescue Edition — ปลดล็อคพอร์ตติดแช่แข็ง, โหมดกักกันคู่เงินเป็นพิษ, และเกราะป้องกันระดับกองทุน
 
-### 📌 หัวข้อที่ 1: ระบบสวิตช์เปิด-ปิดคู่เงินอิสระ (Symbol On/Off Switches)
-* **เป้าหมาย**: ให้ผู้ใช้งานและ Admin สามารถเลือกเปิดหรือปิดคู่เงินแต่ละตัวได้เองจากหน้าต่าง Inputs ของ EA โดยไม่ต้องแก้ไขโค้ด
-* **พิมพ์เขียวการทำงาน (Logic Blueprint)**:
-  1. เพิ่ม Input Parameters แบบ `bool` ครบทั้ง 20 คู่เงิน:
-     ```mql5
-     input group "==== 🌐 SYMBOL ACTIVATION SWITCHES (เปิด-ปิดรายคู่เงิน) ===="
-     input bool InpEnable_EURUSD = true;  // EURUSD (Active)
-     input bool InpEnable_GBPUSD = true;  // GBPUSD (Active)
-     input bool InpEnable_USDJPY = true;  // USDJPY (Active)
-     input bool InpEnable_USDCHF = true;  // USDCHF (Active)
-     input bool InpEnable_EURJPY = true;  // EURJPY (High Profit/High Risk)
-     input bool InpEnable_GBPJPY = true;  // GBPJPY (High Profit/High Risk)
-     input bool InpEnable_AUDCAD = false; // AUDCAD (Default OFF: High DD Drag)
-     input bool InpEnable_EURCHF = false; // EURCHF (Default OFF: 100% Hold Drag)
-     input bool InpEnable_GBPCHF = false; // GBPCHF (Default OFF: Low Profit)
-     // ... ครบทั้ง 20 คู่
-     ```
-  2. ใน `OnInit()`: นำค่า Input มากำหนดให้ `g_state[i].enabled`
-  3. **ระบบ Close-Only Graceful Shutdown**:
-     * หากสวิตช์เป็น `false` และ **ยังไม่มีไม้ค้าง**: บอทจะไม่ส่งคำสั่งเปิดไม้แรกเด็ดขาด
-     * หากสวิตช์เป็น `false` แต่ **มีไม้เดิมค้างอยู่แล้ว**: บอทยังคงดูแลแก้ไม้และรวบ TP ให้จนจบวัฏจักรนั้นอย่างปลอดภัย เมื่อปิดรอบเสร็จแล้วจะไม่เปิดรอบใหม่อีก
-
----
-
-### 📌 หัวข้อที่ 2: การปรับคัดกรองคู่เงิน (Pair Replacement & Optimization)
-* **เป้าหมาย**: ตัด 3 คู่เงินที่เป็นตัวถ่วงพอร์ต (กำไรน้อยแต่ Drawdown สูง/ติดนาน) และนำ 3 คู่เงินที่มีคุณสมบัติ Mean-Reversion ดีกว่าเข้ามาทดแทน
-* **คู่เงินที่เสนอตัดออก**:
-  1. `AUDCAD` (ติดแก้ไม้บ่อยสุดในพอร์ต 61.5% - 100% แต่กำไรเพียง 968 USC)
-  2. `EURCHF` (ติดลากข้ามวัน 100% กราฟแคบดองเงินนาน 38 วัน แต่กำไรเพียง 1,081 USC)
-  3. `GBPCHF` (กำไรต่ำที่สุดในพอร์ต เพียง 332 USC)
-* **คู่เงินที่เสนอทดแทนให้ครบ 20 คู่**:
-  1. `AUDNZD` (คู่อันดับ 1 สำหรับระบบ Grid ทั่วโลก กราฟมีคุณสมบัติ Mean-Reversion สูงมาก แทบไม่มี Super Trend ทางเดียว)
-  2. `CADJPY` (เสริมทัพกลุ่ม JPY ที่สร้างกำไรหลักให้พอร์ต แต่ความผันผวนคุมง่ายกว่า GBPJPY)
-  3. `CADCHF` (สวิงในกรอบกว้างและชนรอบ TP ได้เร็วกว่า EURCHF)
-
----
-
-### 📌 หัวข้อที่ 3: ระบบ Breakeven / Time-Based Bailout (ปลดล็อกไม้ดอง)
-* **เป้าหมาย**: แก้ปัญหาคู่เงินที่ติดลากข้ามเดือน (เช่น EURUSD 79 วัน, AUDUSD 67 วัน, EURJPY 84 วัน)
-* **ตรรกะการทำงาน**:
-  * หากรอบใดมีระยะเวลาถือครองเกินกว่าเกณฑ์ที่กำหนด (เช่น $> 21$ วัน หรือ $> 30$ วัน) ให้ระบบปรับลดเป้าหมายกำไร (`InpBasketTargetMoney`) ลงมาเป็น **Breakeven (เท่าทุน + ครอบคลุมค่า Swap/Commission)**
-  * เพื่อให้สามารถปิดรวบเคลียร์พอร์ตได้ทันทีเมื่อมีจังหวะย่อตัวเล็กน้อย คืน Margin ให้พอร์ตพร้อมรับรอบใหม่
-
----
+* **ฟีเจอร์และการปรับปรุงหลัก**:
+  1. **โหมดกักกันคู่เงินเป็นพิษ (Quarantine Symbol Mode)**:
+     - เมื่อคู่ใดคู่หนึ่งมี Drawdown เดี่ยวแตะ **10.0%** (`InpQuarantineTriggerPct`):
+       - บอทระงับการออกไม้แก้ (Grid additions) ในคู่นั้นทันที เพื่อไม่ให้กินมาร์จิ้นเพิ่ม
+       - **ตัด Floating Loss ของคู่นั้นออกจากสมการ DD รวมของพอร์ต**: ป้องกันไม่ให้คู่เดียวฉุดพอร์ตเข้า FREEZE MODE ทำให้อีก 19 คู่ยังคงเทรดเก็บกำไรตามปกติ
+       - ปลดปล่อยกลับสู่ภาวะปกติเมื่อ DD ลดลงมาต่ำกว่า **6.0%** (`InpQuarantineResumePct`)
+  2. **ระบบล็อคความเสียหายรายคู่ (Single-Pair Auto-Hedge Lock)**:
+     - หากคู่ที่ถูกกักกันยังคงถูกลากต่อจน DD แตะ **15.0% (Hard Cap)** (`InpHedgeTriggerPct`):
+       - บอทจะส่งคำสั่งเปิดไม้ฝั่งตรงข้ามในขนาด Net Lot ที่ถืออยู่ทันที (Delta = 0)
+       - **แช่แข็งผลขาดทุน 100% ทันที**: กราฟจะวิ่งต่ออีกกี่พันจุด พอร์ตก็จะไม่ขาดทุนเพิ่มขึ้นอีกแม้แต่เซนต์เดียว
+  3. **ระบบละลายไม้เสีย (Cross-Pair Profit Slicing / Relief Fund)**:
+     - ทุกครั้งที่คู่ชนะปิดทำกำไรได้: จัดสรรกำไร **40%** (`InpProfitReliefSharePct`) ไปสะสมในกองทุนช่วยเหลือ เพื่อปิดไม้ที่ติดลบหนักที่สุดของคู่ที่ติด Quarantine/Hedge
+     - หากคู่ที่ถูกช่วยเป็นไม้ที่มี Hedge: บอทจะตัดทั้งไม้เสียและไม้ Hedge พร้อมกันในสัดส่วนเท่ากัน (Symmetrical Unwind) เพื่อรักษา Delta = 0 ไว้ตลอดเวลา
+     - Balance พอร์ตยังคงเติบโตอย่างมั่นคงต่อเนื่อง ไม่มีการลดลงของ Balance
+  4. **จำกัดการเปิดกลุ่มสกุลเงิน (Currency Cluster Limiter - Max 2 JPY)**:
+     - จำกัดการถือครองคู่เงินที่มีสกุลเงินเดียวกัน (เช่น JPY) **พร้อมกันไม่เกิน 2 คู่** (`InpMaxCurrencyCluster = 2`)
+     - สกัดกั้นความเสี่ยงจากการพุ่งของค่าเงินเดียวที่อาจลากติดลบพร้อมกันหลายคู่
+  5. **สวิตช์เปิด-ปิดรายคู่ 23 คู่ (Symbol Activation Switches) พร้อมปุ่มคลิกบน Dashboard**:
+     - มีสวิตช์เปิด-ปิดอิสระครบ 23 คู่ในหน้าต่าง Inputs
+     - **คลิกเปิด-ปิดได้โดยตรงบนตาราง SYM ของ Dashboard**: แค่คลิกที่ชื่อคู่เงินจะสลับสถานะ ON/OFF ทันที พร้อมบันทึกลง `GlobalVariable` ทนทานต่อการรีบูต VPS
+     - **Close-Only Graceful Shutdown**: สั่งปิดคู่ไหน ถ้ามีไม้เดิมค้างอยู่จะดูแลแก้ไม้ให้จนจบ TP แต่จะไม่เปิดรอบใหม่อีก
+  6. **การสลับคู่เงินคุณภาพสูง (Pair Replacement & Zero-Conflict Magic)**:
+     - ตัด 3 คู่ถ่วงพอร์ต: `AUDCAD` (2010), `EURCHF` (2011), `GBPCHF` (2012) โดยตั้งค่าเริ่มต้นเป็น `false` (Close-Only) เพื่อคุมไม้เดิมที่ค้างอยู่จนจบ
+     - เพิ่ม 3 คู่คุณภาพสูง: `AUDNZD` (Magic 2021: คู่อันดับ 1 สาย Grid), `CADCHF` (Magic 2022), `NZDCAD` (Magic 2023)
+     - ใน `mini`: มี 11 คู่ (10 เดิม + AUDNZD)
+  7. **ระบบปลดล็อกไม้ดอง (Time-Based Breakeven Exit)**:
+     - หากถือครองไม้แรกเกิน **21 วัน** (`InpTimeBailoutDays = 21`): ปรับลดเป้าหมายกำไรลงมาเป็น Breakeven (0.0) รวบปิดคืนมาร์จิ้นทันทีที่กราฟย่อตัว
+  9. **หน้าจอแดชบอร์ดหด-ขยายอัตโนมัติ (Dynamic Auto-Collapse Dashboard)**:
+     - รองรับการแสดงผลทั้ง 23 คู่ (ใน MAX) และ 11 คู่ (ใน mini) อย่างเป็นระเบียบสวยงาม
+     - เมื่อไม้ของคู่เก่า (Legacy: AUDCAD, EURCHF, GBPCHF) ปิดทำกำไรจนครบหมด (Orders = 0) **แดชบอร์ดจะหดตัวกลับมาเหลือ 10 แถว (20 คู่ใน MAX) หรือ 5 แถว (10 คู่ใน mini) โดยอัตโนมัติ 100%** ไม่ต้องแก้ไขโค้ดหรือจัดหน้าจอใหม่เลย
+  8. **แถบแจ้งเตือนอัจฉริยะ (Table E Smart Alert Bar & Capital Cushion)**:
+     - เพิ่ม Table E ใต้ตาราง MODE แสดงค่า **`BUFFER: +XX.X% (X.Xx)`** เทียบกับทุนเริ่มต้น (`InpInitialCapital`)
+     - แสดงแถบแจ้งเตือนความปลอดภัย:
+       - `ALERT: [GBPJPY] QUARANTINED - LOCK WITHDRAWALS (งดถอน)`
+       - `CRITICAL: [GBPJPY] HEDGED (DELTA=0) - RELIEF IN PROGRESS`
+       - `WARNING: MARGIN LEVEL < 300% (TOP-UP RECOMMENDED)`
+       - `STATUS: ALL PAIRS ACTIVE | SYSTEM HEALTHY`
+     - ตัดเครื่องหมาย `$` ออกทั้งหมด รองรับบัญชี Cent (USC) และตัวเลขเพียวๆ อย่างชัดเจน
+  9. **อัปเกรด Order Comments เพื่อการตรวจสอบย้อนหลัง**:
+     - เปลี่ยนจาก `"EASY_M 10Pair"` เป็น `EM17:[SYM]:B[N]`, `EM17:[SYM]:S[N]`, `EM17:[SYM]:HDG` ตรวจสอบใน Trade History ได้ทันที
+* **ไฟล์ที่เกี่ยวข้อง**:
+  - `Experts/EasyM/EASY_M Max Universal v1.17 0922.mq5` / `.ex5`
+  - `Experts/EasyM/EASY_M mini Universal v1.17 0922.mq5` / `.ex5`
 
 ## [v1.16 0904] - 2026-09-04
 ### 🎯 เป้าหมาย: แก้ปัญหาบางคู่เงินกำไรทะลุเป้าหมายแล้วไม่ยอมปิด (Basket Profit Stuck)
