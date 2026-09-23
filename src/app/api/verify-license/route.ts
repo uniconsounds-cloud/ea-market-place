@@ -385,6 +385,14 @@ export async function POST(req: Request) {
             }
         }
 
+        // Opportunistic global sweep: auto-deactivate any expired licenses across the platform
+        supabase.from('licenses')
+            .update({ is_active: false })
+            .eq('is_active', true)
+            .neq('type', 'lifetime')
+            .lt('expiry_date', new Date().toISOString())
+            .then();
+
         // 6. Success
         return NextResponse.json({
             status: 'active',

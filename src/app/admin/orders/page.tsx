@@ -41,6 +41,18 @@ export default function AdminOrdersPage() {
     const fetchOrders = async () => {
         setLoading(true);
 
+        // Auto-deactivate any expired licenses
+        try {
+            await supabase
+                .from('licenses')
+                .update({ is_active: false })
+                .eq('is_active', true)
+                .neq('type', 'lifetime')
+                .lt('expiry_date', new Date().toISOString());
+        } catch (e) {
+            console.error('Error auto-deactivating expired licenses:', e);
+        }
+
         // Fetch all orders with pagination (>1000 records supported)
         let allOrders: any[] = [];
         let from = 0;
@@ -296,6 +308,7 @@ export default function AdminOrdersPage() {
                     const { error: updateError } = await supabase
                         .from('licenses')
                         .update({
+                            user_id: order.user_id,
                             type: commonLicenseType,
                             is_active: true,
                             expiry_date: commonExpiryDate,

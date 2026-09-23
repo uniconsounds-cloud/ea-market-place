@@ -34,7 +34,24 @@ export default function LicensesPage() {
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
-        if (data) setLicenses(data);
+        if (data) {
+            const now = new Date();
+            const expiredIds = data
+                .filter(l => l.is_active && l.type !== 'lifetime' && l.expiry_date && new Date(l.expiry_date) < now)
+                .map(l => l.id);
+
+            if (expiredIds.length > 0) {
+                supabase.from('licenses')
+                    .update({ is_active: false })
+                    .in('id', expiredIds)
+                    .then();
+            }
+
+            setLicenses(data.map(l => ({
+                ...l,
+                is_active: expiredIds.includes(l.id) ? false : l.is_active
+            })));
+        }
         setLoading(false);
     };
 
@@ -84,11 +101,14 @@ export default function LicensesPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-lg">{license.products?.name}</h3>
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
                                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${license.type === 'lifetime' ? 'bg-gold/10 text-gold' : license.type === 'ib' ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'}`}>
                                             {license.type === 'lifetime' ? 'ถาวร' : license.type === 'ib' ? 'IB (โบรกเกอร์)' : 'รายเดือน'}
                                         </span>
-                                        <span>• หมดอายุ: {license.type === 'lifetime' ? 'ตลอดชีพ' : new Date(license.expiry_date).toLocaleDateString('th-TH')}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${license.is_active ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                            {license.is_active ? 'ใช้งานอยู่' : 'หมดอายุ / ปิดใช้งาน'}
+                                        </span>
+                                        <span>• หมดอายุ: {license.type === 'lifetime' ? 'ตลอดชีพ' : license.expiry_date ? new Date(license.expiry_date).toLocaleDateString('th-TH') : '-'}</span>
                                     </div>
                                 </div>
                             </div>

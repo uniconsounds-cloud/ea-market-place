@@ -52,6 +52,18 @@ export default function AdminProductsPage() {
     }, []);
 
     const fetchProducts = async () => {
+        // Auto-deactivate any expired licenses
+        try {
+            await supabase
+                .from('licenses')
+                .update({ is_active: false })
+                .eq('is_active', true)
+                .neq('type', 'lifetime')
+                .lt('expiry_date', new Date().toISOString());
+        } catch (e) {
+            console.error('Error auto-deactivating expired licenses:', e);
+        }
+
         const { data } = await supabase
             .from('products')
             .select('*')

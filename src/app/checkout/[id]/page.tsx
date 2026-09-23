@@ -178,16 +178,31 @@ function CheckoutContent({ productId }: { productId: string }) {
             const ports = accountNumber.split(',').map(p => p.trim()).filter(Boolean);
             const { data: globalLicenses } = await supabase
                 .from('licenses')
-                .select('user_id, product_id, account_number, expiry_date')
+                .select('id, user_id, product_id, account_number, expiry_date, type')
                 .in('account_number', ports) // Check each individual port
-                .eq('is_active', true)
-                .gte('expiry_date', new Date().toISOString()) // Only check if not expired
-                .limit(1);
+                .eq('is_active', true);
 
-            const globalLicense = globalLicenses?.[0];
+            const now = new Date();
+            // Auto-deactivate any expired licenses
+            const expiredIds = (globalLicenses || [])
+                .filter(l => l.type !== 'lifetime' && l.expiry_date && new Date(l.expiry_date) < now)
+                .map(l => l.id);
 
-            if (globalLicense && (!user || (globalLicense.user_id !== user.id) || (globalLicense.product_id !== product.id))) {
-                alert(`หมายเลขพอร์ต ${globalLicense.account_number} ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`);
+            if (expiredIds.length > 0) {
+                supabase.from('licenses')
+                    .update({ is_active: false })
+                    .in('id', expiredIds)
+                    .then();
+            }
+
+            const activeConflict = (globalLicenses || []).find(l => {
+                const isUnexpired = l.type === 'lifetime' || !l.expiry_date || new Date(l.expiry_date) >= now;
+                if (!isUnexpired) return false;
+                return (!user || (l.user_id !== user.id) || (l.product_id !== product.id));
+            });
+
+            if (activeConflict) {
+                alert(`หมายเลขพอร์ต ${activeConflict.account_number} ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`);
                 setSubmitting(false);
                 return;
             }

@@ -183,23 +183,32 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
             for (const port of filledPorts) {
                 const existingUserLicense = userLicenses.find(l => l.account_number === port);
                 if (existingUserLicense) {
-                    const isIbPort = existingUserLicense.type === 'ib' || !!existingUserLicense.ib_broker_name || !!ibAccounts[port];
-                    if (ibStatus === 'approved' && useIbQuota) {
-                        if (!isIbPort) {
-                            setPortValidationMsg({ text: `พอร์ต ${port} เป็นพอร์ตปกติ ไม่สามารถขอแบบ IB ได้`, type: 'error' });
-                            hasError = true;
-                            break;
+                    const now = new Date();
+                    const isLicenseExpired = !existingUserLicense.is_active || (existingUserLicense.type !== 'lifetime' && existingUserLicense.expiry_date && new Date(existingUserLicense.expiry_date) < now);
+                    
+                    // If the old license is expired, allow user to freely request/switch plans
+                    if (!isLicenseExpired) {
+                        const isIbPort = existingUserLicense.type === 'ib' || !!existingUserLicense.ib_broker_name || !!ibAccounts[port];
+                        if (ibStatus === 'approved' && useIbQuota) {
+                            if (!isIbPort) {
+                                setPortValidationMsg({ text: `พอร์ต ${port} เป็นพอร์ตปกติ ไม่สามารถขอแบบ IB ได้`, type: 'error' });
+                                hasError = true;
+                                break;
+                            } else {
+                                isAnyRenewal = true;
+                            }
                         } else {
-                            isAnyRenewal = true;
+                            if (isIbPort) {
+                                setPortValidationMsg({ text: `พอร์ต ${port} เป็นโควต้า IB ไม่สามารถต่อแบบปกติได้`, type: 'error' });
+                                hasError = true;
+                                break;
+                            } else {
+                                isAnyRenewal = true;
+                            }
                         }
                     } else {
-                        if (isIbPort) {
-                            setPortValidationMsg({ text: `พอร์ต ${port} เป็นโควต้า IB ไม่สามารถต่อแบบปกติได้`, type: 'error' });
-                            hasError = true;
-                            break;
-                        } else {
-                            isAnyRenewal = true;
-                        }
+                        // Expired license: treat as renewal/re-activation
+                        isAnyRenewal = true;
                     }
                 }
             }
@@ -217,14 +226,34 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
 
             const { data: globalLicenses } = await supabase
                 .from('licenses')
-                .select('account_number, user_id, is_active')
+                .select('id, account_number, user_id, is_active, expiry_date, type')
                 .in('account_number', filledPorts)
                 .eq('is_active', true);
 
             if (globalLicenses && globalLicenses.length > 0) {
-                const conflicts = globalLicenses.filter(l => l.user_id !== userId);
-                if (conflicts.length > 0) {
-                    setPortValidationMsg({ text: `หมายเลขพอร์ต ${conflicts[0].account_number} มีการใช้งานในระบบแล้วโดยผู้ใช้อื่น ไม่สามารถใช้ซ้ำได้`, type: 'error' });
+                const now = new Date();
+                // Opportunistic cleanup: Auto-deactivate any expired licenses
+                const expiredIds = globalLicenses
+                    .filter(l => l.type !== 'lifetime' && l.expiry_date && new Date(l.expiry_date) < now)
+                    .map(l => l.id);
+
+                if (expiredIds.length > 0) {
+                    supabase.from('licenses')
+                        .update({ is_active: false })
+                        .in('id', expiredIds)
+                        .then();
+                }
+
+                // Only consider truly active and unexpired licenses of OTHER users as conflicts
+                const trulyActiveConflicts = globalLicenses.filter(l => {
+                    if (l.user_id === userId) return false;
+                    if (l.type === 'lifetime') return true;
+                    if (!l.expiry_date) return true;
+                    return new Date(l.expiry_date) >= now;
+                });
+
+                if (trulyActiveConflicts.length > 0) {
+                    setPortValidationMsg({ text: `หมายเลขพอร์ต ${trulyActiveConflicts[0].account_number} มีการใช้งานในระบบแล้วโดยผู้ใช้อื่น และยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`, type: 'error' });
                     setIsRenewal(false);
                     return;
                 }
