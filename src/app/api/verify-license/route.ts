@@ -94,6 +94,15 @@ export async function POST(req: Request) {
                 .eq('product_key', product_id)
                 .maybeSingle();
 
+            if (!product && product_id === 'EZM-PRIME-V1') {
+                const { data: maxProd } = await supabase
+                    .from('products')
+                    .select('id, min_balance, currency, product_key, name')
+                    .eq('product_key', 'EZM-MAX-V1')
+                    .single();
+                if (maxProd) product = maxProd;
+            }
+
             if (!product) {
                 const cleanId = product_id.replace(/[-_\s]/g, '').toLowerCase();
                 const { data: allProds } = await supabase
@@ -143,28 +152,31 @@ export async function POST(req: Request) {
             .eq('is_active', true)
             .single();
 
-        // Fallback check: EasyM Max cross-compatibility (bidirectional fallback between EZM-MAX-V1 and EZM-MAX-TEST)
+        // Fallback check: EasyM Max & Prime cross-compatibility
         const currentProductKey = resolvedProduct?.product_key || product_id;
-        const easymMaxKeys = ['EZM-MAX-V1', 'EZM-MAX-TEST'];
+        const easymMaxKeys = ['EZM-MAX-V1', 'EZM-MAX-TEST', 'EZM-PRIME-V1'];
         if ((error || !license) && easymMaxKeys.includes(currentProductKey)) {
-            const alternateKey = currentProductKey === 'EZM-MAX-V1' ? 'EZM-MAX-TEST' : 'EZM-MAX-V1';
-            const { data: altProduct } = await supabase
-                .from('products')
-                .select('id, min_balance, currency, product_key, name')
-                .eq('product_key', alternateKey)
-                .single();
-            if (altProduct) {
-                const { data: fallbackLicense, error: fallbackError } = await supabase
-                    .from('licenses')
-                    .select('*')
-                    .eq('account_number', account_number)
-                    .eq('product_id', altProduct.id)
-                    .eq('is_active', true)
+            const alternateKeys = easymMaxKeys.filter(k => k !== currentProductKey);
+            for (const altKey of alternateKeys) {
+                const { data: altProduct } = await supabase
+                    .from('products')
+                    .select('id, min_balance, currency, product_key, name')
+                    .eq('product_key', altKey)
                     .single();
-                if (fallbackLicense && !fallbackError) {
-                    license = fallbackLicense;
-                    error = null;
-                    resolvedProduct = altProduct;
+                if (altProduct) {
+                    const { data: fallbackLicense, error: fallbackError } = await supabase
+                        .from('licenses')
+                        .select('*')
+                        .eq('account_number', account_number)
+                        .eq('product_id', altProduct.id)
+                        .eq('is_active', true)
+                        .single();
+                    if (fallbackLicense && !fallbackError) {
+                        license = fallbackLicense;
+                        error = null;
+                        resolvedProduct = altProduct;
+                        break;
+                    }
                 }
             }
         }
