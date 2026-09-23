@@ -992,8 +992,10 @@ export default function EasyMMasterDashboardPage() {
                         runStatus = 'no_telemetry';
                     } else if (hoursSinceLastPing > 48) {
                         runStatus = 'offline_48h';
-                    } else if (balUSC < requiredBalanceUSC) {
+                    } else if (rawBal > 0 && balUSC < requiredBalanceUSC) {
                         runStatus = 'insufficient_balance';
+                    } else if (rawBal === 0) {
+                        runStatus = 'no_telemetry';
                     } else {
                         runStatus = 'running';
                     }
