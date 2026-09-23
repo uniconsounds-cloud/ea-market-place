@@ -61,7 +61,6 @@ export async function POST(req: Request) {
                     equity: snapshot.account?.equity || 0,
                     margin_level: snapshot.account?.margin_level || 0,
                     floating_pnl: (snapshot.buy_state?.floating_pnl || 0) + (snapshot.sell_state?.floating_pnl || 0),
-                    max_drawdown: snapshot.account?.max_drawdown || 0, // Should be calculated or passed
                     buy_count: snapshot.buy_state?.open_count || 0,
                     sell_count: snapshot.sell_state?.open_count || 0,
                     buy_pnl: snapshot.buy_state?.floating_pnl || 0,

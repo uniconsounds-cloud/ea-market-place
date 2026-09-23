@@ -26,7 +26,7 @@ export async function POST(req: Request) {
                     balance: data.balance,
                     equity: data.equity,
                     floating_pnl: data.floating_pnl,
-                    max_drawdown: data.max_drawdown,
+                    daily_max_drawdown: data.max_drawdown || data.daily_max_drawdown || 0,
                     total_lots: data.total_lots,
                     buy_count: data.buy_count,
                     sell_count: data.sell_count,

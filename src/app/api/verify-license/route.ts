@@ -179,7 +179,7 @@ export async function POST(req: Request) {
 
                 const { data: existingStatus } = await supabase
                     .from('farm_port_status')
-                    .select('port_number, equity, account_type, balance, today_pnl, updated_at, daily_max_drawdown, max_drawdown, floating_pnl')
+                    .select('port_number, equity, account_type, balance, today_pnl, updated_at, daily_max_drawdown, floating_pnl')
                     .eq('port_number', String(account_number))
                     .maybeSingle();
 
@@ -202,9 +202,7 @@ export async function POST(req: Request) {
                         currentDD = Number((((numBal - numEquity) / numBal) * 100).toFixed(1));
                     }
                     const existingDailyDD = Number(existingStatus.daily_max_drawdown) || 0;
-                    const existingMaxDD = Number(existingStatus.max_drawdown) || 0;
                     const resolvedDailyDD = Math.max(existingDailyDD, currentDD);
-                    const resolvedMaxDD = Math.max(existingMaxDD, currentDD);
 
                     if (today_profit !== undefined && today_profit !== null && !isNaN(Number(today_profit))) {
                         // Priority 1: Direct MT5 Deal History Profit (impervious to deposits/withdrawals)
@@ -268,10 +266,11 @@ export async function POST(req: Request) {
                             equity: numEquity,
                             floating_pnl: calculatedFloatingPnl,
                             daily_max_drawdown: resolvedDailyDD,
-                            max_drawdown: resolvedMaxDD,
                             today_pnl: todayPnl,
+                            account_type: resolvedProduct?.currency || 'USC',
                             asset_type: currentAssetType,
                             system_code: currentSystemCode,
+                            ea_version: 'v1.16',
                             is_online: true,
                             last_ping: nowIso,
                             updated_at: nowIso
@@ -335,7 +334,6 @@ export async function POST(req: Request) {
                             equity: numEquity,
                             floating_pnl: calculatedFloatingPnl,
                             daily_max_drawdown: currentDD,
-                            max_drawdown: currentDD,
                             today_pnl: initialTodayPnl,
                             account_type: resolvedProduct?.currency || 'USC',
                             asset_type: currentAssetType,

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
                     equity: port_status.equity || 0,
                     margin_level: port_status.margin_level || 0,
                     account_type: port_status.account_type || 'USD',
-                    max_drawdown: port_status.max_drawdown || 0,
+                    daily_max_drawdown: port_status.max_drawdown || port_status.daily_max_drawdown || 0,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'port_number' });
 
