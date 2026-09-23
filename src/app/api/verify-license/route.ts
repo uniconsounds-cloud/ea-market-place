@@ -143,24 +143,28 @@ export async function POST(req: Request) {
             .eq('is_active', true)
             .single();
 
-        // Fallback check: If EZM-MAX-V1 license is not found, check if a license for EZM-MAX-TEST is active
-        if ((error || !license) && product_id === 'EZM-MAX-V1') {
-            const { data: testProduct } = await supabase
+        // Fallback check: EasyM Max cross-compatibility (bidirectional fallback between EZM-MAX-V1 and EZM-MAX-TEST)
+        const currentProductKey = resolvedProduct?.product_key || product_id;
+        const easymMaxKeys = ['EZM-MAX-V1', 'EZM-MAX-TEST'];
+        if ((error || !license) && easymMaxKeys.includes(currentProductKey)) {
+            const alternateKey = currentProductKey === 'EZM-MAX-V1' ? 'EZM-MAX-TEST' : 'EZM-MAX-V1';
+            const { data: altProduct } = await supabase
                 .from('products')
-                .select('id')
-                .eq('product_key', 'EZM-MAX-TEST')
+                .select('id, min_balance, currency, product_key, name')
+                .eq('product_key', alternateKey)
                 .single();
-            if (testProduct) {
+            if (altProduct) {
                 const { data: fallbackLicense, error: fallbackError } = await supabase
                     .from('licenses')
                     .select('*')
                     .eq('account_number', account_number)
-                    .eq('product_id', testProduct.id)
+                    .eq('product_id', altProduct.id)
                     .eq('is_active', true)
                     .single();
                 if (fallbackLicense && !fallbackError) {
                     license = fallbackLicense;
                     error = null;
+                    resolvedProduct = altProduct;
                 }
             }
         }
