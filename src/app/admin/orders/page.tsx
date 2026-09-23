@@ -41,52 +41,89 @@ export default function AdminOrdersPage() {
     const fetchOrders = async () => {
         setLoading(true);
 
-        // Use explicit foreign key names to avoid ambiguity
-        const { data, error } = await supabase
-            .from('orders')
-            .select(`
-                *,
-                products!orders_product_id_fkey (name, price_monthly, price_lifetime),
-                profiles!orders_user_id_profiles_fkey (full_name, email, is_tester)
-            `)
-            .order('created_at', { ascending: false });
+        // Fetch all orders with pagination (>1000 records supported)
+        let allOrders: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        while (true) {
+            const { data: batch, error: batchErr } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    products!orders_product_id_fkey (name, price_monthly, price_lifetime),
+                    profiles!orders_user_id_profiles_fkey (full_name, email, is_tester)
+                `)
+                .order('created_at', { ascending: false })
+                .range(from, from + batchSize - 1);
 
-        if (error) {
-            console.error('Error fetching orders:', error);
+            if (batchErr) {
+                console.error('Error fetching orders batch:', batchErr);
+                break;
+            }
+            if (batch) allOrders = allOrders.concat(batch);
+            if (!batch || batch.length < batchSize) break;
+            from += batchSize;
         }
 
-        if (data && data.length > 0) {
+        if (allOrders.length > 0) {
             // Fetch IB Memberships to get the broker details for these orders
-            const userIds = Array.from(new Set(data.map(o => o.user_id).filter(Boolean)));
-            const { data: ibMemberships } = await supabase
-                .from('ib_memberships')
-                .select('user_id, verification_data, brokers(name)')
-                .in('user_id', userIds)
-                .eq('status', 'approved');
+            const userIds = Array.from(new Set(allOrders.map(o => o.user_id).filter(Boolean)));
+            let ibMembershipsMap: Record<string, string> = {};
 
-            const mappedData = data.map(o => {
-                const matchedIb = ibMemberships?.find(ib => ib.user_id === o.user_id && ib.verification_data === o.account_number);
+            for (let i = 0; i < userIds.length; i += 100) {
+                const chunk = userIds.slice(i, i + 100);
+                const { data: ibMemberships } = await supabase
+                    .from('ib_memberships')
+                    .select('user_id, verification_data, brokers(name)')
+                    .in('user_id', chunk)
+                    .eq('status', 'approved');
+
+                if (ibMemberships) {
+                    ibMemberships.forEach(ib => {
+                        const bName = Array.isArray((ib as any).brokers)
+                            ? (ib as any).brokers[0]?.name
+                            : (ib as any).brokers?.name;
+                        const key = `${ib.user_id}_${ib.verification_data?.trim()}`;
+                        if (bName) ibMembershipsMap[key] = bName;
+                    });
+                }
+            }
+
+            const mappedData = allOrders.map(o => {
+                const port = o.account_number?.trim();
+                const key = `${o.user_id}_${port}`;
+                const matchedBroker = ibMembershipsMap[key];
                 return {
                     ...o,
-                    ib_broker_name: matchedIb ? (Array.isArray((matchedIb as any).brokers) ? (matchedIb as any).brokers[0]?.name : (matchedIb as any).brokers?.name) : undefined
+                    ib_broker_name: matchedBroker || o.ib_broker_name || undefined
                 };
             });
 
             setOrders(mappedData);
         } else {
             console.log('Main fetch returned empty. Trying raw fetch...');
-            const { data: rawData } = await supabase
-                .from('orders')
-                .select('*')
-                .order('created_at', { ascending: false });
+            let rawOrders: any[] = [];
+            let rFrom = 0;
+            while (true) {
+                const { data: rawBatch } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .range(rFrom, rFrom + batchSize - 1);
+                if (rawBatch) rawOrders = rawOrders.concat(rawBatch);
+                if (!rawBatch || rawBatch.length < batchSize) break;
+                rFrom += batchSize;
+            }
 
-            if (rawData) {
-                const mappedData = rawData.map(o => ({
+            if (rawOrders.length > 0) {
+                const mappedData = rawOrders.map(o => ({
                     ...o,
                     products: { name: 'Raw Product (' + o.product_id + ')', price_monthly: 0, price_lifetime: 0 },
                     profiles: { full_name: 'Raw User', email: o.user_id, ib_status: 'none', ib_expiry_date: null, is_tester: false }
                 }));
                 setOrders(mappedData);
+            } else {
+                setOrders([]);
             }
         }
         setLoading(false);
@@ -381,6 +418,8 @@ export default function AdminOrdersPage() {
         return 0;
     });
 
+    const baseOrdersForTabs = hideTestAccounts ? orders.filter(o => !o.profiles?.is_tester) : orders;
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -431,15 +470,15 @@ export default function AdminOrdersPage() {
 
             <Tabs defaultValue="all" value={statusFilter} onValueChange={setStatusFilter} className="w-full">
                 <TabsList className="grid w-full grid-cols-4 mb-8">
-                    <TabsTrigger value="all">ทั้งหมด ({orders.length})</TabsTrigger>
+                    <TabsTrigger value="all">ทั้งหมด ({baseOrdersForTabs.length})</TabsTrigger>
                     <TabsTrigger value="pending" className="data-[state=active]:bg-yellow-500/10 data-[state=active]:text-yellow-500">
-                        รอตรวจสอบ ({orders.filter(o => o.status === 'pending').length})
+                        รอตรวจสอบ ({baseOrdersForTabs.filter(o => o.status === 'pending').length})
                     </TabsTrigger>
                     <TabsTrigger value="completed" className="data-[state=active]:bg-green-500/10 data-[state=active]:text-green-500">
-                        อนุมัติแล้ว ({orders.filter(o => o.status === 'completed').length})
+                        อนุมัติแล้ว ({baseOrdersForTabs.filter(o => o.status === 'completed').length})
                     </TabsTrigger>
                     <TabsTrigger value="rejected" className="data-[state=active]:bg-red-500/10 data-[state=active]:text-red-500">
-                        ปฏิเสธ ({orders.filter(o => o.status === 'rejected').length})
+                        ปฏิเสธ ({baseOrdersForTabs.filter(o => o.status === 'rejected').length})
                     </TabsTrigger>
                 </TabsList>
 
