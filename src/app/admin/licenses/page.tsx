@@ -139,6 +139,10 @@ export default async function AdminLicensesPage() {
         .select('name, asset_class, platform');
 
     return (
-        <AdminLicensesClient initialLicenses={licenses} allProducts={allProducts || []} />
+        <AdminLicensesClient 
+            initialLicenses={licenses} 
+            allProducts={allProducts || []} 
+            currentUserEmail={session?.user?.email || ''} 
+        />
     );
 }
