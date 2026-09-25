@@ -209,7 +209,8 @@ input double InpQuarantineTriggerPct    = 10.0;  // Single-Pair DD% -> QUARANTIN
 input double InpQuarantineResumePct     = 6.0;   // Single-Pair DD% -> back to NORMAL
 input int    InpMaxQuarantinedSymbols   = 2;     // Max Quarantined Pairs before FREEZE ALL
 input bool   InpEnableAutoHedge         = true;  // Auto-Hedge Lock ON/OFF
-input double InpHedgeTriggerPct         = 15.0;  // Single-Pair DD% -> AUTO-HEDGE (Delta=0)
+input double InpHedgeTriggerPct         = 40.0;  // Single-Pair DD% -> AUTO-HEDGE (Delta=0)
+input int    InpMaxHedgedSymbols        = 1;     // Max Hedged Symbols (1 = Single Worst Only)
 input double InpProfitReliefSharePct    = 40.0;  // Profit share to trim toxic pairs (%)
 
 input group "==== 🌐 SYMBOL ACTIVATION SWITCHES (เปิด-ปิดรายคู่เงิน) ===="
@@ -892,34 +893,59 @@ void CheckQuarantineAndHedge()
          }
       }
 
-      // 2. Auto-Hedge Check (Delta = 0)
-      if(InpEnableAutoHedge && lossPct >= InpHedgeTriggerPct && !g_isHedged[i])
+      // 2. Auto-Hedge Check (Delta = 0, Single Worst Symbol Only!)
+      if(InpEnableAutoHedge)
       {
-         double netBuy = CurrentSymbolLotsSide(g_state[i].sym, g_state[i].magic, POSITION_TYPE_BUY);
-         double netSell = CurrentSymbolLotsSide(g_state[i].sym, g_state[i].magic, POSITION_TYPE_SELL);
-         double delta = netBuy - netSell;
-
-         trade.SetExpertMagicNumber(g_state[i].magic + 1000);
-         ConfigureTradeFilling(g_state[i].sym);
-
-         if(delta > 0.009)
+         int hedgedCount = 0;
+         for(int k = 0; k < ArraySize(g_isHedged); k++)
          {
-            string hComment = StringFormat("EM17:%s:HDG", g_state[i].baseSym);
-            if(trade.Sell(delta, g_state[i].sym, 0.0, 0.0, 0.0, hComment))
-            {
-               g_isHedged[i] = true;
-               PrintFormat("EasyM Rescue: AUTO-HEDGE LOCK EXECUTED on %s: Sold %.2f lots to freeze loss at DD=%.2f%%",
-                           g_state[i].baseSym, delta, lossPct);
-            }
+            if(g_isHedged[k]) hedgedCount++;
          }
-         else if(delta < -0.009)
+
+         if(hedgedCount < InpMaxHedgedSymbols)
          {
-            string hComment = StringFormat("EM17:%s:HDG", g_state[i].baseSym);
-            if(trade.Buy(MathAbs(delta), g_state[i].sym, 0.0, 0.0, 0.0, hComment))
+            int worstHedgeIdx = -1;
+            double maxLossPct = 0.0;
+
+            for(int j = 0; j < ArraySize(g_state); j++)
             {
-               g_isHedged[i] = true;
-               PrintFormat("EasyM Rescue: AUTO-HEDGE LOCK EXECUTED on %s: Bought %.2f lots to freeze loss at DD=%.2f%%",
-                           g_state[i].baseSym, MathAbs(delta), lossPct);
+               if(!g_isHedged[j] && g_symLossPct[j] >= InpHedgeTriggerPct && g_symLossPct[j] > maxLossPct)
+               {
+                  maxLossPct = g_symLossPct[j];
+                  worstHedgeIdx = j;
+               }
+            }
+
+            if(worstHedgeIdx >= 0)
+            {
+               int hIdx = worstHedgeIdx;
+               double netBuy = CurrentSymbolLotsSide(g_state[hIdx].sym, g_state[hIdx].magic, POSITION_TYPE_BUY);
+               double netSell = CurrentSymbolLotsSide(g_state[hIdx].sym, g_state[hIdx].magic, POSITION_TYPE_SELL);
+               double delta = netBuy - netSell;
+
+               trade.SetExpertMagicNumber(g_state[hIdx].magic + 1000);
+               ConfigureTradeFilling(g_state[hIdx].sym);
+
+               if(delta > 0.009)
+               {
+                  string hComment = StringFormat("EMP17:%s:HDG", g_state[hIdx].baseSym);
+                  if(trade.Sell(delta, g_state[hIdx].sym, 0.0, 0.0, 0.0, hComment))
+                  {
+                     g_isHedged[hIdx] = true;
+                     PrintFormat("EasyM Prime: AUTO-HEDGE LOCK on %s (Single Worst Symbol): Sold %.2f lots to freeze loss at DD=%.2f%%",
+                                 g_state[hIdx].baseSym, delta, g_symLossPct[hIdx]);
+                  }
+               }
+               else if(delta < -0.009)
+               {
+                  string hComment = StringFormat("EMP17:%s:HDG", g_state[hIdx].baseSym);
+                  if(trade.Buy(MathAbs(delta), g_state[hIdx].sym, 0.0, 0.0, 0.0, hComment))
+                  {
+                     g_isHedged[hIdx] = true;
+                     PrintFormat("EasyM Prime: AUTO-HEDGE LOCK on %s (Single Worst Symbol): Bought %.2f lots to freeze loss at DD=%.2f%%",
+                                 g_state[hIdx].baseSym, MathAbs(delta), g_symLossPct[hIdx]);
+                  }
+               }
             }
          }
       }
