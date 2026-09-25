@@ -40,12 +40,12 @@
 //|  - DashboardUpdate skips disabled symbols                          |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.17"
+#property version   "1.18"
 #property description "EasyM MAX Universal v1.17 0922"
 
 #include <Trade/Trade.mqh>
 #include <Trade/PositionInfo.mqh>
-#define EA_PRODUCT_ID "EZM-MAX-V1"
+#define EA_PRODUCT_ID "EZM-PRIME-V1"
 #define EAEZE_SYNC_ENABLED
 #include <EAE_Licensing.mqh>
 #include "EM_MonitorAdapter.mqh"
@@ -171,6 +171,7 @@ input int    InpMaxPositionsTotal= 33;   // Max orders per symbol
 input double InpMaxSymbolLots    = 20.00; // Max total lots per symbol
 input double InpBasketTargetMoney= 10.0;  // Close money (cent)
 input int    InpTimeBailoutDays  = 21;    // Stuck days -> Breakeven close (0=Disable)
+input double InpTimeBailoutBufferMoney = 2.0;  // Stuck >21d Profit Target buffer (cent, เพื่อให้ปิดจริงไม่ติดลบ)
 
 input group "------- Portfolio Safety"
 input int InpMaxNewSymbolsPerBar = 10; // Max new symbols per bar
@@ -208,8 +209,16 @@ input double InpQuarantineTriggerPct    = 10.0;  // Single-Pair DD% -> QUARANTIN
 input double InpQuarantineResumePct     = 6.0;   // Single-Pair DD% -> back to NORMAL
 input int    InpMaxQuarantinedSymbols   = 2;     // Max Quarantined Pairs before FREEZE ALL
 input bool   InpEnableAutoHedge         = true;  // Auto-Hedge Lock ON/OFF
-input double InpHedgeTriggerPct         = 15.0;  // Single-Pair DD% -> AUTO-HEDGE (Delta=0)
-input double InpProfitReliefSharePct    = 40.0;  // Profit share to trim toxic pairs (%)
+input double InpHedgeTriggerPct         = 40.0;  // Single-Pair DD% -> AUTO-HEDGE (Delta=0)
+input int    InpMaxHedgedSymbols        = 1;     // Max Hedged Symbols (1 = Single Worst Only)
+input bool   InpEnableRescueGrid        = true;  // Rescue Grid Sniping ON/OFF
+input double InpRescueTriggerPct        = 15.0;  // Single-Pair DD% -> RESCUE GRID Start
+input int    InpRescueMaxOrders         = 3;     // Max Rescue Orders per symbol
+input double InpRescueFirstGapPips      = 100.0; // Min pips gap from lowest regular order
+input double InpRescueStepPips          = 45.0;  // Min pips step between rescue orders
+input double InpRescueLot               = 0.00;  // Rescue Lot (0=Auto Ladder, continuous from current order count)
+input double InpRescueTargetMoney       = 15.0;  // Rescue Profit Target (cent) to scalp & trim worst ticket
+input double InpProfitReliefSharePct    = 40.0;  // Profit share from other pairs to trim toxic pairs (%)
 
 input group "==== 🌐 SYMBOL ACTIVATION SWITCHES (เปิด-ปิดรายคู่เงิน) ===="
 input bool InpEnable_EURUSD = true;  // EURUSD (Active)
@@ -243,7 +252,7 @@ input bool InpEnable_GBPCHF = false; // GBPCHF (Legacy Close-Only)
 //====================================================================
 
 // Trading / broker glue (hidden)
-static const string InpEA_Label            = "EASY_M 10Pair"; // Order comment / EA label
+static const string InpEA_Label            = "EasyM Prime"; // Order comment / EA label
 static const bool   InpShowDashboard       = true;          // Dashboard ON/OFF (hidden)
 string g_symbol_suffix = ""; // Dynamically detected suffix
 static const bool   InpRequireAllSymbols   = false;         // Fail init if any missing (hidden)
@@ -410,6 +419,13 @@ struct SymbolState
 
    double nextBuyLot;
    double nextSellLot;
+
+   int    rescueBuyCount;
+   int    rescueSellCount;
+   double lowestRescueBuyOpen;
+   double highestRescueSellOpen;
+   double rescueProfitBuy;
+   double rescueProfitSell;
 };
 
 //-------------------- 10 correlation pairs (20 symbols) -------------
@@ -835,34 +851,59 @@ void CheckQuarantineAndHedge()
          }
       }
 
-      // 2. Auto-Hedge Check (Delta = 0)
-      if(InpEnableAutoHedge && lossPct >= InpHedgeTriggerPct && !g_isHedged[i])
+      // 2. Auto-Hedge Check (Delta = 0, Single Worst Symbol Only!)
+      if(InpEnableAutoHedge)
       {
-         double netBuy = CurrentSymbolLotsSide(g_state[i].sym, g_state[i].magic, POSITION_TYPE_BUY);
-         double netSell = CurrentSymbolLotsSide(g_state[i].sym, g_state[i].magic, POSITION_TYPE_SELL);
-         double delta = netBuy - netSell;
-
-         trade.SetExpertMagicNumber(g_state[i].magic + 1000);
-         ConfigureTradeFilling(g_state[i].sym);
-
-         if(delta > 0.009)
+         int hedgedCount = 0;
+         for(int k = 0; k < ArraySize(g_isHedged); k++)
          {
-            string hComment = StringFormat("EM17:%s:HDG", g_state[i].baseSym);
-            if(trade.Sell(delta, g_state[i].sym, 0.0, 0.0, 0.0, hComment))
-            {
-               g_isHedged[i] = true;
-               PrintFormat("EasyM Rescue: AUTO-HEDGE LOCK EXECUTED on %s: Sold %.2f lots to freeze loss at DD=%.2f%%",
-                           g_state[i].baseSym, delta, lossPct);
-            }
+            if(g_isHedged[k]) hedgedCount++;
          }
-         else if(delta < -0.009)
+
+         if(hedgedCount < InpMaxHedgedSymbols)
          {
-            string hComment = StringFormat("EM17:%s:HDG", g_state[i].baseSym);
-            if(trade.Buy(MathAbs(delta), g_state[i].sym, 0.0, 0.0, 0.0, hComment))
+            int worstHedgeIdx = -1;
+            double maxLossPct = 0.0;
+
+            for(int j = 0; j < ArraySize(g_state); j++)
             {
-               g_isHedged[i] = true;
-               PrintFormat("EasyM Rescue: AUTO-HEDGE LOCK EXECUTED on %s: Bought %.2f lots to freeze loss at DD=%.2f%%",
-                           g_state[i].baseSym, MathAbs(delta), lossPct);
+               if(!g_isHedged[j] && g_symLossPct[j] >= InpHedgeTriggerPct && g_symLossPct[j] > maxLossPct)
+               {
+                  maxLossPct = g_symLossPct[j];
+                  worstHedgeIdx = j;
+               }
+            }
+
+            if(worstHedgeIdx >= 0)
+            {
+               int hIdx = worstHedgeIdx;
+               double netBuy = CurrentSymbolLotsSide(g_state[hIdx].sym, g_state[hIdx].magic, POSITION_TYPE_BUY);
+               double netSell = CurrentSymbolLotsSide(g_state[hIdx].sym, g_state[hIdx].magic, POSITION_TYPE_SELL);
+               double delta = netBuy - netSell;
+
+               trade.SetExpertMagicNumber(g_state[hIdx].magic + 1000);
+               ConfigureTradeFilling(g_state[hIdx].sym);
+
+               if(delta > 0.009)
+               {
+                  string hComment = StringFormat("EMP18:%s:HDG", g_state[hIdx].baseSym);
+                  if(trade.Sell(delta, g_state[hIdx].sym, 0.0, 0.0, 0.0, hComment))
+                  {
+                     g_isHedged[hIdx] = true;
+                     PrintFormat("EasyM Prime: AUTO-HEDGE LOCK on %s (Single Worst Symbol): Sold %.2f lots to freeze loss at DD=%.2f%%",
+                                 g_state[hIdx].baseSym, delta, g_symLossPct[hIdx]);
+                  }
+               }
+               else if(delta < -0.009)
+               {
+                  string hComment = StringFormat("EMP18:%s:HDG", g_state[hIdx].baseSym);
+                  if(trade.Buy(MathAbs(delta), g_state[hIdx].sym, 0.0, 0.0, 0.0, hComment))
+                  {
+                     g_isHedged[hIdx] = true;
+                     PrintFormat("EasyM Prime: AUTO-HEDGE LOCK on %s (Single Worst Symbol): Bought %.2f lots to freeze loss at DD=%.2f%%",
+                                 g_state[hIdx].baseSym, MathAbs(delta), g_symLossPct[hIdx]);
+                  }
+               }
             }
          }
       }
@@ -1232,34 +1273,70 @@ void UpdateSymbolPositions(SymbolState &st)
    st.basketProfitBuy = 0.0;
    st.basketProfitSell = 0.0;
 
+   st.rescueBuyCount = 0;
+   st.rescueSellCount = 0;
+   st.lowestRescueBuyOpen = 0.0;
+   st.highestRescueSellOpen = 0.0;
+   st.rescueProfitBuy = 0.0;
+   st.rescueProfitSell = 0.0;
+
+   long regularMagic = st.magic;
+   long rescueMagic  = st.magic + 2000;
+
    for(int i=0; i<PositionsTotal(); i++)
    {
-      if(!SelectPositionByIndexFiltered(i, st.sym, st.magic)) continue;
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      if(!PositionSelectByTicket(ticket)) continue;
+
+      if((string)PositionGetString(POSITION_SYMBOL) != st.sym) continue;
+      long mg = (long)PositionGetInteger(POSITION_MAGIC);
+      if(mg != regularMagic && mg != rescueMagic) continue;
 
       ENUM_POSITION_TYPE ptype = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
       double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
       double net = PositionNetProfit();
 
-      if(ptype == POSITION_TYPE_BUY)
+      // Regular positions
+      if(mg == regularMagic)
       {
-         st.buyCount++;
-         st.basketProfitBuy += net;
-         if(st.lowestBuyOpen == 0.0 || openPrice < st.lowestBuyOpen) st.lowestBuyOpen = openPrice;
+         if(ptype == POSITION_TYPE_BUY)
+         {
+            st.buyCount++;
+            st.basketProfitBuy += net;
+            if(st.lowestBuyOpen == 0.0 || openPrice < st.lowestBuyOpen) st.lowestBuyOpen = openPrice;
+         }
+         else if(ptype == POSITION_TYPE_SELL)
+         {
+            st.sellCount++;
+            st.basketProfitSell += net;
+            if(st.highestSellOpen == 0.0 || openPrice > st.highestSellOpen) st.highestSellOpen = openPrice;
+         }
       }
-      else if(ptype == POSITION_TYPE_SELL)
+      // Rescue positions
+      else if(mg == rescueMagic)
       {
-         st.sellCount++;
-         st.basketProfitSell += net;
-         if(st.highestSellOpen == 0.0 || openPrice > st.highestSellOpen) st.highestSellOpen = openPrice;
+         if(ptype == POSITION_TYPE_BUY)
+         {
+            st.rescueBuyCount++;
+            st.rescueProfitBuy += net;
+            if(st.lowestRescueBuyOpen == 0.0 || openPrice < st.lowestRescueBuyOpen) st.lowestRescueBuyOpen = openPrice;
+         }
+         else if(ptype == POSITION_TYPE_SELL)
+         {
+            st.rescueSellCount++;
+            st.rescueProfitSell += net;
+            if(st.highestRescueSellOpen == 0.0 || openPrice > st.highestRescueSellOpen) st.highestRescueSellOpen = openPrice;
+         }
       }
    }
 
    st.nextBuyLot  = NormalizeLot(st.sym, LadderLot(st.buyCount + 1));
    st.nextSellLot = NormalizeLot(st.sym, LadderLot(st.sellCount + 1));
 
-   if(st.buyCount > 0 && st.sellCount == 0) st.activeSide = 1;
-   else if(st.sellCount > 0 && st.buyCount == 0) st.activeSide = 2;
-   else if(st.buyCount == 0 && st.sellCount == 0) st.activeSide = 0;
+   if((st.buyCount > 0 || st.rescueBuyCount > 0) && st.sellCount == 0 && st.rescueSellCount == 0) st.activeSide = 1;
+   else if((st.sellCount > 0 || st.rescueSellCount > 0) && st.buyCount == 0 && st.rescueBuyCount == 0) st.activeSide = 2;
+   else if(st.buyCount == 0 && st.sellCount == 0 && st.rescueBuyCount == 0 && st.rescueSellCount == 0) st.activeSide = 0;
 
    UpdateAdaptiveParams(st);
 }
@@ -1308,7 +1385,7 @@ bool OpenBuy(SymbolState &st, double lot)
       }
    }
 
-   string comment = StringFormat("EM17:%s:B%d", st.baseSym, st.buyCount + 1);
+   string comment = StringFormat("EMP18:%s:B%d", st.baseSym, st.buyCount + 1);
    bool ok = trade.Buy(lot, st.sym, 0.0, 0.0, 0.0, comment);
    if(ok)
    {
@@ -1337,7 +1414,7 @@ bool OpenSell(SymbolState &st, double lot)
       }
    }
 
-   string comment = StringFormat("EM17:%s:S%d", st.baseSym, st.sellCount + 1);
+   string comment = StringFormat("EMP18:%s:S%d", st.baseSym, st.sellCount + 1);
    bool ok = trade.Sell(lot, st.sym, 0.0, 0.0, 0.0, comment);
    if(ok)
    {
@@ -1638,6 +1715,124 @@ void CloseAllPositionsBySide(const string sym, const long magic, const ENUM_POSI
    }
 }
 
+ulong FindDeepestLossTicket(const string sym, const long magic, const ENUM_POSITION_TYPE type)
+{
+   ulong worstTicket = 0;
+   double deepestLoss = 0.0;
+
+   int total = PositionsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket <= 0) continue;
+      if(!PositionSelectByTicket(ticket)) continue;
+      if((string)PositionGetString(POSITION_SYMBOL) != sym) continue;
+      if((long)PositionGetInteger(POSITION_MAGIC) != magic) continue;
+      if((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) != type) continue;
+
+      double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+      if(pnl < deepestLoss)
+      {
+         deepestLoss = pnl;
+         worstTicket = ticket;
+      }
+   }
+   return worstTicket;
+}
+
+void TryRescueGrid(SymbolState &st)
+{
+   if(!InpEnableRescueGrid) return;
+   if(!SpreadOK(st.sym)) return;
+
+   int idx = StateIndexBySymbolMagic(st.sym, st.magic);
+   if(idx < 0 || idx >= ArraySize(g_isQuarantined)) return;
+
+   // Symbol must have loss >= InpRescueTriggerPct (15%) and NOT hedged!
+   if(g_symLossPct[idx] < InpRescueTriggerPct || g_isHedged[idx])
+      return;
+
+   int totalRescue = st.rescueBuyCount + st.rescueSellCount;
+   if(totalRescue >= InpRescueMaxOrders) return;
+
+   double ask = SymbolInfoDouble(st.sym, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(st.sym, SYMBOL_BID);
+   if(ask <= 0 || bid <= 0) return;
+
+   double pipSize = PipSizeForSymbol(st.sym);
+
+   long rescueMagic = st.magic + 2000;
+
+   // BUY Rescue
+   if(st.activeSide == 1 && st.buyCount > 0 && st.rescueBuyCount < InpRescueMaxOrders)
+   {
+      bool canEnter = false;
+      if(st.rescueBuyCount == 0)
+      {
+         if(st.lowestBuyOpen > 0.0 && ask <= (st.lowestBuyOpen - (InpRescueFirstGapPips * pipSize)))
+            canEnter = true;
+      }
+      else
+      {
+         if(st.lowestRescueBuyOpen > 0.0 && ask <= (st.lowestRescueBuyOpen - (InpRescueStepPips * pipSize)))
+            canEnter = true;
+      }
+
+      if(canEnter)
+      {
+         int buyLevel = st.buyCount + st.rescueBuyCount + 1;
+         double rLot = (InpRescueLot > 0.0 ? InpRescueLot : LadderLot(buyLevel));
+         rLot = NormalizeLot(st.sym, rLot);
+
+         ConfigureTradeFilling(st.sym);
+         trade.SetExpertMagicNumber(rescueMagic);
+         string comment = StringFormat("EMP18:%s:R%d", st.baseSym, st.rescueBuyCount + 1);
+         if(trade.Buy(rLot, st.sym, 0.0, 0.0, 0.0, comment))
+         {
+            st.lastTradeTime = TimeCurrent();
+            st.lastAction = "RESCUE BUY " + DoubleToString(rLot,2);
+            PrintFormat("EasyM Prime: RESCUE BUY #%d (Order Level %d) opened on %s (Lot: %.2f | Ask: %s | DD: %.2f%%)",
+                        st.rescueBuyCount + 1, buyLevel, st.baseSym, rLot, DoubleToString(ask, (int)SymbolInfoInteger(st.sym, SYMBOL_DIGITS)), g_symLossPct[idx]);
+            UpdateSymbolPositions(st);
+         }
+      }
+   }
+   // SELL Rescue
+   else if(st.activeSide == 2 && st.sellCount > 0 && st.rescueSellCount < InpRescueMaxOrders)
+   {
+      bool canEnter = false;
+      if(st.rescueSellCount == 0)
+      {
+         if(st.highestSellOpen > 0.0 && bid >= (st.highestSellOpen + (InpRescueFirstGapPips * pipSize)))
+            canEnter = true;
+      }
+      else
+      {
+         if(st.highestRescueSellOpen > 0.0 && bid >= (st.highestRescueSellOpen + (InpRescueStepPips * pipSize)))
+            canEnter = true;
+      }
+
+      if(canEnter)
+      {
+         int sellLevel = st.sellCount + st.rescueSellCount + 1;
+         double rLot = (InpRescueLot > 0.0 ? InpRescueLot : LadderLot(sellLevel));
+         rLot = NormalizeLot(st.sym, rLot);
+
+         ConfigureTradeFilling(st.sym);
+         trade.SetExpertMagicNumber(rescueMagic);
+         string comment = StringFormat("EMP18:%s:R%d", st.baseSym, st.rescueSellCount + 1);
+         if(trade.Sell(rLot, st.sym, 0.0, 0.0, 0.0, comment))
+         {
+            st.lastTradeTime = TimeCurrent();
+            st.lastAction = "RESCUE SELL " + DoubleToString(rLot,2);
+            PrintFormat("EasyM Prime: RESCUE SELL #%d (Order Level %d) opened on %s (Lot: %.2f | Bid: %s | DD: %.2f%%)",
+                        st.rescueSellCount + 1, sellLevel, st.baseSym, rLot, DoubleToString(bid, (int)SymbolInfoInteger(st.sym, SYMBOL_DIGITS)), g_symLossPct[idx]);
+            UpdateSymbolPositions(st);
+         }
+      }
+   }
+}
+
 //+------------------------------------------------------------------+
 //| [2026-09-04] v1.16 - TryExit with continuous tick retry & full basket close
 //+------------------------------------------------------------------+
@@ -1651,35 +1846,103 @@ void TryExit(SymbolState &st)
    {
       datetime oldestBuy = GetOldestPositionTime(st.sym, st.magic, POSITION_TYPE_BUY);
       if(oldestBuy > 0 && (TimeCurrent() - oldestBuy) >= (InpTimeBailoutDays * 86400))
-         targetBuy = 0.0; // Breakeven bailout
+         targetBuy = MathMin(InpTimeBailoutBufferMoney, InpBasketTargetMoney); // Breakeven bailout with positive buffer
 
       datetime oldestSell = GetOldestPositionTime(st.sym, st.magic, POSITION_TYPE_SELL);
       if(oldestSell > 0 && (TimeCurrent() - oldestSell) >= (InpTimeBailoutDays * 86400))
-         targetSell = 0.0; // Breakeven bailout
+         targetSell = MathMin(InpTimeBailoutBufferMoney, InpBasketTargetMoney); // Breakeven bailout with positive buffer
    }
 
-   // Check BUY basket target profit
-   if(st.buyCount >= InpExit_MinPositions && st.basketProfitBuy >= targetBuy)
+   // --- BUY BASKET EXIT ---
+   double totalBuyPnl = st.basketProfitBuy + st.rescueProfitBuy;
+   int totalBuyPositions = st.buyCount + st.rescueBuyCount;
+
+   // Case 1: Full Exit (Total Profit >= Target)
+   if(totalBuyPositions > 0 && totalBuyPnl >= targetBuy)
    {
-      double closedPnl = st.basketProfitBuy;
+      double closedPnl = totalBuyPnl;
       CloseAllPositionsBySide(st.sym, st.magic, POSITION_TYPE_BUY);
+      CloseAllPositionsBySide(st.sym, st.magic + 2000, POSITION_TYPE_BUY);
       UpdateSymbolPositions(st);
-      if(st.buyCount == 0 && st.sellCount == 0) st.activeSide = 0;
+      if(st.buyCount == 0 && st.sellCount == 0 && st.rescueBuyCount == 0 && st.rescueSellCount == 0)
+         st.activeSide = 0;
+
+      for(int i = 0; i < ArraySize(g_state); i++) {
+         if(g_state[i].sym == st.sym) {
+            g_isQuarantined[i] = false;
+            break;
+         }
+      }
 
       if(closedPnl > 0.0)
          ProcessProfitRelief(closedPnl, st.sym);
+
+      PrintFormat("EasyM Prime: FULL EXIT on %s BUY (Profit: %.2f) - Released from Quarantine!", st.sym, closedPnl);
+      return;
+   }
+   // Case 2: Rescue Scalp & Trim (Rescue Profit Alone >= Target, trim deepest loss ticket)
+   else if(InpEnableRescueGrid && st.rescueBuyCount > 0 && st.rescueProfitBuy >= InpRescueTargetMoney)
+   {
+      double rescueProfit = st.rescueProfitBuy;
+      CloseAllPositionsBySide(st.sym, st.magic + 2000, POSITION_TYPE_BUY);
+
+      ulong worstTicket = FindDeepestLossTicket(st.sym, st.magic, POSITION_TYPE_BUY);
+      if(worstTicket > 0)
+      {
+         ConfigureTradeFilling(st.sym);
+         trade.SetExpertMagicNumber(st.magic);
+         trade.PositionClose(worstTicket);
+         PrintFormat("EasyM Prime: RESCUE SCALP & TRIM on %s BUY! Profit: +%.2f | Trimmed worst ticket #%I64u",
+                     st.sym, rescueProfit, worstTicket);
+      }
+      UpdateSymbolPositions(st);
+      return;
    }
 
-   // Check SELL basket target profit
-   if(st.sellCount >= InpExit_MinPositions && st.basketProfitSell >= targetSell)
+   // --- SELL BASKET EXIT ---
+   double totalSellPnl = st.basketProfitSell + st.rescueProfitSell;
+   int totalSellPositions = st.sellCount + st.rescueSellCount;
+
+   // Case 1: Full Exit (Total Profit >= Target)
+   if(totalSellPositions > 0 && totalSellPnl >= targetSell)
    {
-      double closedPnl = st.basketProfitSell;
+      double closedPnl = totalSellPnl;
       CloseAllPositionsBySide(st.sym, st.magic, POSITION_TYPE_SELL);
+      CloseAllPositionsBySide(st.sym, st.magic + 2000, POSITION_TYPE_SELL);
       UpdateSymbolPositions(st);
-      if(st.buyCount == 0 && st.sellCount == 0) st.activeSide = 0;
+      if(st.buyCount == 0 && st.sellCount == 0 && st.rescueBuyCount == 0 && st.rescueSellCount == 0)
+         st.activeSide = 0;
+
+      for(int i = 0; i < ArraySize(g_state); i++) {
+         if(g_state[i].sym == st.sym) {
+            g_isQuarantined[i] = false;
+            break;
+         }
+      }
 
       if(closedPnl > 0.0)
          ProcessProfitRelief(closedPnl, st.sym);
+
+      PrintFormat("EasyM Prime: FULL EXIT on %s SELL (Profit: %.2f) - Released from Quarantine!", st.sym, closedPnl);
+      return;
+   }
+   // Case 2: Rescue Scalp & Trim
+   else if(InpEnableRescueGrid && st.rescueSellCount > 0 && st.rescueProfitSell >= InpRescueTargetMoney)
+   {
+      double rescueProfit = st.rescueProfitSell;
+      CloseAllPositionsBySide(st.sym, st.magic + 2000, POSITION_TYPE_SELL);
+
+      ulong worstTicket = FindDeepestLossTicket(st.sym, st.magic, POSITION_TYPE_SELL);
+      if(worstTicket > 0)
+      {
+         ConfigureTradeFilling(st.sym);
+         trade.SetExpertMagicNumber(st.magic);
+         trade.PositionClose(worstTicket);
+         PrintFormat("EasyM Prime: RESCUE SCALP & TRIM on %s SELL! Profit: +%.2f | Trimmed worst ticket #%I64u",
+                     st.sym, rescueProfit, worstTicket);
+      }
+      UpdateSymbolPositions(st);
+      return;
    }
 }
 
@@ -2314,7 +2577,7 @@ void DashboardBuild()
    DashMakeText(DashNameRC("C_T",0,2),  t, cy0+tyPad, "TYPE", DASH_BLUE, fs, 20020); t += cColW[2];
    DashMakeText(DashNameRC("C_VV",0,3), t, cy0+tyPad, "-",    DASH_BLUE, fs, 20020); t += cColW[3];
    DashMakeText(DashNameRC("C_T",0,4), t, cy0+tyPad, g_guard_reason, g_guard_ok ? clrLightBlue : clrWhite, fs, 20020); t += cColW[3];
-   DashMakeText(DashNameRC("C_TAG",0,5),t, cy0+tyPad, g_guard_ok ? "=== EasyM MAX Universal v1.17 0922 ===":" ", DASH_GOLD, fs, 20020);
+   DashMakeText(DashNameRC("C_TAG",0,5),t, cy0+tyPad, g_guard_ok ? "=== EasyM Prime v1.18 0924 ===":" ", DASH_GOLD, fs, 20020);
 
    // --- Draw Table D (Auto status) under Table C
    int dx0 = DashX() + pad;
@@ -2634,7 +2897,7 @@ void DashboardUpdate()
    ObjectSetString(g_dashChart, DashNameRC("C_VV",0,3), OBJPROP_TEXT, typeFull);
    ObjectSetString(g_dashChart, DashNameRC("C_T",0,4), OBJPROP_TEXT, g_guard_reason);
    ObjectSetInteger(g_dashChart, DashNameRC("C_T",0,4), OBJPROP_COLOR, (g_guard_ok ? clrLightBlue : clrWhite));
-   ObjectSetString(g_dashChart, DashNameRC("C_TAG",0,5), OBJPROP_TEXT, g_guard_ok ? "=== EasyM MAX Universal v1.17 0922 ===":" ");
+   ObjectSetString(g_dashChart, DashNameRC("C_TAG",0,5), OBJPROP_TEXT, g_guard_ok ? "=== EasyM Prime v1.18 0924 ===":" ");
    ObjectSetInteger(g_dashChart, DashName("CBG"), OBJPROP_BGCOLOR, g_guard_ok ? clrDarkBlue:clrDarkRed);
    ObjectSetInteger(g_dashChart, DashNameRC("C_VV",0,3), OBJPROP_COLOR, (isCent ? DASH_GREEN : DASH_ORANGE));
    
@@ -2721,7 +2984,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                if(idx >= 0 && idx < ArraySize(g_state))
                {
                   g_state[idx].enabled = !g_state[idx].enabled;
-                  string gvKey = StringFormat("EM17_%I64d_%s_EN", AccountInfoInteger(ACCOUNT_LOGIN), g_state[idx].baseSym);
+                  string gvKey = StringFormat("EMP18_%I64d_%s_EN", AccountInfoInteger(ACCOUNT_LOGIN), g_state[idx].baseSym);
                   GlobalVariableSet(gvKey, g_state[idx].enabled ? 1.0 : 0.0);
                   DashboardUpdate();
                   ChartRedraw(g_dashChart);
@@ -2807,7 +3070,7 @@ int OnInit()
 
       // Load symbol switch from input and check for user click override
       bool sw = GetInputSymbolEnabled(g_cfg[i].sym);
-      string gvKey = StringFormat("EM17_%I64d_%s_EN", AccountInfoInteger(ACCOUNT_LOGIN), g_cfg[i].sym);
+      string gvKey = StringFormat("EMP18_%I64d_%s_EN", AccountInfoInteger(ACCOUNT_LOGIN), g_cfg[i].sym);
       if(GlobalVariableCheck(gvKey))
          sw = (GlobalVariableGet(gvKey) > 0.5);
       g_state[i].enabled = sw;
@@ -2915,7 +3178,7 @@ void OnTick()
    */ //============== Disable inside Port Check =================
    
     // [EAE_SYSTEM] - Smart License check and lightweight simple dashboard sync
-    EaezeCheckLicenseAndSync(EA_PRODUCT_ID, "EASYM_MAX", "1.12.8.U2", 20, InpMagicBase, InpMagicBase);
+    EaezeCheckLicenseAndSync(EA_PRODUCT_ID, "EasyM Prime", "v1.18", 20, InpMagicBase, InpMagicBase);
     ResetPortfolioGridCounterIfNewBar();
 
    // Pass 1: refresh metrics for ALL symbols (so close-only and legacy positions are managed)
@@ -2934,9 +3197,10 @@ void OnTick()
    // Pass 2: trading loop
    for(int i=0; i<ArraySize(g_state); i++)
    {
-      TryEntry(g_state[i]); // Checks enabled, quarantine, cluster internally
-      TryGrid(g_state[i]);  // Allows grid for existing baskets unless quarantined
-      TryExit(g_state[i]);  // Closes positions and triggers profit relief
+      TryEntry(g_state[i]);      // Checks enabled, quarantine, cluster internally
+      TryGrid(g_state[i]);       // Regular grid (locked when quarantined/hedged)
+      TryRescueGrid(g_state[i]); // Rescue grid (sniping 3 orders when DD >= 15%)
+      TryExit(g_state[i]);       // Dual exit: full basket exit or scalp trim
    }
 }
 //+------------------------------------------------------------------+

@@ -7,16 +7,40 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
-import { User, ShieldCheck, Check, Info, AlertTriangle } from 'lucide-react';
+import { User, ShieldCheck, Check, Info, AlertTriangle, Mail } from 'lucide-react';
 import { ROOT_ADMINS } from '@/lib/constants';
 import { toast } from 'sonner';
 
+// Common domain typos dictionary
+const COMMON_DOMAIN_TYPOS: Record<string, string> = {
+    'gmai.com': 'gmail.com',
+    'gamil.com': 'gmail.com',
+    'gmial.com': 'gmail.com',
+    'gmaill.com': 'gmail.com',
+    'gmaik.com': 'gmail.com',
+    'gmai.co.th': 'gmail.com',
+    'gmeil.com': 'gmail.com',
+    'hotmial.com': 'hotmail.com',
+    'hotmai.com': 'hotmail.com',
+    'hotmaill.com': 'hotmail.com',
+    'hitmail.com': 'hotmail.com',
+    'outlok.com': 'outlook.com',
+    'outloo.com': 'outlook.com',
+    'outlock.com': 'outlook.com',
+    'yaho.com': 'yahoo.com',
+    'yahooo.com': 'yahoo.com',
+    'yaho.co.th': 'yahoo.com',
+};
+
 function RegisterContent() {
     const [email, setEmail] = useState('');
+    const [confirmEmail, setConfirmEmail] = useState('');
+    const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [referralData, setReferralData] = useState<{ code: string, name: string } | null>(null);
     const [selectedAdmin, setSelectedAdmin] = useState<string | null>(null);
     const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
@@ -102,41 +126,115 @@ function RegisterContent() {
         fetchReferrerAndAdmins();
     }, []);
 
-    const handleRegister = async (e: React.FormEvent) => {
+    const suggestEmailCorrection = (input: string): string | null => {
+        if (!input || !input.includes('@')) return null;
+        const parts = input.split('@');
+        if (parts.length !== 2) return null;
+        const domain = parts[1].toLowerCase().trim();
+        if (COMMON_DOMAIN_TYPOS[domain]) {
+            return `${parts[0].trim()}@${COMMON_DOMAIN_TYPOS[domain]}`;
+        }
+        return null;
+    };
+
+    const handlePreSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanConfirm = confirmEmail.trim().toLowerCase();
+
+        if (!fullName.trim()) {
+            setError("กรุณากรอกชื่อ-นามสกุล");
+            return;
+        }
+
+        if (!cleanEmail) {
+            setError("กรุณากรอกอีเมล");
+            return;
+        }
+
+        if (!cleanConfirm) {
+            setError("กรุณายืนยันอีเมลอีกครั้ง");
+            return;
+        }
+
+        if (cleanEmail !== cleanConfirm) {
+            setError("อีเมลทั้งสองช่องไม่ตรงกัน กรุณาตรวจสอบตัวสะกด");
+            return;
+        }
+
+        const refCodeSetting = referralData?.code || selectedAdmin;
+        if (!refCodeSetting) {
+            setError("กรุณาเลือกผู้แนะนำเพื่อสมัครสมาชิก");
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร");
+            return;
+        }
+
+        // Show confirmation modal to verify email
+        setShowVerifyModal(true);
+    };
+
+    const handleConfirmRegister = async () => {
         setLoading(true);
         setError(null);
 
+        const cleanEmail = email.trim().toLowerCase();
+        const refCodeSetting = referralData?.code || selectedAdmin;
+
         try {
-            let refCodeSetting = referralData?.code || selectedAdmin;
-
-            if (!refCodeSetting) {
-                setError("กรุณาเลือกผู้แนะนำเพื่อสมัครสมาชิก");
-                setLoading(false);
-                return;
-            }
-
-            const { error } = await supabase.auth.signUp({
-                email,
+            const { data, error: signUpError } = await supabase.auth.signUp({
+                email: cleanEmail,
                 password,
                 options: {
                     data: {
-                        full_name: fullName,
+                        full_name: fullName.trim(),
                         referred_by_code: refCodeSetting,
                     },
                 },
             });
 
-            if (error) {
-                throw error;
+            if (signUpError) {
+                let msg = signUpError.message;
+                if (msg.includes('already registered')) {
+                    msg = 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ หรือใช้อีเมลอื่น';
+                }
+                throw new Error(msg);
             }
 
-            // Check if email confirmation is required (default in Supabase)
-            alert("สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชีของคุณ");
-            
+            setShowVerifyModal(false);
+
+            // 1. If confirm email is disabled in Supabase, session is ready immediately!
+            if (data?.session) {
+                toast.success(`สมัครสมาชิกสำเร็จ! ยินดีต้อนรับคุณ ${fullName.trim()}`);
+                router.refresh();
+                router.push(finalRedirectUrl);
+                return;
+            }
+
+            // 2. Try direct sign in as fallback
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email: cleanEmail,
+                password,
+            });
+
+            if (signInData?.session) {
+                toast.success(`สมัครสมาชิกสำเร็จ! ยินดีต้อนรับคุณ ${fullName.trim()}`);
+                router.refresh();
+                router.push(finalRedirectUrl);
+                return;
+            }
+
+            // 3. Fallback if email confirmation is still active in Supabase
+            toast.info("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ");
             router.push(`/login${queryString}`);
         } catch (err: any) {
-            setError(err.message);
+            setShowVerifyModal(false);
+            setError(err.message || 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
         } finally {
             setLoading(false);
         }
@@ -283,7 +381,7 @@ function RegisterContent() {
                         </div>
                     </div>
 
-                    <form onSubmit={handleRegister} className="space-y-4">
+                    <form onSubmit={handlePreSubmit} className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1" htmlFor="fullName">ชื่อ-นามสกุล</label>
                             <input
@@ -296,6 +394,8 @@ function RegisterContent() {
                                 onChange={(e) => setFullName(e.target.value)}
                             />
                         </div>
+
+                        {/* Email Input */}
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1" htmlFor="email">อีเมล</label>
                             <input
@@ -305,9 +405,58 @@ function RegisterContent() {
                                 className="w-full h-12 rounded-xl border border-border bg-background px-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 transition-all"
                                 placeholder="name@example.com"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEmail(val);
+                                    setEmailSuggestion(suggestEmailCorrection(val));
+                                }}
                             />
+
+                            {/* Suggestion chip if typo detected */}
+                            {emailSuggestion && (
+                                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-500 flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <Info className="w-4 h-4 shrink-0 text-amber-500" />
+                                        <span className="truncate">คุณหมายถึง <strong className="underline">{emailSuggestion}</strong> หรือไม่?</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setEmail(emailSuggestion);
+                                            setConfirmEmail(emailSuggestion);
+                                            setEmailSuggestion(null);
+                                        }}
+                                        className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-300 font-bold px-2 py-1 rounded transition-colors shrink-0"
+                                    >
+                                        แก้ไขให้ฉัน
+                                    </button>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Confirm Email Input */}
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1" htmlFor="confirmEmail">
+                                ยืนยันอีเมลอีกครั้ง
+                            </label>
+                            <input
+                                id="confirmEmail"
+                                type="email"
+                                required
+                                className={`w-full h-12 rounded-xl border bg-background px-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition-all ${
+                                    confirmEmail && email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase()
+                                        ? 'border-red-500 focus-visible:ring-red-500'
+                                        : 'border-border focus-visible:ring-gold'
+                                }`}
+                                placeholder="พิมพ์อีเมลเดิมอีกครั้งเพื่อความถูกต้อง"
+                                value={confirmEmail}
+                                onChange={(e) => setConfirmEmail(e.target.value)}
+                            />
+                            {confirmEmail && email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase() && (
+                                <p className="text-[11px] text-red-500 ml-1">อีเมลทั้งสองช่องไม่ตรงกัน กรุณาตรวจสอบตัวสะกด</p>
+                            )}
+                        </div>
+
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1" htmlFor="password">รหัสผ่าน</label>
                             <input
@@ -321,9 +470,55 @@ function RegisterContent() {
                         </div>
 
                         <Button type="submit" className="w-full h-12 rounded-xl mt-4 font-bold text-base shadow-lg shadow-gold/20 hover:shadow-gold/40 transition-all" variant="gold" disabled={loading || (!referralData && !selectedAdmin)}>
-                            {loading ? 'กำลังสร้างบัญชี...' : 'รับสิทธิ์การใช้งานเลย'}
+                            {loading ? 'กำลังดำเนินการ...' : 'รับสิทธิ์การใช้งานเลย'}
                         </Button>
                     </form>
+
+                    {/* Email Verification / Confirmation Modal */}
+                    {showVerifyModal && (
+                        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-card w-full max-w-md rounded-2xl border border-border p-6 shadow-2xl space-y-5 relative">
+                                <div className="text-center space-y-2">
+                                    <div className="w-12 h-12 bg-gold/10 text-gold rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <Mail className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-lg font-bold">ตรวจสอบความถูกต้องของอีเมล</h3>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">
+                                        ระบบไม่ต้องยืนยันอีเมล จึงสามารถเข้าใช้งานได้ทันที กรุณาตรวจสอบให้แน่ใจว่าอีเมลถูกต้อง เพื่อใช้ล็อกอินและกู้คืนรหัสผ่าน
+                                    </p>
+                                </div>
+
+                                <div className="bg-muted/40 border border-gold/30 rounded-xl p-4 text-center space-y-1">
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">อีเมลสำหรับเข้าสู่ระบบ</p>
+                                    <p className="text-lg font-mono font-bold text-gold break-all">{email.trim().toLowerCase()}</p>
+                                    <p className="text-xs text-muted-foreground pt-1">
+                                        ชื่อ: <span className="font-semibold text-foreground">{fullName.trim()}</span>
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="flex-1 h-11 rounded-xl text-sm"
+                                        onClick={() => setShowVerifyModal(false)}
+                                        disabled={loading}
+                                    >
+                                        กลับไปแก้ไข
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="gold"
+                                        className="flex-1 h-11 rounded-xl text-sm font-bold shadow-lg shadow-gold/20"
+                                        onClick={handleConfirmRegister}
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'กำลังสร้างบัญชี...' : 'ถูกต้อง ยืนยันเลย'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="mt-6 text-center text-sm">
                         <span className="text-muted-foreground">มีบัญชีอยู่แล้ว? </span>

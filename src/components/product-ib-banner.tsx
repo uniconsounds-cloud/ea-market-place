@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { ShieldCheck, Gift, Loader2, Link as LinkIcon } from "lucide-react";
+import { ShieldCheck, Gift, Loader2 } from "lucide-react";
 
 type Broker = {
     id: string;
@@ -267,21 +267,6 @@ export function ProductIbBanner({ productId }: { productId: string }) {
                                         </Select>
                                     </div>
 
-                                    {selectedBroker && (
-                                        <div className="p-3 bg-muted/50 border border-border rounded-md text-xs sm:text-sm animate-in fade-in zoom-in-95 duration-200">
-                                            <div className="font-semibold mb-1 flex items-center gap-1.5 text-xs">
-                                                <LinkIcon className="w-3.5 h-3.5" /> ลิงก์สมัคร (IB Link)
-                                            </div>
-                                            <a
-                                                href={availableBrokers.find(b => b.id === selectedBroker)?.ib_link}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-primary hover:underline break-all text-xs block"
-                                            >
-                                                {availableBrokers.find(b => b.id === selectedBroker)?.ib_link}
-                                            </a>
-                                        </div>
-                                    )}
 
                                     <div className="space-y-1.5">
                                         <Label htmlFor="ib-account" className="text-xs sm:text-sm">เลขพอร์ต หรือ อีเมล (สำหรับการยืนยันตัวตนกับโบรกเกอร์)</Label>

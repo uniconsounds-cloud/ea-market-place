@@ -5,8 +5,9 @@
 ---
 
 ## 📌 สารบัญเวอร์ชัน (Version Index)
-- [v1.17 (0922) - 2026-09-22](#v117-0922---2026-09-22) : The Resilience & Rescue Edition (Quarantine Mode, Auto-Hedge Lock, Profit Slicing, Table E Alert Bar, Cluster Limits, Switches)
-- [v1.16 (0904) - 2026-09-04](#v116-0904---2026-09-04) : ปรับปรุงระบบปิดทำกำไร (Continuous Basket Exit & Trade Filling)
+- [v1.18 (0924) - 2026-09-24](#v118-0924---2026-09-24) : EasyM Prime Flagship (Rescue Grid Sniping R1-R3, Continuous Ladder Lot, Dual-Exit Engine, Single-Worst 40% Hedge, Positive Bailout Buffer)
+- [v1.17 (0922) - 2026-09-22](#v117-0922---2026-09-22) : EasyM Prime Universal (Rebranded to PRIME, Quarantine Mode, Profit Slicing, Time Bailout Buffer, Cluster Limits)
+- [v1.16 (0904) - 2026-09-04](#v116-0904---2026-09-04) : EasyM MAX Universal v1.16 (เวอร์ชันเสถียรสูงสุดของตระกูล MAX คลาสสิก)
 - [v1.15 (0820) - 2026-08-20](#v115-0820---2026-08-20) : ซิงค์ประวัติรายวันอัตโนมัติเมื่อขึ้นวันใหม่ (Anti-Spike History Sync)
 - [v1.14 (0810) - 2026-08-10](#v114-0810---2026-08-10) : ระบบ Staggered Boot Delay & Auto Self-Healing 7 วัน
 - [v1.13 (0609) - 2026-06-09](#v113-0609---2026-06-09) : จัดการ WebRequest Warning และเพิ่มความเสถียรของ Licensing Grace Period
@@ -15,8 +16,40 @@
 
 ---
 
+## [v1.18 0924] - 2026-09-24
+### 🎯 เป้าหมาย: EasyM Prime Flagship Edition — ยกระดับระบบกู้ภัยสไนเปอร์ (Rescue Grid Sniping), ทางออก 2 จังหวะ (Dual-Exit Engine) และเบาะกันชน Breakeven ปิดกำไรไม่ติดลบ
+
+* **ฟีเจอร์และการปรับปรุงหลัก**:
+  1. **สไนเปอร์กู้ภัย 3 นัด (Rescue Grid Sniping [R1-R3])**:
+     - ทำงานเมื่อคู่ที่ถูกกักกันลากต่อจนถึง **15.0% DD** (`InpRescueTriggerPct`)
+     - จำกัดการออกไม้พิเศษสูงสุดเพียง **3 ไม้** (`InpRescueMaxOrders = 3`) ดึงระยะห่างไม้แรก $\ge$ 100 pips และไม้ถัดไป 45 pips
+     - **Continuous Ladder Lot**: ขนาดลอตคำนวณต่อเนื่องตามสเต็ปเดิมของคู่เงินนั้น (เช่น ไม้ 16 -> กู้ภัย 17, 18, 19) ดึงจุดคุ้มทุนเข้ามาประชิดราคาปัจจุบันทันที
+  2. **เครื่องยนต์ทางออก 2 จังหวะ (Dual-Exit Engine)**:
+     - **Full Basket Close**: ปิดรวบกำไรทั้งชุด (หลัก + กู้ภัย) เมื่อผลรวมกำไรพอร์ตเป็นบวกตามเป้าหมาย ปลดปล่อยสถานะ Quarantine ทันที
+     - **Rescue Scalp & Trim**: หากเฉพาะชุดกู้ภัย 3 ไม้ทำกำไรถึงเป้า (`InpRescueTargetMoney = 15.0` Cent) ปิดทำกำไรเฉพาะกู้ภัย แล้วเอากำไรสดไปตัดตอน **"ไม้แรกสุดที่ดอยหนักสุด"** ของชุดหลักทิ้งทีละไม้
+  3. **เกราะล็อกขาดทุนขั้นสุดท้าย (Single-Worst 40% Auto-Hedge Lock)**:
+     - เมื่อพอร์ต DD รวมแตะ **40.0%** ระบบจะล็อก Hedge (Delta=0) เฉพาะ **"คู่ที่ติดลบหนักที่สุดเพียงคู่เดียว"** ไม่เปิด Hedge มั่วทุกคู่ ป้องกันพอร์ตล็อกตาย
+  4. **ปรับเป้า Breakeven 21 วัน มี Buffer กำไรบวกอ่อนๆ (`InpTimeBailoutBufferMoney = 2.0`)**:
+     - ออเดอร์ที่ค้างเกิน 21 วัน ปรับเป้าหมายเป็น `+2.0 Cent` (จากเดิม 0.0) เพื่อเป็นเบาะรองรับค่า Spread และ Slippage ขณะรวบปิดหลายออเดอร์พร้อมกัน ผลลัพธ์ในประวัติ Today P/L จะปิดออกมาเป็น 0 หรือบวกอ่อนๆ ไม่ติดลบเศษเหรียญ
+* **ไฟล์ที่เกี่ยวข้อง**:
+  - `Experts/EasyM/EASY_M Prime v1.18 0924.mq5` / `.ex5`
+
+---
+
 ## [v1.17 0922] - 2026-09-22
-### 🎯 เป้าหมาย: The Resilience & Rescue Edition — ปลดล็อคพอร์ตติดแช่แข็ง, โหมดกักกันคู่เงินเป็นพิษ, และเกราะป้องกันระดับกองทุน
+### 🎯 เป้าหมาย: EasyM Prime Universal (The Resilience & Rescue Edition) — เปลี่ยนชื่อเป็นตระกูล PRIME เพื่อแยกชุดชัดเจนจาก MAX คลาสสิก พร้อมระบบกักกันความเสี่ยง และ Time Bailout Buffer
+
+* **การรีแบรนด์และการอัปเดต**:
+  1. **Rebranding to PRIME**: เปลี่ยนชื่ออย่างเป็นทางการจาก EasyM MAX เป็น **EasyM Prime Universal v1.17 0922** เพื่อแยกกลุ่มสถาปัตยกรรมรุ่นใหม่ที่มีระบบ Quarantine & Resilience ออกจากรุ่นคลาสสิก (EasyM MAX สิ้นสุดที่ v1.16)
+  2. **ปรับเป้า Breakeven 21 วัน มี Buffer กันชน (`InpTimeBailoutBufferMoney = 2.0`)**:
+     - เมื่อออเดอร์ถือค้างเกิน 21 วัน ปรับเป้าหมายกำไรมาที่ `+2.0 Cent` เพื่อป้องกันผลกระทบจาก Slippage ตอนยิงคำสั่งปิดรวบ 10-12 ไม้ ทำให้ผลลัพธ์สุทธิไม่ติดลบ
+  3. **โหมดกักกันคู่เงิน (Quarantine Symbol Mode 10% DD)**: ระงับการเปิดไม้กริดเพิ่มทันทีเมื่อคู่ใดแตะ 10% DD ป้องกันการถมลอต
+  4. **ระบบละลายไม้เสีย (Cross-Pair Profit Slicing 40%)**: ปันผลกำไร 40% จากคู่ชนะมาช่วยตัดไม้ดอย
+  5. **จำกัดกลุ่มสกุลเงิน (Currency Cluster Limiter Max 2 Pairs)**: ควบคุมไม่ให้เปิดคู่เงินสกุลซ้ำเกิน 2 คู่
+  6. **สวิตช์เปิด-ปิดอิสระ 20 คู่ + Graceful Shutdown**: สั่งปิดคู่เสี่ยงได้เองบน Dashboard
+  7. **ปรับ 3 คู่เงินใหม่**: แทนที่ AUDCAD, EURCHF, GBPCHF ด้วย AUDNZD, CADCHF, NZDCAD พร้อมระบบ Close-Only Auto-Collapse สำหรับไม้เก่า
+* **ไฟล์ที่เกี่ยวข้อง**:
+  - `Experts/EasyM/EASY_M Prime Universal v1.17 0922.mq5` / `.ex5`
 
 * **ฟีเจอร์และการปรับปรุงหลัก**:
   1. **โหมดกักกันคู่เงินเป็นพิษ (Quarantine Symbol Mode)**:
