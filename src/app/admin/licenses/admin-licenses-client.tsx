@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap, Loader2, Save, Mail } from 'lucide-react';
+import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap, Loader2, Save, Mail, Crown } from 'lucide-react';
 
 import { useEffect } from 'react';
 
@@ -57,7 +57,7 @@ export default function AdminLicensesClient({
     const [editShowFarm, setEditShowFarm] = useState(false);
 
     // License specific UI logic
-    const [expiryOption, setExpiryOption] = useState<string>("custom");
+    const [expiryOption, setExpiryOption] = useState<string>("3months");
     const [customDate, setCustomDate] = useState<string>("");
 
     // OTP verification hooks
@@ -169,7 +169,7 @@ export default function AdminLicensesClient({
         }
         setEditIsActive(license.is_active);
         setEditShowFarm(license.show_farm || false);
-        setExpiryOption("custom"); // Changed default to custom
+        setExpiryOption("3months"); // Default to 3 months
 
         if (license.expiry_date) {
             const d = new Date(license.expiry_date);
@@ -552,8 +552,11 @@ export default function AdminLicensesClient({
                                 {isPeeJo && (
                                     <div className="flex items-center justify-between border rounded-lg p-3 bg-muted/20">
                                         <div className="space-y-0.5">
-                                            <Label>แสดงปุ่มดูฟาร์ม (Show Farm Button)</Label>
-                                            <p className="text-xs text-muted-foreground">อนุญาตให้ลูกค้าเปิดดูหน้าฟาร์มได้ (สิทธิ์เฉพาะแอดมินพี่โจ้)</p>
+                                            <div className="flex items-center gap-1.5">
+                                                <Label>แสดงปุ่มดูฟาร์ม (Show Farm Button)</Label>
+                                                <Crown className="w-4 h-4 text-amber-400 fill-amber-400/40 shrink-0" />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">อนุญาตให้ลูกค้าเปิดดูหน้าฟาร์มได้</p>
                                         </div>
                                         <Switch checked={editShowFarm} onCheckedChange={setEditShowFarm} />
                                     </div>
@@ -569,7 +572,7 @@ export default function AdminLicensesClient({
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "1month" ? "default" : "outline"}
-                                                className={expiryOption === "1month" ? "bg-primary text-primary-foreground font-semibold" : "text-foreground"}
+                                                className={expiryOption === "1month" ? "bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-md shadow-amber-500/25 border-amber-500 transition-all" : "text-foreground hover:bg-muted/60"}
                                                 onClick={() => setExpiryOption("1month")}
                                             >
                                                 1 เดือน
@@ -578,7 +581,7 @@ export default function AdminLicensesClient({
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "2months" ? "default" : "outline"}
-                                                className={expiryOption === "2months" ? "bg-primary text-primary-foreground font-semibold" : "text-foreground"}
+                                                className={expiryOption === "2months" ? "bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-md shadow-amber-500/25 border-amber-500 transition-all" : "text-foreground hover:bg-muted/60"}
                                                 onClick={() => setExpiryOption("2months")}
                                             >
                                                 2 เดือน
@@ -587,7 +590,7 @@ export default function AdminLicensesClient({
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "3months" ? "default" : "outline"}
-                                                className={expiryOption === "3months" ? "bg-primary text-primary-foreground font-semibold" : "text-foreground"}
+                                                className={expiryOption === "3months" ? "bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-md shadow-amber-500/25 border-amber-500 transition-all" : "text-foreground hover:bg-muted/60"}
                                                 onClick={() => setExpiryOption("3months")}
                                             >
                                                 3 เดือน
@@ -596,7 +599,7 @@ export default function AdminLicensesClient({
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "6months" ? "default" : "outline"}
-                                                className={expiryOption === "6months" ? "bg-primary text-primary-foreground font-semibold" : "text-foreground"}
+                                                className={expiryOption === "6months" ? "bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-md shadow-amber-500/25 border-amber-500 transition-all" : "text-foreground hover:bg-muted/60"}
                                                 onClick={() => setExpiryOption("6months")}
                                             >
                                                 6 เดือน
@@ -605,7 +608,7 @@ export default function AdminLicensesClient({
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "1year" ? "default" : "outline"}
-                                                className={expiryOption === "1year" ? "bg-primary text-primary-foreground font-semibold" : "text-foreground"}
+                                                className={expiryOption === "1year" ? "bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-md shadow-amber-500/25 border-amber-500 transition-all" : "text-foreground hover:bg-muted/60"}
                                                 onClick={() => setExpiryOption("1year")}
                                             >
                                                 1 ปี
@@ -614,7 +617,7 @@ export default function AdminLicensesClient({
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "custom" ? "default" : "outline"}
-                                                className={expiryOption === "custom" ? "bg-primary text-primary-foreground font-semibold" : "text-foreground"}
+                                                className={expiryOption === "custom" ? "bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-md shadow-amber-500/25 border-amber-500 transition-all" : "text-foreground hover:bg-muted/60"}
                                                 onClick={() => setExpiryOption("custom")}
                                             >
                                                 กำหนดเอง
