@@ -158,7 +158,7 @@ void GuardRefresh()
 
 input group "------- General / UI"
 input long   InpMagicBase        = 2000;     // Magic Number
-input double InpInitialCapital   = 100000.0; // Initial Capital (Cent/USC) for Buffer Calculation
+input double InpInitialCapital   = 0.0;      // Initial Capital (0 = Auto-Detect from Balance)
 input int    InpDashFontSize     = 10;       // Font size
 input double InpDashScale        = 1.00;     // Dashboard Scale
 
@@ -472,6 +472,7 @@ bool   g_isQuarantined[];
 bool   g_isHedged[];
 double g_accumulatedReliefBudget = 0.0;
 double g_totalReliefApplied      = 0.0;
+double g_baselineCapital         = 0.0;
 int    g_lastRenderedBodyRows    = 10;
 
 SymbolState g_state[];
@@ -750,6 +751,56 @@ void TrimMatchingHedgeLot(const string sym, const long hedgeMagic, const double 
    }
 }
 
+void SyncReliefFundWithBalance()
+{
+   double bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(bal <= 0.0) return;
+
+   long accLogin = (long)AccountInfoInteger(ACCOUNT_LOGIN);
+   string gvStartKey = StringFormat("EMP_%I64d_START_BAL", accLogin);
+   string gvFundKey  = StringFormat("EMP_%I64d_RELIEF_BUDGET", accLogin);
+   string gvUsedKey  = StringFormat("EMP_%I64d_RELIEF_USED", accLogin);
+
+   // If baseline is not set yet
+   if(g_baselineCapital <= 0.0)
+   {
+      if(GlobalVariableCheck(gvStartKey))
+         g_baselineCapital = GlobalVariableGet(gvStartKey);
+      if(g_baselineCapital <= 0.0)
+      {
+         g_baselineCapital = bal;
+         GlobalVariableSet(gvStartKey, g_baselineCapital);
+      }
+   }
+
+   // 1. Withdrawal Protection:
+   // If user withdrew funds so balance is at or below starting capital,
+   // immediately clear the relief fund so it NEVER eats into initial capital!
+   if(bal <= g_baselineCapital)
+   {
+      g_accumulatedReliefBudget = 0.0;
+   }
+   else
+   {
+      // 2. Net profit ceiling:
+      // Fund cannot exceed 40% of net profits above starting capital
+      double netProfit = bal - g_baselineCapital;
+      double maxAllowedByProfit = netProfit * (InpProfitReliefSharePct / 100.0);
+
+      // 3. Absolute safety cap: 5% of current balance
+      double maxAllowedByCap = bal * 0.05;
+
+      double maxAllowed = MathMin(maxAllowedByProfit, maxAllowedByCap);
+      if(g_accumulatedReliefBudget > maxAllowed)
+         g_accumulatedReliefBudget = maxAllowed;
+      if(g_accumulatedReliefBudget < 0.0)
+         g_accumulatedReliefBudget = 0.0;
+   }
+
+   GlobalVariableSet(gvFundKey, g_accumulatedReliefBudget);
+   GlobalVariableSet(gvUsedKey, g_totalReliefApplied);
+}
+
 void ProcessProfitRelief(const double realizedProfit, const string sourceSym)
 {
    if(!InpEnableQuarantine || InpProfitReliefSharePct <= 0.0 || realizedProfit <= 0.0)
@@ -757,6 +808,9 @@ void ProcessProfitRelief(const double realizedProfit, const string sourceSym)
 
    double reliefPortion = realizedProfit * (InpProfitReliefSharePct / 100.0);
    g_accumulatedReliefBudget += reliefPortion;
+
+   // Enforce withdrawal protection and 5% cap immediately
+   SyncReliefFundWithBalance();
 
    // Find worst quarantined or hedged symbol (Worst-First)
    int worstIdx = -1;
@@ -808,6 +862,8 @@ void ProcessProfitRelief(const double realizedProfit, const string sourceSym)
          {
             g_accumulatedReliefBudget -= lossAmount;
             g_totalReliefApplied += lossAmount;
+            SyncReliefFundWithBalance();
+
             PrintFormat("EasyM Rescue: Profit Relief closed ticket #%I64u on %s (Loss: %.2f | Financed by %s profit | Remaining Relief Budget: %.2f)",
                         worstTicket, targetSym, lossAmount, sourceSym, g_accumulatedReliefBudget);
 
@@ -2602,19 +2658,22 @@ void DashboardBuild()
    DashMakeText(DashNameRC("D_T",0,2),  txD, tyD, "WORST", DASH_BLUE, fs, 20020); txD += dColW[2];
    DashMakeText(DashNameRC("D_VV",0,3), txD, tyD, "-",     DASH_TEXT, fs, 20020);
 
-   // --- Draw Table E (Smart Alert & Buffer) under Table D
+   // --- Draw Table E (Buffer, Relief Fund, Alert): 1 row, 3 columns
    int ey0 = dy0 + rowH + pad;
-   int eCol0W = DashS(280);
-   int eCol1W = MathMax(200, dW - eCol0W);
+   int eCol0W = DashS(180);
+   int eCol1W = DashS(320);
+   int eCol2W = MathMax(200, dW - (eCol0W + eCol1W));
 
    DashMakeRect(DashNameRC("E_V",0,0), dx0, ey0, 1, rowH, DASH_GRID, 140, 20010);
    DashMakeRect(DashNameRC("E_V",0,1), dx0 + eCol0W, ey0, 1, rowH, DASH_GRID, 140, 20010);
-   DashMakeRect(DashNameRC("E_V",0,2), dx0 + dW, ey0, 1, rowH, DASH_GRID, 140, 20010);
+   DashMakeRect(DashNameRC("E_V",0,2), dx0 + eCol0W + eCol1W, ey0, 1, rowH, DASH_GRID, 140, 20010);
+   DashMakeRect(DashNameRC("E_V",0,3), dx0 + dW, ey0, 1, rowH, DASH_GRID, 140, 20010);
    DashMakeRect(DashNameRC("E_H",0,0), dx0, ey0, dW, 1, DASH_GRID, 140, 20010);
    DashMakeRect(DashNameRC("E_H",1,0), dx0, ey0 + rowH, dW, 1, DASH_GRID, 140, 20010);
 
-   DashMakeText(DashNameRC("E_VV",0,0), dx0 + DashPx(5), ey0 + DashPx(3), "BUFFER: +0.0%", DASH_GREEN, fs, 20020);
-   DashMakeText(DashNameRC("E_VV",0,1), dx0 + eCol0W + DashPx(5), ey0 + DashPx(3), "STATUS: SYSTEM HEALTHY", DASH_TEXT, fs, 20020);
+   DashMakeText(DashNameRC("E_VV",0,0), dx0 + DashPx(5), ey0 + DashPx(3), "BUF: +0.0% (1.0x)", DASH_GREEN, fs, 20020);
+   DashMakeText(DashNameRC("E_VV",0,1), dx0 + eCol0W + DashPx(5), ey0 + DashPx(3), "FUND: 0.00 (C:0 | U:0)", DASH_GOLD_TEXT, fs, 20020);
+   DashMakeText(DashNameRC("E_VV",0,2), dx0 + eCol0W + eCol1W + DashPx(5), ey0 + DashPx(3), "STATUS: SYSTEM HEALTHY", DASH_GREEN, fs, 20020);
 
    g_dashBuilt = true;
 }
@@ -2918,18 +2977,26 @@ void DashboardUpdate()
    ObjectSetInteger(g_dashChart, DashNameRC("D_VV",0,1), OBJPROP_COLOR, modeCol);
    ObjectSetInteger(g_dashChart, DashNameRC("D_VV",0,3), OBJPROP_COLOR, DASH_TEXT);
 
-   // --- Table E (Buffer & Alert) Update
-   double initCap = (InpInitialCapital > 0.0) ? InpInitialCapital : bal;
+   // --- Table E (Buffer, Fund, Alert) Update
+   SyncReliefFundWithBalance();
+
+   double initCap = (g_baselineCapital > 0.0) ? g_baselineCapital : bal;
    double bufPct  = (initCap > 0.0) ? ((bal - initCap) / initCap * 100.0) : 0.0;
    double resMult = (initCap > 0.0) ? (bal / initCap) : 1.0;
-   string bufTxt  = StringFormat("BUFFER: %+.1f%% (%.1fx)", bufPct, resMult);
-   if(g_totalReliefApplied > 0.0)
-      bufTxt += StringFormat(" | RELIEF: %.2f", g_totalReliefApplied);
 
+   // Col 0: Buffer
+   string bufTxt = StringFormat("BUF: %+.1f%% (%.1fx)", bufPct, resMult);
    ObjectSetString(g_dashChart, DashNameRC("E_VV",0,0), OBJPROP_TEXT, bufTxt);
    ObjectSetInteger(g_dashChart, DashNameRC("E_VV",0,0), OBJPROP_COLOR, (bufPct >= 0 ? DASH_GREEN : DASH_GOLD_TEXT));
 
-   string alertTxt = "STATUS: ALL PAIRS ACTIVE | SYSTEM HEALTHY";
+   // Col 1: Fund (C: Cap, U: Used)
+   double maxCap = bal * 0.05;
+   string fundTxt = StringFormat("FUND: %.2f (C:%.0f | U:%.2f)", g_accumulatedReliefBudget, maxCap, g_totalReliefApplied);
+   ObjectSetString(g_dashChart, DashNameRC("E_VV",0,1), OBJPROP_TEXT, fundTxt);
+   ObjectSetInteger(g_dashChart, DashNameRC("E_VV",0,1), OBJPROP_COLOR, (g_accumulatedReliefBudget > 0.0 ? DASH_GOLD_TEXT : DASH_TEXT));
+
+   // Col 2: Alert / Status
+   string alertTxt = "STATUS: SYSTEM HEALTHY";
    color alertCol  = DASH_GREEN;
 
    string qList = "";
@@ -2948,17 +3015,17 @@ void DashboardUpdate()
 
    if(StringLen(qList) > 0)
    {
-      alertTxt = StringFormat("ALERT: [%s] LOCK WITHDRAWALS (งดถอน)", qList);
+      alertTxt = StringFormat("ALERT: [%s] LOCK WITHDRAWALS", qList);
       alertCol = DASH_ORANGE;
    }
    else if(marginLevel > 0.0 && marginLevel < 300.0)
    {
-      alertTxt = StringFormat("WARNING: MARGIN LEVEL %.0f%% < 300%% (TOP-UP RECOMMENDED)", marginLevel);
+      alertTxt = StringFormat("WARNING: MARGIN LEVEL %.0f%% < 300%%", marginLevel);
       alertCol = DASH_GOLD_TEXT;
    }
 
-   ObjectSetString(g_dashChart, DashNameRC("E_VV",0,1), OBJPROP_TEXT, alertTxt);
-   ObjectSetInteger(g_dashChart, DashNameRC("E_VV",0,1), OBJPROP_COLOR, alertCol);
+   ObjectSetString(g_dashChart, DashNameRC("E_VV",0,2), OBJPROP_TEXT, alertTxt);
+   ObjectSetInteger(g_dashChart, DashNameRC("E_VV",0,2), OBJPROP_COLOR, alertCol);
 }
 
 
@@ -3125,6 +3192,44 @@ int OnInit()
    }
 
    Print("EASY_M_10Pairs initialized. Symbols=", n, ", MagicBase=", InpMagicBase);
+
+   // Initialize baseline capital & Relief Fund with persistence
+   long accLogin = (long)AccountInfoInteger(ACCOUNT_LOGIN);
+   string gvStartKey = StringFormat("EMP_%I64d_START_BAL", accLogin);
+   string gvFundKey  = StringFormat("EMP_%I64d_RELIEF_BUDGET", accLogin);
+   string gvUsedKey  = StringFormat("EMP_%I64d_RELIEF_USED", accLogin);
+
+   double curBal = AccountInfoDouble(ACCOUNT_BALANCE);
+
+   if(InpInitialCapital > 0.0)
+   {
+      g_baselineCapital = InpInitialCapital;
+      GlobalVariableSet(gvStartKey, g_baselineCapital);
+   }
+   else
+   {
+      if(GlobalVariableCheck(gvStartKey))
+      {
+         g_baselineCapital = GlobalVariableGet(gvStartKey);
+         if(g_baselineCapital <= 0.0)
+         {
+            g_baselineCapital = (curBal > 0.0 ? curBal : 100000.0);
+            GlobalVariableSet(gvStartKey, g_baselineCapital);
+         }
+      }
+      else
+      {
+         g_baselineCapital = (curBal > 0.0 ? curBal : 100000.0);
+         GlobalVariableSet(gvStartKey, g_baselineCapital);
+      }
+   }
+
+   if(GlobalVariableCheck(gvFundKey))
+      g_accumulatedReliefBudget = GlobalVariableGet(gvFundKey);
+   if(GlobalVariableCheck(gvUsedKey))
+      g_totalReliefApplied = GlobalVariableGet(gvUsedKey);
+
+   SyncReliefFundWithBalance();
 
    EventSetTimer(DASH_TIMER_SEC);
    DashApplyChartRules();
