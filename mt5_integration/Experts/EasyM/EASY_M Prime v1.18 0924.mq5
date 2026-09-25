@@ -205,14 +205,14 @@ input int    InpWorstSlowGridEveryBars  = 3;    // SLOW: allow order add every N
 
 input group "------- 🛡️ QUARANTINE & RESCUE DEFENSE"
 input bool   InpEnableQuarantine        = true;  // Quarantine Mode ON/OFF
-input double InpQuarantineTriggerPct    = 10.0;  // Single-Pair DD% -> QUARANTINE
-input double InpQuarantineResumePct     = 6.0;   // Single-Pair DD% -> back to NORMAL
+input double InpQuarantineTriggerPct    = 18.0;  // Single-Pair DD% -> QUARANTINE
+input double InpQuarantineResumePct     = 12.0;  // Single-Pair DD% -> back to NORMAL/FREEZE
 input int    InpMaxQuarantinedSymbols   = 2;     // Max Quarantined Pairs before FREEZE ALL
 input bool   InpEnableAutoHedge         = true;  // Auto-Hedge Lock ON/OFF
 input double InpHedgeTriggerPct         = 40.0;  // Single-Pair DD% -> AUTO-HEDGE (Delta=0)
 input int    InpMaxHedgedSymbols        = 1;     // Max Hedged Symbols (1 = Single Worst Only)
 input bool   InpEnableRescueGrid        = true;  // Rescue Grid Sniping ON/OFF
-input double InpRescueTriggerPct        = 15.0;  // Single-Pair DD% -> RESCUE GRID Start
+input double InpRescueTriggerPct        = 25.0;  // Single-Pair DD% -> RESCUE GRID Start
 input int    InpRescueMaxOrders         = 3;     // Max Rescue Orders per symbol
 input double InpRescueFirstGapPips      = 100.0; // Min pips gap from lowest regular order
 input double InpRescueStepPips          = 45.0;  // Min pips step between rescue orders
