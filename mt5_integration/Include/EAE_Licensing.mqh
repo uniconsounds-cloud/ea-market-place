@@ -754,7 +754,7 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    
    int current_interval = active_sync_interval;
    if(!full_sync_mode) {
-      current_interval = 10; // Sleep mode: check for active viewer every 10 seconds
+      current_interval = 180; // Sleep mode: ping heartbeat every 3 minutes (180s) when no active viewer
    }
    
    if(last_sync_ticks > 0 && (int)(now_ticks - last_sync_ticks) < current_interval * 1000) {
