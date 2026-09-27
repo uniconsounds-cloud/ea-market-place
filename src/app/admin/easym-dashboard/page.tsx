@@ -723,19 +723,41 @@ export default function EasyMMasterDashboardPage() {
                 return lastAdmin || { name: 'Direct / ระบบกลาง', email: 'juntarasate@gmail.com' };
             };
 
-            // B. Fetch all EasyM licenses
+            // B. Fetch all licenses ordered by created_at DESC (latest first)
             const { data: licenses, error: licErr } = await supabase
                 .from('licenses')
-                .select('id, user_id, product_id, account_number, port_name, is_active, created_at, expiry_date, license_tier, products(id, name, product_key)');
+                .select('id, user_id, product_id, account_number, port_name, is_active, created_at, expiry_date, license_tier, products(id, name, product_key)')
+                .order('created_at', { ascending: false });
             if (licErr) throw licErr;
 
-            // Filter for EasyM products
-            const easymLicenses = (licenses || []).filter(l => {
-                const prod = Array.isArray(l.products) ? l.products[0] : l.products;
-                const pKey = (prod as any)?.product_key || '';
-                const pName = (prod as any)?.name || '';
-                return pKey.includes('EZM') || pName.toLowerCase().includes('easym') || pName.toLowerCase().includes('easy m');
+            // Map each unique account number to its LATEST license request
+            const latestLicenseByAcc = new Map<string, any>();
+            (licenses || []).forEach(lic => {
+                const rawAcc = (lic.account_number || '').trim();
+                if (!rawAcc) return;
+                rawAcc.split(/[\s,]+/).filter(Boolean).forEach((acc: string) => {
+                    if (!latestLicenseByAcc.has(acc)) {
+                        latestLicenseByAcc.set(acc, lic);
+                    }
+                });
             });
+
+            // Filter accounts whose LATEST license is in the EasyM family (EasyM Max, mini, Farm, Universal/Prime)
+            // If the user requested another EA (e.g. EasyGold, STEP, START), do not include in EasyM dashboard
+            const easymAccountSet = new Set<string>();
+            const easymLicenses: any[] = [];
+
+            for (const [acc, lic] of latestLicenseByAcc.entries()) {
+                const prod = Array.isArray(lic.products) ? lic.products[0] : lic.products;
+                const pKey = ((prod as any)?.product_key || '').toUpperCase();
+                const pName = ((prod as any)?.name || '').toLowerCase();
+                const isEasyM = pKey.includes('EZM') || pName.includes('easym') || pName.includes('easy m');
+
+                if (isEasyM) {
+                    easymAccountSet.add(acc);
+                    easymLicenses.push(lic);
+                }
+            }
 
             // Set of accounts that actually have a Gold EA license in system
             const goldLicenseAccountSet = new Set<string>();
@@ -1095,11 +1117,9 @@ export default function EasyMMasterDashboardPage() {
                 // Split space/comma separated account numbers if multiple were entered in one field
                 const accList = rawAcc.split(/[\s,]+/).filter(Boolean);
                 accList.forEach((accNum: string) => {
-                    const existing = portItemsMap.get(accNum);
-                    // If account already exists and existing is active while current is inactive, keep active
-                    if (existing && existing.isActive && !lic.is_active) {
-                        return;
-                    }
+                    // Only process accounts whose latest license belongs to EasyM family
+                    if (!easymAccountSet.has(accNum)) return;
+                    if (portItemsMap.has(accNum)) return;
 
                     const customer = lic.user_id ? profileMap.get(lic.user_id) : null;
                     const adminInfo = getRootAdmin(lic.user_id);
@@ -1129,15 +1149,17 @@ export default function EasyMMasterDashboardPage() {
                         resolvedAccType = 'USC';
                     }
 
-                    const prodKey = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.product_key || 'EZM-MAX';
-                    const prodName = (Array.isArray(lic.products) ? lic.products[0] : (lic.products as any))?.name || 'EasyM MAX';
+                    const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
+                    const prodKey = prod?.product_key || 'EZM-MAX';
+                    const prodName = prod?.name || 'EasyM MAX';
 
                     const isGoldMismatch = (accNum === '97072259') || 
                                            (goldLicenseAccountSet.has(accNum) && (status?.system_code?.toLowerCase().includes('gold') || status?.system_code === 'EG_FARMING'));
 
                     const isTester = !!customer?.is_tester || isTestPort(accNum);
-                    const isMax = prodKey.includes('MAX') || prodName.toLowerCase().includes('max');
-                    const isMini = prodKey.includes('MIN') || prodName.toLowerCase().includes('mini');
+                    const isMax = prodKey.toUpperCase().includes('MAX') || prodName.toLowerCase().includes('max');
+                    const isFarm = prodKey.toUpperCase().includes('FARM') || prodName.toLowerCase().includes('farm');
+                    const isMini = prodKey.toUpperCase().includes('MIN') || prodName.toLowerCase().includes('mini');
                     const requiredBalanceUSC = isMax ? 100000 : 50000;
 
                     const rawBal = Number(status?.balance) || 0;
@@ -1293,6 +1315,17 @@ export default function EasyMMasterDashboardPage() {
             (portStatuses || []).forEach(status => {
                 const accNum = status.port_number?.toString();
                 if (accNum && !portItemsMap.has(accNum)) {
+                    // Check if this account has a license in system whose LATEST license is NOT EasyM
+                    const latestLic = latestLicenseByAcc.get(accNum);
+                    if (latestLic) {
+                        const prod = Array.isArray(latestLic.products) ? latestLic.products[0] : latestLic.products;
+                        const pKey = ((prod as any)?.product_key || '').toUpperCase();
+                        const pName = ((prod as any)?.name || '').toLowerCase();
+                        if (!pKey.includes('EZM') && !pName.includes('easym') && !pName.includes('easy m')) {
+                            return; // Customer requested a non-EasyM EA (e.g. EasyGold) as latest license
+                        }
+                    }
+
                     const sc = (status.system_code || '').toLowerCase();
                     if (sc.includes('easym') || sc.includes('easy m')) {
                         const now = new Date();
@@ -1653,8 +1686,12 @@ export default function EasyMMasterDashboardPage() {
 
             // Product filter
             if (selectedProduct !== 'all') {
-                if (selectedProduct === 'max' && !p.productName.toLowerCase().includes('max')) return false;
-                if (selectedProduct === 'mini' && !p.productName.toLowerCase().includes('mini')) return false;
+                const pName = p.productName.toLowerCase();
+                const pKey = p.productKey.toUpperCase();
+                if (selectedProduct === 'max' && !pName.includes('max') && !pKey.includes('MAX')) return false;
+                if (selectedProduct === 'mini' && !pName.includes('mini') && !pKey.includes('MIN')) return false;
+                if (selectedProduct === 'farm' && !pName.includes('farm') && !pKey.includes('FARM')) return false;
+                if (selectedProduct === 'universal' && !pName.includes('universal') && !pKey.includes('UNI') && !pName.includes('prime')) return false;
             }
 
             // License Status filter
@@ -1809,8 +1846,10 @@ export default function EasyMMasterDashboardPage() {
         const onlineCount = filteredPorts.filter(p => p.isOnline).length;
         const offlineCount = totalCount - onlineCount;
 
-        const maxEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('max')).length;
-        const miniEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('mini')).length;
+        const maxEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('max') || p.productKey.includes('MAX')).length;
+        const farmEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('farm') || p.productKey.includes('FARM')).length;
+        const miniEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('mini') || p.productKey.includes('MIN')).length;
+        const universalEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('universal') || p.productKey.includes('UNI') || p.productName.toLowerCase().includes('prime')).length;
 
         let totalBalanceUSC = 0;
         let totalBalanceUSD = 0;
@@ -1872,7 +1911,9 @@ export default function EasyMMasterDashboardPage() {
             onlineCount,
             offlineCount,
             maxEACount,
+            farmEACount,
             miniEACount,
+            universalEACount,
             totalBalanceUSC,
             totalBalanceUSD,
             activeBalanceUSC,
@@ -2073,7 +2114,7 @@ export default function EasyMMasterDashboardPage() {
                             <span className="sm:hidden">วันนี้: </span>
                             +{kpi.totalTodayProfit.toLocaleString('en-US', { maximumFractionDigits: 1 })}
                         </span>
-                        <span>MAX: {kpi.maxEACount} | mini: {kpi.miniEACount}</span>
+                        <span>MAX: {kpi.maxEACount} | Farm: {kpi.farmEACount} | mini: {kpi.miniEACount}</span>
                     </div>
                 </CardContent>
             </Card>
@@ -3697,12 +3738,19 @@ export default function EasyMMasterDashboardPage() {
                                                 } ${
                                                     isFilteredOut ? 'opacity-20 saturate-30 hover:opacity-100 hover:saturate-100' : ''
                                                 }`}
-                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\n${meta.label}\nBalance: ${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
+                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\nสินค้า: ${port.productName}\n${meta.label}\nBalance: ${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
                                             >
                                                 {/* Top Label & Dot */}
                                                 <div className="w-full flex items-center justify-between px-1 pt-1 leading-none">
-                                                    <span className="text-[8px] font-mono font-bold opacity-80 leading-none">
-                                                        {port.productName.toLowerCase().includes('max') ? 'MAX' : 'MINI'}
+                                                    <span className="text-[8px] font-mono font-bold opacity-90 leading-none">
+                                                        {(() => {
+                                                            const pn = port.productName.toLowerCase();
+                                                            const pk = port.productKey.toUpperCase();
+                                                            if (pk.includes('MAX') || pn.includes('max')) return 'MAX';
+                                                            if (pk.includes('FARM') || pn.includes('farm')) return 'FARM';
+                                                            if (pk.includes('MIN') || pn.includes('mini')) return 'MINI';
+                                                            return 'PRIME';
+                                                        })()}
                                                     </span>
                                                     <div className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
                                                 </div>
@@ -4027,13 +4075,15 @@ export default function EasyMMasterDashboardPage() {
 
                             {/* Product Filter */}
                             <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                                <SelectTrigger className="w-full sm:w-[140px] bg-background">
+                                <SelectTrigger className="w-full sm:w-[155px] bg-background">
                                     <SelectValue placeholder="กรองตามสินค้า" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">สินค้าทั้งหมด</SelectItem>
                                     <SelectItem value="max">EasyM MAX</SelectItem>
+                                    <SelectItem value="farm">EasyM Farm</SelectItem>
                                     <SelectItem value="mini">EasyM mini</SelectItem>
+                                    <SelectItem value="universal">EasyM Universal</SelectItem>
                                 </SelectContent>
                             </Select>
 
