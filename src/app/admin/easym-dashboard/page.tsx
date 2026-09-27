@@ -38,7 +38,11 @@ import {
     CircleDollarSign,
     UserCheck,
     KeyRound,
-    X
+    X,
+    Info,
+    Radio,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -88,7 +92,195 @@ interface EasyMPortItem {
     requiredBalanceUSC: number;
     telemetryType: 'full_sync' | 'license_only' | 'none';
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
+    state?: EasyMPortState;
 }
+
+export type EasyMPortState =
+    | 'STATE_1_LIVE'
+    | 'STATE_2A_ONLINE'
+    | 'STATE_2B_LOW_BALANCE'
+    | 'STATE_3_LOST'
+    | 'STATE_4_DELAYED'
+    | 'STATE_5_OFFLINE'
+    | 'STATE_6_DORMANT'
+    | 'STATE_7_ABANDONED'
+    | 'WEEKEND_STANDBY';
+
+export interface PortStateMeta {
+    id: EasyMPortState;
+    label: string;
+    shortLabel: string;
+    description: string;
+    colorBg: string;
+    colorBorder: string;
+    colorText: string;
+    badgeBg: string;
+    dotClass: string;
+    icon: string;
+}
+
+export const PORT_STATE_META: Record<EasyMPortState, PortStateMeta> = {
+    STATE_1_LIVE: {
+        id: 'STATE_1_LIVE',
+        label: 'State 1: เปิดดูฟาร์มสด',
+        shortLabel: 'S1 สด ≤2m',
+        description: 'กำลังเปิดดูหน้าฟาร์ม หรือสื่อสาร telemetry สดต่อเนื่อง (Ping ≤ 2 นาที)',
+        colorBg: 'bg-emerald-500',
+        colorBorder: 'border-emerald-400',
+        colorText: 'text-white',
+        badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+        dotClass: 'bg-emerald-300 animate-pulse',
+        icon: '🟢',
+    },
+    STATE_2A_ONLINE: {
+        id: 'STATE_2A_ONLINE',
+        label: 'State 2A: รันปกติโหมดประหยัด (ทุนผ่าน)',
+        shortLabel: 'S2A ทุนผ่าน',
+        description: 'Smart Sleep Ping ปกติ (Ping ≤ 15 นาที) และยอดเงินทุนถึงเกณฑ์ขั้นต่ำ',
+        colorBg: 'bg-emerald-600',
+        colorBorder: 'border-emerald-500',
+        colorText: 'text-white',
+        badgeBg: 'bg-emerald-600/25 text-emerald-300 border-emerald-500/40',
+        dotClass: 'bg-emerald-400',
+        icon: '🟢',
+    },
+    STATE_2B_LOW_BALANCE: {
+        id: 'STATE_2B_LOW_BALANCE',
+        label: 'State 2B: รันแต่ทุนต่ำกว่าเกณฑ์',
+        shortLabel: 'S2B ทุนต่ำ',
+        description: 'Smart Sleep Ping ทำงาน แต่เงินทุนต่ำกว่าเกณฑ์ของสินค้า (MAX < 100k, Mini < 50k USC)',
+        colorBg: 'bg-amber-500',
+        colorBorder: 'border-amber-400',
+        colorText: 'text-zinc-950 font-bold',
+        badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        dotClass: 'bg-amber-400',
+        icon: '🟡',
+    },
+    STATE_3_LOST: {
+        id: 'STATE_3_LOST',
+        label: 'State 3: ขาดช่วงสั้น / รอรอบ 12h',
+        shortLabel: 'S3 รอตรวจ 12h',
+        description: 'ขาดการติดต่อ 15 นาที - 12 ชั่วโมง (อาจปิดหน้าจอ รอวงรอบตรวจสิทธิ์ถัดไป หรือเน็ตหลุดชั่วคราว)',
+        colorBg: 'bg-orange-400',
+        colorBorder: 'border-orange-300',
+        colorText: 'text-zinc-950 font-bold',
+        badgeBg: 'bg-orange-400/20 text-orange-300 border-orange-400/40',
+        dotClass: 'bg-orange-400',
+        icon: '🟠',
+    },
+    STATE_4_DELAYED: {
+        id: 'STATE_4_DELAYED',
+        label: 'State 4: เกินรอบตรวจสิทธิ์',
+        shortLabel: 'S4 เกินรอบ',
+        description: 'ขาดการติดต่อนาน 12 - 24 ชั่วโมง (เกินกำหนดรอบตรวจสิทธิ์ประจำวัน)',
+        colorBg: 'bg-orange-600',
+        colorBorder: 'border-orange-500',
+        colorText: 'text-white',
+        badgeBg: 'bg-orange-600/20 text-orange-300 border-orange-500/40',
+        dotClass: 'bg-orange-500',
+        icon: '🔴',
+    },
+    STATE_5_OFFLINE: {
+        id: 'STATE_5_OFFLINE',
+        label: 'State 5: ออฟไลน์ขาดติดต่อ',
+        shortLabel: 'S5 หลุด 1-7d',
+        description: 'ขาดการติดต่อนาน 24 ชั่วโมง - 7 วัน (เครื่องดับ VPS หลุด หรือผู้ใช้ปิด MT5)',
+        colorBg: 'bg-rose-600',
+        colorBorder: 'border-rose-500',
+        colorText: 'text-white',
+        badgeBg: 'bg-rose-600/20 text-rose-300 border-rose-500/40',
+        dotClass: 'bg-rose-500',
+        icon: '🔴',
+    },
+    STATE_6_DORMANT: {
+        id: 'STATE_6_DORMANT',
+        label: 'State 6: หยุดรันนาน',
+        shortLabel: 'S6 หยุด 7-30d',
+        description: 'หยุดรันนาน 7 วัน - 30 วัน',
+        colorBg: 'bg-zinc-600',
+        colorBorder: 'border-zinc-500',
+        colorText: 'text-zinc-100',
+        badgeBg: 'bg-zinc-600/25 text-zinc-300 border-zinc-500/40',
+        dotClass: 'bg-zinc-400',
+        icon: '⚪',
+    },
+    STATE_7_ABANDONED: {
+        id: 'STATE_7_ABANDONED',
+        label: 'State 7: ทิ้งร้าง / ยังไม่เริ่มรัน',
+        shortLabel: 'S7 ทิ้งร้าง',
+        description: 'ขาดการติดต่อเกิน 30 วัน หรือยังไม่เคยเปิดรันเลยตั้งแต่ได้รับสิทธิ์',
+        colorBg: 'bg-zinc-800',
+        colorBorder: 'border-zinc-700',
+        colorText: 'text-zinc-400',
+        badgeBg: 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50',
+        dotClass: 'bg-zinc-600',
+        icon: '⚫',
+    },
+    WEEKEND_STANDBY: {
+        id: 'WEEKEND_STANDBY',
+        label: 'Weekend: ตลาดปิดพักผ่อน',
+        shortLabel: 'Weekend พัก',
+        description: 'ตลาดปิดเสาร์-อาทิตย์ (พอร์ตพักผ่อนตามรอบตลาด)',
+        colorBg: 'bg-purple-600',
+        colorBorder: 'border-purple-400',
+        colorText: 'text-white',
+        badgeBg: 'bg-purple-600/20 text-purple-300 border-purple-400/40',
+        dotClass: 'bg-purple-400',
+        icon: '🟣',
+    },
+};
+
+export function checkIsMarketWeekend(date: Date = new Date()): boolean {
+    const bkkTime = new Date(date.getTime() + (7 * 60 + date.getTimezoneOffset()) * 60 * 1000);
+    const day = bkkTime.getDay(); // 0 is Sunday, 6 is Saturday
+    const hours = bkkTime.getHours();
+    
+    // Saturday >= 04:00 AM BKK
+    if (day === 6 && hours >= 4) return true;
+    // Sunday all day
+    if (day === 0) return true;
+    // Monday < 04:00 AM BKK
+    if (day === 1 && hours < 4) return true;
+    return false;
+}
+
+export function resolvePortState(port: { hoursSinceLastPing: number; balance: number; accountType: string; requiredBalanceUSC: number }, isWeekend: boolean, _nowMs?: number): EasyMPortState {
+    if (isWeekend && port.hoursSinceLastPing <= 48 && port.hoursSinceLastPing >= 0) {
+        return 'WEEKEND_STANDBY';
+    }
+
+    const minsSince = port.hoursSinceLastPing * 60;
+    const rawBal = Number(port.balance) || 0;
+    const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
+    const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
+
+    if (minsSince <= 2) {
+        return 'STATE_1_LIVE';
+    }
+
+    if (minsSince <= 15) {
+        return isBalOk ? 'STATE_2A_ONLINE' : 'STATE_2B_LOW_BALANCE';
+    }
+
+    if (port.hoursSinceLastPing <= 12) {
+        return 'STATE_3_LOST';
+    }
+
+    if (port.hoursSinceLastPing <= 24) {
+        return 'STATE_4_DELAYED';
+    }
+
+    if (port.hoursSinceLastPing <= 168) { // 7 days
+        return 'STATE_5_OFFLINE';
+    }
+
+    if (port.hoursSinceLastPing <= 720) { // 30 days
+        return 'STATE_6_DORMANT';
+    }
+
+    return 'STATE_7_ABANDONED';
+}
+
 
 export interface LicenseCheckDisplayInfo {
     lastCheckStr: string;
@@ -460,6 +652,10 @@ export default function EasyMMasterDashboardPage() {
     const [selectedProduct, setSelectedProduct] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [selectedLicenseStatus, setSelectedLicenseStatus] = useState<string>('all');
+    const [selectedStateFilter, setSelectedStateFilter] = useState<string>('all');
+    const [hoveredPortForMatrix, setHoveredPortForMatrix] = useState<EasyMPortItem | null>(null);
+    const [pinnedPortForMatrix, setPinnedPortForMatrix] = useState<EasyMPortItem | null>(null);
+    const [isLegendOpen, setIsLegendOpen] = useState<boolean>(true);
     const [viewMode, setViewMode] = useState<'customer' | 'table' | 'cards'>('customer');
     const [activeTab, setActiveTab] = useState<'performance' | 'ports' | 'team-analytics'>('performance');
     const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
@@ -942,7 +1138,7 @@ export default function EasyMMasterDashboardPage() {
                     const isTester = !!customer?.is_tester || isTestPort(accNum);
                     const isMax = prodKey.includes('MAX') || prodName.toLowerCase().includes('max');
                     const isMini = prodKey.includes('MIN') || prodName.toLowerCase().includes('mini');
-                    const requiredBalanceUSC = isMax ? 100000 : (isMini ? 50000 : 30000);
+                    const requiredBalanceUSC = isMax ? 100000 : 50000;
 
                     const rawBal = Number(status?.balance) || 0;
                     const balUSC = resolvedAccType === 'USD' ? rawBal * 100 : rawBal;
@@ -1079,7 +1275,13 @@ export default function EasyMMasterDashboardPage() {
                         hoursSinceLastPing: Math.round(hoursSinceLastPing),
                         requiredBalanceUSC,
                         telemetryType,
-                        runStatus
+                        runStatus,
+                        state: resolvePortState({
+                            hoursSinceLastPing: Math.round(hoursSinceLastPing),
+                            balance: status?.balance || 0,
+                            accountType: resolvedAccType,
+                            requiredBalanceUSC
+                        }, isWeekend)
                     };
 
 
@@ -1186,7 +1388,13 @@ export default function EasyMMasterDashboardPage() {
                             hoursSinceLastPing: Math.round(hoursSinceLastPing),
                             requiredBalanceUSC,
                             telemetryType,
-                            runStatus
+                            runStatus,
+                            state: resolvePortState({
+                                hoursSinceLastPing: Math.round(hoursSinceLastPing),
+                                balance: status.balance || 0,
+                                accountType: status.account_type || 'USC',
+                                requiredBalanceUSC
+                            }, isWeekend)
                         });
 
                     }
@@ -1455,8 +1663,31 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedLicenseStatus === 'inactive' && p.isActive) return false;
             }
 
+            // Fleet State Filter
+            if (selectedStateFilter !== 'all') {
+                const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                const portSt = p.state || resolvePortState(p, isWk, currentTime);
+                const rawBal = Number(p.balance) || 0;
+                const balUSC = p.accountType === 'USD' ? rawBal * 100 : rawBal;
+                const isBalOk = balUSC >= p.requiredBalanceUSC && rawBal > 0;
+
+                if (selectedStateFilter === 'license_active') {
+                    if (!p.isActive) return false;
+                } else if (selectedStateFilter === 'license_inactive') {
+                    if (p.isActive) return false;
+                } else if (selectedStateFilter === 'bal_ok') {
+                    if (!isBalOk) return false;
+                } else if (selectedStateFilter === 'bal_low') {
+                    if (isBalOk) return false;
+                } else {
+                    if (portSt !== selectedStateFilter) return false;
+                }
+            }
+
             // Status filter
             if (selectedStatus !== 'all') {
+                const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                const portSt = p.state || resolvePortState(p, isWk, currentTime);
                 if (selectedStatus === 'real_running' && !p.isRealRunning) return false;
                 if (selectedStatus === 'mismatch_gold' && p.runStatus !== 'mismatch_gold') return false;
                 if (selectedStatus === 'offline_48h' && p.runStatus !== 'offline_48h') return false;
@@ -1470,11 +1701,55 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedStatus === 'has_telemetry' && !p.hasTelemetry) return false;
                 if (selectedStatus === 'full_sync' && p.telemetryType !== 'full_sync') return false;
                 if (selectedStatus === 'license_only' && p.telemetryType !== 'license_only') return false;
+                if (selectedStatus === 'state_1' && portSt !== 'STATE_1_LIVE') return false;
+                if (selectedStatus === 'state_2a' && portSt !== 'STATE_2A_ONLINE') return false;
+                if (selectedStatus === 'state_2b' && portSt !== 'STATE_2B_LOW_BALANCE') return false;
+                if (selectedStatus === 'state_3' && portSt !== 'STATE_3_LOST') return false;
+                if (selectedStatus === 'state_4' && portSt !== 'STATE_4_DELAYED') return false;
+                if (selectedStatus === 'state_5' && portSt !== 'STATE_5_OFFLINE') return false;
+                if (selectedStatus === 'state_6' && portSt !== 'STATE_6_DORMANT') return false;
+                if (selectedStatus === 'state_7' && portSt !== 'STATE_7_ABANDONED') return false;
+                if (selectedStatus === 'weekend' && portSt !== 'WEEKEND_STANDBY') return false;
             }
 
             return true;
         });
-    }, [ports, searchQuery, selectedAdmin, selectedProduct, selectedStatus, selectedLicenseStatus]);
+    }, [ports, searchQuery, selectedAdmin, selectedProduct, selectedStatus, selectedLicenseStatus, selectedStateFilter, currentTime, fleetStats?.isWeekend]);
+
+    // Fleet Matrix State Counts
+    const stateCounts = useMemo(() => {
+        const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+        const counts: Record<string, number> = {
+            all: ports.length,
+            STATE_1_LIVE: 0,
+            STATE_2A_ONLINE: 0,
+            STATE_2B_LOW_BALANCE: 0,
+            STATE_3_LOST: 0,
+            STATE_4_DELAYED: 0,
+            STATE_5_OFFLINE: 0,
+            STATE_6_DORMANT: 0,
+            STATE_7_ABANDONED: 0,
+            WEEKEND_STANDBY: 0,
+            license_active: 0,
+            license_inactive: 0,
+            bal_ok: 0,
+            bal_low: 0,
+        };
+
+        ports.forEach(p => {
+            const st = p.state || resolvePortState(p, isWk, currentTime);
+            counts[st] = (counts[st] || 0) + 1;
+            if (p.isActive) counts.license_active++;
+            else counts.license_inactive++;
+
+            const rawBal = Number(p.balance) || 0;
+            const balUSC = p.accountType === 'USD' ? rawBal * 100 : rawBal;
+            if (balUSC >= p.requiredBalanceUSC && rawBal > 0) counts.bal_ok++;
+            else counts.bal_low++;
+        });
+
+        return counts;
+    }, [ports, fleetStats?.isWeekend, currentTime]);
 
     // 4. Group by Customer
     const customerGroups = useMemo(() => {
@@ -3167,9 +3442,549 @@ export default function EasyMMasterDashboardPage() {
             {/* TAB 2: ค้นหาและรายการพอร์ตฝูงบิน */}
             {activeTab === 'ports' && (
                 <div className="space-y-6">
+                    {/* 🚀 GRAPHIC FLEET STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฝูงบิน) */}
+                    <Card className="border-border shadow-md bg-gradient-to-b from-card via-card/90 to-card/75 overflow-hidden">
+                        <CardHeader className="pb-3 border-b border-border/40">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                <div>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                                            <Radio className="w-5 h-5 animate-pulse text-blue-400" />
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+                                                แผงมอนิเตอร์สถานะฝูงบิน EasyM (Fleet Status Matrix)
+                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs font-mono font-bold px-2 py-0.5">
+                                                    {ports.length} พอร์ต
+                                                </Badge>
+                                            </CardTitle>
+                                            <CardDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                                                กราฟฟิกสะท้อน State การสื่อสาร (1-7), สิทธิ์ License (Active/Inactive), และความพร้อมเงินทุนของทุกพอร์ต
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {selectedStateFilter !== 'all' && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setSelectedStateFilter('all')}
+                                            className="h-8 px-2.5 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30"
+                                        >
+                                            <X className="w-3.5 h-3.5 mr-1" />
+                                            ล้างตัวกรองสถานะ
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsLegendOpen(!isLegendOpen)}
+                                        className="h-8 px-2.5 text-xs border-border/80 bg-background/50 hover:bg-background"
+                                    >
+                                        <Info className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
+                                        <span>คำอธิบายสัญลักษณ์</span>
+                                        {isLegendOpen ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Quick State Filter Pills */}
+                            <div className="flex items-center gap-1.5 pt-3 overflow-x-auto pb-1 no-scrollbar text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('all')}
+                                    className={`px-2.5 py-1 rounded-lg font-mono font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'all'
+                                            ? 'bg-foreground text-background font-bold shadow-sm'
+                                            : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40'
+                                    }`}
+                                >
+                                    ทั้งหมด ({stateCounts.all})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_1_LIVE')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_1_LIVE'
+                                            ? 'bg-emerald-500 text-white font-bold ring-2 ring-emerald-300 shadow-md'
+                                            : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-500/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span>S1 สด ≤2m ({stateCounts.STATE_1_LIVE})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_2A_ONLINE')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_2A_ONLINE'
+                                            ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-300 shadow-md'
+                                            : 'bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-600/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                    <span>S2A ทุนผ่าน ({stateCounts.STATE_2A_ONLINE})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_2B_LOW_BALANCE')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_2B_LOW_BALANCE'
+                                            ? 'bg-amber-500 text-black font-bold ring-2 ring-amber-300 shadow-md'
+                                            : 'bg-amber-950/40 text-amber-300 hover:bg-amber-950/60 border border-amber-500/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                    <span>S2B ทุนต่ำ ({stateCounts.STATE_2B_LOW_BALANCE})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_3_LOST')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_3_LOST'
+                                            ? 'bg-orange-400 text-black font-bold ring-2 ring-orange-200 shadow-md'
+                                            : 'bg-orange-950/40 text-orange-300 hover:bg-orange-950/60 border border-orange-400/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-orange-400" />
+                                    <span>S3 รอตรวจ 12h ({stateCounts.STATE_3_LOST})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_4_DELAYED')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_4_DELAYED'
+                                            ? 'bg-orange-600 text-white font-bold ring-2 ring-orange-400 shadow-md'
+                                            : 'bg-orange-950/60 text-orange-400 hover:bg-orange-950/80 border border-orange-600/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-orange-500" />
+                                    <span>S4 เกินรอบ ({stateCounts.STATE_4_DELAYED})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_5_OFFLINE')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_5_OFFLINE'
+                                            ? 'bg-rose-600 text-white font-bold ring-2 ring-rose-400 shadow-md'
+                                            : 'bg-rose-950/40 text-rose-300 hover:bg-rose-950/60 border border-rose-500/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-rose-500" />
+                                    <span>S5 หลุด 1-7d ({stateCounts.STATE_5_OFFLINE})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_6_DORMANT')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_6_DORMANT'
+                                            ? 'bg-zinc-600 text-white font-bold ring-2 ring-zinc-400 shadow-md'
+                                            : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border border-zinc-600/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-zinc-400" />
+                                    <span>S6 หยุดนาน ({stateCounts.STATE_6_DORMANT})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_7_ABANDONED')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_7_ABANDONED'
+                                            ? 'bg-zinc-800 text-zinc-200 font-bold ring-2 ring-zinc-600 shadow-md'
+                                            : 'bg-black/60 text-zinc-500 hover:bg-zinc-900 border border-zinc-800'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-zinc-600" />
+                                    <span>S7 ทิ้งร้าง ({stateCounts.STATE_7_ABANDONED})</span>
+                                </button>
+                                {stateCounts.WEEKEND_STANDBY > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedStateFilter('WEEKEND_STANDBY')}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                            selectedStateFilter === 'WEEKEND_STANDBY'
+                                                ? 'bg-purple-600 text-white font-bold ring-2 ring-purple-300 shadow-md'
+                                                : 'bg-purple-950/40 text-purple-300 hover:bg-purple-950/60 border border-purple-500/40'
+                                        }`}
+                                    >
+                                        <div className="w-2 h-2 rounded-full bg-purple-400" />
+                                        <span>Weekend พัก ({stateCounts.WEEKEND_STANDBY})</span>
+                                    </button>
+                                )}
+                                <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('license_active')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'license_active'
+                                            ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-400 shadow-md'
+                                            : 'bg-background/80 text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30'
+                                    }`}
+                                >
+                                    สิทธิ์ Active ({stateCounts.license_active})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('license_inactive')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'license_inactive'
+                                            ? 'bg-zinc-600 text-white font-bold ring-2 ring-zinc-400 shadow-md'
+                                            : 'bg-background/80 text-zinc-400 hover:bg-zinc-500/10 border border-zinc-600/40'
+                                    }`}
+                                >
+                                    สิทธิ์ Inactive ({stateCounts.license_inactive})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('bal_low')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'bal_low'
+                                            ? 'bg-red-500 text-white font-bold ring-2 ring-red-300 shadow-md'
+                                            : 'bg-background/80 text-red-400 hover:bg-red-500/10 border border-red-500/30'
+                                    }`}
+                                >
+                                    ทุนต่ำกว่าเกณฑ์ ({stateCounts.bal_low})
+                                </button>
+                            </div>
+                        </CardHeader>
+
+                        <CardContent className="p-4 space-y-4">
+                            {/* THE MATRIX OF ROUNDED BOXES */}
+                            <div className="bg-black/50 p-4 sm:p-5 rounded-xl border border-border/70 max-h-[360px] overflow-y-auto">
+                                <div className="flex flex-wrap gap-2.5 items-center justify-start">
+                                    {ports.map(port => {
+                                        const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                                        const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                        const meta = PORT_STATE_META[pState];
+                                        const rawBal = Number(port.balance) || 0;
+                                        const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
+                                        const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
+                                        const isHovered = (hoveredPortForMatrix?.portNumber === port.portNumber) || (pinnedPortForMatrix?.portNumber === port.portNumber);
+
+                                        // Matching filter state check
+                                        let isFilteredOut = false;
+                                        if (selectedStateFilter !== 'all') {
+                                            if (selectedStateFilter === 'license_active') isFilteredOut = !port.isActive;
+                                            else if (selectedStateFilter === 'license_inactive') isFilteredOut = port.isActive;
+                                            else if (selectedStateFilter === 'bal_ok') isFilteredOut = !isBalOk;
+                                            else if (selectedStateFilter === 'bal_low') isFilteredOut = isBalOk;
+                                            else isFilteredOut = pState !== selectedStateFilter;
+                                        }
+
+                                        return (
+                                            <div
+                                                key={port.portNumber}
+                                                onMouseEnter={() => setHoveredPortForMatrix(port)}
+                                                onClick={() => {
+                                                    setPinnedPortForMatrix(port);
+                                                    setSearchQuery(port.portNumber);
+                                                    const targetEl = document.getElementById('port-list-section');
+                                                    if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                    toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
+                                                }}
+                                                className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
+                                                    meta.colorBg
+                                                } ${
+                                                    port.isActive
+                                                        ? 'border-2 border-emerald-400 ring-1 ring-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.35)]'
+                                                        : 'border-2 border-zinc-500/70 opacity-60'
+                                                } ${
+                                                    isHovered
+                                                        ? 'scale-125 ring-2 ring-white z-30 shadow-2xl brightness-110'
+                                                        : 'hover:scale-115 hover:z-20'
+                                                } ${
+                                                    isFilteredOut ? 'opacity-20 saturate-30 hover:opacity-100 hover:saturate-100' : ''
+                                                }`}
+                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\n${meta.label}\nBalance: ${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
+                                            >
+                                                {/* Top Label & Dot */}
+                                                <div className="w-full flex items-center justify-between px-1 pt-1 leading-none">
+                                                    <span className="text-[8px] font-mono font-bold opacity-80 leading-none">
+                                                        {port.productName.toLowerCase().includes('max') ? 'MAX' : 'MINI'}
+                                                    </span>
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
+                                                </div>
+
+                                                {/* Center: Port digits */}
+                                                <div className={`text-[10px] sm:text-[11px] font-mono font-black tracking-tight leading-none ${meta.colorText}`}>
+                                                    {port.portNumber.slice(-4)}
+                                                </div>
+
+                                                {/* Bottom Horizontal Line: Green if Balance OK, Grey if Balance Low */}
+                                                <div
+                                                    className={`h-1.5 w-full rounded-b-[6px] transition-colors ${
+                                                        isBalOk
+                                                            ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.95)]'
+                                                            : 'bg-zinc-400/80'
+                                                    }`}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* ACTIVE TELEMETRY RADAR INSPECTOR BANNER */}
+                            {(() => {
+                                const targetPort = hoveredPortForMatrix || pinnedPortForMatrix;
+                                if (!targetPort) {
+                                    return (
+                                        <div className="p-3.5 bg-black/30 rounded-xl border border-border/50 text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
+                                                <span className="text-foreground/90 font-medium">
+                                                    📡 นำเมาส์ไปชี้ที่กล่องพอร์ตใดก็ได้เพื่อตรวจข้อมูลสดแบบเจาะจง หรือคลิกกล่องเพื่อค้นหาพอร์ตนั้นทันที
+                                                </span>
+                                            </div>
+                                            <span className="text-[11px] font-mono text-muted-foreground">
+                                                Active: {stateCounts.license_active} / ทุนผ่าน: {stateCounts.bal_ok}
+                                            </span>
+                                        </div>
+                                    );
+                                }
+
+                                const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                                const pState = targetPort.state || resolvePortState(targetPort, isWk, currentTime);
+                                const meta = PORT_STATE_META[pState];
+                                const rawBal = Number(targetPort.balance) || 0;
+                                const balUSC = targetPort.accountType === 'USD' ? rawBal * 100 : rawBal;
+                                const isBalOk = balUSC >= targetPort.requiredBalanceUSC && rawBal > 0;
+
+                                return (
+                                    <div className="p-4 bg-gradient-to-r from-black/80 via-black/70 to-card/90 rounded-xl border border-blue-500/40 shadow-lg space-y-3 animate-in fade-in duration-200">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2.5 border-b border-border/50">
+                                            <div className="flex flex-wrap items-center gap-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-base font-mono font-black text-foreground">
+                                                        #{targetPort.portNumber}
+                                                    </span>
+                                                    {targetPort.portName && (
+                                                        <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded font-medium">
+                                                            {targetPort.portName}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <Badge variant="outline" className={`${meta.badgeBg} font-medium text-xs px-2.5 py-0.5 flex items-center gap-1.5`}>
+                                                    <div className={`w-2 h-2 rounded-full ${meta.dotClass}`} />
+                                                    <span>{meta.label}</span>
+                                                </Badge>
+
+                                                <Badge variant="outline" className={targetPort.isActive ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 text-xs' : 'bg-zinc-800 text-zinc-400 border-zinc-700 text-xs'}>
+                                                    {targetPort.isActive ? '✅ License Active' : '⛔ License Inactive'}
+                                                </Badge>
+
+                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                                    {targetPort.productName} ({targetPort.eaVersion || 'Universal'})
+                                                </Badge>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <span>ลูกค้า: <strong className="text-foreground">{targetPort.customerName}</strong></span>
+                                                <span className="text-muted-foreground/40">•</span>
+                                                <span className="font-mono text-[11px]">{targetPort.customerEmail}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                                            {/* Balance */}
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
+                                                <span className="text-muted-foreground text-[11px] block">Balance</span>
+                                                <div className="font-mono font-bold text-sm text-foreground">
+                                                    {targetPort.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {targetPort.accountType}
+                                                </div>
+                                                <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${isBalOk ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                    {isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`}
+                                                </span>
+                                            </div>
+
+                                            {/* Equity */}
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
+                                                <span className="text-muted-foreground text-[11px] block">Equity</span>
+                                                <div className="font-mono font-bold text-sm text-foreground">
+                                                    {targetPort.equity.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {targetPort.accountType}
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                                    Floating: {targetPort.floatingPnl > 0 ? '+' : ''}{targetPort.floatingPnl.toLocaleString()}
+                                                </span>
+                                            </div>
+
+                                            {/* Today PnL */}
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
+                                                <span className="text-muted-foreground text-[11px] block">กำไรวันนี้</span>
+                                                <div className={`font-mono font-bold text-sm ${targetPort.todayPnl > 0 ? 'text-emerald-400' : targetPort.todayPnl < 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                                                    {targetPort.todayPnl > 0 ? '+' : ''}{targetPort.todayPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {targetPort.accountType}
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                                    ออเดอร์: {targetPort.buyCount}B / {targetPort.sellCount}S
+                                                </span>
+                                            </div>
+
+                                            {/* Drawdown */}
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
+                                                <span className="text-muted-foreground text-[11px] block">Max Drawdown</span>
+                                                <div className={`font-mono font-bold text-sm ${targetPort.maxDrawdown >= 10 ? 'text-rose-400' : 'text-foreground'}`}>
+                                                    {targetPort.maxDrawdown.toFixed(2)}%
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                                    Daily DD: {targetPort.dailyMaxDrawdown.toFixed(2)}%
+                                                </span>
+                                            </div>
+
+                                            {/* Last Active */}
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
+                                                <span className="text-muted-foreground text-[11px] block">สื่อสารล่าสุด</span>
+                                                <div className="font-mono font-semibold text-xs text-foreground truncate" title={targetPort.lastPing || 'ไม่มีข้อมูล'}>
+                                                    {targetPort.hoursSinceLastPing < 1 
+                                                        ? `${Math.max(1, Math.round(targetPort.hoursSinceLastPing * 60))} นาทีที่แล้ว`
+                                                        : targetPort.hoursSinceLastPing < 48
+                                                            ? `${Math.round(targetPort.hoursSinceLastPing)} ชม. ที่แล้ว`
+                                                            : `${Math.round(targetPort.hoursSinceLastPing / 24)} วันที่แล้ว`
+                                                    }
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">
+                                                    {meta.shortLabel}
+                                                </span>
+                                            </div>
+
+                                            {/* Action prompt */}
+                                            <div className="p-2.5 bg-blue-500/10 rounded-lg border border-blue-500/30 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-blue-500/20 transition-colors"
+                                                onClick={() => {
+                                                    setSearchQuery(targetPort.portNumber);
+                                                    const targetEl = document.getElementById('port-list-section');
+                                                    if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                }}
+                                            >
+                                                <span className="text-[11px] font-bold text-blue-300 flex items-center gap-1">
+                                                    <Search className="w-3.5 h-3.5" /> ค้นหาพอร์ตนี้
+                                                </span>
+                                                <span className="text-[9px] text-blue-200/70 mt-0.5">
+                                                    เลื่อนลงไปดูรายการด้านล่าง
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* LEGEND SECTION (คู่มือคำอธิบายสัญลักษณ์และสี) */}
+                            {isLegendOpen && (
+                                <div className="p-4 bg-muted/30 rounded-xl border border-border/50 space-y-3 text-xs">
+                                    <div className="font-bold text-foreground flex items-center gap-2">
+                                        <Info className="w-4 h-4 text-blue-400" />
+                                        <span>คู่มือคำอธิบายสัญลักษณ์และสีของแผงมอนิเตอร์ (Visual Legend)</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                                        {/* 1. สีพื้นหลัง */}
+                                        <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
+                                            <span className="font-bold text-foreground block border-b border-border/40 pb-1">
+                                                1. สีพื้นหลัง (สถานะการสื่อสาร State 1-7)
+                                            </span>
+                                            <div className="space-y-1.5 text-[11px]">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-500 shrink-0" />
+                                                    <span><strong>State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2 นาที)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0" />
+                                                    <span><strong>State 2A:</strong> Smart Sleep รันปกติ (ทุนผ่าน)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-amber-500 shrink-0" />
+                                                    <span><strong>State 2B:</strong> Smart Sleep แต่ทุนต่ำกว่าเกณฑ์</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-orange-400 shrink-0" />
+                                                    <span><strong>State 3:</strong> ขาดช่วงสั้น / รอตรวจ 12h (15m-12h)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-orange-600 shrink-0" />
+                                                    <span><strong>State 4:</strong> เกินรอบตรวจสิทธิ์ (12h-24h)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-rose-600 shrink-0" />
+                                                    <span><strong>State 5:</strong> ออฟไลน์ขาดติดต่อ (24h - 7 วัน)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-600 shrink-0" />
+                                                    <span><strong>State 6:</strong> หยุดรันนาน (7 วัน - 30 วัน)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-800 shrink-0" />
+                                                    <span><strong>State 7:</strong> ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30 วัน)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 shrink-0" />
+                                                    <span><strong>Weekend:</strong> ตลาดปิดพักผ่อน (เสาร์-อาทิตย์)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 2. ขอบกล่องด้านนอก */}
+                                        <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
+                                            <span className="font-bold text-foreground block border-b border-border/40 pb-1">
+                                                2. ขอบกล่องด้านนอก (สถานะ License)
+                                            </span>
+                                            <div className="space-y-3 text-[11px] pt-1">
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 ring-1 ring-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.4)] shrink-0 flex items-center justify-center text-[9px] font-mono text-emerald-300 font-bold">
+                                                        ON
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-emerald-400 block">ขอบเขียวหนาเรืองแสง (Active)</strong>
+                                                        <span className="text-muted-foreground">License เปิดใช้งานอยู่ตามปกติ มีสิทธิ์รันบน MT5</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-zinc-500/70 opacity-60 shrink-0 flex items-center justify-center text-[9px] font-mono text-zinc-400 font-bold">
+                                                        OFF
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-zinc-400 block">ขอบเทาหม่น (Inactive)</strong>
+                                                        <span className="text-muted-foreground">License ถูกระงับหรือปิดใช้งาน สิทธิ์หยุดส่งคำสั่ง</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 3. ขีดแนวนอนด้านล่าง */}
+                                        <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
+                                            <span className="font-bold text-foreground block border-b border-border/40 pb-1">
+                                                3. ขีดแนวนอนด้านล่าง (ความพร้อมเงินทุน)
+                                            </span>
+                                            <div className="space-y-3 text-[11px] pt-1">
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-8 h-4 rounded bg-zinc-800 border border-zinc-700 relative overflow-hidden shrink-0 flex flex-col justify-end">
+                                                        <div className="h-1.5 w-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-emerald-400 block">ขีดเขียวเรืองแสง (ทุนผ่านเกณฑ์)</strong>
+                                                        <span className="text-muted-foreground">EasyM MAX ≥ 100,000 USC ($1,000) หรือ Mini ≥ 50,000 USC ($500)</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-8 h-4 rounded bg-zinc-800 border border-zinc-700 relative overflow-hidden shrink-0 flex flex-col justify-end">
+                                                        <div className="h-1.5 w-full bg-zinc-400/80" />
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-zinc-400 block">ขีดเทา (ทุนไม่ถึงเกณฑ์ หรือ = 0)</strong>
+                                                        <span className="text-muted-foreground">เงินทุนต่ำกว่าเกณฑ์ของสินค้า หรือพอร์ตว่างยังไม่ได้เติมเงิน</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                     {/* ส่วนบน: แถบค้นหาและตัวกรองต่างๆ */}
                     {/* Filter, Search & View Modes Control Bar */}
-                    <Card className="border-border shadow-sm bg-card">
+                    <Card id="port-list-section" className="border-border shadow-sm bg-card">
                         <CardContent className="p-4 space-y-3">
                     <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
                         {/* Search Bar with auto-expansion & clear button */}
@@ -3236,12 +4051,21 @@ export default function EasyMMasterDashboardPage() {
 
                             {/* Status Filter */}
                             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                                <SelectTrigger className="w-full sm:w-[170px] bg-background">
+                                <SelectTrigger className="w-full sm:w-[175px] bg-background">
                                     <SelectValue placeholder="สถานะพอร์ต" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="max-h-[360px]">
                                     <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
-                                    <SelectItem value="real_running">🟢 รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
+                                    <SelectItem value="state_1">🟢 S1: เปิดดูฟาร์มสด (≤ 2m)</SelectItem>
+                                    <SelectItem value="state_2a">🟢 S2A: รันปกติ Smart Sleep (ทุนผ่าน)</SelectItem>
+                                    <SelectItem value="state_2b">🟡 S2B: รันแต่ทุนต่ำกว่าเกณฑ์</SelectItem>
+                                    <SelectItem value="state_3">🟠 S3: ขาดช่วงสั้น / รอตรวจ 12h</SelectItem>
+                                    <SelectItem value="state_4">🔴 S4: เกินรอบตรวจสิทธิ์ (12-24h)</SelectItem>
+                                    <SelectItem value="state_5">🔴 S5: ออฟไลน์ขาดติดต่อ (1-7d)</SelectItem>
+                                    <SelectItem value="state_6">⚪ S6: หยุดรันนาน (7-30d)</SelectItem>
+                                    <SelectItem value="state_7">⚫ S7: ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30d)</SelectItem>
+                                    <SelectItem value="weekend">🟣 Weekend: ตลาดปิดเสาร์-อาทิตย์</SelectItem>
+                                    <SelectItem value="real_running">⚡ รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
                                     <SelectItem value="mismatch_gold">🥇 รัน EA ทองคำ (EasyGold)</SelectItem>
                                     <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
                                     <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
