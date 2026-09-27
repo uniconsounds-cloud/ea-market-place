@@ -3047,7 +3047,7 @@ void OnTick()
    */ //============== Disable inside Port Check =================
    
     // [EAE_SYSTEM] - Smart License check and lightweight simple dashboard sync
-    EaezeCheckLicenseAndSync(EA_PRODUCT_ID, "EASYM_MAX", "1.12.8.U2", 20, InpMagicBase, InpMagicBase);
+    EaezeCheckLicenseAndSync(EA_PRODUCT_ID, "EasyM Prime Universal", "v1.17", 20, InpMagicBase, InpMagicBase);
     ResetPortfolioGridCounterIfNewBar();
 
    // Pass 1: refresh metrics for ALL symbols (so close-only and legacy positions are managed)
