@@ -148,7 +148,7 @@ export const PORT_STATE_META: Record<EasyMPortState, PortStateMeta> = {
         id: 'STATE_2B_LOW_BALANCE',
         label: 'State 2B: รันแต่ทุนต่ำกว่าเกณฑ์',
         shortLabel: 'S2B ทุนต่ำ',
-        description: 'Smart Sleep Ping ทำงาน แต่เงินทุนต่ำกว่าเกณฑ์ของสินค้า (MAX < 100k, Mini < 50k USC)',
+        description: 'Smart Sleep Ping ทำงาน แต่เงินทุนต่ำกว่าเกณฑ์ของสินค้า (MAX < 100k, Mini < 50k, Farm < 30k USC)',
         colorBg: 'bg-amber-500',
         colorBorder: 'border-amber-400',
         colorText: 'text-zinc-950 font-bold',
@@ -1160,7 +1160,7 @@ export default function EasyMMasterDashboardPage() {
                     const isMax = prodKey.toUpperCase().includes('MAX') || prodName.toLowerCase().includes('max');
                     const isFarm = prodKey.toUpperCase().includes('FARM') || prodName.toLowerCase().includes('farm');
                     const isMini = prodKey.toUpperCase().includes('MIN') || prodName.toLowerCase().includes('mini');
-                    const requiredBalanceUSC = isMax ? 100000 : 50000;
+                    const requiredBalanceUSC = isMax ? 100000 : (isFarm ? 30000 : 50000);
 
                     const rawBal = Number(status?.balance) || 0;
                     const balUSC = resolvedAccType === 'USD' ? rawBal * 100 : rawBal;
@@ -4010,7 +4010,7 @@ export default function EasyMMasterDashboardPage() {
                                                     </div>
                                                     <div>
                                                         <strong className="text-emerald-400 block">ขีดเขียวเรืองแสง (ทุนผ่านเกณฑ์)</strong>
-                                                        <span className="text-muted-foreground">EasyM MAX ≥ 100,000 USC ($1,000) หรือ Mini ≥ 50,000 USC ($500)</span>
+                                                        <span className="text-muted-foreground">EasyM MAX ≥ 100,000 USC ($1,000), Mini ≥ 50,000 USC ($500), Farm ≥ 30,000 USC ($300 ต่อพอร์ต / รวม 5 พอร์ต $1,500)</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start gap-2.5">
