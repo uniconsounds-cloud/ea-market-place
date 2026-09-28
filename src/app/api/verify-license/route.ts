@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { account_number, product_id, balance, equity, today_profit } = body;
+        const { account_number, product_id, balance, equity, today_profit, ea_version, symbol, tier_engine } = body;
 
         if (!account_number || !product_id) {
             return NextResponse.json({ status: 'error', message: 'Missing parameters' }, { status: 400 });
@@ -286,7 +286,7 @@ export async function POST(req: Request) {
                             account_type: resolvedProduct?.currency || 'USC',
                             asset_type: currentAssetType,
                             system_code: currentSystemCode,
-                            ea_version: 'v1.16',
+                            ea_version: ea_version || 'v1.16',
                             is_online: true,
                             last_ping: nowIso,
                             updated_at: nowIso
@@ -354,7 +354,7 @@ export async function POST(req: Request) {
                             account_type: resolvedProduct?.currency || 'USC',
                             asset_type: currentAssetType,
                             system_code: currentSystemCode,
-                            ea_version: 'v1.16',
+                            ea_version: ea_version || 'v1.16',
                             is_online: true,
                             last_ping: nowIso,
                             updated_at: nowIso
@@ -370,6 +370,30 @@ export async function POST(req: Request) {
 
             } catch (telemetryErr) {
                 console.error('License verification status telemetry update error:', telemetryErr);
+            }
+        } else {
+            // Legacy 1-URL port (EA only sends license check without balance)
+            // Keep port marked online and update ping time so dashboard knows port is active
+            try {
+                const nowIso = new Date().toISOString();
+                const { data: existingStatus } = await supabase
+                    .from('farm_port_status')
+                    .select('port_number')
+                    .eq('port_number', String(account_number))
+                    .maybeSingle();
+
+                if (existingStatus) {
+                    await supabase
+                        .from('farm_port_status')
+                        .update({
+                            is_online: true,
+                            last_ping: nowIso,
+                            updated_at: nowIso
+                        })
+                        .eq('port_number', String(account_number));
+                }
+            } catch (legacyPingErr) {
+                console.error('Legacy 1-URL ping status update error:', legacyPingErr);
             }
         }
 

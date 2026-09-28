@@ -34,7 +34,10 @@ export async function POST(req: Request) {
                     sell_pnl: data.sell_pnl,
                     account_type: data.account_type,
                     asset_type: data.asset_type,
-                    is_online: data.is_online,
+                    today_pnl: data.today_profit ?? data.today_pnl ?? 0,
+                    ea_version: data.ea_version || 'v2.00',
+                    system_code: data.system_code || 'EasyM',
+                    is_online: data.is_online ?? true,
                     last_ping: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'port_number' });

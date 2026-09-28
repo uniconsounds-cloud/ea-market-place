@@ -91,6 +91,7 @@ interface EasyMPortItem {
     hoursSinceLastPing: number;
     requiredBalanceUSC: number;
     telemetryType: 'full_sync' | 'license_only' | 'none';
+    engineTier: 'v2_3tier' | 'legacy_2url' | 'legacy_1url';
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
     state?: EasyMPortState;
 }
@@ -1193,11 +1194,22 @@ export default function EasyMMasterDashboardPage() {
                     const histWorstDD = portWorstDDMap.get(accNum) || 0;
                     const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
 
-                    // Telemetry type: full_sync (2 URLs) vs license_only (1 URL) vs none
+                    // Telemetry type & 3-Tier Engine classification
                     const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
                     const telemetryType: 'full_sync' | 'license_only' | 'none' = hasUniversalTelemetry 
                         ? 'full_sync' 
                         : (hasRealStatus ? 'license_only' : 'none');
+
+                    const eaVerStr = String(status?.ea_version || '').toLowerCase();
+                    const isV2 = eaVerStr.includes('v2') || eaVerStr.startsWith('2.');
+                    let engineTier: 'v2_3tier' | 'legacy_2url' | 'legacy_1url' = 'legacy_1url';
+                    if (isV2) {
+                        engineTier = 'v2_3tier';
+                    } else if (hasUniversalTelemetry || (status?.server_time != null) || (rawBal > 0 && hoursSinceLastPing <= 12)) {
+                        engineTier = 'legacy_2url';
+                    } else {
+                        engineTier = 'legacy_1url';
+                    }
 
                     let runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold' = 'running';
                     if (!lic.is_active) {
@@ -1206,10 +1218,13 @@ export default function EasyMMasterDashboardPage() {
                         runStatus = 'tester';
                     } else if (isGoldMismatch) {
                         runStatus = 'mismatch_gold';
-                    } else if (!hasRealStatus || lastActive === 0) {
-                        runStatus = 'no_telemetry';
                     } else if (hoursSinceLastPing > 48) {
                         runStatus = 'offline_48h';
+                    } else if (engineTier === 'legacy_1url' && hoursSinceLastPing <= 48) {
+                        // Legacy 1-URL port: checking license normally, running without live telemetry
+                        runStatus = 'running';
+                    } else if (!hasRealStatus || lastActive === 0) {
+                        runStatus = 'no_telemetry';
                     } else if (rawBal > 0 && balUSC < requiredBalanceUSC) {
                         runStatus = 'insufficient_balance';
                     } else if (rawBal === 0) {
@@ -1297,6 +1312,7 @@ export default function EasyMMasterDashboardPage() {
                         hoursSinceLastPing: Math.round(hoursSinceLastPing),
                         requiredBalanceUSC,
                         telemetryType,
+                        engineTier,
                         runStatus,
                         state: resolvePortState({
                             hoursSinceLastPing: Math.round(hoursSinceLastPing),
@@ -1421,6 +1437,7 @@ export default function EasyMMasterDashboardPage() {
                             hoursSinceLastPing: Math.round(hoursSinceLastPing),
                             requiredBalanceUSC,
                             telemetryType,
+                            engineTier: (String(status.ea_version || '').toLowerCase().includes('v2')) ? 'v2_3tier' : 'legacy_2url',
                             runStatus,
                             state: resolvePortState({
                                 hoursSinceLastPing: Math.round(hoursSinceLastPing),
@@ -1716,6 +1733,12 @@ export default function EasyMMasterDashboardPage() {
                     if (!isBalOk) return false;
                 } else if (selectedStateFilter === 'bal_low') {
                     if (isBalOk) return false;
+                } else if (selectedStateFilter === 'v2_3tier') {
+                    if (p.engineTier !== 'v2_3tier') return false;
+                } else if (selectedStateFilter === 'legacy_1url') {
+                    if (p.engineTier !== 'legacy_1url') return false;
+                } else if (selectedStateFilter === 'legacy_2url') {
+                    if (p.engineTier !== 'legacy_2url') return false;
                 } else {
                     if (portSt !== selectedStateFilter) return false;
                 }
@@ -1771,6 +1794,9 @@ export default function EasyMMasterDashboardPage() {
             license_inactive: 0,
             bal_ok: 0,
             bal_low: 0,
+            v2_3tier: 0,
+            legacy_1url: 0,
+            legacy_2url: 0,
         };
 
         ports.forEach(p => {
@@ -1778,6 +1804,10 @@ export default function EasyMMasterDashboardPage() {
             counts[st] = (counts[st] || 0) + 1;
             if (p.isActive) counts.license_active++;
             else counts.license_inactive++;
+
+            if (p.engineTier === 'v2_3tier') counts.v2_3tier++;
+            else if (p.engineTier === 'legacy_2url') counts.legacy_2url++;
+            else counts.legacy_1url++;
 
             const rawBal = Number(p.balance) || 0;
             const balUSC = p.accountType === 'USD' ? rawBal * 100 : rawBal;
@@ -3688,6 +3718,40 @@ export default function EasyMMasterDashboardPage() {
                                 >
                                     ทุนต่ำกว่าเกณฑ์ ({stateCounts.bal_low})
                                 </button>
+                                <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('v2_3tier')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                        selectedStateFilter === 'v2_3tier'
+                                            ? 'bg-cyan-600 text-white font-bold ring-2 ring-cyan-400 shadow-md'
+                                            : 'bg-background/80 text-cyan-400 hover:bg-cyan-500/10 border border-cyan-500/30'
+                                    }`}
+                                >
+                                    <span>⚡ v2.00 3-Tier ({stateCounts.v2_3tier})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('legacy_1url')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                        selectedStateFilter === 'legacy_1url'
+                                            ? 'bg-amber-600 text-white font-bold ring-2 ring-amber-400 shadow-md'
+                                            : 'bg-background/80 text-amber-400 hover:bg-amber-500/10 border border-amber-500/30'
+                                    }`}
+                                >
+                                    <span>⚠️ Legacy 1-URL ({stateCounts.legacy_1url})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('legacy_2url')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                        selectedStateFilter === 'legacy_2url'
+                                            ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-400 shadow-md'
+                                            : 'bg-background/80 text-blue-400 hover:bg-blue-500/10 border border-blue-500/30'
+                                    }`}
+                                >
+                                    <span>📡 Legacy 2-URLs ({stateCounts.legacy_2url})</span>
+                                </button>
                             </div>
                         </CardHeader>
 
@@ -3711,6 +3775,9 @@ export default function EasyMMasterDashboardPage() {
                                             else if (selectedStateFilter === 'license_inactive') isFilteredOut = port.isActive;
                                             else if (selectedStateFilter === 'bal_ok') isFilteredOut = !isBalOk;
                                             else if (selectedStateFilter === 'bal_low') isFilteredOut = isBalOk;
+                                            else if (selectedStateFilter === 'v2_3tier') isFilteredOut = port.engineTier !== 'v2_3tier';
+                                            else if (selectedStateFilter === 'legacy_1url') isFilteredOut = port.engineTier !== 'legacy_1url';
+                                            else if (selectedStateFilter === 'legacy_2url') isFilteredOut = port.engineTier !== 'legacy_2url';
                                             else isFilteredOut = pState !== selectedStateFilter;
                                         }
 
@@ -3738,18 +3805,29 @@ export default function EasyMMasterDashboardPage() {
                                                 } ${
                                                     isFilteredOut ? 'opacity-20 saturate-30 hover:opacity-100 hover:saturate-100' : ''
                                                 }`}
-                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\nสินค้า: ${port.productName}\n${meta.label}\nBalance: ${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
+                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\nสินค้า: ${port.productName}\nเครื่องยนต์: ${
+                                                    port.engineTier === 'v2_3tier'
+                                                        ? '⚡ v2.00 (3-Tier Engine)'
+                                                        : (port.engineTier === 'legacy_1url'
+                                                            ? '⚠️ Legacy (1 URL) - รออัปเกรด v2.00'
+                                                            : '📡 Legacy (2 URLs)')
+                                                }\n${meta.label}\nBalance: ${
+                                                    port.engineTier === 'legacy_1url'
+                                                        ? 'รออัปเกรด v2.00 เพื่อดึงทุน Real-time'
+                                                        : `${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})`
+                                                }\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
                                             >
                                                 {/* Top Label & Dot */}
                                                 <div className="w-full flex items-center justify-between px-1 pt-1 leading-none">
-                                                    <span className="text-[8px] font-mono font-bold opacity-90 leading-none">
+                                                    <span className={`text-[8px] font-mono font-bold leading-none ${port.engineTier === 'v2_3tier' ? 'text-cyan-300 drop-shadow-[0_0_2px_rgba(103,232,249,0.8)]' : 'opacity-90'}`}>
                                                         {(() => {
                                                             const pn = port.productName.toLowerCase();
                                                             const pk = port.productKey.toUpperCase();
-                                                            if (pk.includes('MAX') || pn.includes('max')) return 'MAX';
-                                                            if (pk.includes('FARM') || pn.includes('farm')) return 'FARM';
-                                                            if (pk.includes('MIN') || pn.includes('mini')) return 'MINI';
-                                                            return 'PRIME';
+                                                            let base = 'PRIME';
+                                                            if (pk.includes('MAX') || pn.includes('max')) base = 'MAX';
+                                                            else if (pk.includes('FARM') || pn.includes('farm')) base = 'FARM';
+                                                            else if (pk.includes('MIN') || pn.includes('mini')) base = 'MINI';
+                                                            return port.engineTier === 'v2_3tier' ? `${base} v2` : base;
                                                         })()}
                                                     </span>
                                                     <div className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
@@ -3760,12 +3838,18 @@ export default function EasyMMasterDashboardPage() {
                                                     {port.portNumber.slice(-4)}
                                                 </div>
 
-                                                {/* Bottom Horizontal Line: Green if Balance OK, Grey if Balance Low */}
+                                                {/* Bottom Horizontal Line:
+                                                    - Emerald Green if Balance OK
+                                                    - Amber Glow if Legacy 1-URL (รออัปเกรด v2.00)
+                                                    - Grey if Balance Low
+                                                */}
                                                 <div
                                                     className={`h-1.5 w-full rounded-b-[6px] transition-colors ${
                                                         isBalOk
                                                             ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.95)]'
-                                                            : 'bg-zinc-400/80'
+                                                            : (port.engineTier === 'legacy_1url'
+                                                                ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
+                                                                : 'bg-zinc-400/80')
                                                     }`}
                                                 />
                                             </div>
@@ -3827,6 +3911,21 @@ export default function EasyMMasterDashboardPage() {
                                                 <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
                                                     {targetPort.productName} ({targetPort.eaVersion || 'Universal'})
                                                 </Badge>
+
+                                                {/* Engine Tier Badge */}
+                                                {targetPort.engineTier === 'v2_3tier' ? (
+                                                    <Badge variant="outline" className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs flex items-center gap-1 font-semibold">
+                                                        <span>⚡ v2.00 (3-Tier Engine)</span>
+                                                    </Badge>
+                                                ) : targetPort.engineTier === 'legacy_1url' ? (
+                                                    <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs flex items-center gap-1 font-semibold">
+                                                        <span>⚠️ Legacy (1 URL - รออัปเกรด v2.00)</span>
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-xs flex items-center gap-1 font-medium">
+                                                        <span>📡 Legacy (2 URLs)</span>
+                                                    </Badge>
+                                                )}
                                             </div>
 
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -3836,15 +3935,38 @@ export default function EasyMMasterDashboardPage() {
                                             </div>
                                         </div>
 
+                                        {/* Legacy 1-URL Explanation Banner */}
+                                        {targetPort.engineTier === 'legacy_1url' && (
+                                            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-200 flex items-start gap-2">
+                                                <span className="text-sm shrink-0">ℹ️</span>
+                                                <div className="leading-relaxed">
+                                                    <strong className="text-amber-300">พอร์ตนี้ใช้ EasyM รุ่นเดิม (ส่งเฉพาะ URL เช็คสิทธิ์):</strong>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                        พอร์ตยังคงทำงานและเช็คสิทธิ์ได้ตามปกติ แต่ยังไม่มีการส่งยอดทุนแบบ Real-time เข้ามา แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> ลากทับลงชาร์ต เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาทีผ่าน WebRequest เดิม (<code className="text-amber-300">https://eaeze.com</code>) ได้ทันทีโดยไม่ต้องตั้งค่า MT5 ใหม่!
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                                             {/* Balance */}
                                             <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
                                                 <span className="text-muted-foreground text-[11px] block">Balance</span>
                                                 <div className="font-mono font-bold text-sm text-foreground">
-                                                    {targetPort.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {targetPort.accountType}
+                                                    {targetPort.engineTier === 'legacy_1url' && targetPort.balance === 0
+                                                        ? <span className="text-amber-300 text-xs">รออัปเกรด v2.00</span>
+                                                        : `${targetPort.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${targetPort.accountType}`
+                                                    }
                                                 </div>
-                                                <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${isBalOk ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                    {isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`}
+                                                <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
+                                                    targetPort.engineTier === 'legacy_1url'
+                                                        ? 'text-amber-400'
+                                                        : (isBalOk ? 'text-emerald-400' : 'text-amber-400')
+                                                }`}>
+                                                    {targetPort.engineTier === 'legacy_1url'
+                                                        ? '⚠️ รัน 1 URL (ไม่มี Telemetry ทุน)'
+                                                        : (isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`)
+                                                    }
                                                 </span>
                                             </div>
 
@@ -4015,10 +4137,19 @@ export default function EasyMMasterDashboardPage() {
                                                 </div>
                                                 <div className="flex items-start gap-2.5">
                                                     <div className="w-8 h-4 rounded bg-zinc-800 border border-zinc-700 relative overflow-hidden shrink-0 flex flex-col justify-end">
+                                                        <div className="h-1.5 w-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]" />
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-amber-400 block">ขีดส้ม/ทอง (Legacy 1-URL - รออัปเกรด v2.00)</strong>
+                                                        <span className="text-muted-foreground">รัน EasyM รุ่นเดิม (ก่อน 3-Tier) ใส่เฉพาะ URL ตรวจสิทธิ์ จึงไม่มีการส่งค่าทุน Real-time (แนะนำให้อัปเกรดเป็น v2.00 เพื่อดึงทุนอัตโนมัติ)</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-8 h-4 rounded bg-zinc-800 border border-zinc-700 relative overflow-hidden shrink-0 flex flex-col justify-end">
                                                         <div className="h-1.5 w-full bg-zinc-400/80" />
                                                     </div>
                                                     <div>
-                                                        <strong className="text-zinc-400 block">ขีดเทา (ทุนไม่ถึงเกณฑ์ หรือ = 0)</strong>
+                                                        <strong className="text-zinc-400 block">ขีดเทา (ทุนไม่ถึงเกณฑ์)</strong>
                                                         <span className="text-muted-foreground">เงินทุนต่ำกว่าเกณฑ์ของสินค้า หรือพอร์ตว่างยังไม่ได้เติมเงิน</span>
                                                     </div>
                                                 </div>
