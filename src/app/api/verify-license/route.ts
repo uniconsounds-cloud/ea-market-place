@@ -152,9 +152,9 @@ export async function POST(req: Request) {
             .eq('is_active', true)
             .single();
 
-        // Fallback check: EasyM Max & Prime cross-compatibility
+        // Fallback check: EasyM Max, Prime & Universal cross-compatibility
         const currentProductKey = resolvedProduct?.product_key || product_id;
-        const easymMaxKeys = ['EZM-MAX-V1', 'EZM-MAX-TEST', 'EZM-PRIME-V1'];
+        const easymMaxKeys = ['EZM-MAX-V1', 'EZM-MAX-TEST', 'EZM-PRIME-V1', 'EZM-UNI-V1'];
         if ((error || !license) && easymMaxKeys.includes(currentProductKey)) {
             const alternateKeys = easymMaxKeys.filter(k => k !== currentProductKey);
             for (const altKey of alternateKeys) {

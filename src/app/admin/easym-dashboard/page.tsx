@@ -1159,9 +1159,11 @@ export default function EasyMMasterDashboardPage() {
 
                     const isTester = !!customer?.is_tester || isTestPort(accNum);
                     const isMax = prodKey.toUpperCase().includes('MAX') || prodName.toLowerCase().includes('max');
+                    const isUniversal = prodKey.toUpperCase().includes('UNI') || prodName.toLowerCase().includes('universal');
+                    const isPrime = prodKey.toUpperCase().includes('PRIME') || prodName.toLowerCase().includes('prime');
                     const isFarm = prodKey.toUpperCase().includes('FARM') || prodName.toLowerCase().includes('farm');
                     const isMini = prodKey.toUpperCase().includes('MIN') || prodName.toLowerCase().includes('mini');
-                    const requiredBalanceUSC = isMax ? 100000 : (isFarm ? 30000 : 50000);
+                    const requiredBalanceUSC = (isMax || isUniversal || isPrime) ? 100000 : (isFarm ? 30000 : 50000);
 
                     const rawBal = Number(status?.balance) || 0;
                     const balUSC = resolvedAccType === 'USD' ? rawBal * 100 : rawBal;
@@ -1708,7 +1710,8 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedProduct === 'max' && !pName.includes('max') && !pKey.includes('MAX')) return false;
                 if (selectedProduct === 'mini' && !pName.includes('mini') && !pKey.includes('MIN')) return false;
                 if (selectedProduct === 'farm' && !pName.includes('farm') && !pKey.includes('FARM')) return false;
-                if (selectedProduct === 'universal' && !pName.includes('universal') && !pKey.includes('UNI') && !pName.includes('prime')) return false;
+                if (selectedProduct === 'universal' && !pName.includes('universal') && !pKey.includes('UNI')) return false;
+                if (selectedProduct === 'prime' && !pName.includes('prime') && !pKey.includes('PRIME')) return false;
             }
 
             // License Status filter
@@ -1879,7 +1882,8 @@ export default function EasyMMasterDashboardPage() {
         const maxEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('max') || p.productKey.includes('MAX')).length;
         const farmEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('farm') || p.productKey.includes('FARM')).length;
         const miniEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('mini') || p.productKey.includes('MIN')).length;
-        const universalEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('universal') || p.productKey.includes('UNI') || p.productName.toLowerCase().includes('prime')).length;
+        const universalEACount = filteredPorts.filter(p => (p.productName.toLowerCase().includes('universal') || p.productKey.includes('UNI')) && !p.productName.toLowerCase().includes('prime') && !p.productKey.includes('PRIME')).length;
+        const primeEACount = filteredPorts.filter(p => p.productName.toLowerCase().includes('prime') || p.productKey.includes('PRIME')).length;
 
         let totalBalanceUSC = 0;
         let totalBalanceUSD = 0;
@@ -1944,6 +1948,7 @@ export default function EasyMMasterDashboardPage() {
             farmEACount,
             miniEACount,
             universalEACount,
+            primeEACount,
             totalBalanceUSC,
             totalBalanceUSD,
             activeBalanceUSC,
@@ -2144,7 +2149,7 @@ export default function EasyMMasterDashboardPage() {
                             <span className="sm:hidden">วันนี้: </span>
                             +{kpi.totalTodayProfit.toLocaleString('en-US', { maximumFractionDigits: 1 })}
                         </span>
-                        <span>MAX: {kpi.maxEACount} | Farm: {kpi.farmEACount} | mini: {kpi.miniEACount}</span>
+                        <span>MAX: {kpi.maxEACount} | Farm: {kpi.farmEACount} | mini: {kpi.miniEACount}{kpi.universalEACount > 0 ? ` | Uni: ${kpi.universalEACount}` : ''}{kpi.primeEACount > 0 ? ` | Prime: ${kpi.primeEACount}` : ''}</span>
                     </div>
                 </CardContent>
             </Card>
@@ -3823,10 +3828,12 @@ export default function EasyMMasterDashboardPage() {
                                                         {(() => {
                                                             const pn = port.productName.toLowerCase();
                                                             const pk = port.productKey.toUpperCase();
-                                                            let base = 'PRIME';
-                                                            if (pk.includes('MAX') || pn.includes('max')) base = 'MAX';
+                                                            let base = 'MAX';
+                                                            if (pk.includes('UNI') || pn.includes('universal')) base = 'UNI';
+                                                            else if (pk.includes('PRIME') || pn.includes('prime')) base = 'PRIME';
                                                             else if (pk.includes('FARM') || pn.includes('farm')) base = 'FARM';
                                                             else if (pk.includes('MIN') || pn.includes('mini')) base = 'MINI';
+                                                            else if (pk.includes('MAX') || pn.includes('max')) base = 'MAX';
                                                             return port.engineTier === 'v2_3tier' ? `${base} v2` : base;
                                                         })()}
                                                     </span>
@@ -4215,6 +4222,7 @@ export default function EasyMMasterDashboardPage() {
                                     <SelectItem value="farm">EasyM Farm</SelectItem>
                                     <SelectItem value="mini">EasyM mini</SelectItem>
                                     <SelectItem value="universal">EasyM Universal</SelectItem>
+                                    <SelectItem value="prime">EasyM Prime</SelectItem>
                                 </SelectContent>
                             </Select>
 
