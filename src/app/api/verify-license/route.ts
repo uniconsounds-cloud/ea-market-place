@@ -275,10 +275,12 @@ export async function POST(req: Request) {
                     const currentAssetType = isProdGold ? 'GOLD' : 'FOREX';
                     const currentSystemCode = resolvedProduct?.name || (isProdGold ? 'EasyGold' : 'EasyM MAX');
 
+                    const resolvedBal = (numBal > 0) ? numBal : (numEquity > 0 ? numEquity : (Number(existingStatus.balance) || 0));
+
                     await supabase
                         .from('farm_port_status')
                         .update({
-                            balance: numBal,
+                            balance: resolvedBal,
                             equity: numEquity,
                             floating_pnl: calculatedFloatingPnl,
                             daily_max_drawdown: resolvedDailyDD,
@@ -399,7 +401,13 @@ export async function POST(req: Request) {
 
         // 4. Check Minimum Balance requirement (Enforce minimum balance strictly)
         const isBypassBalance = ['97053088', '21692434'].includes(account_number);
-        if (!isBypassBalance && balance !== undefined && productMinBalance > 0 && Number(balance) < productMinBalance) {
+        // Effective capital evaluates both balance and equity (prevents MT5 broker connection race condition where balance is briefly 0 or funds are in equity)
+        const effectiveCapital = Math.max(
+            (balance !== undefined && !isNaN(Number(balance))) ? Number(balance) : 0,
+            (equity !== undefined && !isNaN(Number(equity))) ? Number(equity) : 0
+        );
+
+        if (!isBypassBalance && productMinBalance > 0 && effectiveCapital > 0 && effectiveCapital < productMinBalance) {
             const displayMin = resolvedProduct?.currency === 'USC' 
                 ? `$${resolvedProduct.min_balance || (productMinBalance / 100)} (${productMinBalance.toLocaleString()} USC)`
                 : `$${productMinBalance}`;
