@@ -1683,10 +1683,10 @@ export default function EasyMMasterDashboardPage() {
         }
     };
 
-    // 3. Filtered Ports
-    const filteredPorts = useMemo(() => {
+    // 3. Search & Scope Filtered Ports (Powers the Fleet Matrix view)
+    const searchFilteredPorts = useMemo(() => {
         return ports.filter(p => {
-            // Search query
+            // Search query (matches portNumber, customerName, customerEmail, portName)
             if (searchQuery.trim()) {
                 const q = searchQuery.toLowerCase().trim();
                 const matchNumber = p.portNumber.toLowerCase().includes(q);
@@ -1720,6 +1720,14 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedLicenseStatus === 'inactive' && p.isActive) return false;
             }
 
+            return true;
+        });
+    }, [ports, searchQuery, selectedAdmin, selectedProduct, selectedLicenseStatus]);
+
+    // 4. Final Filtered Ports (Applies Matrix State Filter and Status Filter on top of searchFilteredPorts)
+    // Powers the detailed list (Customer view, Table, Cards) below the Matrix.
+    const filteredPorts = useMemo(() => {
+        return searchFilteredPorts.filter(p => {
             // Fleet State Filter
             if (selectedStateFilter !== 'all') {
                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
@@ -1777,13 +1785,13 @@ export default function EasyMMasterDashboardPage() {
 
             return true;
         });
-    }, [ports, searchQuery, selectedAdmin, selectedProduct, selectedStatus, selectedLicenseStatus, selectedStateFilter, currentTime, fleetStats?.isWeekend]);
+    }, [searchFilteredPorts, selectedStateFilter, selectedStatus, currentTime, fleetStats?.isWeekend]);
 
-    // Fleet Matrix State Counts
+    // Fleet Matrix State Counts (reflects counts within searchFilteredPorts)
     const stateCounts = useMemo(() => {
         const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
         const counts: Record<string, number> = {
-            all: ports.length,
+            all: searchFilteredPorts.length,
             STATE_1_LIVE: 0,
             STATE_2A_ONLINE: 0,
             STATE_2B_LOW_BALANCE: 0,
@@ -1802,7 +1810,7 @@ export default function EasyMMasterDashboardPage() {
             legacy_2url: 0,
         };
 
-        ports.forEach(p => {
+        searchFilteredPorts.forEach(p => {
             const st = p.state || resolvePortState(p, isWk, currentTime);
             counts[st] = (counts[st] || 0) + 1;
             if (p.isActive) counts.license_active++;
@@ -1819,7 +1827,7 @@ export default function EasyMMasterDashboardPage() {
         });
 
         return counts;
-    }, [ports, fleetStats?.isWeekend, currentTime]);
+    }, [searchFilteredPorts, fleetStats?.isWeekend, currentTime]);
 
     // 4. Group by Customer
     const customerGroups = useMemo(() => {
@@ -3519,7 +3527,157 @@ export default function EasyMMasterDashboardPage() {
             {activeTab === 'ports' && (
                 <div className="space-y-6">
                     {/* 🚀 GRAPHIC FLEET STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฝูงบิน) */}
+                    {/* 🚀 GRAPHIC FLEET STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฝูงบิน แบบผนวก Search & Matrix) */}
                     <Card className="border-border shadow-md bg-gradient-to-b from-card via-card/90 to-card/75 overflow-hidden">
+                        {/* 🔎 แถบค้นหาและการกรองหลัก (Search & Scope Filter Toolbar) ผนวกที่ส่วนบนสุดของ Matrix */}
+                        <div className="p-3 sm:p-4 bg-black/40 border-b border-border/50 space-y-2.5">
+                            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                                {/* Search Bar with auto-expansion & clear button */}
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                    <Input
+                                        placeholder="ค้นหาด้วยเลขพอร์ต, ชื่อลูกค้า, อีเมล, หรือชื่อพอร์ต..."
+                                        value={searchQuery}
+                                        onFocus={() => setIsSearchFocused(true)}
+                                        onBlur={() => setIsSearchFocused(false)}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-9 pr-9 bg-background h-10 w-full text-sm font-sans"
+                                    />
+                                    {searchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-colors"
+                                            title="ล้างคำค้นหา"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Filters and View Mode Controls */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* Admin Filter */}
+                                    <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                                        <SelectTrigger className="w-full sm:w-[150px] bg-background h-10 text-xs">
+                                            <SelectValue placeholder="กรองตามแอดมิน" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">แอดมินทั้งหมด</SelectItem>
+                                            <SelectItem value="juntarasate">สายงานพี่โจ้</SelectItem>
+                                            <SelectItem value="bctutor">สายงานครูชัย</SelectItem>
+                                            <SelectItem value="other">พอร์ตระบบ / อื่นๆ</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
+                                    {/* Product Filter */}
+                                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                                        <SelectTrigger className="w-full sm:w-[155px] bg-background h-10 text-xs">
+                                            <SelectValue placeholder="กรองตามสินค้า" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">สินค้าทั้งหมด</SelectItem>
+                                            <SelectItem value="max">EasyM MAX</SelectItem>
+                                            <SelectItem value="farm">EasyM Farm</SelectItem>
+                                            <SelectItem value="mini">EasyM mini</SelectItem>
+                                            <SelectItem value="universal">EasyM Universal</SelectItem>
+                                            <SelectItem value="prime">EasyM Prime</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
+                                    {/* License Status Filter */}
+                                    <Select value={selectedLicenseStatus} onValueChange={setSelectedLicenseStatus}>
+                                        <SelectTrigger className="w-full sm:w-[145px] bg-background h-10 text-xs">
+                                            <SelectValue placeholder="สถานะ License" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">License ทั้งหมด</SelectItem>
+                                            <SelectItem value="active">✅ เปิดใช้งาน (Active)</SelectItem>
+                                            <SelectItem value="inactive">⛔ ระงับ (Inactive)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
+                                    {/* View Mode Buttons */}
+                                    <div className="flex items-center gap-1 border border-border rounded-lg p-0.5 bg-background shrink-0 ml-auto sm:ml-0 h-10">
+                                        <Button
+                                            variant={viewMode === 'customer' ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('customer')}
+                                            className="text-xs h-8 px-2.5"
+                                        >
+                                            <Users className="w-3.5 h-3.5 mr-1" />
+                                            <span className="hidden sm:inline">แยกตามลูกค้า</span>
+                                            <span className="sm:hidden">ลูกค้า</span>
+                                        </Button>
+                                        <Button
+                                            variant={viewMode === 'table' ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('table')}
+                                            className="text-xs h-8 px-2.5"
+                                        >
+                                            <Layers className="w-3.5 h-3.5 mr-1" />
+                                            <span className="hidden sm:inline">ตารางรวม</span>
+                                            <span className="sm:hidden">ตาราง</span>
+                                        </Button>
+                                        <Button
+                                            variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('cards')}
+                                            className="text-xs h-8 px-2.5"
+                                        >
+                                            <BarChart3 className="w-3.5 h-3.5 mr-1" />
+                                            <span className="hidden sm:inline">การ์ดพอร์ต</span>
+                                            <span className="sm:hidden">การ์ด</span>
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Search / Filter Active Badges */}
+                            {(searchQuery || selectedAdmin !== 'all' || selectedProduct !== 'all' || selectedLicenseStatus !== 'all') && (
+                                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                                    <span className="text-muted-foreground text-[11px]">กำลังกรอง Matrix:</span>
+                                    {searchQuery && (
+                                        <Badge variant="secondary" className="gap-1 font-mono text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                                            <span>ค้นหา: "{searchQuery}"</span>
+                                            <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSearchQuery('')} />
+                                        </Badge>
+                                    )}
+                                    {selectedAdmin !== 'all' && (
+                                        <Badge variant="secondary" className="gap-1 text-[11px]">
+                                            <span>สายงาน: {selectedAdmin === 'juntarasate' ? 'พี่โจ้' : selectedAdmin === 'bctutor' ? 'ครูชัย' : 'พอร์ตระบบ'}</span>
+                                            <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedAdmin('all')} />
+                                        </Badge>
+                                    )}
+                                    {selectedProduct !== 'all' && (
+                                        <Badge variant="secondary" className="gap-1 text-[11px]">
+                                            <span>สินค้า: {selectedProduct.toUpperCase()}</span>
+                                            <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedProduct('all')} />
+                                        </Badge>
+                                    )}
+                                    {selectedLicenseStatus !== 'all' && (
+                                        <Badge variant="secondary" className="gap-1 text-[11px]">
+                                            <span>สิทธิ์: {selectedLicenseStatus === 'active' ? 'Active' : 'Inactive'}</span>
+                                            <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedLicenseStatus('all')} />
+                                        </Badge>
+                                    )}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            setSelectedAdmin('all');
+                                            setSelectedProduct('all');
+                                            setSelectedLicenseStatus('all');
+                                        }}
+                                        className="h-5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                                    >
+                                        ล้างการค้นหาทั้งหมด
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
                         <CardHeader className="pb-3 border-b border-border/40">
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                                 <div>
@@ -3531,7 +3689,9 @@ export default function EasyMMasterDashboardPage() {
                                             <CardTitle className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
                                                 แผงมอนิเตอร์สถานะฝูงบิน EasyM (Fleet Status Matrix)
                                                 <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs font-mono font-bold px-2 py-0.5">
-                                                    {ports.length} พอร์ต
+                                                    {searchFilteredPorts.length === ports.length 
+                                                        ? `${ports.length} พอร์ต` 
+                                                        : `แสดง ${searchFilteredPorts.length} จาก ${ports.length} พอร์ต`}
                                                 </Badge>
                                             </CardTitle>
                                             <CardDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5">
@@ -3762,41 +3922,62 @@ export default function EasyMMasterDashboardPage() {
 
                         <CardContent className="p-4 space-y-4">
                             {/* THE MATRIX OF ROUNDED BOXES */}
-                            <div className="bg-black/50 p-4 sm:p-5 rounded-xl border border-border/70 max-h-[360px] overflow-y-auto">
-                                <div className="flex flex-wrap gap-2.5 items-center justify-start">
-                                    {ports.map(port => {
-                                        const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                                        const pState = port.state || resolvePortState(port, isWk, currentTime);
-                                        const meta = PORT_STATE_META[pState];
-                                        const rawBal = Number(port.balance) || 0;
-                                        const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
-                                        const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
-                                        const isHovered = (hoveredPortForMatrix?.portNumber === port.portNumber) || (pinnedPortForMatrix?.portNumber === port.portNumber);
+                            <div className="bg-black/50 p-4 sm:p-5 rounded-xl border border-border/70 max-h-[380px] overflow-y-auto">
+                                {searchFilteredPorts.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                                        <Search className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                                        <p className="text-sm font-semibold text-foreground">ไม่พบพอร์ตที่ตรงกับเงื่อนไขการค้นหาบน Matrix</p>
+                                        <p className="text-xs text-muted-foreground mt-1">ลองเปลี่ยนคำค้นหา หรือกดปุ่มด้านล่างเพื่อล้างการค้นหา</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setSearchQuery('');
+                                                setSelectedAdmin('all');
+                                                setSelectedProduct('all');
+                                                setSelectedLicenseStatus('all');
+                                                setSelectedStateFilter('all');
+                                            }}
+                                            className="mt-3.5 text-xs border-border/70 hover:bg-muted"
+                                        >
+                                            <X className="w-3.5 h-3.5 mr-1.5" />
+                                            ล้างตัวกรองทั้งหมด
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2.5 items-center justify-start">
+                                        {searchFilteredPorts.map(port => {
+                                            const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                                            const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                            const meta = PORT_STATE_META[pState];
+                                            const rawBal = Number(port.balance) || 0;
+                                            const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
+                                            const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
+                                            const isHovered = (hoveredPortForMatrix?.portNumber === port.portNumber) || (pinnedPortForMatrix?.portNumber === port.portNumber);
 
-                                        // Matching filter state check
-                                        let isFilteredOut = false;
-                                        if (selectedStateFilter !== 'all') {
-                                            if (selectedStateFilter === 'license_active') isFilteredOut = !port.isActive;
-                                            else if (selectedStateFilter === 'license_inactive') isFilteredOut = port.isActive;
-                                            else if (selectedStateFilter === 'bal_ok') isFilteredOut = !isBalOk;
-                                            else if (selectedStateFilter === 'bal_low') isFilteredOut = isBalOk;
-                                            else if (selectedStateFilter === 'v2_3tier') isFilteredOut = port.engineTier !== 'v2_3tier';
-                                            else if (selectedStateFilter === 'legacy_1url') isFilteredOut = port.engineTier !== 'legacy_1url';
-                                            else if (selectedStateFilter === 'legacy_2url') isFilteredOut = port.engineTier !== 'legacy_2url';
-                                            else isFilteredOut = pState !== selectedStateFilter;
-                                        }
+                                            // Matching filter state check
+                                            let isFilteredOut = false;
+                                            if (selectedStateFilter !== 'all') {
+                                                if (selectedStateFilter === 'license_active') isFilteredOut = !port.isActive;
+                                                else if (selectedStateFilter === 'license_inactive') isFilteredOut = port.isActive;
+                                                else if (selectedStateFilter === 'bal_ok') isFilteredOut = !isBalOk;
+                                                else if (selectedStateFilter === 'bal_low') isFilteredOut = isBalOk;
+                                                else if (selectedStateFilter === 'v2_3tier') isFilteredOut = port.engineTier !== 'v2_3tier';
+                                                else if (selectedStateFilter === 'legacy_1url') isFilteredOut = port.engineTier !== 'legacy_1url';
+                                                else if (selectedStateFilter === 'legacy_2url') isFilteredOut = port.engineTier !== 'legacy_2url';
+                                                else isFilteredOut = pState !== selectedStateFilter;
+                                            }
 
-                                        return (
-                                            <div
-                                                key={port.portNumber}
-                                                onMouseEnter={() => setHoveredPortForMatrix(port)}
-                                                onClick={() => {
-                                                    setPinnedPortForMatrix(port);
-                                                    setSearchQuery(port.portNumber);
-                                                    const targetEl = document.getElementById('port-list-section');
-                                                    if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                    toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
-                                                }}
+                                            return (
+                                                <div
+                                                    key={port.portNumber}
+                                                    onMouseEnter={() => setHoveredPortForMatrix(port)}
+                                                    onClick={() => {
+                                                        setPinnedPortForMatrix(port);
+                                                        const targetEl = document.getElementById('port-list-section');
+                                                        if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                        toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
+                                                    }}
                                                 className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
                                                     meta.colorBg
                                                 } ${
@@ -3863,6 +4044,7 @@ export default function EasyMMasterDashboardPage() {
                                         );
                                     })}
                                 </div>
+                            )}
                             </div>
 
                             {/* ACTIVE TELEMETRY RADAR INSPECTOR BANNER */}
@@ -4168,211 +4350,135 @@ export default function EasyMMasterDashboardPage() {
                         </CardContent>
                     </Card>
 
-                    {/* ส่วนบน: แถบค้นหาและตัวกรองต่างๆ */}
-                    {/* Filter, Search & View Modes Control Bar */}
+                    {/* ส่วนแสดงรายการพอร์ตที่ถูกกรองตามเงื่อนไข (Detailed Port List Section) */}
                     <Card id="port-list-section" className="border-border shadow-sm bg-card">
-                        <CardContent className="p-4 space-y-3">
-                    <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-                        {/* Search Bar with auto-expansion & clear button */}
-                        <div className={`relative transition-all duration-300 w-full ${isSearchFocused || searchQuery ? 'xl:flex-1' : 'xl:w-[380px]'}`}>
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                            <Input
-                                placeholder="ค้นหาด้วยเลขพอร์ต, ชื่อลูกค้า, อีเมล, หรือชื่อพอร์ต..."
-                                value={searchQuery}
-                                onFocus={() => setIsSearchFocused(true)}
-                                onBlur={() => setIsSearchFocused(false)}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-9 bg-background h-10 w-full text-sm font-sans"
-                            />
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-colors"
-                                    title="ล้างคำค้นหา"
+                        <CardContent className="p-3 sm:p-4 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                        <Layers className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm sm:text-base font-bold text-foreground">
+                                                รายการพอร์ตตามเงื่อนไข
+                                            </span>
+                                            <Badge variant="outline" className="text-xs font-mono font-bold bg-primary/5 text-primary border-primary/20">
+                                                {filteredPorts.length} พอร์ต
+                                            </Badge>
+                                            {filteredPorts.length !== ports.length && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    (จากทั้งหมด {ports.length} พอร์ต)
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                            {viewMode === 'customer' ? 'แสดงข้อมูลจัดกลุ่มตามลูกค้า' : viewMode === 'table' ? 'แสดงข้อมูลแบบตารางรวมทั้งหมด' : 'แสดงข้อมูลแบบการ์ดพอร์ต'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Status Dropdown Filter for deep status inspection */}
+                                <div className="flex items-center gap-2">
+                                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                                        <SelectTrigger className="w-full sm:w-[175px] bg-background h-8 text-xs">
+                                            <SelectValue placeholder="สถานะพอร์ต" />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-[360px]">
+                                            <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
+                                            <SelectItem value="state_1">🟢 S1: เปิดดูฟาร์มสด (≤ 2m)</SelectItem>
+                                            <SelectItem value="state_2a">🟢 S2A: รันปกติ Smart Sleep (ทุนผ่าน)</SelectItem>
+                                            <SelectItem value="state_2b">🟡 S2B: รันแต่ทุนต่ำกว่าเกณฑ์</SelectItem>
+                                            <SelectItem value="state_3">🟠 S3: ขาดช่วงสั้น / รอตรวจ 12h</SelectItem>
+                                            <SelectItem value="state_4">🔴 S4: เกินรอบตรวจสิทธิ์ (12-24h)</SelectItem>
+                                            <SelectItem value="state_5">🔴 S5: ออฟไลน์ขาดติดต่อ (1-7d)</SelectItem>
+                                            <SelectItem value="state_6">⚪ S6: หยุดรันนาน (7-30d)</SelectItem>
+                                            <SelectItem value="state_7">⚫ S7: ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30d)</SelectItem>
+                                            <SelectItem value="weekend">🟣 Weekend: ตลาดปิดเสาร์-อาทิตย์</SelectItem>
+                                            <SelectItem value="real_running">⚡ รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
+                                            <SelectItem value="mismatch_gold">🥇 รัน EA ทองคำ (EasyGold)</SelectItem>
+                                            <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
+                                            <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
+                                            <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
+                                            <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
+                                            <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
+                                            <SelectItem value="full_sync">📡 2 URLs (Full WebSync)</SelectItem>
+                                            <SelectItem value="license_only">🔑 1 URL (License Only)</SelectItem>
+                                            <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
+                                            <SelectItem value="profit_positive">{fleetStats?.isWeekend ? `📈 กำไร (${fleetStats.today.dateLabel})` : '📈 วันนี้บวก'}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {/* Quick Filter Buttons */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
+                                <span className="text-muted-foreground font-medium mr-1 text-[11px]">
+                                    <span className="hidden sm:inline">ตัวกรองด่วน:</span>
+                                    <span className="sm:hidden">กรอง:</span>
+                                </span>
+                                <Button 
+                                    variant={selectedStatus === 'all' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('all')}
+                                    className="h-7 text-xs px-2.5 rounded-full"
                                 >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Filters and View Mode Controls */}
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            {/* Admin Filter */}
-                            <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
-                                <SelectTrigger className="w-full sm:w-[150px] bg-background">
-                                    <SelectValue placeholder="กรองตามแอดมิน" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">แอดมินทั้งหมด</SelectItem>
-                                    <SelectItem value="juntarasate">สายงานพี่โจ้</SelectItem>
-                                    <SelectItem value="bctutor">สายงานครูชัย</SelectItem>
-                                    <SelectItem value="other">พอร์ตระบบ / อื่นๆ</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {/* Product Filter */}
-                            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                                <SelectTrigger className="w-full sm:w-[155px] bg-background">
-                                    <SelectValue placeholder="กรองตามสินค้า" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">สินค้าทั้งหมด</SelectItem>
-                                    <SelectItem value="max">EasyM MAX</SelectItem>
-                                    <SelectItem value="farm">EasyM Farm</SelectItem>
-                                    <SelectItem value="mini">EasyM mini</SelectItem>
-                                    <SelectItem value="universal">EasyM Universal</SelectItem>
-                                    <SelectItem value="prime">EasyM Prime</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {/* License Status Filter */}
-                            <Select value={selectedLicenseStatus} onValueChange={setSelectedLicenseStatus}>
-                                <SelectTrigger className="w-full sm:w-[145px] bg-background">
-                                    <SelectValue placeholder="สถานะ License" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">License ทั้งหมด</SelectItem>
-                                    <SelectItem value="active">✅ เปิดใช้งาน (Active)</SelectItem>
-                                    <SelectItem value="inactive">⛔ ระงับ (Inactive)</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {/* Status Filter */}
-                            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                                <SelectTrigger className="w-full sm:w-[175px] bg-background">
-                                    <SelectValue placeholder="สถานะพอร์ต" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-[360px]">
-                                    <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
-                                    <SelectItem value="state_1">🟢 S1: เปิดดูฟาร์มสด (≤ 2m)</SelectItem>
-                                    <SelectItem value="state_2a">🟢 S2A: รันปกติ Smart Sleep (ทุนผ่าน)</SelectItem>
-                                    <SelectItem value="state_2b">🟡 S2B: รันแต่ทุนต่ำกว่าเกณฑ์</SelectItem>
-                                    <SelectItem value="state_3">🟠 S3: ขาดช่วงสั้น / รอตรวจ 12h</SelectItem>
-                                    <SelectItem value="state_4">🔴 S4: เกินรอบตรวจสิทธิ์ (12-24h)</SelectItem>
-                                    <SelectItem value="state_5">🔴 S5: ออฟไลน์ขาดติดต่อ (1-7d)</SelectItem>
-                                    <SelectItem value="state_6">⚪ S6: หยุดรันนาน (7-30d)</SelectItem>
-                                    <SelectItem value="state_7">⚫ S7: ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30d)</SelectItem>
-                                    <SelectItem value="weekend">🟣 Weekend: ตลาดปิดเสาร์-อาทิตย์</SelectItem>
-                                    <SelectItem value="real_running">⚡ รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
-                                    <SelectItem value="mismatch_gold">🥇 รัน EA ทองคำ (EasyGold)</SelectItem>
-                                    <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
-                                    <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
-                                    <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
-                                    <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
-                                    <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
-                                    <SelectItem value="full_sync">📡 2 URLs (Full WebSync)</SelectItem>
-                                    <SelectItem value="license_only">🔑 1 URL (License Only)</SelectItem>
-                                    <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
-                                    <SelectItem value="profit_positive">{fleetStats?.isWeekend ? `📈 กำไร (${fleetStats.today.dateLabel})` : '📈 วันนี้บวก'}</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {/* View Mode Buttons */}
-                            <div className="flex items-center gap-1 border border-border rounded-lg p-0.5 bg-background shrink-0 ml-auto sm:ml-0">
-                                <Button
-                                    variant={viewMode === 'customer' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('customer')}
-                                    className="text-xs h-8 px-2.5"
-                                >
-                                    <Users className="w-3.5 h-3.5 mr-1" />
-                                    <span className="hidden sm:inline">แยกตามลูกค้า</span>
-                                    <span className="sm:hidden">ลูกค้า</span>
+                                    ทั้งหมด ({searchFilteredPorts.length})
                                 </Button>
-                                <Button
-                                    variant={viewMode === 'table' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('table')}
-                                    className="text-xs h-8 px-2.5"
+                                <Button 
+                                    variant={selectedStatus === 'real_running' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('real_running')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
                                 >
-                                    <Layers className="w-3.5 h-3.5 mr-1" />
-                                    <span className="hidden sm:inline">ตารางรวม</span>
-                                    <span className="sm:hidden">ตาราง</span>
+                                    ⚡ รันจริงเท่านั้น ({searchFilteredPorts.filter(p => p.isRealRunning).length})
                                 </Button>
-                                <Button
-                                    variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('cards')}
-                                    className="text-xs h-8 px-2.5"
+                                <Button 
+                                    variant={selectedStatus === 'full_sync' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('full_sync')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'full_sync' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
+                                    title="พอร์ตที่มีการตั้งค่า WebRequest ครบทั้ง 2 URLs (ส่งออเดอร์, กำไร และ DD ครบถ้วน)"
                                 >
-                                    <BarChart3 className="w-3.5 h-3.5 mr-1" />
-                                    <span className="hidden sm:inline">การ์ดพอร์ต</span>
-                                    <span className="sm:hidden">การ์ด</span>
+                                    📡 2 URLs (Full) ({searchFilteredPorts.filter(p => p.telemetryType === 'full_sync').length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'license_only' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('license_only')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'license_only' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                                    title="พอร์ตที่มี WebRequest ตัวเดียว (เช็คสิทธิ์อย่างเดียว) แนะนำเพิ่ม URL Supabase ใน MT5"
+                                >
+                                    🔑 1 URL (License) ({searchFilteredPorts.filter(p => p.telemetryType === 'license_only').length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'offline_48h' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('offline_48h')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'offline_48h' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                                    title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว"
+                                >
+                                    ⏸️ ขาดติดต่อ &gt;48h ({searchFilteredPorts.filter(p => p.runStatus === 'offline_48h').length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'insufficient_bal' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('insufficient_bal')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'insufficient_bal' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-400 border-red-500/30 hover:bg-red-500/10'}`}
+                                >
+                                    ⚠️ ทุนไม่ถึง ({searchFilteredPorts.filter(p => p.runStatus === 'insufficient_balance').length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'online' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('online')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'online' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-400 border-blue-500/30 hover:bg-blue-500/10'}`}
+                                >
+                                    🟢 สด &lt;30 นาที ({searchFilteredPorts.filter(p => p.isOnline).length})
                                 </Button>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Quick Filter Buttons */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
-                        <span className="text-muted-foreground font-medium mr-1 text-[11px]">
-                            <span className="hidden sm:inline">ตัวกรองด่วน:</span>
-                            <span className="sm:hidden">กรอง:</span>
-                        </span>
-                        <Button 
-                            variant={selectedStatus === 'all' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('all')}
-                            className="h-7 text-xs px-2.5 rounded-full"
-                        >
-                            ทั้งหมด ({ports.length})
-                        </Button>
-                        <Button 
-                            variant={selectedStatus === 'real_running' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('real_running')}
-                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
-                        >
-                            ⚡ รันจริงเท่านั้น ({ports.filter(p => p.isRealRunning).length})
-                        </Button>
-                        <Button 
-                            variant={selectedStatus === 'full_sync' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('full_sync')}
-                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'full_sync' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
-                            title="พอร์ตที่มีการตั้งค่า WebRequest ครบทั้ง 2 URLs (ส่งออเดอร์, กำไร และ DD ครบถ้วน)"
-                        >
-                            📡 2 URLs (Full) ({ports.filter(p => p.telemetryType === 'full_sync').length})
-                        </Button>
-                        <Button 
-                            variant={selectedStatus === 'license_only' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('license_only')}
-                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'license_only' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
-                            title="พอร์ตที่มี WebRequest ตัวเดียว (เช็คสิทธิ์อย่างเดียว) แนะนำเพิ่ม URL Supabase ใน MT5"
-                        >
-                            🔑 1 URL (License) ({ports.filter(p => p.telemetryType === 'license_only').length})
-                        </Button>
-                        <Button 
-                            variant={selectedStatus === 'offline_48h' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('offline_48h')}
-                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'offline_48h' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
-                            title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว"
-                        >
-                            ⏸️ ขาดติดต่อ &gt;48h ({ports.filter(p => p.runStatus === 'offline_48h').length})
-                        </Button>
-                        <Button 
-                            variant={selectedStatus === 'insufficient_bal' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('insufficient_bal')}
-                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'insufficient_bal' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-400 border-red-500/30 hover:bg-red-500/10'}`}
-                        >
-                            ⚠️ ทุนไม่ถึง ({ports.filter(p => p.runStatus === 'insufficient_balance').length})
-                        </Button>
-                        <Button 
-                            variant={selectedStatus === 'online' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setSelectedStatus('online')}
-                            className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'online' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-400 border-blue-500/30 hover:bg-blue-500/10'}`}
-                        >
-                            🟢 สด &lt;30 นาที ({ports.filter(p => p.isOnline).length})
-                        </Button>
-                    </div>
-
-                </CardContent>
-            </Card>
+                        </CardContent>
+                    </Card>
 
             {/* คั่นด้วย: ข้อมูลแถวบนสุดเดิม (จำนวนฝูงบินทั้งหมด, พลังทุน, กำไรลอยตัว, เจ้าของพอร์ต) */}
             {kpiCardsElement}
