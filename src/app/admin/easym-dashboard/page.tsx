@@ -692,11 +692,21 @@ export default function EasyMMasterDashboardPage() {
         setLoadingData(true);
         setIsRefreshing(true);
         try {
-            // A. Fetch all profiles to resolve referral upline admins
-            const { data: profiles, error: profileErr } = await supabase
-                .from('profiles')
-                .select('id, full_name, email, role, referred_by, created_at, is_tester');
-            if (profileErr) throw profileErr;
+            // A. Fetch all profiles to resolve referral upline admins (paginated)
+            let profiles: any[] = [];
+            let profPage = 0;
+            const profPageSize = 1000;
+            while (true) {
+                const { data: batch, error: profileErr } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, role, referred_by, created_at, is_tester')
+                    .range(profPage * profPageSize, (profPage + 1) * profPageSize - 1);
+                if (profileErr) throw profileErr;
+                if (!batch || batch.length === 0) break;
+                profiles = profiles.concat(batch);
+                if (batch.length < profPageSize) break;
+                profPage++;
+            }
 
             const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
@@ -724,12 +734,22 @@ export default function EasyMMasterDashboardPage() {
                 return lastAdmin || { name: 'Direct / ระบบกลาง', email: 'juntarasate@gmail.com' };
             };
 
-            // B. Fetch all licenses ordered by created_at DESC (latest first)
-            const { data: licenses, error: licErr } = await supabase
-                .from('licenses')
-                .select('id, user_id, product_id, account_number, port_name, is_active, created_at, expiry_date, license_tier, products(id, name, product_key)')
-                .order('created_at', { ascending: false });
-            if (licErr) throw licErr;
+            // B. Fetch all licenses ordered by created_at DESC (latest first) with full pagination
+            let licenses: any[] = [];
+            let licPage = 0;
+            const licPageSize = 1000;
+            while (true) {
+                const { data: batch, error: licErr } = await supabase
+                    .from('licenses')
+                    .select('id, user_id, product_id, account_number, port_name, is_active, created_at, expiry_date, license_tier, products(id, name, product_key)')
+                    .order('created_at', { ascending: false })
+                    .range(licPage * licPageSize, (licPage + 1) * licPageSize - 1);
+                if (licErr) throw licErr;
+                if (!batch || batch.length === 0) break;
+                licenses = licenses.concat(batch);
+                if (batch.length < licPageSize) break;
+                licPage++;
+            }
 
             // Map each unique account number to its LATEST license request
             const latestLicenseByAcc = new Map<string, any>();
@@ -774,11 +794,24 @@ export default function EasyMMasterDashboardPage() {
                 }
             });
 
-            // C. Fetch all farm_port_status
-            const { data: portStatuses, error: statusErr } = await supabase
-                .from('farm_port_status')
-                .select('*');
-            if (statusErr) console.error('Status fetch error:', statusErr);
+            // C. Fetch all farm_port_status (paginated)
+            let portStatuses: any[] = [];
+            let stPage = 0;
+            const stPageSize = 1000;
+            while (true) {
+                const { data: batch, error: statusErr } = await supabase
+                    .from('farm_port_status')
+                    .select('*')
+                    .range(stPage * stPageSize, (stPage + 1) * stPageSize - 1);
+                if (statusErr) {
+                    console.error('Status fetch error:', statusErr);
+                    break;
+                }
+                if (!batch || batch.length === 0) break;
+                portStatuses = portStatuses.concat(batch);
+                if (batch.length < stPageSize) break;
+                stPage++;
+            }
 
             const statusMap = new Map((portStatuses || []).map(s => [s.port_number?.toString(), s]));
 

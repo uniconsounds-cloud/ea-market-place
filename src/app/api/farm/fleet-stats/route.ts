@@ -12,12 +12,22 @@ export async function GET() {
             .select('id, email, is_tester');
         const testerProfileIds = new Set((profiles || []).filter((p: any) => p.is_tester).map((p: any) => p.id));
 
-        const { data: licenses, error: licErr } = await supabase
-            .from('licenses')
-            .select('created_at, is_active, account_number, user_id, expiry_date, products(name, product_key)')
-            .eq('is_active', true);
+        let licenses: any[] = [];
+        let licPage = 0;
+        const licPageSize = 1000;
+        while (true) {
+            const { data: batch, error: licErr } = await supabase
+                .from('licenses')
+                .select('created_at, is_active, account_number, user_id, expiry_date, products(name, product_key)')
+                .eq('is_active', true)
+                .range(licPage * licPageSize, (licPage + 1) * licPageSize - 1);
 
-        if (licErr) throw licErr;
+            if (licErr) throw licErr;
+            if (!batch || batch.length === 0) break;
+            licenses = licenses.concat(batch);
+            if (batch.length < licPageSize) break;
+            licPage++;
+        }
 
         const easymLicenses = (licenses || []).filter(l => {
             const prod = Array.isArray(l.products) ? l.products[0] : l.products;
@@ -26,10 +36,25 @@ export async function GET() {
             return pKey.includes('EZM') || pName.toLowerCase().includes('easym') || pName.toLowerCase().includes('easy m');
         });
 
-        // Fetch Port Statuses for Capital & Ping Verification
-        const { data: statuses } = await supabase
-            .from('farm_port_status')
-            .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at, last_ping, asset_type, system_code, ea_version');
+        // Fetch Port Statuses for Capital & Ping Verification (paginated)
+        let statuses: any[] = [];
+        let stPage = 0;
+        const stPageSize = 1000;
+        while (true) {
+            const { data: batch, error: statusErr } = await supabase
+                .from('farm_port_status')
+                .select('port_number, balance, account_type, today_pnl, daily_max_drawdown, is_online, updated_at, last_ping, asset_type, system_code, ea_version')
+                .range(stPage * stPageSize, (stPage + 1) * stPageSize - 1);
+
+            if (statusErr) {
+                console.error('Status fetch error in fleet-stats:', statusErr);
+                break;
+            }
+            if (!batch || batch.length === 0) break;
+            statuses = statuses.concat(batch);
+            if (batch.length < stPageSize) break;
+            stPage++;
+        }
 
         const statusMap = new Map((statuses || []).map((s: any) => [String(s.port_number).trim(), s]));
 
