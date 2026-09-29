@@ -1802,9 +1802,11 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedStatus === 'offline' && p.isOnline) return false;
                 if (selectedStatus === 'high_dd' && p.maxDrawdown < 10) return false;
                 if (selectedStatus === 'profit_positive' && p.todayPnl <= 0) return false;
-                if (selectedStatus === 'has_telemetry' && !p.hasTelemetry) return false;
-                if (selectedStatus === 'full_sync' && p.telemetryType !== 'full_sync') return false;
-                if (selectedStatus === 'license_only' && p.telemetryType !== 'license_only') return false;
+                if (selectedStatus === 'v2_3tier' && p.engineTier !== 'v2_3tier') return false;
+                if (selectedStatus === 'legacy_2url' && p.engineTier !== 'legacy_2url') return false;
+                if (selectedStatus === 'legacy_1url' && p.engineTier !== 'legacy_1url') return false;
+                if (selectedStatus === 'full_sync' && p.engineTier !== 'legacy_2url' && p.engineTier !== 'v2_3tier') return false;
+                if (selectedStatus === 'license_only' && p.engineTier !== 'legacy_1url') return false;
                 if (selectedStatus === 'state_1' && portSt !== 'STATE_1_LIVE') return false;
                 if (selectedStatus === 'state_2a' && portSt !== 'STATE_2A_ONLINE') return false;
                 if (selectedStatus === 'state_2b' && portSt !== 'STATE_2B_LOW_BALANCE') return false;
@@ -3919,7 +3921,7 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('v2_3tier')}
+                                    onClick={() => setSelectedStateFilter(selectedStateFilter === 'v2_3tier' ? 'all' : 'v2_3tier')}
                                     className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                                         selectedStateFilter === 'v2_3tier'
                                             ? 'bg-cyan-600 text-white font-bold ring-2 ring-cyan-400 shadow-md'
@@ -3930,25 +3932,25 @@ export default function EasyMMasterDashboardPage() {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('legacy_1url')}
+                                    onClick={() => setSelectedStateFilter(selectedStateFilter === 'legacy_2url' ? 'all' : 'legacy_2url')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                        selectedStateFilter === 'legacy_2url'
+                                            ? 'bg-sky-600 text-white font-bold ring-2 ring-sky-400 shadow-md'
+                                            : 'bg-background/80 text-sky-400 hover:bg-sky-500/10 border border-sky-500/30'
+                                    }`}
+                                >
+                                    <span>📡 2 URLs WebSync ({stateCounts.legacy_2url})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter(selectedStateFilter === 'legacy_1url' ? 'all' : 'legacy_1url')}
                                     className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                                         selectedStateFilter === 'legacy_1url'
                                             ? 'bg-amber-600 text-white font-bold ring-2 ring-amber-400 shadow-md'
                                             : 'bg-background/80 text-amber-400 hover:bg-amber-500/10 border border-amber-500/30'
                                     }`}
                                 >
-                                    <span>⚠️ Legacy 1-URL ({stateCounts.legacy_1url})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedStateFilter('legacy_2url')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                                        selectedStateFilter === 'legacy_2url'
-                                            ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-400 shadow-md'
-                                            : 'bg-background/80 text-blue-400 hover:bg-blue-500/10 border border-blue-500/30'
-                                    }`}
-                                >
-                                    <span>📡 Legacy 2-URLs ({stateCounts.legacy_2url})</span>
+                                    <span>🔑 1 URL License ({stateCounts.legacy_1url})</span>
                                 </button>
                             </div>
                         </CardHeader>
@@ -4024,21 +4026,31 @@ export default function EasyMMasterDashboardPage() {
                                                 } ${
                                                     isFilteredOut ? 'opacity-20 saturate-30 hover:opacity-100 hover:saturate-100' : ''
                                                 }`}
-                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\nสินค้า: ${port.productName}\nเครื่องยนต์: ${
+                                                title={`พอร์ต #${port.portNumber} (${port.customerName})\nสินค้า: ${port.productName} (${port.eaVersion})\nระบบเชื่อมต่อ: ${
                                                     port.engineTier === 'v2_3tier'
-                                                        ? '⚡ v2.00 (3-Tier Engine)'
-                                                        : (port.engineTier === 'legacy_1url'
-                                                            ? '⚠️ Legacy (1 URL) - รออัปเกรด v2.00'
-                                                            : '📡 Legacy (2 URLs)')
-                                                }\n${meta.label}\nBalance: ${
-                                                    port.engineTier === 'legacy_1url' && port.balance === 0
-                                                        ? 'รออัปเกรด v2.00 เพื่อดึงทุน Real-time'
-                                                        : `${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})`
-                                                }\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
+                                                        ? '⚡ v2.00 (Single Domain 3-Tier)'
+                                                        : (port.engineTier === 'legacy_2url'
+                                                            ? '📡 2 URLs (WebSync Telemetry)'
+                                                            : '🔑 1 URL (License Check Ping)')
+                                                }\nสถานะ: ${meta.label}\nBalance: ${
+                                                    rawBal > 0
+                                                        ? `${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? '✅ ทุนผ่าน' : '⚠️ ทุนต่ำกว่าเกณฑ์'})`
+                                                        : '0 (ยังไม่เติมทุน)'
+                                                }\nEquity: ${port.equity > 0 ? `${port.equity.toLocaleString()} ${port.accountType}` : '-'}\nFloating PnL: ${
+                                                    port.floatingPnl !== 0 ? `${port.floatingPnl > 0 ? '+' : ''}${port.floatingPnl.toLocaleString()} ${port.accountType}` : '0'
+                                                }\nกำไรวันนี้: ${port.todayPnl > 0 ? `+${port.todayPnl.toLocaleString()} USC` : '0'}\nสิทธิ์: ${
+                                                    port.isActive ? 'Active' : 'Inactive'
+                                                }\nคลิกเพื่อดูรายละเอียด`}
                                             >
                                                 {/* Top Label & Dot */}
                                                 <div className="w-full flex items-center justify-between px-1 pt-1 leading-none">
-                                                    <span className={`text-[8px] font-mono font-bold leading-none ${port.engineTier === 'v2_3tier' ? 'text-cyan-300 drop-shadow-[0_0_2px_rgba(103,232,249,0.8)]' : 'opacity-90'}`}>
+                                                    <span className={`text-[8px] font-mono font-bold leading-none ${
+                                                        port.engineTier === 'v2_3tier' 
+                                                            ? 'text-cyan-300 drop-shadow-[0_0_3px_rgba(103,232,249,0.9)]' 
+                                                            : (port.engineTier === 'legacy_2url' 
+                                                                ? 'text-sky-300' 
+                                                                : 'text-amber-300')
+                                                    }`}>
                                                         {(() => {
                                                             const pn = port.productName.toLowerCase();
                                                             const pk = port.productKey.toUpperCase();
@@ -4048,7 +4060,10 @@ export default function EasyMMasterDashboardPage() {
                                                             else if (pk.includes('FARM') || pn.includes('farm')) base = 'FARM';
                                                             else if (pk.includes('MIN') || pn.includes('mini')) base = 'MINI';
                                                             else if (pk.includes('MAX') || pn.includes('max')) base = 'MAX';
-                                                            return port.engineTier === 'v2_3tier' ? `${base} v2` : base;
+                                                            
+                                                            if (port.engineTier === 'v2_3tier') return `${base} v2`;
+                                                            if (port.engineTier === 'legacy_2url') return `${base} 2U`;
+                                                            return `${base} 1U`;
                                                         })()}
                                                     </span>
                                                     <div className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
@@ -4060,17 +4075,17 @@ export default function EasyMMasterDashboardPage() {
                                                 </div>
 
                                                 {/* Bottom Horizontal Line:
-                                                    - Emerald Green if Balance OK
-                                                    - Amber Glow if Legacy 1-URL with 0 balance (รออัปเกรด v2.00)
-                                                    - Grey if Balance Low
+                                                    - Emerald Green if Balance OK (passes required threshold for all tiers!)
+                                                    - Amber if Balance Low
+                                                    - Zinc if Balance 0
                                                 */}
                                                 <div
                                                     className={`h-1.5 w-full rounded-b-[6px] transition-colors ${
                                                         isBalOk
                                                             ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.95)]'
-                                                            : (port.engineTier === 'legacy_1url' && port.balance === 0
+                                                            : (rawBal > 0
                                                                 ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
-                                                                : 'bg-zinc-400/80')
+                                                                : 'bg-zinc-600')
                                                     }`}
                                                 />
                                             </div>
@@ -4137,15 +4152,15 @@ export default function EasyMMasterDashboardPage() {
                                                 {/* Engine Tier Badge */}
                                                 {targetPort.engineTier === 'v2_3tier' ? (
                                                     <Badge variant="outline" className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs flex items-center gap-1 font-semibold">
-                                                        <span>⚡ v2.00 (3-Tier Engine)</span>
+                                                        <span>⚡ v2.00 (Single Domain 3-Tier)</span>
                                                     </Badge>
-                                                ) : targetPort.engineTier === 'legacy_1url' ? (
-                                                    <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs flex items-center gap-1 font-semibold">
-                                                        <span>⚠️ Legacy (1 URL - รออัปเกรด v2.00)</span>
+                                                ) : targetPort.engineTier === 'legacy_2url' ? (
+                                                    <Badge variant="outline" className="bg-sky-500/20 text-sky-300 border-sky-500/40 text-xs flex items-center gap-1 font-medium">
+                                                        <span>📡 2 URLs (WebSync Telemetry)</span>
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-xs flex items-center gap-1 font-medium">
-                                                        <span>📡 Legacy (2 URLs)</span>
+                                                    <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs flex items-center gap-1 font-medium">
+                                                        <span>🔑 1 URL (License Check Ping)</span>
                                                     </Badge>
                                                 )}
                                             </div>
@@ -4157,16 +4172,38 @@ export default function EasyMMasterDashboardPage() {
                                             </div>
                                         </div>
 
-                                        {/* Legacy 1-URL Explanation Banner */}
+                                        {/* Architecture Explanation Banners */}
+                                        {targetPort.engineTier === 'v2_3tier' && (
+                                            <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-xs text-cyan-200 flex items-start gap-2">
+                                                <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                                                <div className="leading-relaxed">
+                                                    <strong className="text-cyan-300">พอร์ตนี้ใช้ EasyM v2.00 ระบบ 3-Tier (Single Domain):</strong>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                        เชื่อมต่อผ่าน <code className="text-cyan-300">https://eaeze.com</code> โดเมนเดียวจบ รองรับ Tier 1 (ตรวจสิทธิ์ 12 ชม.), Tier 2 (Smart Ping หลับประหยัดเน็ต 3 นาที) และ Tier 3 (สตรีมสด 20 วินาทีเมื่อเปิดดูหน้าฟาร์ม) ประหยัด Bandwidth สูงสุด 90%
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {targetPort.engineTier === 'legacy_2url' && (
+                                            <div className="p-2.5 bg-sky-500/10 border border-sky-500/30 rounded-lg text-xs text-sky-200 flex items-start gap-2">
+                                                <Radio className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                                                <div className="leading-relaxed">
+                                                    <strong className="text-sky-300">พอร์ตนี้ใช้ EasyM v1.x (2 URLs WebSync):</strong>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                        เชื่อมต่อ WebRequest 2 URLs (<code className="text-sky-300">eaeze.com</code> + Supabase) มีระบบตรวจสิทธิ์ 12 ชม. พร้อมส่ง Telemetry สด มีโหมดหลับประหยัดเน็ต และสตรีมสด 20 วินาทีเมื่อเปิดดูหน้าฟาร์ม
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                         {targetPort.engineTier === 'legacy_1url' && (
                                             <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-200 flex items-start gap-2">
                                                 <span className="text-sm shrink-0">ℹ️</span>
                                                 <div className="leading-relaxed">
-                                                    <strong className="text-amber-300">พอร์ตนี้ใช้ EasyM รุ่นเดิม (ส่งเฉพาะ URL เช็คสิทธิ์):</strong>
+                                                    <strong className="text-amber-300">พอร์ตนี้ใช้ EasyM รุ่นเดิม (1 URL ระบบตรวจสิทธิ์):</strong>
                                                     <p className="text-[11px] text-muted-foreground mt-0.5">
                                                         {targetPort.balance > 0 
-                                                            ? <>พอร์ตนี้ส่งการตรวจเช็คสิทธิ์และอัปเดตยอดทุนล่าสุดตามรอบตรวจสิทธิ์ (<code className="text-amber-300">1 URL</code>) แต่ยังไม่มี WebSync ส่งจำนวนออเดอร์/Lots แบบ Real-time แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาที</>
-                                                            : <>พอร์ตยังคงทำงานและเช็คสิทธิ์ได้ตามปกติ แต่ยังไม่มีการส่งยอดทุนแบบ Real-time เข้ามา แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> ลากทับลงชาร์ต เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาทีผ่าน WebRequest เดิม (<code className="text-amber-300">https://eaeze.com</code>) ได้ทันทีโดยไม่ต้องตั้งค่า MT5 ใหม่!</>
+                                                            ? <>ส่งการตรวจสิทธิ์และยอดเงินทุน/กำไรล่าสุดตามรอบตรวจสิทธิ์ (<code className="text-amber-300">1 URL</code>) แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาทีผ่าน WebRequest เดิม (<code className="text-amber-300">https://eaeze.com</code>) ได้ทันที</>
+                                                            : <>พอร์ตยังคงทำงานและเช็คสิทธิ์ได้ตามปกติ แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> ลากทับลงชาร์ต เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาทีผ่าน WebRequest เดิม (<code className="text-amber-300">https://eaeze.com</code>) ได้ทันทีโดยไม่ต้องตั้งค่า MT5 ใหม่!</>
                                                         }
                                                     </p>
                                                 </div>
@@ -4178,20 +4215,15 @@ export default function EasyMMasterDashboardPage() {
                                             <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
                                                 <span className="text-muted-foreground text-[11px] block">Balance</span>
                                                 <div className="font-mono font-bold text-sm text-foreground">
-                                                    {targetPort.engineTier === 'legacy_1url' && targetPort.balance === 0
-                                                        ? <span className="text-amber-300 text-xs">รออัปเกรด v2.00</span>
-                                                        : `${targetPort.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${targetPort.accountType}`
+                                                    {rawBal > 0
+                                                        ? `${targetPort.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${targetPort.accountType}`
+                                                        : <span className="text-muted-foreground text-xs">0 {targetPort.accountType}</span>
                                                     }
                                                 </div>
                                                 <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
-                                                    targetPort.engineTier === 'legacy_1url' && targetPort.balance === 0
-                                                        ? 'text-amber-400'
-                                                        : (isBalOk ? 'text-emerald-400' : 'text-amber-400')
+                                                    isBalOk ? 'text-emerald-400' : 'text-amber-400'
                                                 }`}>
-                                                    {targetPort.engineTier === 'legacy_1url' && targetPort.balance === 0
-                                                        ? '⚠️ รัน 1 URL (ไม่มี Telemetry ทุน)'
-                                                        : (isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`)
-                                                    }
+                                                    {isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`}
                                                 </span>
                                             </div>
 
@@ -4213,7 +4245,10 @@ export default function EasyMMasterDashboardPage() {
                                                     {targetPort.todayPnl > 0 ? '+' : ''}{targetPort.todayPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {targetPort.accountType}
                                                 </div>
                                                 <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                                    ออเดอร์: {targetPort.buyCount}B / {targetPort.sellCount}S
+                                                    {targetPort.engineTier === 'legacy_1url' 
+                                                        ? 'รอบตรวจ 12 ชม.' 
+                                                        : `ออเดอร์: ${targetPort.buyCount}B / ${targetPort.sellCount}S`
+                                                    }
                                                 </span>
                                             </div>
 
@@ -4272,7 +4307,7 @@ export default function EasyMMasterDashboardPage() {
                                         <span>คู่มือคำอธิบายสัญลักษณ์และสีของแผงมอนิเตอร์ (Visual Legend)</span>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
                                         {/* 1. สีพื้นหลัง */}
                                         <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
                                             <span className="font-bold text-foreground block border-b border-border/40 pb-1">
@@ -4365,17 +4400,53 @@ export default function EasyMMasterDashboardPage() {
                                                         <div className="h-1.5 w-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]" />
                                                     </div>
                                                     <div>
-                                                        <strong className="text-amber-400 block">ขีดส้ม/ทอง (Legacy 1-URL - รออัปเกรด v2.00)</strong>
-                                                        <span className="text-muted-foreground">รัน EasyM รุ่นเดิม (ก่อน 3-Tier) ใส่เฉพาะ URL ตรวจสิทธิ์ จึงไม่มีการส่งค่าทุน Real-time (แนะนำให้อัปเกรดเป็น v2.00 เพื่อดึงทุนอัตโนมัติ)</span>
+                                                        <strong className="text-amber-400 block">ขีดส้ม/ทอง (ทุนต่ำกว่าเกณฑ์)</strong>
+                                                        <span className="text-muted-foreground">มีเงินทุนในพอร์ตแต่ยังไม่ถึงเกณฑ์ขั้นต่ำของสินค้านั้นๆ</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start gap-2.5">
                                                     <div className="w-8 h-4 rounded bg-zinc-800 border border-zinc-700 relative overflow-hidden shrink-0 flex flex-col justify-end">
-                                                        <div className="h-1.5 w-full bg-zinc-400/80" />
+                                                        <div className="h-1.5 w-full bg-zinc-600" />
                                                     </div>
                                                     <div>
-                                                        <strong className="text-zinc-400 block">ขีดเทา (ทุนไม่ถึงเกณฑ์)</strong>
-                                                        <span className="text-muted-foreground">เงินทุนต่ำกว่าเกณฑ์ของสินค้า หรือพอร์ตว่างยังไม่ได้เติมเงิน</span>
+                                                        <strong className="text-zinc-400 block">ขีดเทา (พอร์ตว่าง / ทุนเป็น 0)</strong>
+                                                        <span className="text-muted-foreground">Balance เท่ากับ 0 หรือยังไม่ได้ฝากเงินเข้าพอร์ต</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 4. สถาปัตยกรรมเชื่อมต่อ MT5 */}
+                                        <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
+                                            <span className="font-bold text-foreground block border-b border-border/40 pb-1">
+                                                4. สถาปัตยกรรมเชื่อมต่อ (Architecture)
+                                            </span>
+                                            <div className="space-y-3 text-[11px] pt-1">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-400/50 shrink-0">
+                                                        v2
+                                                    </span>
+                                                    <div>
+                                                        <strong className="text-cyan-400 block">⚡ v2.00 Single Domain 3-Tier</strong>
+                                                        <span className="text-muted-foreground">ใส่เฉพาะ eaeze.com โดเมนเดียว รองรับ T1 ตรวจสิทธิ์ 12 ชม., T2 หลับ 3 นาที, T3 ตื่น 20 วิ เมื่อดูฟาร์ม</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] font-mono font-bold text-sky-300 bg-sky-950/80 px-1.5 py-0.5 rounded border border-sky-400/50 shrink-0">
+                                                        2U
+                                                    </span>
+                                                    <div>
+                                                        <strong className="text-sky-400 block">📡 2 URLs WebSync (v1.16)</strong>
+                                                        <span className="text-muted-foreground">เชื่อมต่อทั้ง Supabase และ eaeze.com โหมดหลับ 10 วิ โหมดตื่นส่งออเดอร์ 20 วิ</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-400/50 shrink-0">
+                                                        1U
+                                                    </span>
+                                                    <div>
+                                                        <strong className="text-amber-400 block">🔑 1 URL License Check Ping</strong>
+                                                        <span className="text-muted-foreground">ใส่เฉพาะ eaeze.com ตรวจสิทธิ์พร้อมส่ง Balance/Equity ทุก ~12 ชม. อัปเกรดเป็น v2 ได้ทันที</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -4432,14 +4503,15 @@ export default function EasyMMasterDashboardPage() {
                                             <SelectItem value="state_7">⚫ S7: ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30d)</SelectItem>
                                             <SelectItem value="weekend">🟣 Weekend: ตลาดปิดเสาร์-อาทิตย์</SelectItem>
                                             <SelectItem value="real_running">⚡ รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
+                                            <SelectItem value="v2_3tier">⚡ v2.00 (Single Domain 3-Tier)</SelectItem>
+                                            <SelectItem value="legacy_2url">📡 2 URLs (WebSync Telemetry)</SelectItem>
+                                            <SelectItem value="legacy_1url">🔑 1 URL (License Check Ping)</SelectItem>
                                             <SelectItem value="mismatch_gold">🥇 รัน EA ทองคำ (EasyGold)</SelectItem>
                                             <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
                                             <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
                                             <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
                                             <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
                                             <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
-                                            <SelectItem value="full_sync">📡 2 URLs (Full WebSync)</SelectItem>
-                                            <SelectItem value="license_only">🔑 1 URL (License Only)</SelectItem>
                                             <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
                                             <SelectItem value="profit_positive">{fleetStats?.isWeekend ? `📈 กำไร (${fleetStats.today.dateLabel})` : '📈 วันนี้บวก'}</SelectItem>
                                         </SelectContent>
@@ -4467,25 +4539,34 @@ export default function EasyMMasterDashboardPage() {
                                     onClick={() => setSelectedStatus('real_running')}
                                     className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
                                 >
-                                    ⚡ รันจริงเท่านั้น ({searchFilteredPorts.filter(p => p.isRealRunning).length})
+                                    ⚡ รันจริง ({searchFilteredPorts.filter(p => p.isRealRunning).length})
                                 </Button>
                                 <Button 
-                                    variant={selectedStatus === 'full_sync' ? 'default' : 'outline'} 
+                                    variant={selectedStatus === 'v2_3tier' ? 'default' : 'outline'} 
                                     size="sm" 
-                                    onClick={() => setSelectedStatus('full_sync')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'full_sync' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
-                                    title="พอร์ตที่มีการตั้งค่า WebRequest ครบทั้ง 2 URLs (ส่งออเดอร์, กำไร และ DD ครบถ้วน)"
+                                    onClick={() => setSelectedStatus('v2_3tier')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'v2_3tier' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10'}`}
+                                    title="พอร์ต EasyM v2.00 ระบบ Single Domain 3-Tier (ใส่ URL เดียว eaeze.com ครบทุกฟังก์ชัน)"
                                 >
-                                    📡 2 URLs (Full) ({searchFilteredPorts.filter(p => p.telemetryType === 'full_sync').length})
+                                    ⚡ v2.00 3-Tier ({searchFilteredPorts.filter(p => p.engineTier === 'v2_3tier').length})
                                 </Button>
                                 <Button 
-                                    variant={selectedStatus === 'license_only' ? 'default' : 'outline'} 
+                                    variant={selectedStatus === 'legacy_2url' ? 'default' : 'outline'} 
                                     size="sm" 
-                                    onClick={() => setSelectedStatus('license_only')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'license_only' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
-                                    title="พอร์ตที่มี WebRequest ตัวเดียว (เช็คสิทธิ์อย่างเดียว) แนะนำเพิ่ม URL Supabase ใน MT5"
+                                    onClick={() => setSelectedStatus('legacy_2url')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'legacy_2url' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
+                                    title="พอร์ตที่มีการตั้งค่า WebRequest 2 URLs (ส่งออเดอร์, กำไร และ DD ครบถ้วน)"
                                 >
-                                    🔑 1 URL (License) ({searchFilteredPorts.filter(p => p.telemetryType === 'license_only').length})
+                                    📡 2 URLs ({searchFilteredPorts.filter(p => p.engineTier === 'legacy_2url').length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'legacy_1url' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus('legacy_1url')}
+                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'legacy_1url' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                                    title="พอร์ตที่ใส่เฉพาะ URL ตรวจสิทธิ์ 1 URL (ส่ง Balance, Equity และกำไรทุก ~12 ชม.)"
+                                >
+                                    🔑 1 URL ({searchFilteredPorts.filter(p => p.engineTier === 'legacy_1url').length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'offline_48h' ? 'default' : 'outline'} 
@@ -4728,15 +4809,19 @@ export default function EasyMMasterDashboardPage() {
                                                                     ⛔ Inactive
                                                                 </Badge>
                                                             ) : null}
-                                                            {port.telemetryType === 'full_sync' ? (
+                                                            {port.engineTier === 'v2_3tier' ? (
+                                                                <span className="inline-flex items-center gap-1 text-[8px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 (3-Tier)
+                                                                </span>
+                                                            ) : port.engineTier === 'legacy_2url' ? (
                                                                 <span className="inline-flex items-center gap-1 text-[8px] text-sky-400 font-mono bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"></span> 2 URLs (Full)
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"></span> 📡 2 URLs (WebSync)
                                                                 </span>
-                                                            ) : port.telemetryType === 'license_only' ? (
-                                                                <span className="inline-flex items-center gap-1 text-[8px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): แนะนำเพิ่ม URL Supabase ใน MT5 เพื่อรับข้อมูล Full Telemetry">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> 1 URL (License)
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 text-[8px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help" title="เชื่อมต่อระบบลิขสิทธิ์ (1 URL): ตรวจสอบสิทธิ์ พร้อมส่ง Balance, Equity และกำไรทุกรอบตรวจสิทธิ์ (~12 ชม.)">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> 🔑 1 URL (License)
                                                                 </span>
-                                                            ) : null}
+                                                            )}
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
@@ -4926,15 +5011,19 @@ export default function EasyMMasterDashboardPage() {
                                                         ⛔ Inactive
                                                     </Badge>
                                                 ) : null}
-                                                {port.telemetryType === 'full_sync' ? (
+                                                {port.engineTier === 'v2_3tier' ? (
+                                                    <span className="inline-flex items-center gap-1 text-[8px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 (3-Tier)
+                                                    </span>
+                                                ) : port.engineTier === 'legacy_2url' ? (
                                                     <span className="inline-flex items-center gap-1 text-[8px] text-sky-400 font-mono bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"></span> 2 URLs (Full)
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"></span> 📡 2 URLs (WebSync)
                                                     </span>
-                                                ) : port.telemetryType === 'license_only' ? (
-                                                    <span className="inline-flex items-center gap-1 text-[8px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): คำนวณ DD/กำไรจาก Balance แนะนำเพิ่ม URL Supabase ใน MT5 เพื่อรับข้อมูล Telemetry แบบเรียลไทม์">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> 1 URL (License)
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[8px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): ตรวจสอบสิทธิ์ พร้อมส่ง Balance, Equity และกำไรทุกรอบตรวจสิทธิ์ (~12 ชม.)">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> 🔑 1 URL (License)
                                                     </span>
-                                                ) : null}
+                                                )}
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
@@ -4976,24 +5065,28 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">
                                                 <Wifi className="w-2.5 h-2.5" /> Online
                                             </span>
-                                        ) : port.hasTelemetry ? (
+                                        ) : port.runStatus === 'no_telemetry' ? (
+                                            <span className="flex items-center gap-1 text-[9px] bg-zinc-500/10 text-zinc-400 border border-zinc-500/30 px-1.5 py-0.5 rounded-full">
+                                                ⚪ ยังไม่เริ่มรัน
+                                            </span>
+                                        ) : (
                                             <span className="flex items-center gap-1 text-[10px] bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-full">
                                                 <WifiOff className="w-2.5 h-2.5" /> Offline
                                             </span>
+                                        )}
+                                        {port.engineTier === 'v2_3tier' ? (
+                                            <span className="flex items-center gap-1 text-[9px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded-full font-medium" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> ⚡ v2.00 (3-Tier)
+                                            </span>
+                                        ) : port.engineTier === 'legacy_2url' ? (
+                                            <span className="flex items-center gap-1 text-[9px] bg-sky-500/10 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full font-medium" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span> 📡 2 URLs (WebSync)
+                                            </span>
                                         ) : (
-                                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full" title="ยังไม่ได้ตั้งค่า WebRequest ตัวที่ 2 (api/farm/sync)">
-                                                ⚠️ ไม่มี Telemetry
+                                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-medium" title="เชื่อมต่อระบบลิขสิทธิ์ (1 URL): ตรวจสอบสิทธิ์ พร้อมส่ง Balance, Equity และกำไรทุกรอบตรวจสิทธิ์ (~12 ชม.)">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 🔑 1 URL (License)
                                             </span>
                                         )}
-                                        {port.telemetryType === 'full_sync' ? (
-                                            <span className="flex items-center gap-1 text-[9px] bg-sky-500/10 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full font-medium" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span> 2 URLs (Full Sync)
-                                            </span>
-                                        ) : port.telemetryType === 'license_only' ? (
-                                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-medium" title="เชื่อมต่อเฉพาะระบบลิขสิทธิ์ (1 URL): คำนวณ DD/กำไรจาก Balance แนะนำเพิ่ม URL Supabase ใน MT5 เพื่อรับข้อมูล Full Telemetry">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> 1 URL (License Only)
-                                            </span>
-                                        ) : null}
                                         {port.runStatus === 'mismatch_gold' && (
                                             <span className="text-[9px] bg-amber-500/15 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
                                                 🥇 รันทองคำ (EasyGold)
