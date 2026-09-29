@@ -1240,7 +1240,7 @@ export default function EasyMMasterDashboardPage() {
                     let engineTier: 'v2_3tier' | 'legacy_2url' | 'legacy_1url' = 'legacy_1url';
                     if (isV2) {
                         engineTier = 'v2_3tier';
-                    } else if (hasUniversalTelemetry || (status?.server_time != null) || (rawBal > 0 && hoursSinceLastPing <= 12)) {
+                    } else if (hasUniversalTelemetry || (status?.server_time != null)) {
                         engineTier = 'legacy_2url';
                     } else {
                         engineTier = 'legacy_1url';
@@ -1472,7 +1472,7 @@ export default function EasyMMasterDashboardPage() {
                             hoursSinceLastPing: Math.round(hoursSinceLastPing),
                             requiredBalanceUSC,
                             telemetryType,
-                            engineTier: (String(status.ea_version || '').toLowerCase().includes('v2')) ? 'v2_3tier' : 'legacy_2url',
+                            engineTier: (String(status.ea_version || '').toLowerCase().includes('v2')) ? 'v2_3tier' : ((hasUniversalTelemetry || status.server_time != null) ? 'legacy_2url' : 'legacy_1url'),
                             runStatus,
                             state: resolvePortState({
                                 hoursSinceLastPing: Math.round(hoursSinceLastPing),
@@ -4031,7 +4031,7 @@ export default function EasyMMasterDashboardPage() {
                                                             ? '⚠️ Legacy (1 URL) - รออัปเกรด v2.00'
                                                             : '📡 Legacy (2 URLs)')
                                                 }\n${meta.label}\nBalance: ${
-                                                    port.engineTier === 'legacy_1url'
+                                                    port.engineTier === 'legacy_1url' && port.balance === 0
                                                         ? 'รออัปเกรด v2.00 เพื่อดึงทุน Real-time'
                                                         : `${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? 'ทุนผ่าน' : 'ทุนต่ำกว่าเกณฑ์'})`
                                                 }\nสิทธิ์: ${port.isActive ? 'Active' : 'Inactive'}\nคลิกเพื่อค้นหา`}
@@ -4061,14 +4061,14 @@ export default function EasyMMasterDashboardPage() {
 
                                                 {/* Bottom Horizontal Line:
                                                     - Emerald Green if Balance OK
-                                                    - Amber Glow if Legacy 1-URL (รออัปเกรด v2.00)
+                                                    - Amber Glow if Legacy 1-URL with 0 balance (รออัปเกรด v2.00)
                                                     - Grey if Balance Low
                                                 */}
                                                 <div
                                                     className={`h-1.5 w-full rounded-b-[6px] transition-colors ${
                                                         isBalOk
                                                             ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.95)]'
-                                                            : (port.engineTier === 'legacy_1url'
+                                                            : (port.engineTier === 'legacy_1url' && port.balance === 0
                                                                 ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
                                                                 : 'bg-zinc-400/80')
                                                     }`}
@@ -4164,14 +4164,17 @@ export default function EasyMMasterDashboardPage() {
                                                 <div className="leading-relaxed">
                                                     <strong className="text-amber-300">พอร์ตนี้ใช้ EasyM รุ่นเดิม (ส่งเฉพาะ URL เช็คสิทธิ์):</strong>
                                                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                                                        พอร์ตยังคงทำงานและเช็คสิทธิ์ได้ตามปกติ แต่ยังไม่มีการส่งยอดทุนแบบ Real-time เข้ามา แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> ลากทับลงชาร์ต เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาทีผ่าน WebRequest เดิม (<code className="text-amber-300">https://eaeze.com</code>) ได้ทันทีโดยไม่ต้องตั้งค่า MT5 ใหม่!
+                                                        {targetPort.balance > 0 
+                                                            ? <>พอร์ตนี้ส่งการตรวจเช็คสิทธิ์และอัปเดตยอดทุนล่าสุดตามรอบตรวจสิทธิ์ (<code className="text-amber-300">1 URL</code>) แต่ยังไม่มี WebSync ส่งจำนวนออเดอร์/Lots แบบ Real-time แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาที</>
+                                                            : <>พอร์ตยังคงทำงานและเช็คสิทธิ์ได้ตามปกติ แต่ยังไม่มีการส่งยอดทุนแบบ Real-time เข้ามา แนะนำให้อัปเกรดเป็น <strong>EasyM v2.00</strong> ลากทับลงชาร์ต เพื่อเปิดใช้งานระบบ 3-Tier และ Smart Ping 3 นาทีผ่าน WebRequest เดิม (<code className="text-amber-300">https://eaeze.com</code>) ได้ทันทีโดยไม่ต้องตั้งค่า MT5 ใหม่!</>
+                                                        }
                                                     </p>
                                                 </div>
                                             </div>
                                         )}
 
                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-                                            {/* Balance */}
+                                             {/* Balance */}
                                             <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
                                                 <span className="text-muted-foreground text-[11px] block">Balance</span>
                                                 <div className="font-mono font-bold text-sm text-foreground">
@@ -4181,11 +4184,11 @@ export default function EasyMMasterDashboardPage() {
                                                     }
                                                 </div>
                                                 <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
-                                                    targetPort.engineTier === 'legacy_1url'
+                                                    targetPort.engineTier === 'legacy_1url' && targetPort.balance === 0
                                                         ? 'text-amber-400'
                                                         : (isBalOk ? 'text-emerald-400' : 'text-amber-400')
                                                 }`}>
-                                                    {targetPort.engineTier === 'legacy_1url'
+                                                    {targetPort.engineTier === 'legacy_1url' && targetPort.balance === 0
                                                         ? '⚠️ รัน 1 URL (ไม่มี Telemetry ทุน)'
                                                         : (isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`)
                                                     }
