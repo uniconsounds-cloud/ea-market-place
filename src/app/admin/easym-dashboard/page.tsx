@@ -246,7 +246,7 @@ export function checkIsMarketWeekend(date: Date = new Date()): boolean {
 }
 
 export function resolvePortState(port: { hoursSinceLastPing: number; balance: number; accountType: string; requiredBalanceUSC: number; lastPing?: string | null }, isWeekend: boolean, _nowMs?: number): EasyMPortState {
-    if (!port.lastPing || port.hoursSinceLastPing >= 9999) {
+    if (port.hoursSinceLastPing >= 9999 || port.hoursSinceLastPing < 0) {
         return 'STATE_7_ABANDONED';
     }
 
@@ -4076,7 +4076,12 @@ export default function EasyMMasterDashboardPage() {
                                                             return `${base} 1U`;
                                                         })()}
                                                     </span>
-                                                    <div className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`} />
+                                                    {pState === 'STATE_1_LIVE' ? (
+                                                        <div className="relative flex items-center justify-center w-2 h-2 shrink-0" title="🟢 กำลังเปิดดูหน้าฟาร์มสด (Live Streaming)">
+                                                            <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-80 animate-ping" />
+                                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white shadow-[0_0_8px_rgba(255,255,255,1)]" />
+                                                        </div>
+                                                    ) : null}
                                                 </div>
 
                                                 {/* Center: Port digits */}
@@ -4320,64 +4325,52 @@ export default function EasyMMasterDashboardPage() {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
-                                        {/* 1. สีพื้นหลังและจุดสถานะ */}
+                                        {/* 1. สีพื้นหลังกล่อง */}
                                         <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
                                             <span className="font-bold text-foreground block border-b border-border/40 pb-1">
-                                                1. สีพื้นหลัง & จุดมุมขวาบน (State 1-7)
+                                                1. สีพื้นหลังกล่อง (State 1-7)
                                             </span>
                                             <div className="space-y-1.5 text-[11px]">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-500 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-500 shrink-0 relative flex items-center justify-center">
+                                                        <span className="absolute w-1.5 h-1.5 rounded-full bg-white animate-ping opacity-80" />
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_4px_white]" />
                                                     </div>
-                                                    <span><strong>State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2 นาที)</span>
+                                                    <div>
+                                                        <strong className="text-emerald-400">State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2m)
+                                                        <span className="text-[10px] text-white/80 block">*มีจุดขาวเรืองแสงกะพริบมุมขวาบน</span>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                                    </div>
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0" />
                                                     <span><strong>State 2A:</strong> Smart Sleep รันปกติ (ทุนผ่าน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-amber-500 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                                    </div>
+                                                    <div className="w-3.5 h-3.5 rounded bg-amber-500 shrink-0" />
                                                     <span><strong>State 2B:</strong> Smart Sleep แต่ทุนต่ำกว่าเกณฑ์</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-orange-400 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                                                    </div>
+                                                    <div className="w-3.5 h-3.5 rounded bg-orange-400 shrink-0" />
                                                     <span><strong>State 3:</strong> ขาดช่วงสั้น / รอตรวจ 12h (15m-12h)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-orange-600 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                                                    </div>
+                                                    <div className="w-3.5 h-3.5 rounded bg-orange-600 shrink-0" />
                                                     <span><strong>State 4:</strong> เกินรอบตรวจสิทธิ์ (12h-24h)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-rose-600 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                                    </div>
+                                                    <div className="w-3.5 h-3.5 rounded bg-rose-600 shrink-0" />
                                                     <span><strong>State 5:</strong> ออฟไลน์ขาดติดต่อ (24h - 7 วัน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-600 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
-                                                    </div>
-                                                    <span><strong>State 6:</strong> จุดเทาสว่าง = หยุดรันนาน (7-30 วัน)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-600 shrink-0" />
+                                                    <span><strong>State 6:</strong> หยุดรันนาน (7 วัน - 30 วัน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-800 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
-                                                    </div>
-                                                    <span><strong>State 7:</strong> จุดเทาเข้ม = ทิ้งร้าง/ยังไม่เริ่ม (&gt;30 วัน)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-800 shrink-0" />
+                                                    <span><strong>State 7:</strong> ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30 วัน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 shrink-0 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                                                    </div>
+                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 shrink-0" />
                                                     <span><strong>Weekend:</strong> ตลาดปิดพักผ่อน (เสาร์-อาทิตย์)</span>
                                                 </div>
                                             </div>
