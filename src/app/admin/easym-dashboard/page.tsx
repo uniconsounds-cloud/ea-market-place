@@ -245,7 +245,11 @@ export function checkIsMarketWeekend(date: Date = new Date()): boolean {
     return false;
 }
 
-export function resolvePortState(port: { hoursSinceLastPing: number; balance: number; accountType: string; requiredBalanceUSC: number }, isWeekend: boolean, _nowMs?: number): EasyMPortState {
+export function resolvePortState(port: { hoursSinceLastPing: number; balance: number; accountType: string; requiredBalanceUSC: number; lastPing?: string | null }, isWeekend: boolean, _nowMs?: number): EasyMPortState {
+    if (!port.lastPing || port.hoursSinceLastPing >= 9999) {
+        return 'STATE_7_ABANDONED';
+    }
+
     if (isWeekend && port.hoursSinceLastPing <= 48 && port.hoursSinceLastPing >= 0) {
         return 'WEEKEND_STANDBY';
     }
@@ -1168,11 +1172,10 @@ export default function EasyMMasterDashboardPage() {
                     const diffTime = Math.abs(now.getTime() - startDt.getTime());
                     const activeDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-                    // Check online: active ping within last 30 minutes
+                    // Check online: active ping within last 30 minutes (strictly from MT5 last_ping)
                     let isOnline = false;
                     const pingTime = status?.last_ping ? new Date(status.last_ping).getTime() : 0;
-                    const updTime = (status?.updated_at && status?.last_ping) ? new Date(status.updated_at).getTime() : 0;
-                    const lastActive = Math.max(pingTime, updTime);
+                    const lastActive = pingTime;
                     if (lastActive > 0) {
                         isOnline = (now.getTime() - lastActive) < 30 * 60 * 1000;
                     }
@@ -1253,13 +1256,13 @@ export default function EasyMMasterDashboardPage() {
                         runStatus = 'tester';
                     } else if (isGoldMismatch) {
                         runStatus = 'mismatch_gold';
+                    } else if (!hasRealStatus || lastActive === 0 || !status?.last_ping) {
+                        runStatus = 'no_telemetry';
                     } else if (hoursSinceLastPing > 48) {
                         runStatus = 'offline_48h';
                     } else if (engineTier === 'legacy_1url' && hoursSinceLastPing <= 48) {
                         // Legacy 1-URL port: checking license normally, running without live telemetry
                         runStatus = 'running';
-                    } else if (!hasRealStatus || lastActive === 0) {
-                        runStatus = 'no_telemetry';
                     } else if (rawBal > 0 && balUSC < requiredBalanceUSC) {
                         runStatus = 'insufficient_balance';
                     } else if (rawBal === 0) {
@@ -1272,7 +1275,7 @@ export default function EasyMMasterDashboardPage() {
 
                     const lastActiveDateStr = status?.last_ping 
                         ? status.last_ping.substring(0, 10) 
-                        : (portLastDateMap.get(accNum) || (status?.updated_at ? status.updated_at.substring(0, 10) : null));
+                        : (portLastDateMap.get(accNum) || null);
 
                     let endDateDisplay: string | null = null;
                     let lifecycleStatus: 'active' | 'dormant' | 'ended' | 'not_started' = 'not_started';
@@ -1385,8 +1388,7 @@ export default function EasyMMasterDashboardPage() {
                         
                         let isOnline = false;
                         const pingT = status.last_ping ? new Date(status.last_ping).getTime() : 0;
-                        const updT = status.updated_at ? new Date(status.updated_at).getTime() : 0;
-                        const lastActive = Math.max(pingT, updT);
+                        const lastActive = pingT;
                         if (lastActive > 0) {
                             isOnline = (now.getTime() - lastActive) < 30 * 60 * 1000;
                         }
@@ -4032,7 +4034,15 @@ export default function EasyMMasterDashboardPage() {
                                                         : (port.engineTier === 'legacy_2url'
                                                             ? '📡 2 URLs (WebSync Telemetry)'
                                                             : '🔑 1 URL (License Check Ping)')
-                                                }\nสถานะ: ${meta.label}\nBalance: ${
+                                                }\nสถานะ: ${meta.label}\nสื่อสารล่าสุด: ${
+                                                    !port.lastPing || port.hoursSinceLastPing >= 9999
+                                                        ? 'ยังไม่เคยสื่อสาร (ยังไม่เริ่มรัน)'
+                                                        : port.hoursSinceLastPing < 1
+                                                            ? `${Math.max(1, Math.round(port.hoursSinceLastPing * 60))} นาทีที่แล้ว`
+                                                            : port.hoursSinceLastPing < 48
+                                                                ? `${Math.round(port.hoursSinceLastPing)} ชม. ที่แล้ว`
+                                                                : `${Math.round(port.hoursSinceLastPing / 24)} วันที่แล้ว`
+                                                }\nBalance: ${
                                                     rawBal > 0
                                                         ? `${port.balance.toLocaleString()} ${port.accountType} (${isBalOk ? '✅ ทุนผ่าน' : '⚠️ ทุนต่ำกว่าเกณฑ์'})`
                                                         : '0 (ยังไม่เติมทุน)'
@@ -4266,12 +4276,14 @@ export default function EasyMMasterDashboardPage() {
                                             {/* Last Active */}
                                             <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
                                                 <span className="text-muted-foreground text-[11px] block">สื่อสารล่าสุด</span>
-                                                <div className="font-mono font-semibold text-xs text-foreground truncate" title={targetPort.lastPing || 'ไม่มีข้อมูล'}>
-                                                    {targetPort.hoursSinceLastPing < 1 
-                                                        ? `${Math.max(1, Math.round(targetPort.hoursSinceLastPing * 60))} นาทีที่แล้ว`
-                                                        : targetPort.hoursSinceLastPing < 48
-                                                            ? `${Math.round(targetPort.hoursSinceLastPing)} ชม. ที่แล้ว`
-                                                            : `${Math.round(targetPort.hoursSinceLastPing / 24)} วันที่แล้ว`
+                                                <div className="font-mono font-semibold text-xs text-foreground truncate" title={targetPort.lastPing ? new Date(targetPort.lastPing).toLocaleString('th-TH') : 'ยังไม่เคยสื่อสาร / ยังไม่เริ่มรัน'}>
+                                                    {!targetPort.lastPing || targetPort.hoursSinceLastPing >= 9999
+                                                        ? 'ยังไม่เคยสื่อสาร'
+                                                        : targetPort.hoursSinceLastPing < 1 
+                                                            ? `${Math.max(1, Math.round(targetPort.hoursSinceLastPing * 60))} นาทีที่แล้ว`
+                                                            : targetPort.hoursSinceLastPing < 48
+                                                                ? `${Math.round(targetPort.hoursSinceLastPing)} ชม. ที่แล้ว`
+                                                                : `${Math.round(targetPort.hoursSinceLastPing / 24)} วันที่แล้ว`
                                                     }
                                                 </div>
                                                 <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">
@@ -4308,46 +4320,64 @@ export default function EasyMMasterDashboardPage() {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
-                                        {/* 1. สีพื้นหลัง */}
+                                        {/* 1. สีพื้นหลังและจุดสถานะ */}
                                         <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
                                             <span className="font-bold text-foreground block border-b border-border/40 pb-1">
-                                                1. สีพื้นหลัง (สถานะการสื่อสาร State 1-7)
+                                                1. สีพื้นหลัง & จุดมุมขวาบน (State 1-7)
                                             </span>
                                             <div className="space-y-1.5 text-[11px]">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-500 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-500 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                                                    </div>
                                                     <span><strong>State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2 นาที)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                    </div>
                                                     <span><strong>State 2A:</strong> Smart Sleep รันปกติ (ทุนผ่าน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-amber-500 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-amber-500 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                                    </div>
                                                     <span><strong>State 2B:</strong> Smart Sleep แต่ทุนต่ำกว่าเกณฑ์</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-orange-400 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-orange-400 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                                                    </div>
                                                     <span><strong>State 3:</strong> ขาดช่วงสั้น / รอตรวจ 12h (15m-12h)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-orange-600 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-orange-600 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                                    </div>
                                                     <span><strong>State 4:</strong> เกินรอบตรวจสิทธิ์ (12h-24h)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-rose-600 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-rose-600 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                                    </div>
                                                     <span><strong>State 5:</strong> ออฟไลน์ขาดติดต่อ (24h - 7 วัน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-600 shrink-0" />
-                                                    <span><strong>State 6:</strong> หยุดรันนาน (7 วัน - 30 วัน)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-600 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                                                    </div>
+                                                    <span><strong>State 6:</strong> จุดเทาสว่าง = หยุดรันนาน (7-30 วัน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-800 shrink-0" />
-                                                    <span><strong>State 7:</strong> ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30 วัน)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-800 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                                                    </div>
+                                                    <span><strong>State 7:</strong> จุดเทาเข้ม = ทิ้งร้าง/ยังไม่เริ่ม (&gt;30 วัน)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 shrink-0" />
+                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 shrink-0 flex items-center justify-center">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                                                    </div>
                                                     <span><strong>Weekend:</strong> ตลาดปิดพักผ่อน (เสาร์-อาทิตย์)</span>
                                                 </div>
                                             </div>
@@ -4717,13 +4747,19 @@ export default function EasyMMasterDashboardPage() {
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono font-semibold">
                                                         {port.runStatus === 'offline_48h' ? (
-                                                            <div className="flex flex-col items-end" title={`ขาดการติดต่อมาแล้ว ${port.hoursSinceLastPing} ชม. อาจถอนเงินออกแล้ว`}>
+                                                            <div className="flex flex-col items-end" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดการติดต่อมาแล้ว ${port.hoursSinceLastPing} ชม. อาจถอนเงินออกแล้ว` : 'ยังไม่เคยเริ่มรัน'}>
                                                                 <span className="text-muted-foreground/60 line-through text-xs">
                                                                     {port.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {port.accountType}
                                                                 </span>
-                                                                <span className="text-[10px] text-amber-400 font-sans font-medium">
-                                                                    ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
-                                                                </span>
+                                                                {port.lastPing && port.hoursSinceLastPing < 9999 ? (
+                                                                    <span className="text-[10px] text-amber-400 font-sans font-medium">
+                                                                        ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-zinc-500 font-sans font-medium">
+                                                                        ⚪ ยังไม่เริ่มรัน
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <span className={port.isRealRunning ? 'text-foreground' : 'text-muted-foreground'}>
@@ -4784,8 +4820,8 @@ export default function EasyMMasterDashboardPage() {
                                                                     🥇 รันทองคำ (EasyGold)
                                                                 </Badge>
                                                             ) : port.runStatus === 'offline_48h' ? (
-                                                                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={`ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน`}>
-                                                                    ⏸️ ขาดติดต่อ ({port.hoursSinceLastPing}h)
+                                                                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน` : 'ยังไม่เคยเริ่มรัน'}>
+                                                                    ⏸️ ขาดติดต่อ ({port.lastPing && port.hoursSinceLastPing < 9999 ? `${port.hoursSinceLastPing}h` : 'ยังไม่รัน'})
                                                                 </Badge>
                                                             ) : port.runStatus === 'insufficient_balance' ? (
                                                                 <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 text-[9px] px-1.5 py-0" title={`ทุนไม่ถึงเกณฑ์ (มี ${port.balance.toLocaleString()} / ต้องการ ${port.requiredBalanceUSC.toLocaleString()} USC)`}>
@@ -4919,13 +4955,19 @@ export default function EasyMMasterDashboardPage() {
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-semibold">
                                             {port.runStatus === 'offline_48h' ? (
-                                                <div className="flex flex-col items-end" title={`ขาดการติดต่อมาแล้ว ${port.hoursSinceLastPing} ชม. อาจถอนเงินออกแล้ว`}>
+                                                <div className="flex flex-col items-end" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดการติดต่อมาแล้ว ${port.hoursSinceLastPing} ชม. อาจถอนเงินออกแล้ว` : 'ยังไม่เคยเริ่มรัน'}>
                                                     <span className="text-muted-foreground/60 line-through text-xs">
                                                         {port.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {port.accountType}
                                                     </span>
-                                                    <span className="text-[10px] text-amber-400 font-sans font-medium">
-                                                        ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
-                                                    </span>
+                                                    {port.lastPing && port.hoursSinceLastPing < 9999 ? (
+                                                        <span className="text-[10px] text-amber-400 font-sans font-medium">
+                                                            ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-zinc-500 font-sans font-medium">
+                                                            ⚪ ยังไม่เริ่มรัน
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <span className={port.isRealRunning ? 'text-foreground' : 'text-muted-foreground'}>
@@ -4986,8 +5028,8 @@ export default function EasyMMasterDashboardPage() {
                                                         🥇 รันทองคำ (EasyGold)
                                                     </Badge>
                                                 ) : port.runStatus === 'offline_48h' ? (
-                                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={`ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน`}>
-                                                        ⏸️ ขาดติดต่อ ({port.hoursSinceLastPing}h)
+                                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน` : 'ยังไม่เคยเริ่มรัน'}>
+                                                        ⏸️ ขาดติดต่อ ({port.lastPing && port.hoursSinceLastPing < 9999 ? `${port.hoursSinceLastPing}h` : 'ยังไม่รัน'})
                                                     </Badge>
                                                 ) : port.runStatus === 'insufficient_balance' ? (
                                                     <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 text-[9px] px-1.5 py-0" title={`ทุนไม่ถึงเกณฑ์ (มี ${port.balance.toLocaleString()} / ต้องการ ${port.requiredBalanceUSC.toLocaleString()} USC)`}>
@@ -5124,9 +5166,15 @@ export default function EasyMMasterDashboardPage() {
                                                 <span className="font-bold text-muted-foreground/60 line-through text-sm">
                                                     {port.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })} {port.accountType}
                                                 </span>
-                                                <span className="text-[10px] text-amber-400 font-sans block">
-                                                    ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
-                                                </span>
+                                                {port.lastPing && port.hoursSinceLastPing < 9999 ? (
+                                                    <span className="text-[10px] text-amber-400 font-sans block">
+                                                        ⏸️ ค้าง ({Math.round(port.hoursSinceLastPing / 24)} วัน)
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-zinc-500 font-sans block">
+                                                        ⚪ ยังไม่เริ่มรัน
+                                                    </span>
+                                                )}
                                             </div>
                                         ) : (
                                             <span className="font-bold text-foreground text-sm">
