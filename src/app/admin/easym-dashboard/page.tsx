@@ -1282,6 +1282,9 @@ export default function EasyMMasterDashboardPage() {
                                            (goldLicenseAccountSet.has(accNum) && (status?.system_code?.toLowerCase().includes('gold') || status?.system_code === 'EG_FARMING'));
 
                     const isTester = !!customer?.is_tester || isTestPort(accNum);
+                    if (isTester && accNum !== '21692434') {
+                        return; // Exclude tester ports completely from EasyM Dashboard
+                    }
                     const isMax = prodKey.toUpperCase().includes('MAX') || prodName.toLowerCase().includes('max');
                     const isUniversal = prodKey.toUpperCase().includes('UNI') || prodName.toLowerCase().includes('universal');
                     const isPrime = prodKey.toUpperCase().includes('PRIME') || prodName.toLowerCase().includes('prime');
@@ -1456,23 +1459,15 @@ export default function EasyMMasterDashboardPage() {
                 });
             });
 
-            // Also check if there are ports in farm_port_status that have system_code like EasyM but not in licenses
+            // Also check if Master Port 21692434 is in farm_port_status (does not require standard EasyM license)
             (portStatuses || []).forEach(status => {
                 const accNum = status.port_number?.toString();
-                if (accNum && !portItemsMap.has(accNum)) {
-                    // Check if this account has a license in system whose LATEST license is NOT EasyM
-                    const latestLic = latestLicenseByAcc.get(accNum);
-                    if (latestLic) {
-                        const prod = Array.isArray(latestLic.products) ? latestLic.products[0] : latestLic.products;
-                        const pKey = ((prod as any)?.product_key || '').toUpperCase();
-                        const pName = ((prod as any)?.name || '').toLowerCase();
-                        if (!pKey.includes('EZM') && !pName.includes('easym') && !pName.includes('easy m')) {
-                            return; // Customer requested a non-EasyM EA (e.g. EasyGold) as latest license
-                        }
-                    }
+                if (!accNum || portItemsMap.has(accNum)) return;
+                if (isTestPort(accNum)) return;
+                if (accNum !== '21692434') return; // Only allow Master Port 21692434 without a direct EasyM license
 
-                    const sc = (status.system_code || '').toLowerCase();
-                    if (sc.includes('easym') || sc.includes('easy m')) {
+                const sc = (status.system_code || '').toLowerCase();
+                if (sc.includes('easym') || sc.includes('easy m')) {
                         const now = new Date();
                         const startDt = new Date(status.created_at || status.updated_at || new Date());
                         const activeDays = Math.max(1, Math.ceil(Math.abs(now.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24)));
@@ -1590,9 +1585,7 @@ export default function EasyMMasterDashboardPage() {
                                 lastViewedAt: (status as any)?.last_viewed_at || null
                             }, isWeekend)
                         });
-
                     }
-                }
             });
 
             const portList = Array.from(portItemsMap.values());
@@ -1828,6 +1821,9 @@ export default function EasyMMasterDashboardPage() {
     // 3. Search & Scope Filtered Ports (Powers the Fleet Matrix view)
     const searchFilteredPorts = useMemo(() => {
         return ports.filter(p => {
+            // Strictly exclude tester ports from the Fleet Matrix & dashboard view
+            if (p.isTester && p.portNumber !== '21692434') return false;
+
             // Search query (matches portNumber, customerName, customerEmail, portName)
             if (searchQuery.trim()) {
                 const q = searchQuery.toLowerCase().trim();
@@ -4673,7 +4669,6 @@ export default function EasyMMasterDashboardPage() {
                                             <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
                                             <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
                                             <SelectItem value="no_telemetry">⚪ ยังไม่เริ่มรัน (No Ping)</SelectItem>
-                                            <SelectItem value="tester">🧪 บัญชีทดสอบ (Tester)</SelectItem>
                                             <SelectItem value="online">⚡ สด &lt; 30 นาที</SelectItem>
                                             <SelectItem value="high_dd">⚠️ DD &gt; 10%</SelectItem>
                                             <SelectItem value="profit_positive">{fleetStats?.isWeekend ? `📈 กำไร (${fleetStats.today.dateLabel})` : '📈 วันนี้บวก'}</SelectItem>
