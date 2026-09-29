@@ -283,11 +283,11 @@ export function resolvePortState(
     // A port is in STATE_1_LIVE ONLY IF:
     // 1) Architecture connects to farm live streaming (engineTier !== 'legacy_1url')
     // 2) An active viewer is on this port's farm page right now (lastViewedAt within 3 minutes)
-    // 3) MT5 is actively responding with telemetry (minsSince <= 2)
+    // 3) MT5 is actively responding with telemetry (minsSince <= 5)
     const isViewerActive = port.lastViewedAt
         ? (nowTime - new Date(port.lastViewedAt).getTime() <= 3 * 60 * 1000)
         : false;
-    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && minsSince <= 2;
+    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && minsSince <= 5;
 
     if (isLiveView) {
         return 'STATE_1_LIVE';
@@ -1202,13 +1202,28 @@ export default function EasyMMasterDashboardPage() {
                     const diffTime = Math.abs(now.getTime() - startDt.getTime());
                     const activeDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-                    // Check online: active ping within last 30 minutes (strictly from MT5 last_ping)
-                    let isOnline = false;
+                    const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
+
+                    // Check online: active ping or real telemetry sync
                     const pingTime = status?.last_ping ? new Date(status.last_ping).getTime() : 0;
-                    const lastActive = pingTime;
-                    if (lastActive > 0) {
-                        isOnline = (now.getTime() - lastActive) < 30 * 60 * 1000;
+                    let lastActive = pingTime;
+
+                    // For 2-URL / v2 telemetry ports syncing via sync_ea_data:
+                    // sync_ea_data updates status.updated_at and status.server_time.
+                    // We trust updated_at when status.server_time is within the last 48 hours (active MT5 broker clock),
+                    // or if it's a recent telemetry sync within the last 24 hours.
+                    const updateTime = status?.updated_at ? new Date(status.updated_at).getTime() : 0;
+                    const hasRecentServerTime = status?.server_time 
+                        ? Math.abs(now.getTime() - (Number(status.server_time) * 1000)) < 48 * 60 * 60 * 1000 
+                        : false;
+                    const isRecentTelemetrySync = hasUniversalTelemetry && updateTime > 0 && (now.getTime() - updateTime) < 24 * 60 * 60 * 1000;
+
+                    if ((hasRecentServerTime || isRecentTelemetrySync) && updateTime > lastActive) {
+                        lastActive = updateTime;
                     }
+
+                    const isOnline = lastActive > 0 && (now.getTime() - lastActive) < 30 * 60 * 1000;
+                    const effectiveLastPing = lastActive > 0 ? new Date(lastActive).toISOString() : (status?.last_ping || null);
 
                     // Account type: prioritize product currency if status is empty shell or defaults to USD while product is USC
                     let resolvedAccType = status?.account_type || prodCurrency;
@@ -1263,7 +1278,6 @@ export default function EasyMMasterDashboardPage() {
                     const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
 
                     // Telemetry type & 3-Tier Engine classification
-                    const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
                     const telemetryType: 'full_sync' | 'license_only' | 'none' = hasUniversalTelemetry 
                         ? 'full_sync' 
                         : (hasRealStatus ? 'license_only' : 'none');
@@ -1363,7 +1377,7 @@ export default function EasyMMasterDashboardPage() {
                         sellCount: status?.sell_count || 0,
                         accountType: resolvedAccType,
                         isOnline,
-                        lastPing: status?.last_ping || null,
+                        lastPing: effectiveLastPing,
                         lastLicenseCheck: (status as any)?.last_license_check || status?.last_ping || null,
                         lastViewedAt: (status as any)?.last_viewed_at || null,
                         updatedAt: status?.updated_at || null,
@@ -1388,7 +1402,7 @@ export default function EasyMMasterDashboardPage() {
                             balance: status?.balance || 0,
                             accountType: resolvedAccType,
                             requiredBalanceUSC,
-                            lastPing: status?.last_ping || null,
+                            lastPing: effectiveLastPing,
                             engineTier,
                             lastViewedAt: (status as any)?.last_viewed_at || null
                         }, isWeekend)
@@ -1420,12 +1434,25 @@ export default function EasyMMasterDashboardPage() {
                         const startDt = new Date(status.created_at || status.updated_at || new Date());
                         const activeDays = Math.max(1, Math.ceil(Math.abs(now.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24)));
                         
+                        const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
+
                         let isOnline = false;
                         const pingT = status.last_ping ? new Date(status.last_ping).getTime() : 0;
-                        const lastActive = pingT;
+                        let lastActive = pingT;
+                        const updateT = status?.updated_at ? new Date(status.updated_at).getTime() : 0;
+                        const hasRecentServerTime = status?.server_time 
+                            ? Math.abs(now.getTime() - (Number(status.server_time) * 1000)) < 48 * 60 * 60 * 1000 
+                            : false;
+                        const isRecentTelemetrySync = hasUniversalTelemetry && updateT > 0 && (now.getTime() - updateT) < 24 * 60 * 60 * 1000;
+
+                        if ((hasRecentServerTime || isRecentTelemetrySync) && updateT > lastActive) {
+                            lastActive = updateT;
+                        }
+
                         if (lastActive > 0) {
                             isOnline = (now.getTime() - lastActive) < 30 * 60 * 1000;
                         }
+                        const effectiveLastPing = lastActive > 0 ? new Date(lastActive).toISOString() : (status.last_ping || null);
 
                         const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
                         const statusTodayPnl = Number(status.today_pnl) || 0;
@@ -1449,7 +1476,6 @@ export default function EasyMMasterDashboardPage() {
                         const histWorstDD = portWorstDDMap.get(accNum) || 0;
                         const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
 
-                        const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
                         const telemetryType: 'full_sync' | 'license_only' | 'none' = hasUniversalTelemetry 
                             ? 'full_sync' 
                             : ((status?.last_ping || status?.updated_at) ? 'license_only' : 'none');
@@ -1476,8 +1502,8 @@ export default function EasyMMasterDashboardPage() {
                             licenseTier: 'pro',
                             startDate: startDt.toLocaleDateString('th-TH'),
                             startDateRaw: (status.created_at || status.updated_at || new Date().toISOString()).substring(0, 10),
-                            endDate: isRealRunning ? null : (status.last_ping ? new Date(status.last_ping).toLocaleDateString('th-TH') : null),
-                            endDateRaw: isRealRunning ? null : (status.last_ping ? status.last_ping.substring(0, 10) : null),
+                            endDate: isRealRunning ? null : (effectiveLastPing ? new Date(effectiveLastPing).toLocaleDateString('th-TH') : null),
+                            endDateRaw: isRealRunning ? null : (effectiveLastPing ? effectiveLastPing.substring(0, 10) : null),
                             durationDays: activeDays,
                             lifecycleStatus: isRealRunning ? 'active' : 'dormant',
                             activeDays,
@@ -1491,7 +1517,7 @@ export default function EasyMMasterDashboardPage() {
                             sellCount: status.sell_count || 0,
                             accountType: status.account_type || 'USC',
                             isOnline,
-                            lastPing: status.last_ping || null,
+                            lastPing: effectiveLastPing,
                             lastLicenseCheck: (status as any)?.last_license_check || status.last_ping || null,
                             lastViewedAt: (status as any)?.last_viewed_at || null,
                             updatedAt: status.updated_at || null,
@@ -1516,7 +1542,7 @@ export default function EasyMMasterDashboardPage() {
                                 balance: status.balance || 0,
                                 accountType: status.account_type || 'USC',
                                 requiredBalanceUSC,
-                                lastPing: status.last_ping || null,
+                                lastPing: effectiveLastPing,
                                 engineTier: (String(status.ea_version || '').toLowerCase().includes('v2')) ? 'v2_3tier' : ((hasUniversalTelemetry || status.server_time != null) ? 'legacy_2url' : 'legacy_1url'),
                                 lastViewedAt: (status as any)?.last_viewed_at || null
                             }, isWeekend)
