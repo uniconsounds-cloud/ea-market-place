@@ -99,14 +99,14 @@ interface EasyMPortItem {
 
 export type EasyMPortState =
     | 'STATE_1_LIVE'
-    | 'STATE_2A_ONLINE'
-    | 'STATE_2B_LOW_BALANCE'
-    | 'STATE_3_LOST'
+    | 'STATE_2_ONLINE'
+    | 'STATE_3_STANDBY_12H'
     | 'STATE_4_DELAYED'
-    | 'STATE_5_OFFLINE'
-    | 'STATE_6_DORMANT'
-    | 'STATE_7_ABANDONED'
-    | 'WEEKEND_STANDBY';
+    | 'STATE_5_DISCONNECTED'
+    | 'STATE_6_STOPPED'
+    | 'STATE_7_DORMANT'
+    | 'STATE_8_ABANDONED'
+    | 'STATE_9_NEVER_CONNECTED';
 
 export interface PortStateMeta {
     id: EasyMPortState;
@@ -124,111 +124,111 @@ export interface PortStateMeta {
 export const PORT_STATE_META: Record<EasyMPortState, PortStateMeta> = {
     STATE_1_LIVE: {
         id: 'STATE_1_LIVE',
-        label: 'State 1: เปิดดูฟาร์มสด',
+        label: 'State 1: เปิดดูฟาร์มสด (≤ 2m)',
         shortLabel: 'S1 สด ≤2m',
-        description: 'มีผู้กำลังเปิดดูหน้าฟาร์มสด และ EA กำลังสตรีมข้อมูลสดต่อเนื่อง (Ping ≤ 2 นาที)',
+        description: 'มีผู้กำลังเปิดดูหน้าฟาร์มสด และ EA กำลังสตรีมข้อมูลสดเรียลไทม์ (Ping ≤ 2 นาที)',
         colorBg: 'bg-emerald-500',
         colorBorder: 'border-emerald-400',
         colorText: 'text-white',
         badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-        dotClass: 'bg-emerald-300 animate-pulse',
+        dotClass: 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)] animate-pulse',
         icon: '🟢',
     },
-    STATE_2A_ONLINE: {
-        id: 'STATE_2A_ONLINE',
-        label: 'State 2A: รันปกติโหมดประหยัด (ทุนผ่าน)',
-        shortLabel: 'S2A ทุนผ่าน',
-        description: 'Smart Sleep Ping ปกติ (Ping ≤ 15 นาที) และยอดเงินทุนถึงเกณฑ์ขั้นต่ำ',
+    STATE_2_ONLINE: {
+        id: 'STATE_2_ONLINE',
+        label: 'State 2: ออนไลน์ปกติ (Smart Sleep)',
+        shortLabel: 'S2 ออนไลน์',
+        description: 'Smart Sleep Ping ปกติ (Ping ≤ 15 นาที หรือ v2.00 ทุก 3 นาที) สุขภาพพอร์ตดีเยี่ยม',
         colorBg: 'bg-emerald-600',
         colorBorder: 'border-emerald-500',
         colorText: 'text-white',
         badgeBg: 'bg-emerald-600/25 text-emerald-300 border-emerald-500/40',
-        dotClass: 'bg-emerald-400',
+        dotClass: 'bg-emerald-300',
         icon: '🟢',
     },
-    STATE_2B_LOW_BALANCE: {
-        id: 'STATE_2B_LOW_BALANCE',
-        label: 'State 2B: รันแต่ทุนต่ำกว่าเกณฑ์',
-        shortLabel: 'S2B ทุนต่ำ',
-        description: 'Smart Sleep Ping ทำงาน แต่เงินทุนต่ำกว่าเกณฑ์ของสินค้า (MAX < 100k, Mini < 50k, Farm < 30k USC)',
+    STATE_3_STANDBY_12H: {
+        id: 'STATE_3_STANDBY_12H',
+        label: 'State 3: สแตนด์บายรอบตรวจ 12h',
+        shortLabel: 'S3 รอบตรวจ 12h',
+        description: 'รันปกติ รอวงรอบตรวจสิทธิ์ถัดไปตามคาบเวลา (Ping 15 นาที - 12 ชม.)',
+        colorBg: 'bg-emerald-700',
+        colorBorder: 'border-emerald-600',
+        colorText: 'text-emerald-100',
+        badgeBg: 'bg-emerald-700/30 text-emerald-300 border-emerald-600/40',
+        dotClass: '',
+        icon: '🟢',
+    },
+    STATE_4_DELAYED: {
+        id: 'STATE_4_DELAYED',
+        label: 'State 4: ชะลอตรวจสิทธิ์ (12-24h)',
+        shortLabel: 'S4 เกินรอบ 12-24h',
+        description: 'ขาดการติดต่อนาน 12 - 24 ชั่วโมง (เลยรอบตรวจสิทธิ์ 12 ชม. มาเล็กน้อย อาจปิดจอหรือเน็ตหลุด)',
         colorBg: 'bg-amber-500',
         colorBorder: 'border-amber-400',
         colorText: 'text-zinc-950 font-bold',
         badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-        dotClass: 'bg-amber-400',
+        dotClass: '',
         icon: '🟡',
     },
-    STATE_3_LOST: {
-        id: 'STATE_3_LOST',
-        label: 'State 3: ขาดช่วงสั้น / รอรอบ 12h',
-        shortLabel: 'S3 รอตรวจ 12h',
-        description: 'ขาดการติดต่อ 15 นาที - 12 ชั่วโมง (อาจปิดหน้าจอ รอวงรอบตรวจสิทธิ์ถัดไป หรือเน็ตหลุดชั่วคราว)',
-        colorBg: 'bg-orange-400',
-        colorBorder: 'border-orange-300',
-        colorText: 'text-zinc-950 font-bold',
-        badgeBg: 'bg-orange-400/20 text-orange-300 border-orange-400/40',
-        dotClass: 'bg-orange-400',
-        icon: '🟠',
-    },
-    STATE_4_DELAYED: {
-        id: 'STATE_4_DELAYED',
-        label: 'State 4: เกินรอบตรวจสิทธิ์',
-        shortLabel: 'S4 เกินรอบ',
-        description: 'ขาดการติดต่อนาน 12 - 24 ชั่วโมง (เกินกำหนดรอบตรวจสิทธิ์ประจำวัน)',
+    STATE_5_DISCONNECTED: {
+        id: 'STATE_5_DISCONNECTED',
+        label: 'State 5: หลุดการเชื่อมต่อ (24-48h)',
+        shortLabel: 'S5 หลุด 24-48h',
+        description: 'ขาดการติดต่อนาน 24 - 48 ชั่วโมง (เกิน 1 วัน เริ่มมีความผิดปกติ)',
         colorBg: 'bg-orange-600',
         colorBorder: 'border-orange-500',
         colorText: 'text-white',
         badgeBg: 'bg-orange-600/20 text-orange-300 border-orange-500/40',
-        dotClass: 'bg-orange-500',
-        icon: '🔴',
+        dotClass: '',
+        icon: '🟠',
     },
-    STATE_5_OFFLINE: {
-        id: 'STATE_5_OFFLINE',
-        label: 'State 5: ออฟไลน์ขาดติดต่อ',
-        shortLabel: 'S5 หลุด 1-7d',
-        description: 'ขาดการติดต่อนาน 24 ชั่วโมง - 7 วัน (เครื่องดับ VPS หลุด หรือผู้ใช้ปิด MT5)',
+    STATE_6_STOPPED: {
+        id: 'STATE_6_STOPPED',
+        label: 'State 6: หยุดรันแล้ว (> 48h - 7d)',
+        shortLabel: 'S6 หยุดรัน >48h',
+        description: 'ขาดการติดต่อเกิน 48 ชั่วโมง ถึง 7 วัน (ตัดเข้าเกณฑ์หยุดรัน/อาจถอนเงินออก)',
         colorBg: 'bg-rose-600',
         colorBorder: 'border-rose-500',
         colorText: 'text-white',
         badgeBg: 'bg-rose-600/20 text-rose-300 border-rose-500/40',
-        dotClass: 'bg-rose-500',
+        dotClass: '',
         icon: '🔴',
     },
-    STATE_6_DORMANT: {
-        id: 'STATE_6_DORMANT',
-        label: 'State 6: หยุดรันนาน',
-        shortLabel: 'S6 หยุด 7-30d',
-        description: 'หยุดรันนาน 7 วัน - 30 วัน',
+    STATE_7_DORMANT: {
+        id: 'STATE_7_DORMANT',
+        label: 'State 7: หยุดรันนาน (7 - 30d)',
+        shortLabel: 'S7 หยุดนาน 7-30d',
+        description: 'หยุดรันต่อเนื่องนาน 7 วัน ถึง 30 วัน',
         colorBg: 'bg-zinc-600',
         colorBorder: 'border-zinc-500',
-        colorText: 'text-zinc-100',
+        colorText: 'text-zinc-200',
         badgeBg: 'bg-zinc-600/25 text-zinc-300 border-zinc-500/40',
-        dotClass: 'bg-zinc-400',
+        dotClass: '',
         icon: '⚪',
     },
-    STATE_7_ABANDONED: {
-        id: 'STATE_7_ABANDONED',
-        label: 'State 7: ทิ้งร้าง / ยังไม่เริ่มรัน',
-        shortLabel: 'S7 ทิ้งร้าง',
-        description: 'ขาดการติดต่อเกิน 30 วัน หรือยังไม่เคยเปิดรันเลยตั้งแต่ได้รับสิทธิ์',
+    STATE_8_ABANDONED: {
+        id: 'STATE_8_ABANDONED',
+        label: 'State 8: ทิ้งร้าง (> 30d)',
+        shortLabel: 'S8 ทิ้งร้าง >30d',
+        description: 'ไม่ได้เปิดใช้งานหรือขาดการติดต่อเกิน 30 วันขึ้นไป',
         colorBg: 'bg-zinc-800',
         colorBorder: 'border-zinc-700',
         colorText: 'text-zinc-400',
         badgeBg: 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50',
-        dotClass: 'bg-zinc-600',
+        dotClass: '',
         icon: '⚫',
     },
-    WEEKEND_STANDBY: {
-        id: 'WEEKEND_STANDBY',
-        label: 'Weekend: ตลาดปิดพักผ่อน',
-        shortLabel: 'Weekend พัก',
-        description: 'ตลาดปิดเสาร์-อาทิตย์ (พอร์ตพักผ่อนตามรอบตลาด)',
-        colorBg: 'bg-purple-600',
-        colorBorder: 'border-purple-400',
-        colorText: 'text-white',
-        badgeBg: 'bg-purple-600/20 text-purple-300 border-purple-400/40',
-        dotClass: 'bg-purple-400',
-        icon: '🟣',
+    STATE_9_NEVER_CONNECTED: {
+        id: 'STATE_9_NEVER_CONNECTED',
+        label: 'State 9: ยังไม่เคยสื่อสาร (0 ครั้ง)',
+        shortLabel: 'S9 ยังไม่เริ่ม',
+        description: 'มี License ในระบบแล้ว แต่ยังไม่เคยเปิดรันหรือส่ง WebRequest เข้ามาเลย',
+        colorBg: 'bg-zinc-900/60',
+        colorBorder: 'border-dashed border-zinc-600',
+        colorText: 'text-zinc-500',
+        badgeBg: 'bg-zinc-900/50 text-zinc-400 border-dashed border-zinc-600',
+        dotClass: '',
+        icon: '🔲',
     },
 };
 
@@ -246,6 +246,24 @@ export function checkIsMarketWeekend(date: Date = new Date()): boolean {
     return false;
 }
 
+export function getWeekendElapsedHours(now: Date = new Date()): number {
+    if (!checkIsMarketWeekend(now)) return 0;
+    const bkkTime = new Date(now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60 * 1000);
+    const day = bkkTime.getDay(); // 0 is Sunday, 6 is Saturday, 1 is Monday
+    const hours = bkkTime.getHours();
+    const minutes = bkkTime.getMinutes();
+    
+    // Market closed on Saturday at 04:00 BKK
+    if (day === 6) {
+        return Math.max(0, (hours - 4) + minutes / 60);
+    } else if (day === 0) {
+        return 20 + hours + minutes / 60;
+    } else if (day === 1 && hours < 4) {
+        return 44 + hours + minutes / 60;
+    }
+    return 0;
+}
+
 export function resolvePortState(
     port: {
         hoursSinceLastPing: number;
@@ -259,61 +277,73 @@ export function resolvePortState(
     isWeekend: boolean,
     _nowMs?: number
 ): EasyMPortState {
-    if (port.hoursSinceLastPing >= 9999 || port.hoursSinceLastPing < 0) {
-        return 'STATE_7_ABANDONED';
-    }
-
-    if (isWeekend && port.hoursSinceLastPing <= 48 && port.hoursSinceLastPing >= 0) {
-        return 'WEEKEND_STANDBY';
+    // 1. Never Connected (State 9)
+    if (!port.lastPing || port.hoursSinceLastPing >= 9999 || port.hoursSinceLastPing < 0) {
+        return 'STATE_9_NEVER_CONNECTED';
     }
 
     const nowTime = _nowMs || Date.now();
-    let minsSince = port.hoursSinceLastPing * 60;
-    if (port.lastPing) {
-        const pingMs = new Date(port.lastPing).getTime();
-        if (!isNaN(pingMs)) {
-            minsSince = Math.max(0, (nowTime - pingMs) / (1000 * 60));
+    let effectiveHours = port.hoursSinceLastPing;
+
+    // Weekend Freeze logic: If market is closed on weekend, subtract elapsed weekend hours so healthy ports do not degrade
+    if (isWeekend) {
+        const weekendElapsed = getWeekendElapsedHours(new Date(nowTime));
+        if (weekendElapsed > 0 && effectiveHours > 0) {
+            effectiveHours = Math.max(0, effectiveHours - weekendElapsed);
         }
     }
 
-    const rawBal = Number(port.balance) || 0;
-    const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
-    const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
+    let minsSince = effectiveHours * 60;
+    if (port.lastPing && !isWeekend) {
+        const pingMs = new Date(port.lastPing).getTime();
+        if (!isNaN(pingMs)) {
+            minsSince = Math.max(0, (nowTime - pingMs) / (1000 * 60));
+            effectiveHours = minsSince / 60;
+        }
+    }
 
-    // A port is in STATE_1_LIVE ONLY IF:
-    // 1) Architecture connects to farm live streaming (engineTier !== 'legacy_1url')
-    // 2) An active viewer is on this port's farm page right now (lastViewedAt within 3 minutes)
-    // 3) MT5 is actively responding with telemetry (minsSince <= 5)
+    // State 1: Live View (Viewer is actively looking at farm page within 3 mins + recent ping within 2 mins)
     const isViewerActive = port.lastViewedAt
         ? (nowTime - new Date(port.lastViewedAt).getTime() <= 3 * 60 * 1000)
         : false;
-    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && minsSince <= 5;
+    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && minsSince <= 2;
 
-    if (isLiveView) {
+    if (isLiveView || minsSince <= 0.5) {
         return 'STATE_1_LIVE';
     }
 
+    // State 2: Online (Smart Sleep: ping within 15 mins)
     if (minsSince <= 15) {
-        return isBalOk ? 'STATE_2A_ONLINE' : 'STATE_2B_LOW_BALANCE';
+        return 'STATE_2_ONLINE';
     }
 
-    if (port.hoursSinceLastPing <= 12) {
-        return 'STATE_3_LOST';
+    // State 3: Standby 12h (Regular 12h license cycle: <= 12 hours)
+    if (effectiveHours <= 12) {
+        return 'STATE_3_STANDBY_12H';
     }
 
-    if (port.hoursSinceLastPing <= 24) {
+    // State 4: Delayed (12 - 24 hours)
+    if (effectiveHours <= 24) {
         return 'STATE_4_DELAYED';
     }
 
-    if (port.hoursSinceLastPing <= 168) { // 7 days
-        return 'STATE_5_OFFLINE';
+    // State 5: Disconnected (24 - 48 hours)
+    if (effectiveHours <= 48) {
+        return 'STATE_5_DISCONNECTED';
     }
 
-    if (port.hoursSinceLastPing <= 720) { // 30 days
-        return 'STATE_6_DORMANT';
+    // State 6: Stopped (> 48 hours to 7 days)
+    if (effectiveHours <= 168) {
+        return 'STATE_6_STOPPED';
     }
 
-    return 'STATE_7_ABANDONED';
+    // State 7: Dormant (7 to 30 days)
+    if (effectiveHours <= 720) {
+        return 'STATE_7_DORMANT';
+    }
+
+    // State 8: Abandoned (> 30 days)
+    return 'STATE_8_ABANDONED';
 }
 
 
@@ -441,6 +471,19 @@ export function getLicenseCheckInfo(lastCheckIso: string | null, nowMs: number):
             };
         }
     }
+}
+
+export function formatLastCommunication(lastPing: string | null, hoursSinceLastPing: number): string {
+    if (!lastPing || hoursSinceLastPing >= 9999) {
+        return 'ยังไม่เคยสื่อสาร';
+    }
+    if (hoursSinceLastPing < 1) {
+        return `${Math.max(1, Math.round(hoursSinceLastPing * 60))} นาทีที่แล้ว`;
+    }
+    if (hoursSinceLastPing < 48) {
+        return `${Math.round(hoursSinceLastPing)} ชม. ที่แล้ว`;
+    }
+    return `${Math.round(hoursSinceLastPing / 24)} วันที่แล้ว`;
 }
 
 export interface MonthlyFleetStat {
@@ -1872,16 +1915,16 @@ export default function EasyMMasterDashboardPage() {
                 if (selectedStatus === 'legacy_2url' && p.engineTier !== 'legacy_2url') return false;
                 if (selectedStatus === 'legacy_1url' && p.engineTier !== 'legacy_1url') return false;
                 if (selectedStatus === 'full_sync' && p.engineTier !== 'legacy_2url' && p.engineTier !== 'v2_3tier') return false;
-                if (selectedStatus === 'license_only' && p.engineTier !== 'legacy_1url') return false;
                 if (selectedStatus === 'state_1' && portSt !== 'STATE_1_LIVE') return false;
-                if (selectedStatus === 'state_2a' && portSt !== 'STATE_2A_ONLINE') return false;
-                if (selectedStatus === 'state_2b' && portSt !== 'STATE_2B_LOW_BALANCE') return false;
-                if (selectedStatus === 'state_3' && portSt !== 'STATE_3_LOST') return false;
+                if (selectedStatus === 'state_2' && portSt !== 'STATE_2_ONLINE') return false;
+                if (selectedStatus === 'state_3' && portSt !== 'STATE_3_STANDBY_12H') return false;
                 if (selectedStatus === 'state_4' && portSt !== 'STATE_4_DELAYED') return false;
-                if (selectedStatus === 'state_5' && portSt !== 'STATE_5_OFFLINE') return false;
-                if (selectedStatus === 'state_6' && portSt !== 'STATE_6_DORMANT') return false;
-                if (selectedStatus === 'state_7' && portSt !== 'STATE_7_ABANDONED') return false;
-                if (selectedStatus === 'weekend' && portSt !== 'WEEKEND_STANDBY') return false;
+                if (selectedStatus === 'state_5' && portSt !== 'STATE_5_DISCONNECTED') return false;
+                if (selectedStatus === 'state_6' && portSt !== 'STATE_6_STOPPED') return false;
+                if (selectedStatus === 'state_7' && portSt !== 'STATE_7_DORMANT') return false;
+                if (selectedStatus === 'state_8' && portSt !== 'STATE_8_ABANDONED') return false;
+                if (selectedStatus === 'state_9' && portSt !== 'STATE_9_NEVER_CONNECTED') return false;
+                if (selectedStatus === 'weekend' && (!isWk || !p.isRealRunning)) return false;
             }
 
             return true;
@@ -1894,14 +1937,15 @@ export default function EasyMMasterDashboardPage() {
         const counts: Record<string, number> = {
             all: searchFilteredPorts.length,
             STATE_1_LIVE: 0,
-            STATE_2A_ONLINE: 0,
-            STATE_2B_LOW_BALANCE: 0,
-            STATE_3_LOST: 0,
+            STATE_2_ONLINE: 0,
+            STATE_3_STANDBY_12H: 0,
             STATE_4_DELAYED: 0,
-            STATE_5_OFFLINE: 0,
-            STATE_6_DORMANT: 0,
-            STATE_7_ABANDONED: 0,
-            WEEKEND_STANDBY: 0,
+            STATE_5_DISCONNECTED: 0,
+            STATE_6_STOPPED: 0,
+            STATE_7_DORMANT: 0,
+            STATE_8_ABANDONED: 0,
+            STATE_9_NEVER_CONNECTED: 0,
+            weekend_standby: 0,
             license_active: 0,
             license_inactive: 0,
             bal_ok: 0,
@@ -1914,6 +1958,9 @@ export default function EasyMMasterDashboardPage() {
         searchFilteredPorts.forEach(p => {
             const st = p.state || resolvePortState(p, isWk, currentTime);
             counts[st] = (counts[st] || 0) + 1;
+            if (isWk && (st === 'STATE_1_LIVE' || st === 'STATE_2_ONLINE' || st === 'STATE_3_STANDBY_12H' || p.isRealRunning)) {
+                counts.weekend_standby++;
+            }
             if (p.isActive) counts.license_active++;
             else counts.license_inactive++;
 
@@ -3849,105 +3896,117 @@ export default function EasyMMasterDashboardPage() {
                                             : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-500/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse" />
                                     <span>S1 สด ≤2m ({stateCounts.STATE_1_LIVE})</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('STATE_2A_ONLINE')}
+                                    onClick={() => setSelectedStateFilter('STATE_2_ONLINE')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                        selectedStateFilter === 'STATE_2A_ONLINE'
+                                        selectedStateFilter === 'STATE_2_ONLINE'
                                             ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-300 shadow-md'
                                             : 'bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-600/40'
                                     }`}
                                 >
                                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                                    <span>S2A ทุนผ่าน ({stateCounts.STATE_2A_ONLINE})</span>
+                                    <span>S2 ออนไลน์ ({stateCounts.STATE_2_ONLINE})</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('STATE_2B_LOW_BALANCE')}
+                                    onClick={() => setSelectedStateFilter('STATE_3_STANDBY_12H')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                        selectedStateFilter === 'STATE_2B_LOW_BALANCE'
-                                            ? 'bg-amber-500 text-black font-bold ring-2 ring-amber-300 shadow-md'
-                                            : 'bg-amber-950/40 text-amber-300 hover:bg-amber-950/60 border border-amber-500/40'
+                                        selectedStateFilter === 'STATE_3_STANDBY_12H'
+                                            ? 'bg-emerald-700 text-white font-bold ring-2 ring-emerald-400 shadow-md'
+                                            : 'bg-emerald-950/50 text-emerald-400 hover:bg-emerald-950/70 border border-emerald-700/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-amber-400" />
-                                    <span>S2B ทุนต่ำ ({stateCounts.STATE_2B_LOW_BALANCE})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedStateFilter('STATE_3_LOST')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                        selectedStateFilter === 'STATE_3_LOST'
-                                            ? 'bg-orange-400 text-black font-bold ring-2 ring-orange-200 shadow-md'
-                                            : 'bg-orange-950/40 text-orange-300 hover:bg-orange-950/60 border border-orange-400/40'
-                                    }`}
-                                >
-                                    <div className="w-2 h-2 rounded-full bg-orange-400" />
-                                    <span>S3 รอตรวจ 12h ({stateCounts.STATE_3_LOST})</span>
+                                    <div className="w-2 h-2 rounded-full bg-emerald-600" />
+                                    <span>S3 รอบตรวจ 12h ({stateCounts.STATE_3_STANDBY_12H})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_4_DELAYED')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
                                         selectedStateFilter === 'STATE_4_DELAYED'
+                                            ? 'bg-amber-500 text-black font-bold ring-2 ring-amber-300 shadow-md'
+                                            : 'bg-amber-950/40 text-amber-300 hover:bg-amber-950/60 border border-amber-500/40'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                    <span>S4 เกินรอบ 12-24h ({stateCounts.STATE_4_DELAYED})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_5_DISCONNECTED')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_5_DISCONNECTED'
                                             ? 'bg-orange-600 text-white font-bold ring-2 ring-orange-400 shadow-md'
                                             : 'bg-orange-950/60 text-orange-400 hover:bg-orange-950/80 border border-orange-600/40'
                                     }`}
                                 >
                                     <div className="w-2 h-2 rounded-full bg-orange-500" />
-                                    <span>S4 เกินรอบ ({stateCounts.STATE_4_DELAYED})</span>
+                                    <span>S5 หลุด 24-48h ({stateCounts.STATE_5_DISCONNECTED})</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('STATE_5_OFFLINE')}
+                                    onClick={() => setSelectedStateFilter('STATE_6_STOPPED')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                        selectedStateFilter === 'STATE_5_OFFLINE'
+                                        selectedStateFilter === 'STATE_6_STOPPED'
                                             ? 'bg-rose-600 text-white font-bold ring-2 ring-rose-400 shadow-md'
                                             : 'bg-rose-950/40 text-rose-300 hover:bg-rose-950/60 border border-rose-500/40'
                                     }`}
                                 >
                                     <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                    <span>S5 หลุด 1-7d ({stateCounts.STATE_5_OFFLINE})</span>
+                                    <span>S6 หยุดรัน &gt;48h ({stateCounts.STATE_6_STOPPED})</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('STATE_6_DORMANT')}
+                                    onClick={() => setSelectedStateFilter('STATE_7_DORMANT')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                        selectedStateFilter === 'STATE_6_DORMANT'
+                                        selectedStateFilter === 'STATE_7_DORMANT'
                                             ? 'bg-zinc-600 text-white font-bold ring-2 ring-zinc-400 shadow-md'
                                             : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border border-zinc-600/40'
                                     }`}
                                 >
                                     <div className="w-2 h-2 rounded-full bg-zinc-400" />
-                                    <span>S6 หยุดนาน ({stateCounts.STATE_6_DORMANT})</span>
+                                    <span>S7 หยุดนาน ({stateCounts.STATE_7_DORMANT})</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedStateFilter('STATE_7_ABANDONED')}
+                                    onClick={() => setSelectedStateFilter('STATE_8_ABANDONED')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                        selectedStateFilter === 'STATE_7_ABANDONED'
+                                        selectedStateFilter === 'STATE_8_ABANDONED'
                                             ? 'bg-zinc-800 text-zinc-200 font-bold ring-2 ring-zinc-600 shadow-md'
                                             : 'bg-black/60 text-zinc-500 hover:bg-zinc-900 border border-zinc-800'
                                     }`}
                                 >
                                     <div className="w-2 h-2 rounded-full bg-zinc-600" />
-                                    <span>S7 ทิ้งร้าง ({stateCounts.STATE_7_ABANDONED})</span>
+                                    <span>S8 ทิ้งร้าง ({stateCounts.STATE_8_ABANDONED})</span>
                                 </button>
-                                {stateCounts.WEEKEND_STANDBY > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter('STATE_9_NEVER_CONNECTED')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        selectedStateFilter === 'STATE_9_NEVER_CONNECTED'
+                                            ? 'bg-zinc-900 text-zinc-300 font-bold ring-2 ring-zinc-500 border border-dashed border-zinc-500 shadow-md'
+                                            : 'bg-zinc-950/40 text-zinc-500 hover:bg-zinc-900 border border-dashed border-zinc-700'
+                                    }`}
+                                >
+                                    <div className="w-2 h-2 rounded-full border border-dashed border-zinc-500" />
+                                    <span>S9 ยังไม่เริ่ม ({stateCounts.STATE_9_NEVER_CONNECTED})</span>
+                                </button>
+                                {stateCounts.weekend_standby > 0 && (
                                     <button
                                         type="button"
-                                        onClick={() => setSelectedStateFilter('WEEKEND_STANDBY')}
+                                        onClick={() => setSelectedStateFilter('weekend_standby')}
                                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
-                                            selectedStateFilter === 'WEEKEND_STANDBY'
+                                            selectedStateFilter === 'weekend_standby'
                                                 ? 'bg-purple-600 text-white font-bold ring-2 ring-purple-300 shadow-md'
                                                 : 'bg-purple-950/40 text-purple-300 hover:bg-purple-950/60 border border-purple-500/40'
                                         }`}
                                     >
-                                        <div className="w-2 h-2 rounded-full bg-purple-400" />
-                                        <span>Weekend พัก ({stateCounts.WEEKEND_STANDBY})</span>
+                                        <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                                        <span>Weekend พัก ({stateCounts.weekend_standby})</span>
                                     </button>
                                 )}
                                 <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
@@ -4066,6 +4125,7 @@ export default function EasyMMasterDashboardPage() {
                                                 else if (selectedStateFilter === 'v2_3tier') isFilteredOut = port.engineTier !== 'v2_3tier';
                                                 else if (selectedStateFilter === 'legacy_1url') isFilteredOut = port.engineTier !== 'legacy_1url';
                                                 else if (selectedStateFilter === 'legacy_2url') isFilteredOut = port.engineTier !== 'legacy_2url';
+                                                else if (selectedStateFilter === 'weekend_standby') isFilteredOut = !isWk || (pState !== 'STATE_1_LIVE' && pState !== 'STATE_2_ONLINE' && pState !== 'STATE_3_STANDBY_12H' && !port.isRealRunning);
                                                 else isFilteredOut = pState !== selectedStateFilter;
                                             }
 
@@ -4082,9 +4142,13 @@ export default function EasyMMasterDashboardPage() {
                                                 className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
                                                     meta.colorBg
                                                 } ${
-                                                    port.isActive
-                                                        ? 'border-2 border-emerald-400 ring-1 ring-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.35)]'
-                                                        : 'border-2 border-zinc-500/70 opacity-60'
+                                                    isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H' || port.isRealRunning)
+                                                        ? 'border-2 border-purple-400 ring-2 ring-purple-400/50 shadow-[0_0_12px_rgba(192,132,252,0.65)] animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]'
+                                                        : (pState === 'STATE_9_NEVER_CONNECTED'
+                                                            ? 'border-2 border-dashed border-zinc-600/80'
+                                                            : (port.isActive
+                                                                ? 'border-2 border-emerald-400 ring-1 ring-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.35)]'
+                                                                : 'border-2 border-zinc-500/70 opacity-60'))
                                                 } ${
                                                     isHovered
                                                         ? 'scale-125 ring-2 ring-white z-30 shadow-2xl brightness-110'
@@ -4098,7 +4162,7 @@ export default function EasyMMasterDashboardPage() {
                                                         : (port.engineTier === 'legacy_2url'
                                                             ? '📡 2 URLs (WebSync Telemetry)'
                                                             : '🔑 1 URL (License Check Ping)')
-                                                }\nสถานะ: ${meta.label}\nสื่อสารล่าสุด: ${
+                                                }\nสถานะ: ${meta.label}${isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H') ? ' (🏖️ Weekend Standby ตลาดปิด)' : ''}\nสื่อสารล่าสุด: ${
                                                     !port.lastPing || port.hoursSinceLastPing >= 9999
                                                         ? 'ยังไม่เคยสื่อสาร (ยังไม่เริ่มรัน)'
                                                         : port.hoursSinceLastPing < 1
@@ -4141,9 +4205,13 @@ export default function EasyMMasterDashboardPage() {
                                                         })()}
                                                     </span>
                                                     {pState === 'STATE_1_LIVE' ? (
-                                                        <div className="relative flex items-center justify-center w-2 h-2 shrink-0" title="🟢 กำลังเปิดดูหน้าฟาร์มสด (Live Streaming)">
+                                                        <div className="relative flex items-center justify-center w-2 h-2 shrink-0" title="🟢 กำลังเปิดดูหน้าฟาร์มสด (Live Streaming 20s)">
                                                             <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-80 animate-ping" />
                                                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white shadow-[0_0_8px_rgba(255,255,255,1)]" />
+                                                        </div>
+                                                    ) : pState === 'STATE_2_ONLINE' ? (
+                                                        <div className="flex items-center justify-center w-2 h-2 shrink-0" title="🟢 ออนไลน์ปกติ (Smart Sleep)">
+                                                            <span className="inline-flex rounded-full h-1.5 w-1.5 bg-emerald-300 shadow-[0_0_4px_rgba(110,231,183,0.9)]" />
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -4216,7 +4284,7 @@ export default function EasyMMasterDashboardPage() {
                                                 </div>
 
                                                 <Badge variant="outline" className={`${meta.badgeBg} font-medium text-xs px-2.5 py-0.5 flex items-center gap-1.5`}>
-                                                    <div className={`w-2 h-2 rounded-full ${meta.dotClass}`} />
+                                                    {meta.dotClass ? <div className={`w-2 h-2 rounded-full ${meta.dotClass}`} /> : <span>{meta.icon}</span>}
                                                     <span>{meta.label}</span>
                                                 </Badge>
 
@@ -4300,9 +4368,11 @@ export default function EasyMMasterDashboardPage() {
                                                     }
                                                 </div>
                                                 <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
-                                                    isBalOk ? 'text-emerald-400' : 'text-amber-400'
+                                                    rawBal === 0 ? 'text-zinc-400' : (isBalOk ? 'text-emerald-400' : 'text-amber-400')
                                                 }`}>
-                                                    {isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC`}
+                                                    {rawBal === 0 
+                                                        ? '⚪ ยังไม่เติมเงิน (ทุนเป็น 0)' 
+                                                        : (isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต่ำกว่าเกณฑ์ (ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC)`)}
                                                 </span>
                                             </div>
 
@@ -4392,7 +4462,7 @@ export default function EasyMMasterDashboardPage() {
                                         {/* 1. สีพื้นหลังกล่อง */}
                                         <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
                                             <span className="font-bold text-foreground block border-b border-border/40 pb-1">
-                                                1. สีพื้นหลังกล่อง (State 1-7)
+                                                1. สีพื้นหลังกล่อง (State 1-9 ตามมิติเวลา)
                                             </span>
                                             <div className="space-y-1.5 text-[11px]">
                                                 <div className="flex items-center gap-2">
@@ -4401,41 +4471,46 @@ export default function EasyMMasterDashboardPage() {
                                                         <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_4px_white]" />
                                                     </div>
                                                     <div>
-                                                        <strong className="text-emerald-400">State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2m และมีคนกำลังเปิดดูหน้าฟาร์ม)
-                                                        <span className="text-[10px] text-white/80 block">*มีจุดขาวเรืองแสงกะพริบมุมขวาบน</span>
+                                                        <strong className="text-emerald-400">S1 เปิดดูฟาร์มสด:</strong> สตรีมมิ่งสด (Ping ≤ 2m, จุดขาวกะพริบ)
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0" />
-                                                    <span><strong>State 2A:</strong> Smart Sleep รันปกติ (ทุนผ่าน)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-600 shrink-0 flex items-center justify-center">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />
+                                                    </div>
+                                                    <span><strong className="text-emerald-400">S2 ออนไลน์ปกติ:</strong> Smart Sleep (Ping ≤ 15m, จุดเขียวนิ่ง)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-emerald-700 shrink-0" />
+                                                    <span><strong className="text-emerald-400">S3 สแตนด์บาย 12h:</strong> รอบตรวจสิทธิ์ (Ping 15m - 12h)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-3.5 h-3.5 rounded bg-amber-500 shrink-0" />
-                                                    <span><strong>State 2B:</strong> Smart Sleep แต่ทุนต่ำกว่าเกณฑ์</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-orange-400 shrink-0" />
-                                                    <span><strong>State 3:</strong> ขาดช่วงสั้น / รอตรวจ 12h (15m-12h)</span>
+                                                    <span><strong className="text-amber-400">S4 ชะลอตรวจสิทธิ์:</strong> เกินรอบตรวจเล็กน้อย (12h - 24h)</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-3.5 h-3.5 rounded bg-orange-600 shrink-0" />
-                                                    <span><strong>State 4:</strong> เกินรอบตรวจสิทธิ์ (12h-24h)</span>
+                                                    <span><strong className="text-orange-400">S5 หลุดการเชื่อมต่อ:</strong> ขาดการติดต่อ 24h - 48h</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-3.5 h-3.5 rounded bg-rose-600 shrink-0" />
-                                                    <span><strong>State 5:</strong> ออฟไลน์ขาดติดต่อ (24h - 7 วัน)</span>
+                                                    <span><strong className="text-rose-400">S6 หยุดรันแล้ว:</strong> ขาดการติดต่อ &gt; 48h - 7 วัน</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-3.5 h-3.5 rounded bg-zinc-600 shrink-0" />
-                                                    <span><strong>State 6:</strong> หยุดรันนาน (7 วัน - 30 วัน)</span>
+                                                    <span><strong className="text-zinc-300">S7 หยุดรันนาน:</strong> ขาดการติดต่อ 7 วัน - 30 วัน</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-3.5 h-3.5 rounded bg-zinc-800 shrink-0" />
-                                                    <span><strong>State 7:</strong> ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30 วัน)</span>
+                                                    <span><strong className="text-zinc-400">S8 ทิ้งร้าง:</strong> ขาดการติดต่อ &gt; 30 วัน</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 shrink-0" />
-                                                    <span><strong>Weekend:</strong> ตลาดปิดพักผ่อน (เสาร์-อาทิตย์)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-900/60 border border-dashed border-zinc-600 shrink-0" />
+                                                    <span><strong className="text-zinc-500">S9 ยังไม่เคยสื่อสาร:</strong> มี License แต่ยังไม่เริ่มรัน (0 ครั้ง)</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 border border-purple-400 shrink-0" />
+                                                    <span><strong className="text-purple-300">Weekend:</strong> ตลาดปิดพักผ่อน (ขอบเรืองแสงสีม่วง)</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -4581,13 +4656,14 @@ export default function EasyMMasterDashboardPage() {
                                         <SelectContent className="max-h-[360px]">
                                             <SelectItem value="all">สถานะพอร์ตทั้งหมด</SelectItem>
                                             <SelectItem value="state_1">🟢 S1: เปิดดูฟาร์มสด (≤ 2m)</SelectItem>
-                                            <SelectItem value="state_2a">🟢 S2A: รันปกติ Smart Sleep (ทุนผ่าน)</SelectItem>
-                                            <SelectItem value="state_2b">🟡 S2B: รันแต่ทุนต่ำกว่าเกณฑ์</SelectItem>
-                                            <SelectItem value="state_3">🟠 S3: ขาดช่วงสั้น / รอตรวจ 12h</SelectItem>
-                                            <SelectItem value="state_4">🔴 S4: เกินรอบตรวจสิทธิ์ (12-24h)</SelectItem>
-                                            <SelectItem value="state_5">🔴 S5: ออฟไลน์ขาดติดต่อ (1-7d)</SelectItem>
-                                            <SelectItem value="state_6">⚪ S6: หยุดรันนาน (7-30d)</SelectItem>
-                                            <SelectItem value="state_7">⚫ S7: ทิ้งร้าง / ยังไม่เริ่ม (&gt; 30d)</SelectItem>
+                                            <SelectItem value="state_2">🟢 S2: ออนไลน์ปกติ (Smart Sleep)</SelectItem>
+                                            <SelectItem value="state_3">🟢 S3: สแตนด์บายรอบตรวจ 12h</SelectItem>
+                                            <SelectItem value="state_4">🟡 S4: ชะลอตรวจสิทธิ์ (12-24h)</SelectItem>
+                                            <SelectItem value="state_5">🟠 S5: หลุดการเชื่อมต่อ (24-48h)</SelectItem>
+                                            <SelectItem value="state_6">🔴 S6: หยุดรันแล้ว (&gt; 48h-7d)</SelectItem>
+                                            <SelectItem value="state_7">⚪ S7: หยุดรันนาน (7-30d)</SelectItem>
+                                            <SelectItem value="state_8">⚫ S8: ทิ้งร้าง (&gt; 30d)</SelectItem>
+                                            <SelectItem value="state_9">🔲 S9: ยังไม่เคยสื่อสาร (0 ครั้ง)</SelectItem>
                                             <SelectItem value="weekend">🟣 Weekend: ตลาดปิดเสาร์-อาทิตย์</SelectItem>
                                             <SelectItem value="real_running">⚡ รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
                                             <SelectItem value="v2_3tier">⚡ v2.00 (Single Domain 3-Tier)</SelectItem>
@@ -4762,7 +4838,7 @@ export default function EasyMMasterDashboardPage() {
                                                 <TableHead className="text-right">Floating PnL</TableHead>
                                                 <TableHead className="text-right">Drawdown</TableHead>
                                                 <TableHead className="text-right">{fleetStats?.isWeekend ? `กำไร (${fleetStats.today.dateLabel})` : 'กำไรวันนี้'}</TableHead>
-                                                <TableHead className="text-center w-[155px]">เช็คสิทธิ์ล่าสุด / ถัดไป</TableHead>
+                                                <TableHead className="text-center w-[175px]">สื่อสารล่าสุด / รอบถัดไป</TableHead>
                                                 <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                                 <TableHead className="text-center">สถานะ</TableHead>
                                             </TableRow>
@@ -4848,12 +4924,16 @@ export default function EasyMMasterDashboardPage() {
                                                     </TableCell>
                                                     {(() => {
                                                         const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
+                                                        const lastCommStr = formatLastCommunication(port.lastPing, port.hoursSinceLastPing);
+                                                        const lastPingDate = port.lastPing ? new Date(port.lastPing) : null;
+                                                        const timeStr = lastPingDate ? lastPingDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }) : '';
+
                                                         return (
                                                             <TableCell className="text-center font-mono">
                                                                 <div className="flex flex-col items-center gap-0.5" title={checkInfo.fullTooltip}>
-                                                                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
-                                                                        <KeyRound className="w-3 h-3 text-amber-400 shrink-0" />
-                                                                        <span>{checkInfo.lastCheckStr}</span>
+                                                                    <div className="flex items-center gap-1 text-[11px] font-medium text-foreground whitespace-nowrap" title={lastPingDate ? `สื่อสารล่าสุด: ${lastPingDate.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} น.` : 'ยังไม่เคยสื่อสาร'}>
+                                                                        <Activity className="w-3 h-3 text-cyan-400 shrink-0" />
+                                                                        <span>{lastCommStr}{timeStr ? ` (${timeStr} น.)` : ''}</span>
                                                                     </div>
                                                                     <span className={`inline-flex items-center gap-1 text-[10px] font-sans px-1.5 py-0.5 rounded border whitespace-nowrap ${checkInfo.badgeClass}`}>
                                                                         <Clock className="w-2.5 h-2.5 shrink-0" />
@@ -4868,40 +4948,52 @@ export default function EasyMMasterDashboardPage() {
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            {port.runStatus === 'running' ? (
-                                                                <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
-                                                                    🟢 รันจริง {port.isOnline ? '(สด)' : '(<48h)'}
-                                                                </Badge>
-                                                            ) : port.runStatus === 'mismatch_gold' ? (
-                                                                <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/40 text-[9px] px-1.5 py-0 font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
-                                                                    🥇 รันทองคำ (EasyGold)
-                                                                </Badge>
-                                                            ) : port.runStatus === 'offline_48h' ? (
-                                                                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน` : 'ยังไม่เคยเริ่มรัน'}>
-                                                                    ⏸️ ขาดติดต่อ ({port.lastPing && port.hoursSinceLastPing < 9999 ? `${port.hoursSinceLastPing}h` : 'ยังไม่รัน'})
-                                                                </Badge>
-                                                            ) : port.runStatus === 'insufficient_balance' ? (
-                                                                <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 text-[9px] px-1.5 py-0" title={`ทุนไม่ถึงเกณฑ์ (มี ${port.balance.toLocaleString()} / ต้องการ ${port.requiredBalanceUSC.toLocaleString()} USC)`}>
-                                                                    ⚠️ ทุนไม่ถึง
-                                                                </Badge>
-                                                            ) : port.runStatus === 'no_telemetry' ? (
-                                                                <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0">
-                                                                    ⚪ ยังไม่เริ่มรัน
-                                                                </Badge>
-                                                            ) : port.isTester ? (
-                                                                <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-[9px] px-1.5 py-0">
-                                                                    🧪 Tester
-                                                                </Badge>
-                                                            ) : (
-                                                                <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0">
-                                                                    ⚪ ออฟไลน์
-                                                                </Badge>
-                                                            )}
-                                                            {!port.isActive ? (
-                                                                <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
-                                                                    ⛔ Inactive
-                                                                </Badge>
-                                                            ) : null}
+                                                            {(() => {
+                                                                const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                                                                const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                                                const meta = PORT_STATE_META[pState] || PORT_STATE_META.STATE_3_STANDBY_12H;
+                                                                return (
+                                                                    <>
+                                                                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-medium whitespace-nowrap ${meta.badgeBg}`}>
+                                                                            {meta.icon} {meta.shortLabel}
+                                                                        </Badge>
+                                                                        {port.runStatus === 'running' ? (
+                                                                            <span className="text-[9px] text-emerald-400 font-sans">
+                                                                                🟢 รันจริง {port.isOnline ? '(สด)' : '(<48h)'}
+                                                                            </span>
+                                                                        ) : port.runStatus === 'mismatch_gold' ? (
+                                                                            <span className="text-[9px] text-amber-300 font-sans" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
+                                                                                🥇 รันทองคำ
+                                                                            </span>
+                                                                        ) : port.runStatus === 'offline_48h' ? (
+                                                                            <span className="text-[9px] text-amber-400 font-sans" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน` : 'ยังไม่เคยเริ่มรัน'}>
+                                                                                ⏸️ ขาดติดต่อ ({port.lastPing && port.hoursSinceLastPing < 9999 ? `${port.hoursSinceLastPing}h` : 'ยังไม่รัน'})
+                                                                            </span>
+                                                                        ) : port.runStatus === 'insufficient_balance' ? (
+                                                                            <span className="text-[9px] text-red-400 font-sans" title={`ทุนไม่ถึงเกณฑ์ (มี ${port.balance.toLocaleString()} / ต้องการ ${port.requiredBalanceUSC.toLocaleString()} USC)`}>
+                                                                                ⚠️ ทุนไม่ถึง
+                                                                            </span>
+                                                                        ) : port.runStatus === 'no_telemetry' ? (
+                                                                            <span className="text-[9px] text-zinc-400 font-sans">
+                                                                                ⚪ ยังไม่เริ่มรัน
+                                                                            </span>
+                                                                        ) : port.isTester ? (
+                                                                            <span className="text-[9px] text-orange-400 font-sans">
+                                                                                🧪 Tester
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-[9px] text-zinc-400 font-sans">
+                                                                                ⚪ ออฟไลน์
+                                                                            </span>
+                                                                        )}
+                                                                        {!port.isActive ? (
+                                                                            <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
+                                                                                ⛔ Inactive
+                                                                            </Badge>
+                                                                        ) : null}
+                                                                    </>
+                                                                );
+                                                            })()}
                                                             {port.engineTier === 'v2_3tier' ? (
                                                                 <span className="inline-flex items-center gap-1 text-[8px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 (3-Tier)
@@ -4961,7 +5053,7 @@ export default function EasyMMasterDashboardPage() {
                                     <TableHead className="text-right">Floating PnL</TableHead>
                                     <TableHead className="text-right">Max DD</TableHead>
                                     <TableHead className="text-right">{fleetStats?.isWeekend ? `กำไร (${fleetStats.today.dateLabel})` : 'กำไรวันนี้'}</TableHead>
-                                    <TableHead className="text-center w-[155px]">เช็คสิทธิ์ล่าสุด / ถัดไป</TableHead>
+                                    <TableHead className="text-center w-[175px]">สื่อสารล่าสุด / รอบถัดไป</TableHead>
                                     <TableHead className="text-center">เวอร์ชัน EA</TableHead>
                                     <TableHead className="text-center">สถานะ</TableHead>
                                 </TableRow>
@@ -5056,12 +5148,16 @@ export default function EasyMMasterDashboardPage() {
                                         </TableCell>
                                         {(() => {
                                             const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
+                                            const lastCommStr = formatLastCommunication(port.lastPing, port.hoursSinceLastPing);
+                                            const lastPingDate = port.lastPing ? new Date(port.lastPing) : null;
+                                            const timeStr = lastPingDate ? lastPingDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }) : '';
+
                                             return (
                                                 <TableCell className="text-center font-mono">
                                                     <div className="flex flex-col items-center gap-0.5" title={checkInfo.fullTooltip}>
-                                                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
-                                                            <KeyRound className="w-3 h-3 text-amber-400 shrink-0" />
-                                                            <span>{checkInfo.lastCheckStr}</span>
+                                                        <div className="flex items-center gap-1 text-[11px] font-medium text-foreground whitespace-nowrap" title={lastPingDate ? `สื่อสารล่าสุด: ${lastPingDate.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} น.` : 'ยังไม่เคยสื่อสาร'}>
+                                                            <Activity className="w-3 h-3 text-cyan-400 shrink-0" />
+                                                            <span>{lastCommStr}{timeStr ? ` (${timeStr} น.)` : ''}</span>
                                                         </div>
                                                         <span className={`inline-flex items-center gap-1 text-[10px] font-sans px-1.5 py-0.5 rounded border whitespace-nowrap ${checkInfo.badgeClass}`}>
                                                             <Clock className="w-2.5 h-2.5 shrink-0" />
@@ -5076,40 +5172,52 @@ export default function EasyMMasterDashboardPage() {
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className="flex flex-col items-center gap-1">
-                                                {port.runStatus === 'running' ? (
-                                                    <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0">
-                                                        🟢 รันจริง {port.isOnline ? '(สด)' : '(<48h)'}
-                                                    </Badge>
-                                                ) : port.runStatus === 'mismatch_gold' ? (
-                                                    <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/40 text-[9px] px-1.5 py-0 font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
-                                                        🥇 รันทองคำ (EasyGold)
-                                                    </Badge>
-                                                ) : port.runStatus === 'offline_48h' ? (
-                                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[9px] px-1.5 py-0" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน` : 'ยังไม่เคยเริ่มรัน'}>
-                                                        ⏸️ ขาดติดต่อ ({port.lastPing && port.hoursSinceLastPing < 9999 ? `${port.hoursSinceLastPing}h` : 'ยังไม่รัน'})
-                                                    </Badge>
-                                                ) : port.runStatus === 'insufficient_balance' ? (
-                                                    <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 text-[9px] px-1.5 py-0" title={`ทุนไม่ถึงเกณฑ์ (มี ${port.balance.toLocaleString()} / ต้องการ ${port.requiredBalanceUSC.toLocaleString()} USC)`}>
-                                                        ⚠️ ทุนไม่ถึง
-                                                    </Badge>
-                                                ) : port.runStatus === 'no_telemetry' ? (
-                                                    <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0">
-                                                        ⚪ ยังไม่เริ่มรัน
-                                                    </Badge>
-                                                ) : port.isTester ? (
-                                                    <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-[9px] px-1.5 py-0">
-                                                        🧪 Tester
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0">
-                                                        ⚪ ออฟไลน์
-                                                    </Badge>
-                                                )}
-                                                {!port.isActive ? (
-                                                    <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
-                                                        ⛔ Inactive
-                                                    </Badge>
-                                                ) : null}
+                                                {(() => {
+                                                    const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                                                    const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                                    const meta = PORT_STATE_META[pState] || PORT_STATE_META.STATE_3_STANDBY_12H;
+                                                    return (
+                                                        <>
+                                                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-medium whitespace-nowrap ${meta.badgeBg}`}>
+                                                                {meta.icon} {meta.shortLabel}
+                                                            </Badge>
+                                                            {port.runStatus === 'running' ? (
+                                                                <span className="text-[9px] text-emerald-400 font-sans">
+                                                                    🟢 รันจริง {port.isOnline ? '(สด)' : '(<48h)'}
+                                                                </span>
+                                                            ) : port.runStatus === 'mismatch_gold' ? (
+                                                                <span className="text-[9px] text-amber-300 font-sans" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
+                                                                    🥇 รันทองคำ
+                                                                </span>
+                                                            ) : port.runStatus === 'offline_48h' ? (
+                                                                <span className="text-[9px] text-amber-400 font-sans" title={port.lastPing && port.hoursSinceLastPing < 9999 ? `ขาดติดต่อ ${Math.round(port.hoursSinceLastPing / 24)} วัน` : 'ยังไม่เคยเริ่มรัน'}>
+                                                                    ⏸️ ขาดติดต่อ ({port.lastPing && port.hoursSinceLastPing < 9999 ? `${port.hoursSinceLastPing}h` : 'ยังไม่รัน'})
+                                                                </span>
+                                                            ) : port.runStatus === 'insufficient_balance' ? (
+                                                                <span className="text-[9px] text-red-400 font-sans" title={`ทุนไม่ถึงเกณฑ์ (มี ${port.balance.toLocaleString()} / ต้องการ ${port.requiredBalanceUSC.toLocaleString()} USC)`}>
+                                                                    ⚠️ ทุนไม่ถึง
+                                                                </span>
+                                                            ) : port.runStatus === 'no_telemetry' ? (
+                                                                <span className="text-[9px] text-zinc-400 font-sans">
+                                                                    ⚪ ยังไม่เริ่มรัน
+                                                                </span>
+                                                            ) : port.isTester ? (
+                                                                <span className="text-[9px] text-orange-400 font-sans">
+                                                                    🧪 Tester
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[9px] text-zinc-400 font-sans">
+                                                                    ⚪ ออฟไลน์
+                                                                </span>
+                                                            )}
+                                                            {!port.isActive ? (
+                                                                <Badge variant="outline" className="text-red-400 border-red-500/30 bg-red-500/10 text-[9px] px-1.5 py-0">
+                                                                    ⛔ Inactive
+                                                                </Badge>
+                                                            ) : null}
+                                                        </>
+                                                    );
+                                                })()}
                                                 {port.engineTier === 'v2_3tier' ? (
                                                     <span className="inline-flex items-center gap-1 text-[8px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 (3-Tier)
@@ -5274,14 +5382,23 @@ export default function EasyMMasterDashboardPage() {
                                     </div>
 
                                     {(() => {
+                                        const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
+                                        const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                        const meta = PORT_STATE_META[pState] || PORT_STATE_META.STATE_3_STANDBY_12H;
                                         const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
+                                        const lastCommStr = formatLastCommunication(port.lastPing, port.hoursSinceLastPing);
+                                        const lastPingDate = port.lastPing ? new Date(port.lastPing) : null;
+                                        const timeStr = lastPingDate ? lastPingDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }) : '';
+
                                         return (
                                             <div className="pt-2 border-t border-border/40 space-y-1.5" title={checkInfo.fullTooltip}>
                                                 <div className="flex items-center justify-between text-[11px]">
                                                     <span className="text-muted-foreground flex items-center gap-1">
-                                                        <KeyRound className="w-3 h-3 text-amber-400 shrink-0" /> ตรวจสิทธิ์ล่าสุด:
+                                                        <Activity className="w-3 h-3 text-cyan-400 shrink-0" /> สื่อสารล่าสุด:
                                                     </span>
-                                                    <span className="font-mono text-foreground font-medium">{checkInfo.lastCheckStr}</span>
+                                                    <span className="font-mono text-foreground font-medium">
+                                                        {lastCommStr}{timeStr ? ` (${timeStr} น.)` : ''}
+                                                    </span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[11px]">
                                                     <span className="text-muted-foreground flex items-center gap-1">
@@ -5290,6 +5407,12 @@ export default function EasyMMasterDashboardPage() {
                                                     <span className={`inline-flex items-center gap-1 font-mono px-1.5 py-0.5 rounded border text-[10px] ${checkInfo.badgeClass}`}>
                                                         {checkInfo.countdownText}
                                                     </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[11px] pt-1">
+                                                    <span className="text-muted-foreground">สถานะ State:</span>
+                                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-medium ${meta.badgeBg}`}>
+                                                        {meta.icon} {meta.shortLabel}
+                                                    </Badge>
                                                 </div>
                                             </div>
                                         );
