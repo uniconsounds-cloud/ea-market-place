@@ -892,6 +892,44 @@ export default function EasyMMasterDashboardPage() {
 
             const statusMap = new Map((portStatuses || []).map(s => [s.port_number?.toString(), s]));
 
+            // D. Fetch live active orders from farm_active_orders (guarantees real order metrics and prevents telemetry state loss)
+            const { data: activeOrdersRaw } = await supabase
+                .from('farm_active_orders')
+                .select('port_number, type, raw_lot_size, current_pnl, updated_at');
+
+            const activeOrdersSummaryMap = new Map<string, {
+                buyCount: number;
+                sellCount: number;
+                totalLots: number;
+                floatingPnl: number;
+                orderCount: number;
+                latestOrderUpdate: number;
+            }>();
+
+            (activeOrdersRaw || []).forEach(o => {
+                const pNum = o.port_number?.toString();
+                if (!pNum) return;
+                const existing = activeOrdersSummaryMap.get(pNum) || {
+                    buyCount: 0,
+                    sellCount: 0,
+                    totalLots: 0,
+                    floatingPnl: 0,
+                    orderCount: 0,
+                    latestOrderUpdate: 0
+                };
+                existing.orderCount++;
+                existing.totalLots += Number(o.raw_lot_size) || 0;
+                existing.floatingPnl += Number(o.current_pnl) || 0;
+                const oType = String(o.type || '').toUpperCase();
+                if (oType === 'BUY') existing.buyCount++;
+                else if (oType === 'SELL') existing.sellCount++;
+                if (o.updated_at) {
+                    const upMs = new Date(o.updated_at).getTime();
+                    if (upMs > existing.latestOrderUpdate) existing.latestOrderUpdate = upMs;
+                }
+                activeOrdersSummaryMap.set(pNum, existing);
+            });
+
             // D. Fetch accumulated daily history (paginated to include all 3,900+ rows)
             let allDailyHistory: any[] = [];
             let histPage = 0;
@@ -1245,7 +1283,10 @@ export default function EasyMMasterDashboardPage() {
                     const diffTime = Math.abs(now.getTime() - startDt.getTime());
                     const activeDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-                    const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
+                    const activeOrderSummary = activeOrdersSummaryMap.get(accNum);
+                    const hasActiveOrders = !!activeOrderSummary && activeOrderSummary.orderCount > 0;
+
+                    const hasUniversalTelemetry = hasActiveOrders || !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
 
                     // Check online: active ping or real telemetry sync
                     const pingTime = status?.last_ping ? new Date(status.last_ping).getTime() : 0;
@@ -1263,6 +1304,9 @@ export default function EasyMMasterDashboardPage() {
 
                     if ((hasRecentServerTime || isRecentTelemetrySync) && updateTime > lastActive) {
                         lastActive = updateTime;
+                    }
+                    if (hasActiveOrders && activeOrderSummary.latestOrderUpdate > lastActive) {
+                        lastActive = activeOrderSummary.latestOrderUpdate;
                     }
 
                     const isOnline = lastActive > 0 && (now.getTime() - lastActive) < 30 * 60 * 1000;
@@ -1308,13 +1352,20 @@ export default function EasyMMasterDashboardPage() {
                     const rawBalVal = Number(status?.balance) || 0;
                     const rawEqVal = Number(status?.equity) || 0;
                     let resolvedFloatingPnl = Number(status?.floating_pnl) || 0;
-                    if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
+                    if (resolvedFloatingPnl === 0 && hasActiveOrders) {
+                        resolvedFloatingPnl = Number(activeOrderSummary.floatingPnl.toFixed(2));
+                    } else if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
                         resolvedFloatingPnl = Number((rawEqVal - rawBalVal).toFixed(2));
                     }
 
+                    let resolvedEquity = rawEqVal;
+                    if ((resolvedEquity === 0 || resolvedEquity === rawBalVal) && resolvedFloatingPnl !== 0 && rawBalVal > 0) {
+                        resolvedEquity = Number((rawBalVal + resolvedFloatingPnl).toFixed(2));
+                    }
+
                     let calculatedDD = 0;
-                    if (rawBalVal > 0 && rawEqVal > 0 && rawEqVal < rawBalVal) {
-                        calculatedDD = Number((((rawBalVal - rawEqVal) / rawBalVal) * 100).toFixed(1));
+                    if (rawBalVal > 0 && resolvedEquity > 0 && resolvedEquity < rawBalVal) {
+                        calculatedDD = Number((((rawBalVal - resolvedEquity) / rawBalVal) * 100).toFixed(1));
                     }
                     const statusDailyDD = Math.max(Number(status?.daily_max_drawdown) || 0, calculatedDD);
                     const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
@@ -1333,7 +1384,7 @@ export default function EasyMMasterDashboardPage() {
                     let engineTier: 'v2_3tier' | 'legacy_2url' | 'legacy_1url' = 'legacy_1url';
                     if (isV2) {
                         engineTier = 'v2_3tier';
-                    } else if (hasUniversalTelemetry || (status?.server_time != null)) {
+                    } else if (hasUniversalTelemetry || hasActiveOrders || (status?.server_time != null)) {
                         engineTier = 'legacy_2url';
                     } else {
                         engineTier = 'legacy_1url';
@@ -1414,13 +1465,19 @@ export default function EasyMMasterDashboardPage() {
                         lifecycleStatus,
                         activeDays,
                         balance: status?.balance || 0,
-                        equity: status?.equity || 0,
+                        equity: resolvedEquity > 0 ? resolvedEquity : (status?.equity || 0),
                         floatingPnl: resolvedFloatingPnl,
                         maxDrawdown: resolvedMaxDD,
                         dailyMaxDrawdown: resolvedDailyDD,
-                        totalLots: status?.total_lots || 0,
-                        buyCount: status?.buy_count || 0,
-                        sellCount: status?.sell_count || 0,
+                        totalLots: (status?.total_lots != null && Number(status.total_lots) > 0) 
+                            ? Number(status.total_lots) 
+                            : (activeOrderSummary ? Number(activeOrderSummary.totalLots.toFixed(2)) : 0),
+                        buyCount: (status?.buy_count != null && Number(status.buy_count) > 0) 
+                            ? Number(status.buy_count) 
+                            : (activeOrderSummary?.buyCount || 0),
+                        sellCount: (status?.sell_count != null && Number(status.sell_count) > 0) 
+                            ? Number(status.sell_count) 
+                            : (activeOrderSummary?.sellCount || 0),
                         accountType: resolvedAccType,
                         isOnline,
                         lastPing: effectiveLastPing,
@@ -1472,7 +1529,9 @@ export default function EasyMMasterDashboardPage() {
                         const startDt = new Date(status.created_at || status.updated_at || new Date());
                         const activeDays = Math.max(1, Math.ceil(Math.abs(now.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24)));
                         
-                        const hasUniversalTelemetry = !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
+                        const activeOrderSummary = activeOrdersSummaryMap.get(accNum);
+                        const hasActiveOrders = !!activeOrderSummary && activeOrderSummary.orderCount > 0;
+                        const hasUniversalTelemetry = hasActiveOrders || !!(status?.server_time || status?.current_price || (status?.total_lots && status.total_lots > 0) || (status?.today_closed_lots && status.today_closed_lots > 0) || (status?.buy_count && status.buy_count > 0) || (status?.sell_count && status.sell_count > 0));
 
                         let isOnline = false;
                         const pingT = status.last_ping ? new Date(status.last_ping).getTime() : 0;
@@ -1485,6 +1544,9 @@ export default function EasyMMasterDashboardPage() {
 
                         if ((hasRecentServerTime || isRecentTelemetrySync) && updateT > lastActive) {
                             lastActive = updateT;
+                        }
+                        if (hasActiveOrders && activeOrderSummary.latestOrderUpdate > lastActive) {
+                            lastActive = activeOrderSummary.latestOrderUpdate;
                         }
 
                         if (lastActive > 0) {
@@ -1499,13 +1561,20 @@ export default function EasyMMasterDashboardPage() {
                         const rawBalVal = Number(status.balance) || 0;
                         const rawEqVal = Number(status.equity) || 0;
                         let resolvedFloatingPnl = Number(status.floating_pnl) || 0;
-                        if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
+                        if (resolvedFloatingPnl === 0 && hasActiveOrders) {
+                            resolvedFloatingPnl = Number(activeOrderSummary.floatingPnl.toFixed(2));
+                        } else if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
                             resolvedFloatingPnl = Number((rawEqVal - rawBalVal).toFixed(2));
                         }
 
+                        let resolvedEquity = rawEqVal;
+                        if ((resolvedEquity === 0 || resolvedEquity === rawBalVal) && resolvedFloatingPnl !== 0 && rawBalVal > 0) {
+                            resolvedEquity = Number((rawBalVal + resolvedFloatingPnl).toFixed(2));
+                        }
+
                         let calculatedDD = 0;
-                        if (rawBalVal > 0 && rawEqVal > 0 && rawEqVal < rawBalVal) {
-                            calculatedDD = Number((((rawBalVal - rawEqVal) / rawBalVal) * 100).toFixed(1));
+                        if (rawBalVal > 0 && resolvedEquity > 0 && resolvedEquity < rawBalVal) {
+                            calculatedDD = Number((((rawBalVal - resolvedEquity) / rawBalVal) * 100).toFixed(1));
                         }
                         const statusDailyDD = Math.max(Number(status.daily_max_drawdown) || 0, calculatedDD);
                         const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
@@ -1546,13 +1615,19 @@ export default function EasyMMasterDashboardPage() {
                             lifecycleStatus: isRealRunning ? 'active' : 'dormant',
                             activeDays,
                             balance: status.balance || 0,
-                            equity: status.equity || 0,
+                            equity: resolvedEquity > 0 ? resolvedEquity : (status.equity || 0),
                             floatingPnl: resolvedFloatingPnl,
                             maxDrawdown: resolvedMaxDD,
                             dailyMaxDrawdown: resolvedDailyDD,
-                            totalLots: status.total_lots || 0,
-                            buyCount: status.buy_count || 0,
-                            sellCount: status.sell_count || 0,
+                            totalLots: (status?.total_lots != null && Number(status.total_lots) > 0) 
+                                ? Number(status.total_lots) 
+                                : (activeOrderSummary ? Number(activeOrderSummary.totalLots.toFixed(2)) : 0),
+                            buyCount: (status?.buy_count != null && Number(status.buy_count) > 0) 
+                                ? Number(status.buy_count) 
+                                : (activeOrderSummary?.buyCount || 0),
+                            sellCount: (status?.sell_count != null && Number(status.sell_count) > 0) 
+                                ? Number(status.sell_count) 
+                                : (activeOrderSummary?.sellCount || 0),
                             accountType: status.account_type || 'USC',
                             isOnline,
                             lastPing: effectiveLastPing,

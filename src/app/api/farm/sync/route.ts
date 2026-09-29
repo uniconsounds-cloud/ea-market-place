@@ -25,24 +25,60 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid payload structure' }, { status: 400 });
         }
 
-        // --- Process Port Status if provided ---
-        if (port_status) {
-            const { error: portStatusError } = await supabaseAdmin
-                .from('farm_port_status')
-                .upsert({
-                    port_number: port_number,
-                    balance: port_status.balance || 0,
-                    equity: port_status.equity || 0,
-                    margin_level: port_status.margin_level || 0,
-                    account_type: port_status.account_type || 'USD',
-                    daily_max_drawdown: port_status.max_drawdown || port_status.daily_max_drawdown || 0,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'port_number' });
+        // Compute active order aggregates
+        let totalLots = 0;
+        let floatingPnl = 0;
+        let buyCount = 0;
+        let sellCount = 0;
+        orders.forEach((o: any) => {
+            totalLots += Number(o.raw_lot_size || o.lot || 0);
+            floatingPnl += Number(o.current_pnl || 0);
+            const oType = String(o.type || '').toUpperCase();
+            if (oType === 'BUY') buyCount++;
+            else if (oType === 'SELL') sellCount++;
+        });
 
-            if (portStatusError) {
-                console.error('Farm Sync Error (Port Status):', portStatusError);
-                // We don't fail the whole sync if just status fails, but log it
-            }
+        // --- Process Port Status ---
+        const { data: existingStatus } = await supabaseAdmin
+            .from('farm_port_status')
+            .select('balance, equity, daily_max_drawdown, account_type')
+            .eq('port_number', String(port_number))
+            .maybeSingle();
+
+        const rawBal = Number(port_status?.balance) || Number(existingStatus?.balance) || 0;
+        const resolvedFloating = Number(floatingPnl.toFixed(2));
+        const resolvedEquity = (port_status?.equity && Number(port_status.equity) > 0)
+            ? Number(port_status.equity)
+            : (rawBal > 0 ? Number((rawBal + resolvedFloating).toFixed(2)) : (Number(existingStatus?.equity) || 0));
+
+        let calculatedDD = 0;
+        if (rawBal > 0 && resolvedEquity < rawBal) {
+            calculatedDD = Number((((rawBal - resolvedEquity) / rawBal) * 100).toFixed(1));
+        }
+        const existingDD = Number(existingStatus?.daily_max_drawdown) || 0;
+        const resolvedDD = Math.max(existingDD, port_status?.max_drawdown || 0, port_status?.daily_max_drawdown || 0, calculatedDD);
+
+        const { error: portStatusError } = await supabaseAdmin
+            .from('farm_port_status')
+            .upsert({
+                port_number: String(port_number),
+                balance: rawBal,
+                equity: resolvedEquity,
+                floating_pnl: resolvedFloating,
+                buy_count: buyCount,
+                sell_count: sellCount,
+                total_lots: Number(totalLots.toFixed(2)),
+                margin_level: port_status?.margin_level || 0,
+                account_type: port_status?.account_type || existingStatus?.account_type || 'USC',
+                daily_max_drawdown: resolvedDD,
+                server_time: Math.floor(Date.now() / 1000),
+                is_online: true,
+                last_ping: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'port_number' });
+
+        if (portStatusError) {
+            console.error('Farm Sync Error (Port Status):', portStatusError);
         }
 
         // Process orders for upsertion

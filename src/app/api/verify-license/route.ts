@@ -231,10 +231,14 @@ export async function POST(req: Request) {
 
                     const numEquity = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
                         ? Number(equity)
-                        : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal);
+                        : (existingStatus.floating_pnl != null && Number(existingStatus.floating_pnl) !== 0
+                            ? Number((numBal + Number(existingStatus.floating_pnl)).toFixed(2))
+                            : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal));
 
                     // Automatic calculation of Floating PnL & Drawdowns from Balance & Equity
-                    const calculatedFloatingPnl = Number((numEquity - numBal).toFixed(2));
+                    const calculatedFloatingPnl = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
+                        ? Number((numEquity - numBal).toFixed(2))
+                        : (existingStatus.floating_pnl != null ? Number(existingStatus.floating_pnl) : Number((numEquity - numBal).toFixed(2)));
                     let currentDD = 0;
                     if (numBal > 0 && numEquity < numBal) {
                         currentDD = Number((((numBal - numEquity) / numBal) * 100).toFixed(1));
