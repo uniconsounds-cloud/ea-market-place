@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabaseClient';
 export const runtime = 'edge';
 
 
-// Calculates Forex market trading date (rolls over at 05:00 AM Bangkok)
+// Calculates Forex market trading date (rolls over at 05:00 AM Bangkok / 17:00 New York)
+// Forex & Gold markets operate Mon-Fri. Weekends (Friday 17:00 NY to Sunday 17:00 NY) are closed.
 function getMarketTradingDate(date: Date = new Date()): Date {
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/New_York',
@@ -26,12 +27,33 @@ function getMarketTradingDate(date: Date = new Date()): Date {
     const day = parseInt(partMap.day, 10);
     const hour = parseInt(partMap.hour, 10);
 
-    // Forex daily candle closes at 17:00 (5:00 PM) New York time (EDT: 04:00 BKK, EST: 05:00 BKK)
-    const marketDate = new Date(year, month, day);
-    if (hour >= 17) {
-        marketDate.setDate(marketDate.getDate() + 1);
+    const d = new Date(year, month, day);
+    const dayOfWeek = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+
+    if (dayOfWeek === 5) {
+        // Friday: after 17:00 NY, the week's trading is complete.
+        // It stays Friday's market date until Sunday 17:00 NY.
+        return d;
+    } else if (dayOfWeek === 6) {
+        // Saturday: market is closed, refers to Friday's market date
+        d.setDate(d.getDate() - 1);
+        return d;
+    } else if (dayOfWeek === 0) {
+        // Sunday: before 17:00 NY, market is closed (refers to Friday).
+        // At or after 17:00 NY, new trading week opens for Monday!
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1); // Monday
+        } else {
+            d.setDate(d.getDate() - 2); // Friday
+        }
+        return d;
+    } else {
+        // Monday - Thursday: closes at 17:00 NY, rolling over to next day
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1);
+        }
+        return d;
     }
-    return marketDate;
 }
 
 function getMarketTradingDateStr(date: Date = new Date()): string {

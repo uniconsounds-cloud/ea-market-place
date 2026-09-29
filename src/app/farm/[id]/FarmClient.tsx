@@ -40,12 +40,27 @@ function getMarketTradingDate(date: Date = new Date()): Date {
     const day = parseInt(partMap.day, 10);
     const hour = parseInt(partMap.hour, 10);
 
-    // Forex daily candle closes at 17:00 (5:00 PM) New York time (EDT: 04:00 BKK, EST: 05:00 BKK)
-    const marketDate = new Date(year, month, day);
-    if (hour >= 17) {
-        marketDate.setDate(marketDate.getDate() + 1);
+    const d = new Date(year, month, day);
+    const dayOfWeek = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+
+    if (dayOfWeek === 5) {
+        return d; // Friday: stays Friday after 17:00 NY until Sunday 17:00 NY
+    } else if (dayOfWeek === 6) {
+        d.setDate(d.getDate() - 1); // Saturday -> Friday
+        return d;
+    } else if (dayOfWeek === 0) {
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1); // Sunday 17:00+ NY -> Monday
+        } else {
+            d.setDate(d.getDate() - 2); // Sunday daytime -> Friday
+        }
+        return d;
+    } else {
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1);
+        }
+        return d;
     }
-    return marketDate;
 }
 
 // ==========================================
@@ -864,11 +879,14 @@ export default function FarmClient({
                 
                 const dayOfWeek = curr.getDay(); // 0: Sun, 6: Sat
                 const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isForexOrGold = !portStatus?.asset_type || portStatus?.asset_type === 'FOREX' || portStatus?.asset_type === 'GOLD';
 
                 if (historyMap.has(dateStr)) {
                     const item = historyMap.get(dateStr)!;
-                    if (isWeekend && Math.abs(Number(item.profit)) < 0.01) {
-                        // skip zero-profit weekend
+                    // Forex & Gold markets are strictly closed on Saturday & Sunday.
+                    // Always skip weekends for Forex/Gold, and skip zero-profit weekends for others.
+                    if (isWeekend && (isForexOrGold || Math.abs(Number(item.profit)) < 0.01)) {
+                        // skip weekend
                     } else {
                         filledList.push(item);
                     }
