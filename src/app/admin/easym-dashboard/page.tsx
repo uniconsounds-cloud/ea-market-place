@@ -93,6 +93,7 @@ interface EasyMPortItem {
     telemetryType: 'full_sync' | 'license_only' | 'none';
     engineTier: 'v2_3tier' | 'legacy_2url' | 'legacy_1url';
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
+    lastViewedAt?: string | null;
     state?: EasyMPortState;
 }
 
@@ -125,7 +126,7 @@ export const PORT_STATE_META: Record<EasyMPortState, PortStateMeta> = {
         id: 'STATE_1_LIVE',
         label: 'State 1: เปิดดูฟาร์มสด',
         shortLabel: 'S1 สด ≤2m',
-        description: 'กำลังเปิดดูหน้าฟาร์ม หรือสื่อสาร telemetry สดต่อเนื่อง (Ping ≤ 2 นาที)',
+        description: 'มีผู้กำลังเปิดดูหน้าฟาร์มสด และ EA กำลังสตรีมข้อมูลสดต่อเนื่อง (Ping ≤ 2 นาที)',
         colorBg: 'bg-emerald-500',
         colorBorder: 'border-emerald-400',
         colorText: 'text-white',
@@ -245,7 +246,19 @@ export function checkIsMarketWeekend(date: Date = new Date()): boolean {
     return false;
 }
 
-export function resolvePortState(port: { hoursSinceLastPing: number; balance: number; accountType: string; requiredBalanceUSC: number; lastPing?: string | null }, isWeekend: boolean, _nowMs?: number): EasyMPortState {
+export function resolvePortState(
+    port: {
+        hoursSinceLastPing: number;
+        balance: number;
+        accountType: string;
+        requiredBalanceUSC: number;
+        lastPing?: string | null;
+        engineTier?: string;
+        lastViewedAt?: string | null;
+    },
+    isWeekend: boolean,
+    _nowMs?: number
+): EasyMPortState {
     if (port.hoursSinceLastPing >= 9999 || port.hoursSinceLastPing < 0) {
         return 'STATE_7_ABANDONED';
     }
@@ -254,12 +267,29 @@ export function resolvePortState(port: { hoursSinceLastPing: number; balance: nu
         return 'WEEKEND_STANDBY';
     }
 
-    const minsSince = port.hoursSinceLastPing * 60;
+    const nowTime = _nowMs || Date.now();
+    let minsSince = port.hoursSinceLastPing * 60;
+    if (port.lastPing) {
+        const pingMs = new Date(port.lastPing).getTime();
+        if (!isNaN(pingMs)) {
+            minsSince = Math.max(0, (nowTime - pingMs) / (1000 * 60));
+        }
+    }
+
     const rawBal = Number(port.balance) || 0;
     const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
     const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
 
-    if (minsSince <= 2) {
+    // A port is in STATE_1_LIVE ONLY IF:
+    // 1) Architecture connects to farm live streaming (engineTier !== 'legacy_1url')
+    // 2) An active viewer is on this port's farm page right now (lastViewedAt within 3 minutes)
+    // 3) MT5 is actively responding with telemetry (minsSince <= 2)
+    const isViewerActive = port.lastViewedAt
+        ? (nowTime - new Date(port.lastViewedAt).getTime() <= 3 * 60 * 1000)
+        : false;
+    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && minsSince <= 2;
+
+    if (isLiveView) {
         return 'STATE_1_LIVE';
     }
 
@@ -1335,6 +1365,7 @@ export default function EasyMMasterDashboardPage() {
                         isOnline,
                         lastPing: status?.last_ping || null,
                         lastLicenseCheck: (status as any)?.last_license_check || status?.last_ping || null,
+                        lastViewedAt: (status as any)?.last_viewed_at || null,
                         updatedAt: status?.updated_at || null,
                         todayPnl: resolvedTodayPnl,
                         todayClosedLots: status?.today_closed_lots || 0,
@@ -1347,16 +1378,19 @@ export default function EasyMMasterDashboardPage() {
                         isGoldMismatch,
                         actualAssetType: status?.asset_type || 'UNKNOWN',
                         actualSystemCode: status?.system_code || 'UNKNOWN',
-                        hoursSinceLastPing: Math.round(hoursSinceLastPing),
+                        hoursSinceLastPing: Number(hoursSinceLastPing.toFixed(2)),
                         requiredBalanceUSC,
                         telemetryType,
                         engineTier,
                         runStatus,
                         state: resolvePortState({
-                            hoursSinceLastPing: Math.round(hoursSinceLastPing),
+                            hoursSinceLastPing,
                             balance: status?.balance || 0,
                             accountType: resolvedAccType,
-                            requiredBalanceUSC
+                            requiredBalanceUSC,
+                            lastPing: status?.last_ping || null,
+                            engineTier,
+                            lastViewedAt: (status as any)?.last_viewed_at || null
                         }, isWeekend)
                     };
 
@@ -1459,6 +1493,7 @@ export default function EasyMMasterDashboardPage() {
                             isOnline,
                             lastPing: status.last_ping || null,
                             lastLicenseCheck: (status as any)?.last_license_check || status.last_ping || null,
+                            lastViewedAt: (status as any)?.last_viewed_at || null,
                             updatedAt: status.updated_at || null,
                             todayPnl: resolvedTodayPnl,
                             todayClosedLots: status.today_closed_lots || 0,
@@ -1471,16 +1506,19 @@ export default function EasyMMasterDashboardPage() {
                             isGoldMismatch: false,
                             actualAssetType: status.asset_type || 'FOREX',
                             actualSystemCode: status.system_code || 'EasyM MAX',
-                            hoursSinceLastPing: Math.round(hoursSinceLastPing),
+                            hoursSinceLastPing: Number(hoursSinceLastPing.toFixed(2)),
                             requiredBalanceUSC,
                             telemetryType,
                             engineTier: (String(status.ea_version || '').toLowerCase().includes('v2')) ? 'v2_3tier' : ((hasUniversalTelemetry || status.server_time != null) ? 'legacy_2url' : 'legacy_1url'),
                             runStatus,
                             state: resolvePortState({
-                                hoursSinceLastPing: Math.round(hoursSinceLastPing),
+                                hoursSinceLastPing,
                                 balance: status.balance || 0,
                                 accountType: status.account_type || 'USC',
-                                requiredBalanceUSC
+                                requiredBalanceUSC,
+                                lastPing: status.last_ping || null,
+                                engineTier: (String(status.ea_version || '').toLowerCase().includes('v2')) ? 'v2_3tier' : ((hasUniversalTelemetry || status.server_time != null) ? 'legacy_2url' : 'legacy_1url'),
+                                lastViewedAt: (status as any)?.last_viewed_at || null
                             }, isWeekend)
                         });
 
@@ -4337,7 +4375,7 @@ export default function EasyMMasterDashboardPage() {
                                                         <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_4px_white]" />
                                                     </div>
                                                     <div>
-                                                        <strong className="text-emerald-400">State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2m)
+                                                        <strong className="text-emerald-400">State 1:</strong> เปิดดูฟาร์มสด (Ping ≤ 2m และมีคนกำลังเปิดดูหน้าฟาร์ม)
                                                         <span className="text-[10px] text-white/80 block">*มีจุดขาวเรืองแสงกะพริบมุมขวาบน</span>
                                                     </div>
                                                 </div>
