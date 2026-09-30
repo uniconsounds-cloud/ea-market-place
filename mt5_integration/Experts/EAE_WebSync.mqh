@@ -154,8 +154,9 @@ double EAE_GetDailyMaxDrawdownPct()
 //+------------------------------------------------------------------+
 bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, EAE_DailySummary &out_sum)
 {
-   datetime start = (targetDay / 86400) * 86400;
-   datetime end   = start + 86399;
+   MqlDateTime dt; TimeToStruct(targetDay, dt); dt.hour=0; dt.min=0; dt.sec=0;
+   datetime start = StructToTime(dt);
+   datetime end   = targetDay;
    
    ZeroMemory(out_sum);
    out_sum.date          = start;
@@ -319,7 +320,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    // Hash Check for Throttling (only applies in full sync mode)
    if(g_eae_full_sync_mode)
    {
-      current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2);
+      current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2) + "_" + DoubleToString(today.total_profit, 2);
       if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now_ticks - g_eae_last_heartbeat_ticks) < g_eae_heartbeat_interval * 1000)
       {
          return true; // Skip redundant upload if nothing changed

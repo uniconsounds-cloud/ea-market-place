@@ -370,8 +370,9 @@ double EaezeGetDailyMaxDrawdownPct()
 // Helper for today's profit
 double EaezeScanTodayProfit(long magic_buy, long magic_sell, double &out_lots)
 {
-   datetime start = (TimeCurrent() / 86400) * 86400;
-   datetime end   = start + 86399;
+   MqlDateTime dt; TimeToStruct(TimeCurrent(), dt); dt.hour=0; dt.min=0; dt.sec=0;
+   datetime start = StructToTime(dt);
+   datetime end   = TimeCurrent();
    double profit = 0.0;
    out_lots = 0.0;
    
