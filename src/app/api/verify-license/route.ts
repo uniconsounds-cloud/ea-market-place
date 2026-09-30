@@ -219,7 +219,7 @@ export async function POST(req: Request) {
 
                 const { data: existingStatus } = await supabase
                     .from('farm_port_status')
-                    .select('port_number, equity, account_type, balance, today_pnl, updated_at, daily_max_drawdown, floating_pnl')
+                    .select('port_number, equity, account_type, balance, today_pnl, updated_at, daily_max_drawdown, floating_pnl, system_code, ea_version')
                     .eq('port_number', String(account_number))
                     .maybeSingle();
 
@@ -315,8 +315,8 @@ export async function POST(req: Request) {
                             today_pnl: todayPnl,
                             account_type: resolvedProduct?.currency || 'USC',
                             asset_type: currentAssetType,
-                            system_code: currentSystemCode,
-                            ea_version: ea_version || 'v1.16',
+                            system_code: (existingStatus.system_code && existingStatus.system_code !== 'UNKNOWN' && existingStatus.system_code !== 'EasyM mini') ? existingStatus.system_code : currentSystemCode,
+                            ea_version: ea_version || existingStatus.ea_version || 'v1.16',
                             is_online: true,
                             last_ping: nowIso,
                             updated_at: nowIso

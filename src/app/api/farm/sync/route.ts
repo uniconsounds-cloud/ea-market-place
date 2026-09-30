@@ -41,7 +41,7 @@ export async function POST(req: Request) {
         // --- Process Port Status ---
         const { data: existingStatus } = await supabaseAdmin
             .from('farm_port_status')
-            .select('balance, equity, daily_max_drawdown, account_type')
+            .select('balance, equity, daily_max_drawdown, account_type, system_code, ea_version')
             .eq('port_number', String(port_number))
             .maybeSingle();
 
@@ -70,6 +70,8 @@ export async function POST(req: Request) {
                 total_lots: Number(totalLots.toFixed(2)),
                 margin_level: port_status?.margin_level || 0,
                 account_type: port_status?.account_type || existingStatus?.account_type || 'USC',
+                system_code: port_status?.system_code || existingStatus?.system_code || 'EasyM',
+                ea_version: port_status?.ea_version || existingStatus?.ea_version || 'v1.16',
                 daily_max_drawdown: resolvedDD,
                 server_time: Math.floor(Date.now() / 1000),
                 is_online: true,

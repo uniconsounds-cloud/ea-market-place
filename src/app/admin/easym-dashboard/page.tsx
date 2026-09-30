@@ -1320,7 +1320,11 @@ export default function EasyMMasterDashboardPage() {
 
                     const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
                     const prodKey = prod?.product_key || 'EZM-MAX';
-                    const prodName = prod?.name || 'EasyM MAX';
+                    const rawProdName = prod?.name || 'EasyM MAX';
+                    const actualSys = status?.system_code || '';
+                    const prodName = (actualSys && actualSys !== 'UNKNOWN' && actualSys.toLowerCase().includes('easym')) 
+                        ? actualSys 
+                        : rawProdName;
 
                     const isGoldMismatch = (accNum === '97072259') || 
                                            (goldLicenseAccountSet.has(accNum) && (status?.system_code?.toLowerCase().includes('gold') || status?.system_code === 'EG_FARMING'));
@@ -1329,11 +1333,11 @@ export default function EasyMMasterDashboardPage() {
                     if (isTester && accNum !== '21692434') {
                         return; // Exclude tester ports completely from EasyM Dashboard
                     }
-                    const isMax = prodKey.toUpperCase().includes('MAX') || prodName.toLowerCase().includes('max');
-                    const isUniversal = prodKey.toUpperCase().includes('UNI') || prodName.toLowerCase().includes('universal');
-                    const isPrime = prodKey.toUpperCase().includes('PRIME') || prodName.toLowerCase().includes('prime');
-                    const isFarm = prodKey.toUpperCase().includes('FARM') || prodName.toLowerCase().includes('farm');
-                    const isMini = prodKey.toUpperCase().includes('MIN') || prodName.toLowerCase().includes('mini');
+                    const isPrime = prodKey.toUpperCase().includes('PRIME') || prodName.toLowerCase().includes('prime') || actualSys.toLowerCase().includes('prime');
+                    const isUniversal = prodKey.toUpperCase().includes('UNI') || prodName.toLowerCase().includes('universal') || actualSys.toLowerCase().includes('universal');
+                    const isFarm = prodKey.toUpperCase().includes('FARM') || prodName.toLowerCase().includes('farm') || actualSys.toLowerCase().includes('farm');
+                    const isMini = prodKey.toUpperCase().includes('MIN') || prodName.toLowerCase().includes('mini') || actualSys.toLowerCase().includes('mini');
+                    const isMax = prodKey.toUpperCase().includes('MAX') || prodName.toLowerCase().includes('max') || actualSys.toLowerCase().includes('max');
                     const requiredBalanceUSC = (isMax || isUniversal || isPrime) ? 100000 : (isFarm ? 30000 : 50000);
 
                     const rawBal = Number(status?.balance) || 0;
@@ -4261,14 +4265,16 @@ export default function EasyMMasterDashboardPage() {
                                                                 : 'text-amber-300')
                                                     }`}>
                                                         {(() => {
-                                                            const pn = port.productName.toLowerCase();
+                                                            const pn = (port.actualSystemCode && port.actualSystemCode !== 'UNKNOWN' ? port.actualSystemCode : port.productName).toLowerCase();
                                                             const pk = port.productKey.toUpperCase();
+                                                            const actVer = (port.eaVersion || '').toLowerCase();
+                                                            
                                                             let base = 'MAX';
-                                                            if (pk.includes('UNI') || pn.includes('universal')) base = 'UNI';
-                                                            else if (pk.includes('PRIME') || pn.includes('prime')) base = 'PRIME';
-                                                            else if (pk.includes('FARM') || pn.includes('farm')) base = 'FARM';
-                                                            else if (pk.includes('MIN') || pn.includes('mini')) base = 'MINI';
-                                                            else if (pk.includes('MAX') || pn.includes('max')) base = 'MAX';
+                                                            if (pn.includes('prime') || actVer.includes('prime')) base = 'PRIME';
+                                                            else if (pn.includes('farm') || actVer.includes('farm')) base = 'FARM';
+                                                            else if (pn.includes('mini') || actVer.includes('mini')) base = 'MINI';
+                                                            else if (pn.includes('universal') || pk.includes('UNI')) base = 'UNI';
+                                                            else if (pn.includes('max') || pk.includes('MAX')) base = 'MAX';
                                                             
                                                             if (port.engineTier === 'v2_3tier') return `${base} v2`;
                                                             if (port.engineTier === 'legacy_2url') return `${base} 2U`;
