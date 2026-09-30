@@ -34,20 +34,42 @@ void EM_BuildIdentity(EAE_SystemIdentity &id, long magicBase)
    id.site_name      = "eaeze.com";
    id.product_family = "EasyM";
    
-   // Check which EA is running based on the EA_PRODUCT_ID macro
-   if(StringFind(EA_PRODUCT_ID, "MAX") >= 0) {
-       id.system_code = "EasyM MAX";
-       id.ea_name     = "EasyM MAX";
-   } else {
+   // Check which EA is running based on EA_SYSTEM_CODE or EA_PRODUCT_ID macro
+#ifdef EA_SYSTEM_CODE
+   id.system_code = EA_SYSTEM_CODE;
+   id.ea_name     = EA_SYSTEM_CODE;
+#else
+   if(StringFind(EA_PRODUCT_ID, "PRIME") >= 0 || StringFind(EA_PRODUCT_ID, "Prime") >= 0) {
+       id.system_code = "EasyM Prime";
+       id.ea_name     = "EasyM Prime";
+   } else if(StringFind(EA_PRODUCT_ID, "FARM") >= 0 || StringFind(EA_PRODUCT_ID, "Farm") >= 0) {
+       id.system_code = "EasyM Farm";
+       id.ea_name     = "EasyM Farm";
+   } else if(StringFind(EA_PRODUCT_ID, "MIN") >= 0 || StringFind(EA_PRODUCT_ID, "mini") >= 0) {
        id.system_code = "EasyM mini";
        id.ea_name     = "EasyM mini";
+   } else if(StringFind(EA_PRODUCT_ID, "MAX") >= 0 || StringFind(EA_PRODUCT_ID, "Max") >= 0) {
+       id.system_code = "EasyM Max";
+       id.ea_name     = "EasyM Max";
+   } else {
+       id.system_code = "EasyM";
+       id.ea_name     = "EasyM";
    }
+#endif
 
    id.family_code    = "EM";
    id.strategy_name  = "Multi-Currency";
    id.product_family = EAE_AutoDetectAssetType(_Symbol);
 
-   id.ea_version     = "V1";
+#ifdef EA_VERSION_STR
+   id.ea_version     = EA_VERSION_STR;
+#else
+   #ifdef EA_VERSION
+      id.ea_version  = EA_VERSION;
+   #else
+      id.ea_version  = "v1.16";
+   #endif
+#endif
 
    id.symbol         = "MULTI"; // Multi-currency
    id.chart_id       = ChartID();

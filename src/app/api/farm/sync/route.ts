@@ -41,7 +41,7 @@ export async function POST(req: Request) {
         // --- Process Port Status ---
         const { data: existingStatus } = await supabaseAdmin
             .from('farm_port_status')
-            .select('balance, equity, daily_max_drawdown, account_type, system_code, ea_version')
+            .select('balance, equity, daily_max_drawdown, account_type, system_code, ea_version, today_pnl')
             .eq('port_number', String(port_number))
             .maybeSingle();
 
@@ -58,6 +58,14 @@ export async function POST(req: Request) {
         const existingDD = Number(existingStatus?.daily_max_drawdown) || 0;
         const resolvedDD = Math.max(existingDD, port_status?.max_drawdown || 0, port_status?.daily_max_drawdown || 0, calculatedDD);
 
+        const resolvedTodayPnl = (port_status?.today_profit !== undefined && port_status?.today_profit !== null && !isNaN(Number(port_status.today_profit)))
+            ? Number(port_status.today_profit)
+            : (port_status?.today_pnl !== undefined && port_status?.today_pnl !== null && !isNaN(Number(port_status.today_pnl)))
+                ? Number(port_status.today_pnl)
+                : (summary?.today_profit !== undefined && summary?.today_profit !== null && !isNaN(Number(summary.today_profit)))
+                    ? Number(summary.today_profit)
+                    : (existingStatus?.today_pnl !== undefined ? Number(existingStatus.today_pnl) : 0);
+
         const { error: portStatusError } = await supabaseAdmin
             .from('farm_port_status')
             .upsert({
@@ -72,6 +80,7 @@ export async function POST(req: Request) {
                 account_type: port_status?.account_type || existingStatus?.account_type || 'USC',
                 system_code: port_status?.system_code || existingStatus?.system_code || 'EasyM',
                 ea_version: port_status?.ea_version || existingStatus?.ea_version || 'v1.16',
+                today_pnl: resolvedTodayPnl,
                 daily_max_drawdown: resolvedDD,
                 server_time: Math.floor(Date.now() / 1000),
                 is_online: true,
