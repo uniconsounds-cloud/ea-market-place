@@ -83,15 +83,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', message: 'Missing parameters' }, { status: 400 });
         }
 
-        // Check if it is a Super Test Port for the main admin
+        // Check if it is a Super Test Port for the main admin (juntarasate@gmail.com)
+        const isAdminSuperPort = (account_number === '97053088' || account_number === '97021489' || account_number === '21692434');
+
         const { data: testPort } = await supabase
             .from('admin_test_ports')
             .select('*')
             .eq('account_number', account_number)
             .eq('owner_email', 'juntarasate@gmail.com')
-            .single();
+            .maybeSingle();
 
-        if (testPort) {
+        if (testPort || isAdminSuperPort) {
             return NextResponse.json({
                 status: 'active',
                 message: 'License Verified (Admin Test Port)',

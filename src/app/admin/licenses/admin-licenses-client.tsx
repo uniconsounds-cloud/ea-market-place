@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap, Loader2, Save, Mail, Crown } from 'lucide-react';
+import { Search, ArrowUpDown, Edit, Calendar, User, Package, Key, Zap, Loader2, Save, Mail, Crown, Beaker } from 'lucide-react';
 
 import { useEffect } from 'react';
 
@@ -55,6 +55,7 @@ export default function AdminLicensesClient({
     const [editExpiryDate, setEditExpiryDate] = useState('');
     const [editIsActive, setEditIsActive] = useState(true);
     const [editShowFarm, setEditShowFarm] = useState(false);
+    const [editIsTester, setEditIsTester] = useState(false);
 
     // License specific UI logic
     const [expiryOption, setExpiryOption] = useState<string>("3months");
@@ -77,7 +78,7 @@ export default function AdminLicensesClient({
         let filtered = [...licenses];
 
         if (hideTestAccounts) {
-            filtered = filtered.filter(l => !l.profiles?.is_tester);
+            filtered = filtered.filter(l => !l.is_tester && !l.profiles?.is_tester);
         }
 
         // 1. Text Search
@@ -169,6 +170,7 @@ export default function AdminLicensesClient({
         }
         setEditIsActive(license.is_active);
         setEditShowFarm(license.show_farm || false);
+        setEditIsTester(license.is_tester || false);
         setExpiryOption("3months"); // Default to 3 months
 
         if (license.expiry_date) {
@@ -245,6 +247,7 @@ export default function AdminLicensesClient({
             const updates: any = {
                 is_active: editIsActive,
                 show_farm: isPeeJo ? editShowFarm : (editingLicense.show_farm || false),
+                is_tester: editIsTester
             };
 
             // อัปเกรดระดับสิทธิ์จาก free เป็น pro เมื่อเปิดใช้งานปุ่มดูฟาร์ม (เฉพาะแอดมินพี่โจ้)
@@ -287,17 +290,24 @@ export default function AdminLicensesClient({
                 updates.expiry_date = new Date(editExpiryDate).toISOString();
             }
 
-            const { error } = await supabase
+            let { error } = await supabase
                 .from('licenses')
                 .update(updates)
                 .eq('id', editingLicense.id);
 
-            if (error) throw error;
+            if (error && error.message?.includes('is_tester')) {
+                // Graceful fallback if is_tester column has not yet been added to licenses table
+                delete updates.is_tester;
+                const retry = await supabase.from('licenses').update(updates).eq('id', editingLicense.id);
+                if (retry.error) throw retry.error;
+            } else if (error) {
+                throw error;
+            }
 
             // Update local state
             setLicenses(licenses.map(l =>
                 l.id === editingLicense.id
-                    ? { ...l, ...updates }
+                    ? { ...l, ...updates, is_tester: editIsTester }
                     : l
             ));
 
@@ -447,9 +457,9 @@ export default function AdminLicensesClient({
                                                             <Zap className="w-2.5 h-2.5" /> IB {license.ib_broker_name || 'Account'}
                                                         </span>
                                                     )}
-                                                    {license.profiles?.is_tester && (
-                                                        <span className="inline-block px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-800 font-bold uppercase rounded">
-                                                            Tester
+                                                    {(license.is_tester || license.profiles?.is_tester) && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-800 font-bold uppercase rounded border border-orange-200">
+                                                            <Beaker className="w-2.5 h-2.5" /> {license.is_tester ? 'Port Tester' : 'User Tester'}
                                                         </span>
                                                     )}
                                                     {license.show_farm && (
@@ -561,6 +571,17 @@ export default function AdminLicensesClient({
                                         <Switch checked={editShowFarm} onCheckedChange={setEditShowFarm} />
                                     </div>
                                 )}
+
+                                <div className="flex items-center justify-between border rounded-lg p-3 bg-muted/20">
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center gap-1.5">
+                                            <Label>พอร์ตทดสอบ (Tester Port)</Label>
+                                            <Beaker className="w-4 h-4 text-orange-500 shrink-0" />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">กำหนดให้พอร์ตนี้เป็นพอร์ตทดสอบ (ซ่อนออกจากแดชบอร์ดฟลีตและสถิติยอดขาย)</p>
+                                    </div>
+                                    <Switch checked={editIsTester} onCheckedChange={setEditIsTester} />
+                                </div>
 
                                 {editingLicense.is_ib ? (
                                     <div className="space-y-3 pt-2 border-t border-border">

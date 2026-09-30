@@ -1325,7 +1325,7 @@ export default function EasyMMasterDashboardPage() {
                     const isGoldMismatch = (accNum === '97072259') || 
                                            (goldLicenseAccountSet.has(accNum) && (status?.system_code?.toLowerCase().includes('gold') || status?.system_code === 'EG_FARMING'));
 
-                    const isTester = !!customer?.is_tester || isTestPort(accNum);
+                    const isTester = !!lic?.is_tester || !!customer?.is_tester || isTestPort(accNum);
                     if (isTester && accNum !== '21692434') {
                         return; // Exclude tester ports completely from EasyM Dashboard
                     }
