@@ -223,10 +223,10 @@ export const PORT_STATE_META: Record<EasyMPortState, PortStateMeta> = {
         label: 'State 9: ยังไม่เคยสื่อสาร (0 ครั้ง)',
         shortLabel: 'S9 ยังไม่เริ่ม',
         description: 'มี License ในระบบแล้ว แต่ยังไม่เคยเปิดรันหรือส่ง WebRequest เข้ามาเลย',
-        colorBg: 'bg-zinc-900/60',
-        colorBorder: 'border-dashed border-zinc-600',
-        colorText: 'text-zinc-500',
-        badgeBg: 'bg-zinc-900/50 text-zinc-400 border-dashed border-zinc-600',
+        colorBg: 'bg-checkerboard',
+        colorBorder: 'border-zinc-700/60',
+        colorText: 'text-zinc-400',
+        badgeBg: 'bg-checkerboard text-zinc-400 border border-zinc-700/60',
         dotClass: '',
         icon: '🔲',
     },
@@ -1967,6 +1967,13 @@ export default function EasyMMasterDashboardPage() {
                     if (p.engineTier !== 'legacy_1url') return false;
                 } else if (selectedStateFilter === 'legacy_2url') {
                     if (p.engineTier !== 'legacy_2url') return false;
+                } else if (selectedStateFilter === 'prime') {
+                    const prodKey = (p.productKey || '').toUpperCase();
+                    const prodName = (p.productName || '').toLowerCase();
+                    const actualSys = (p.actualSystemCode || '').toLowerCase();
+                    const eaVer = (p.eaVersion || '').toLowerCase();
+                    const isP = prodKey.includes('PRIME') || prodName.includes('prime') || actualSys.includes('prime') || eaVer.includes('prime');
+                    if (!isP) return false;
                 } else {
                     if (portSt !== selectedStateFilter) return false;
                 }
@@ -2021,6 +2028,7 @@ export default function EasyMMasterDashboardPage() {
             STATE_8_ABANDONED: 0,
             STATE_9_NEVER_CONNECTED: 0,
             weekend_standby: 0,
+            prime: 0,
             license_active: 0,
             license_inactive: 0,
             bal_ok: 0,
@@ -2035,6 +2043,13 @@ export default function EasyMMasterDashboardPage() {
             counts[st] = (counts[st] || 0) + 1;
             if (isWk && (st === 'STATE_1_LIVE' || st === 'STATE_2_ONLINE' || st === 'STATE_3_STANDBY_12H' || p.isRealRunning)) {
                 counts.weekend_standby++;
+            }
+            const prodKey = (p.productKey || '').toUpperCase();
+            const prodName = (p.productName || '').toLowerCase();
+            const actualSys = (p.actualSystemCode || '').toLowerCase();
+            const eaVer = (p.eaVersion || '').toLowerCase();
+            if (prodKey.includes('PRIME') || prodName.includes('prime') || actualSys.includes('prime') || eaVer.includes('prime')) {
+                counts.prime++;
             }
             if (p.isActive) counts.license_active++;
             else counts.license_inactive++;
@@ -4082,14 +4097,28 @@ export default function EasyMMasterDashboardPage() {
                                     onClick={() => setSelectedStateFilter('STATE_9_NEVER_CONNECTED')}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_9_NEVER_CONNECTED'
-                                            ? 'bg-zinc-900 text-zinc-300 font-bold ring-2 ring-zinc-500 border border-dashed border-zinc-500 shadow-md'
-                                            : 'bg-zinc-950/40 text-zinc-500 hover:bg-zinc-900 border border-dashed border-zinc-700'
+                                            ? 'bg-zinc-900 text-zinc-300 font-bold ring-2 ring-zinc-500 border border-zinc-600 shadow-md'
+                                            : 'bg-zinc-950/40 text-zinc-500 hover:bg-zinc-900 border border-zinc-800'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full border border-dashed border-zinc-500 shrink-0" />
+                                    <div className="w-2.5 h-2.5 rounded bg-checkerboard border border-zinc-600 shrink-0" />
                                     <span className="hidden sm:inline">S9 ยังไม่เริ่ม</span>
                                     <span className="sm:hidden">S9 ไม่เริ่ม</span>
                                     <span>({stateCounts.STATE_9_NEVER_CONNECTED})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter(selectedStateFilter === 'prime' ? 'all' : 'prime')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                        selectedStateFilter === 'prime'
+                                            ? 'bg-cyan-600 text-white font-bold ring-2 ring-cyan-300 shadow-md'
+                                            : 'bg-background/80 text-cyan-400 hover:bg-cyan-500/10 border border-cyan-500/40'
+                                    }`}
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)] shrink-0" />
+                                    <span className="hidden sm:inline">💎 EasyM Prime</span>
+                                    <span className="sm:hidden">💎 Prime</span>
+                                    <span>({stateCounts.prime || 0})</span>
                                 </button>
                                 {stateCounts.weekend_standby > 0 && (
                                     <button
@@ -4225,6 +4254,13 @@ export default function EasyMMasterDashboardPage() {
                                             const isBalOk = balUSC >= port.requiredBalanceUSC && rawBal > 0;
                                             const isHovered = (hoveredPortForMatrix?.portNumber === port.portNumber) || (pinnedPortForMatrix?.portNumber === port.portNumber);
 
+                                            // Check EasyM Prime
+                                            const prodKey = (port.productKey || '').toUpperCase();
+                                            const prodName = (port.productName || '').toLowerCase();
+                                            const actualSys = (port.actualSystemCode || '').toLowerCase();
+                                            const eaVer = (port.eaVersion || '').toLowerCase();
+                                            const isPrime = prodKey.includes('PRIME') || prodName.includes('prime') || actualSys.includes('prime') || eaVer.includes('prime');
+
                                             // Matching filter state check
                                             let isFilteredOut = false;
                                             if (selectedStateFilter !== 'all') {
@@ -4235,10 +4271,20 @@ export default function EasyMMasterDashboardPage() {
                                                 else if (selectedStateFilter === 'v2_3tier') isFilteredOut = port.engineTier !== 'v2_3tier';
                                                 else if (selectedStateFilter === 'legacy_1url') isFilteredOut = port.engineTier !== 'legacy_1url';
                                                 else if (selectedStateFilter === 'legacy_2url') isFilteredOut = port.engineTier !== 'legacy_2url';
+                                                else if (selectedStateFilter === 'prime') isFilteredOut = !isPrime;
                                                 else if (selectedStateFilter === 'weekend_standby') isFilteredOut = !isWk || (pState !== 'STATE_1_LIVE' && pState !== 'STATE_2_ONLINE' && pState !== 'STATE_3_STANDBY_12H' && !port.isRealRunning);
                                                 else isFilteredOut = pState !== selectedStateFilter;
                                             }
                                             const isWeekendRunning = isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H' || port.isRealRunning);
+
+                                            // Outer border/glow: Prime outer cyan ring + slow pulsing weekend aura outside inner license border
+                                            const outerBorderClass = (isPrime && isWeekendRunning)
+                                                ? 'animate-weekend-prime-glow'
+                                                : isPrime
+                                                    ? 'ring-prime-cyan'
+                                                    : isWeekendRunning
+                                                        ? 'animate-weekend-glow'
+                                                        : (port.isActive ? 'shadow-[0_0_6px_rgba(52,211,153,0.35)]' : '');
 
                                             return (
                                                 <div
@@ -4250,18 +4296,13 @@ export default function EasyMMasterDashboardPage() {
                                                         if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                                         toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
                                                     }}
-                                                    style={isWeekendRunning ? { animation: 'weekend-border-pulse 6s ease-in-out infinite' } : undefined}
                                                 className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
                                                     meta.colorBg
                                                 } ${
-                                                    isWeekendRunning
-                                                        ? 'border-2 animate-weekend-border'
-                                                        : (pState === 'STATE_9_NEVER_CONNECTED'
-                                                            ? 'border-2 border-dashed border-zinc-600/80'
-                                                            : (port.isActive
-                                                                ? 'border-2 border-emerald-400 ring-1 ring-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.35)]'
-                                                                : 'border-2 border-zinc-500/70 opacity-60'))
-                                                } ${
+                                                    port.isActive
+                                                        ? 'border-2 border-emerald-400'
+                                                        : 'border-2 border-zinc-500/70 opacity-60'
+                                                } ${outerBorderClass} ${
                                                     isHovered
                                                         ? 'scale-125 ring-2 ring-white z-30 shadow-2xl brightness-110'
                                                         : 'hover:scale-115 hover:z-20'
@@ -4626,12 +4667,8 @@ export default function EasyMMasterDashboardPage() {
                                                     <span><strong className="text-zinc-400">S8 ทิ้งร้าง:</strong> ขาดการติดต่อ &gt; 30 วัน</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-zinc-900/60 border border-dashed border-zinc-600 shrink-0" />
-                                                    <span><strong className="text-zinc-500">S9 ยังไม่เคยสื่อสาร:</strong> มี License แต่ยังไม่เริ่มรัน (0 ครั้ง)</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded bg-purple-600 border border-purple-400 shrink-0" />
-                                                    <span><strong className="text-purple-300">Weekend:</strong> ตลาดปิดพักผ่อน (ขอบเรืองแสงสีม่วง)</span>
+                                                    <div className="w-3.5 h-3.5 rounded bg-checkerboard border border-zinc-600 shrink-0" />
+                                                    <span><strong className="text-zinc-400">S9 ยังไม่เคยสื่อสาร:</strong> มี License แต่ยังไม่เริ่มรัน (0 ครั้ง, ลายหมากรุก)</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -4639,15 +4676,15 @@ export default function EasyMMasterDashboardPage() {
                                         {/* 2. ขอบกล่องด้านนอก */}
                                         <div className="space-y-2 p-3 bg-black/40 rounded-lg border border-border/40">
                                             <span className="font-bold text-foreground block border-b border-border/40 pb-1">
-                                                2. ขอบกล่องด้านนอก (สถานะ License)
+                                                2. ขอบกล่อง (ขอบในสิทธิ์ &amp; ขอบนอก)
                                             </span>
-                                            <div className="space-y-3 text-[11px] pt-1">
+                                            <div className="space-y-2.5 text-[11px] pt-1">
                                                 <div className="flex items-start gap-2.5">
-                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 ring-1 ring-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.4)] shrink-0 flex items-center justify-center text-[9px] font-mono text-emerald-300 font-bold">
+                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)] shrink-0 flex items-center justify-center text-[9px] font-mono text-emerald-300 font-bold">
                                                         ON
                                                     </div>
                                                     <div>
-                                                        <strong className="text-emerald-400 block">ขอบเขียวหนาเรืองแสง (Active)</strong>
+                                                        <strong className="text-emerald-400 block">ขอบในสีเขียว (Active)</strong>
                                                         <span className="text-muted-foreground">License เปิดใช้งานอยู่ตามปกติ มีสิทธิ์รันบน MT5</span>
                                                     </div>
                                                 </div>
@@ -4656,8 +4693,26 @@ export default function EasyMMasterDashboardPage() {
                                                         OFF
                                                     </div>
                                                     <div>
-                                                        <strong className="text-zinc-400 block">ขอบเทาหม่น (Inactive)</strong>
+                                                        <strong className="text-zinc-400 block">ขอบในสีเทา (Inactive)</strong>
                                                         <span className="text-muted-foreground">License ถูกระงับหรือปิดใช้งาน สิทธิ์หยุดส่งคำสั่ง</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 ring-prime-cyan shrink-0 flex items-center justify-center text-[8px] font-mono text-cyan-300 font-bold">
+                                                        PRM
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-cyan-400 block">ขอบนอกสีฟ้า (EasyM Prime)</strong>
+                                                        <span className="text-muted-foreground">พอร์ตที่เป็น EasyM Prime แยกจาก mini และ MAX ชัดเจน</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 animate-weekend-glow shrink-0 flex items-center justify-center text-[8px] font-mono text-purple-300 font-bold">
+                                                        WK
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-purple-300 block">ขอบนอกสีม่วงกระพริบช้า (Weekend)</strong>
+                                                        <span className="text-muted-foreground">ตลาดปิดเสาร์-อาทิตย์ เรืองแสงกระพริบช้านอกขอบเขียว/เทาเดิม</span>
                                                     </div>
                                                 </div>
                                             </div>
