@@ -4238,6 +4238,7 @@ export default function EasyMMasterDashboardPage() {
                                                 else if (selectedStateFilter === 'weekend_standby') isFilteredOut = !isWk || (pState !== 'STATE_1_LIVE' && pState !== 'STATE_2_ONLINE' && pState !== 'STATE_3_STANDBY_12H' && !port.isRealRunning);
                                                 else isFilteredOut = pState !== selectedStateFilter;
                                             }
+                                            const isWeekendRunning = isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H' || port.isRealRunning);
 
                                             return (
                                                 <div
@@ -4249,10 +4250,11 @@ export default function EasyMMasterDashboardPage() {
                                                         if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                                         toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
                                                     }}
+                                                    style={isWeekendRunning ? { animation: 'weekend-border-pulse 6s ease-in-out infinite' } : undefined}
                                                 className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
                                                     meta.colorBg
                                                 } ${
-                                                    isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H' || port.isRealRunning)
+                                                    isWeekendRunning
                                                         ? 'border-2 animate-weekend-border'
                                                         : (pState === 'STATE_9_NEVER_CONNECTED'
                                                             ? 'border-2 border-dashed border-zinc-600/80'

@@ -113,14 +113,14 @@
 @keyframes weekend-border-pulse {
   0%, 100% {
     border-color: rgba(192, 132, 252, 0.95);
-    box-shadow: 0 0 10px rgba(192, 132, 252, 0.6), inset 0 0 4px rgba(192, 132, 252, 0.15);
+    box-shadow: 0 0 12px rgba(192, 132, 252, 0.7);
   }
   50% {
-    border-color: rgba(168, 85, 247, 0.25);
-    box-shadow: 0 0 2px rgba(192, 132, 252, 0.1), inset 0 0 0px transparent;
+    border-color: rgba(168, 85, 247, 0.15);
+    box-shadow: 0 0 0px transparent;
   }
 }
 
-@utility animate-weekend-border {
-  animation: weekend-border-pulse 4.5s ease-in-out infinite;
+.animate-weekend-border {
+  animation: weekend-border-pulse 6s ease-in-out infinite !important;
 }
