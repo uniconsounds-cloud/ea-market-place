@@ -872,8 +872,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     const dailyHistory = useMemo(() => {
         if (!history.length) return [];
         
-        // Filter out the broker's "today" using Thailand timezone reference
-        let filteredData = history.filter(item => item.date !== brokerDateStr);
+        // Filter out today's active trading date and any future dates (only show past completed days before today)
+        let filteredData = history.filter(item => item.date < brokerDateStr);
         
         // Filter out history before the user joined the challenge if viewing 'my' tab
         if (historyTab === 'my' && challengeStartDate) {
@@ -894,12 +894,12 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             const firstDateStr = sorted[0].date.split('T')[0];
             const startDate = new Date(firstDateStr + 'T00:00:00');
 
-            const bkkDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-            const yesterdayDate = new Date(bkkDateStr + 'T00:00:00');
-            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            // History crates represent completed days strictly prior to today's active trading date (brokerDateStr)
+            const lastCompletedDate = new Date(brokerDateStr + 'T00:00:00');
+            lastCompletedDate.setDate(lastCompletedDate.getDate() - 1);
 
             const curr = new Date(startDate);
-            while (curr <= yesterdayDate) {
+            while (curr <= lastCompletedDate) {
                 const yyyy = curr.getFullYear();
                 const mm = String(curr.getMonth() + 1).padStart(2, '0');
                 const dd = String(curr.getDate()).padStart(2, '0');
@@ -935,6 +935,9 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             filledList.push(...sorted);
         }
 
+        // Extra guarantee: ensure no item equals or exceeds today's active market trading date
+        const safeFilledList = filledList.filter(item => item.date < brokerDateStr);
+
         const accountType = portStatus?.account_type || 'USC';
         const isUSC = accountType.toUpperCase().trim() === 'USC' || accountType.toUpperCase().trim() === 'CENT';
 
@@ -945,7 +948,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             '2027-03-26': 'Good Friday'
         };
 
-        return filledList.map((item, idx) => {
+        return safeFilledList.map((item, idx) => {
             const proportionalRatio = 1.0;
             const pnl = Number(item.profit || 0) * proportionalRatio;
             const cents = isUSC ? pnl : pnl * 100;

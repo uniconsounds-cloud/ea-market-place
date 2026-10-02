@@ -2274,8 +2274,8 @@ export default function EasyMMasterDashboardPage() {
                 <CardContent className="p-4 sm:p-5">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-muted-foreground">
-                            <span className="hidden sm:inline">ฝูงบิน EasyM ทั้งหมด</span>
-                            <span className="sm:hidden">ฝูงบิน EasyM (Total)</span>
+                            <span className="hidden sm:inline">ฟาร์ม EasyM ทั้งหมด</span>
+                            <span className="sm:hidden">ฟาร์ม EasyM</span>
                         </span>
                         <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
                             <Layers className="w-4 h-4" />
@@ -2743,7 +2743,7 @@ export default function EasyMMasterDashboardPage() {
                                     <strong className="text-red-300">แนวทางแก้ไขเร่งด่วนเมื่อใกล้ถึงลิมิต:</strong>
                                     <p>1. ขยายรอบส่งข้อมูล (Interval) ของ EA ใน MT5 จาก 20s เป็น <strong>30-45 วินาที</strong></p>
                                     <p>2. เปิดใช้ <strong>Connection Pooling (Supavisor)</strong> ใน Supabase เพื่อลดภาระ Connection</p>
-                                    <p>3. หากฝูงบินเกิน 400+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
+                                    <p>3. หากฟาร์มเกิน 400+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
                                 </div>
                             </div>
 
@@ -2799,7 +2799,7 @@ export default function EasyMMasterDashboardPage() {
     );
 
     return (
-        <div className="space-y-6 pb-12">
+        <div className="space-y-6 pb-12 w-full max-w-full min-w-0">
             {/* Header with Super Admin Tag & Refresh Button */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-5">
                 <div>
@@ -2817,7 +2817,7 @@ export default function EasyMMasterDashboardPage() {
                         EasyM Master Admin Dashboard
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        ศูนย์ควบคุมและติดตามสถิติฝูงบินพอร์ตที่รัน EasyM (MAX & mini) ทั่วทั้งระบบ พร้อมตรวจสอบทราฟฟิก MT5 และทรัพยากร Supabase
+                        ศูนย์ควบคุมและติดตามสถิติฟาร์มพอร์ตที่รัน EasyM (MAX & mini) ทั่วทั้งระบบ พร้อมตรวจสอบทราฟฟิก MT5 และทรัพยากร Supabase
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2835,20 +2835,21 @@ export default function EasyMMasterDashboardPage() {
             </div>
 
             {/* Main Tabs Navigation Bar */}
-            <div className="flex items-center gap-2 border-b border-border/60 pb-2 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-2 border-b border-border/60 pb-2 overflow-x-auto no-scrollbar w-full max-w-full min-w-0">
                 <button
                     type="button"
                     onClick={() => setActiveTab('performance')}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'performance'
                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                             : 'bg-card/70 text-muted-foreground hover:text-foreground hover:bg-accent border border-border/50'
                     }`}
                 >
-                    <Trophy className="w-4 h-4 text-amber-400" />
-                    <span>สถิติผลงานฝูงบิน (วันนี้ vs เมื่อวาน)</span>
+                    <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="hidden sm:inline">สถิติผลงานฟาร์ม (วันนี้ vs เมื่อวาน)</span>
+                    <span className="sm:hidden">ผลงานฟาร์ม</span>
                     {fleetStats && (
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                        <span className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-medium ${
                             activeTab === 'performance' ? 'bg-blue-700/80 text-blue-100' : 'bg-muted text-muted-foreground'
                         }`}>
                             {fleetStats.isWeekend ? 'วันหยุด' : 'Live'}
@@ -2859,15 +2860,16 @@ export default function EasyMMasterDashboardPage() {
                 <button
                     type="button"
                     onClick={() => setActiveTab('ports')}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'ports'
                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                             : 'bg-card/70 text-muted-foreground hover:text-foreground hover:bg-accent border border-border/50'
                     }`}
                 >
-                    <Search className="w-4 h-4 text-blue-400" />
-                    <span>ค้นหาและรายการพอร์ต</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                    <Search className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span className="hidden sm:inline">ค้นหาและรายการพอร์ตฟาร์ม</span>
+                    <span className="sm:hidden">รายการพอร์ต</span>
+                    <span className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-medium ${
                         activeTab === 'ports' ? 'bg-blue-700/80 text-blue-100' : 'bg-muted text-muted-foreground'
                     }`}>
                         {filteredPorts.length}
@@ -2877,15 +2879,16 @@ export default function EasyMMasterDashboardPage() {
                 <button
                     type="button"
                     onClick={() => setActiveTab('team-analytics')}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'team-analytics'
                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                             : 'bg-card/70 text-muted-foreground hover:text-foreground hover:bg-accent border border-border/50'
                     }`}
                 >
-                    <Users className="w-4 h-4 text-purple-400" />
-                    <span>สายงาน &amp; วิวัฒนาการ &amp; ระบบหลังบ้าน</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                    <Users className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span className="hidden sm:inline">สายงาน &amp; วิวัฒนาการ &amp; ระบบหลังบ้าน</span>
+                    <span className="sm:hidden">สายงาน &amp; ระบบ</span>
+                    <span className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-medium ${
                         activeTab === 'team-analytics' ? 'bg-blue-700/80 text-blue-100' : 'bg-muted text-muted-foreground'
                     }`}>
                         3 ส่วน
@@ -2893,7 +2896,7 @@ export default function EasyMMasterDashboardPage() {
                 </button>
             </div>
 
-            {/* TAB 1: สถิติผลงานฝูงบิน EasyM วันนี้ vs เมื่อวาน */}
+            {/* TAB 1: สถิติผลงานฟาร์ม EasyM วันนี้ vs เมื่อวาน */}
             {activeTab === 'performance' && (
                 <div className="space-y-6">
                     {/* Fleet Performance & Telemetry Accuracy Section (Verified Live Data) */}
@@ -2903,7 +2906,7 @@ export default function EasyMMasterDashboardPage() {
                         <div className="flex items-center gap-2">
                             <Sparkles className="w-5 h-5 text-amber-400" />
                             <h2 className="text-base sm:text-lg font-bold text-amber-200 flex items-center gap-2">
-                                <span>สถิติผลงานฝูงบิน EasyM วันนี้ vs เมื่อวาน</span>
+                                <span>สถิติผลงานฟาร์ม EasyM วันนี้ vs เมื่อวาน</span>
                                 <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
                                     Live Synchronized
                                 </span>
@@ -3402,7 +3405,7 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.today.avgProfit.toLocaleString()} USC</span>
                                         </div>
                                         <div>
-                                            <span className="hidden sm:inline">DD เฉลี่ยทั้งฝูงบิน: </span>
+                                            <span className="hidden sm:inline">DD เฉลี่ยทั้งฟาร์ม: </span>
                                             <span className="sm:hidden">DD เฉลี่ย: </span>
                                             <span className="text-amber-300 font-mono">{fleetStats.today.avgDD}%</span>
                                         </div>
@@ -3441,7 +3444,7 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.yesterday.avgProfit.toLocaleString()} USC</span>
                                         </div>
                                         <div>
-                                            <span className="hidden sm:inline">DD เฉลี่ยทั้งฝูงบิน: </span>
+                                            <span className="hidden sm:inline">DD เฉลี่ยทั้งฟาร์ม: </span>
                                             <span className="sm:hidden">DD เฉลี่ย: </span>
                                             <span className="text-amber-300 font-mono">{fleetStats.yesterday.avgDD}%</span>
                                         </div>
@@ -3624,8 +3627,8 @@ export default function EasyMMasterDashboardPage() {
                             </div>
                             <div>
                                 <h2 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
-                                    <span className="hidden sm:inline">วิวัฒนาการและการเติบโตของฝูงบิน EasyM รายเดือน</span>
-                                    <span className="sm:hidden">การเติบโตรายเดือน (Monthly Stats)</span>
+                                    <span className="hidden sm:inline">วิวัฒนาการและการเติบโตของฟาร์ม EasyM รายเดือน</span>
+                                    <span className="sm:hidden">การเติบโตของฟาร์ม</span>
                                     <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-[10px] px-1.5 py-0">
                                         Lifecycle &amp; Retention
                                     </Badge>
@@ -3746,17 +3749,17 @@ export default function EasyMMasterDashboardPage() {
                 </div>
             )}
 
-            {/* TAB 2: ค้นหาและรายการพอร์ตฝูงบิน */}
+            {/* TAB 2: ค้นหาและรายการพอร์ตฟาร์ม */}
             {activeTab === 'ports' && (
-                <div className="space-y-6">
-                    {/* 🚀 GRAPHIC FLEET STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฝูงบิน) */}
-                    {/* 🚀 GRAPHIC FLEET STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฝูงบิน แบบผนวก Search & Matrix) */}
-                    <Card className="border-border shadow-md bg-gradient-to-b from-card via-card/90 to-card/75 overflow-hidden">
+                <div className="space-y-6 w-full max-w-full min-w-0">
+                    {/* 🚀 GRAPHIC FARM STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฟาร์ม) */}
+                    {/* 🚀 GRAPHIC FARM STATUS MATRIX PANEL (แผงมอนิเตอร์สถานะพอร์ตฟาร์ม แบบผนวก Search & Matrix) */}
+                    <Card className="border-border shadow-md bg-gradient-to-b from-card via-card/90 to-card/75 overflow-hidden w-full max-w-full">
                         {/* 🔎 แถบค้นหาและการกรองหลัก (Search & Scope Filter Toolbar) ผนวกที่ส่วนบนสุดของ Matrix */}
                         <div className="p-3 sm:p-4 bg-black/40 border-b border-border/50 space-y-2.5">
                             <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
                                 {/* Search Bar with auto-expansion & clear button */}
-                                <div className="relative flex-1">
+                                <div className="relative flex-1 min-w-0">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                                     <Input
                                         placeholder="ค้นหาด้วยเลขพอร์ต, ชื่อลูกค้า, อีเมล, หรือชื่อพอร์ต..."
@@ -3782,7 +3785,7 @@ export default function EasyMMasterDashboardPage() {
                                 <div className="flex flex-wrap items-center gap-2">
                                     {/* Admin Filter */}
                                     <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
-                                        <SelectTrigger className="w-full sm:w-[150px] bg-background h-10 text-xs">
+                                        <SelectTrigger className="w-full sm:w-[140px] bg-background h-10 text-xs">
                                             <SelectValue placeholder="กรองตามแอดมิน" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -3795,7 +3798,7 @@ export default function EasyMMasterDashboardPage() {
 
                                     {/* Product Filter */}
                                     <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                                        <SelectTrigger className="w-full sm:w-[155px] bg-background h-10 text-xs">
+                                        <SelectTrigger className="w-full sm:w-[145px] bg-background h-10 text-xs">
                                             <SelectValue placeholder="กรองตามสินค้า" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -3810,7 +3813,7 @@ export default function EasyMMasterDashboardPage() {
 
                                     {/* License Status Filter */}
                                     <Select value={selectedLicenseStatus} onValueChange={setSelectedLicenseStatus}>
-                                        <SelectTrigger className="w-full sm:w-[145px] bg-background h-10 text-xs">
+                                        <SelectTrigger className="w-full sm:w-[135px] bg-background h-10 text-xs">
                                             <SelectValue placeholder="สถานะ License" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -3826,7 +3829,7 @@ export default function EasyMMasterDashboardPage() {
                                             variant={viewMode === 'customer' ? 'default' : 'ghost'}
                                             size="sm"
                                             onClick={() => setViewMode('customer')}
-                                            className="text-xs h-8 px-2.5"
+                                            className="text-xs h-8 px-2.5 shrink-0 whitespace-nowrap"
                                         >
                                             <Users className="w-3.5 h-3.5 mr-1" />
                                             <span className="hidden sm:inline">แยกตามลูกค้า</span>
@@ -3836,7 +3839,7 @@ export default function EasyMMasterDashboardPage() {
                                             variant={viewMode === 'table' ? 'default' : 'ghost'}
                                             size="sm"
                                             onClick={() => setViewMode('table')}
-                                            className="text-xs h-8 px-2.5"
+                                            className="text-xs h-8 px-2.5 shrink-0 whitespace-nowrap"
                                         >
                                             <Layers className="w-3.5 h-3.5 mr-1" />
                                             <span className="hidden sm:inline">ตารางรวม</span>
@@ -3846,7 +3849,7 @@ export default function EasyMMasterDashboardPage() {
                                             variant={viewMode === 'cards' ? 'default' : 'ghost'}
                                             size="sm"
                                             onClick={() => setViewMode('cards')}
-                                            className="text-xs h-8 px-2.5"
+                                            className="text-xs h-8 px-2.5 shrink-0 whitespace-nowrap"
                                         >
                                             <BarChart3 className="w-3.5 h-3.5 mr-1" />
                                             <span className="hidden sm:inline">การ์ดพอร์ต</span>
@@ -3859,27 +3862,27 @@ export default function EasyMMasterDashboardPage() {
                             {/* Search / Filter Active Badges */}
                             {(searchQuery || selectedAdmin !== 'all' || selectedProduct !== 'all' || selectedLicenseStatus !== 'all') && (
                                 <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                                    <span className="text-muted-foreground text-[11px]">กำลังกรอง Matrix:</span>
+                                    <span className="text-muted-foreground text-[11px] shrink-0 whitespace-nowrap">กำลังกรอง Matrix:</span>
                                     {searchQuery && (
-                                        <Badge variant="secondary" className="gap-1 font-mono text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                                        <Badge variant="secondary" className="gap-1 font-mono text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/30 shrink-0 whitespace-nowrap">
                                             <span>ค้นหา: "{searchQuery}"</span>
                                             <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSearchQuery('')} />
                                         </Badge>
                                     )}
                                     {selectedAdmin !== 'all' && (
-                                        <Badge variant="secondary" className="gap-1 text-[11px]">
+                                        <Badge variant="secondary" className="gap-1 text-[11px] shrink-0 whitespace-nowrap">
                                             <span>สายงาน: {selectedAdmin === 'juntarasate' ? 'พี่โจ้' : selectedAdmin === 'bctutor' ? 'ครูชัย' : 'พอร์ตระบบ'}</span>
                                             <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedAdmin('all')} />
                                         </Badge>
                                     )}
                                     {selectedProduct !== 'all' && (
-                                        <Badge variant="secondary" className="gap-1 text-[11px]">
+                                        <Badge variant="secondary" className="gap-1 text-[11px] shrink-0 whitespace-nowrap">
                                             <span>สินค้า: {selectedProduct.toUpperCase()}</span>
                                             <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedProduct('all')} />
                                         </Badge>
                                     )}
                                     {selectedLicenseStatus !== 'all' && (
-                                        <Badge variant="secondary" className="gap-1 text-[11px]">
+                                        <Badge variant="secondary" className="gap-1 text-[11px] shrink-0 whitespace-nowrap">
                                             <span>สิทธิ์: {selectedLicenseStatus === 'active' ? 'Active' : 'Inactive'}</span>
                                             <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedLicenseStatus('all')} />
                                         </Badge>
@@ -3893,7 +3896,7 @@ export default function EasyMMasterDashboardPage() {
                                             setSelectedProduct('all');
                                             setSelectedLicenseStatus('all');
                                         }}
-                                        className="h-5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                                        className="h-5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap"
                                     >
                                         ล้างการค้นหาทั้งหมด
                                     </Button>
@@ -3901,60 +3904,64 @@ export default function EasyMMasterDashboardPage() {
                             )}
                         </div>
 
-                        <CardHeader className="pb-3 border-b border-border/40">
+                        <CardHeader className="pb-3 border-b border-border/40 p-3 sm:p-5">
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                                 <div>
                                     <div className="flex items-center gap-2.5">
-                                        <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                                        <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 shrink-0">
                                             <Radio className="w-5 h-5 animate-pulse text-blue-400" />
                                         </div>
-                                        <div>
-                                            <CardTitle className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
-                                                แผงมอนิเตอร์สถานะฝูงบิน EasyM (Fleet Status Matrix)
-                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs font-mono font-bold px-2 py-0.5">
+                                        <div className="min-w-0">
+                                            <CardTitle className="text-base sm:text-lg font-bold text-foreground flex flex-wrap items-center gap-2">
+                                                <span className="hidden sm:inline">แผงมอนิเตอร์สถานะฟาร์ม EasyM (Farm Status Matrix)</span>
+                                                <span className="sm:hidden">สถานะฟาร์ม EasyM (Matrix)</span>
+                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs font-mono font-bold px-2 py-0.5 whitespace-nowrap shrink-0">
                                                     {searchFilteredPorts.length === ports.length 
                                                         ? `${ports.length} พอร์ต` 
-                                                        : `แสดง ${searchFilteredPorts.length} จาก ${ports.length} พอร์ต`}
+                                                        : `แสดง ${searchFilteredPorts.length}/${ports.length} พอร์ต`}
                                                 </Badge>
                                             </CardTitle>
-                                            <CardDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                                                กราฟฟิกสะท้อน State การสื่อสาร (1-7), สิทธิ์ License (Active/Inactive), และความพร้อมเงินทุนของทุกพอร์ต
+                                            <CardDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5 truncate">
+                                                <span className="hidden md:inline">กราฟิกสะท้อน State การสื่อสาร (1-9), สิทธิ์ License, และความพร้อมเงินทุนของทุกพอร์ต</span>
+                                                <span className="md:hidden">สถานะ S1-S9, License และเงินทุน</span>
                                             </CardDescription>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 shrink-0">
                                     {selectedStateFilter !== 'all' && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => setSelectedStateFilter('all')}
-                                            className="h-8 px-2.5 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30"
+                                            className="h-8 px-2.5 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30 shrink-0 whitespace-nowrap"
                                         >
                                             <X className="w-3.5 h-3.5 mr-1" />
-                                            ล้างตัวกรองสถานะ
+                                            <span className="hidden sm:inline">ล้างตัวกรองสถานะ</span>
+                                            <span className="sm:hidden">ล้างกรอง</span>
                                         </Button>
                                     )}
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setIsLegendOpen(!isLegendOpen)}
-                                        className="h-8 px-2.5 text-xs border-border/80 bg-background/50 hover:bg-background"
+                                        className="h-8 px-2.5 text-xs border-border/80 bg-background/50 hover:bg-background shrink-0 whitespace-nowrap"
                                     >
                                         <Info className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
-                                        <span>คำอธิบายสัญลักษณ์</span>
+                                        <span className="hidden sm:inline">คำอธิบายสัญลักษณ์</span>
+                                        <span className="sm:hidden">สัญลักษณ์</span>
                                         {isLegendOpen ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
                                     </Button>
                                 </div>
                             </div>
 
                             {/* Quick State Filter Pills */}
-                            <div className="flex items-center gap-1.5 pt-3 overflow-x-auto pb-1 no-scrollbar text-xs">
+                            <div className="flex items-center gap-1.5 pt-3 overflow-x-auto pb-1 no-scrollbar text-xs w-full max-w-full min-w-0">
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('all')}
-                                    className={`px-2.5 py-1 rounded-lg font-mono font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`px-2.5 py-1 rounded-lg font-mono font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'all'
                                             ? 'bg-foreground text-background font-bold shadow-sm'
                                             : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40'
@@ -3965,192 +3972,220 @@ export default function EasyMMasterDashboardPage() {
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_1_LIVE')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_1_LIVE'
                                             ? 'bg-emerald-500 text-white font-bold ring-2 ring-emerald-300 shadow-md'
                                             : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-500/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse" />
-                                    <span>S1 สด ≤2m ({stateCounts.STATE_1_LIVE})</span>
+                                    <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse shrink-0" />
+                                    <span className="hidden sm:inline">S1 สด ≤2m</span>
+                                    <span className="sm:hidden">S1 สด</span>
+                                    <span>({stateCounts.STATE_1_LIVE})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_2_ONLINE')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_2_ONLINE'
                                             ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-300 shadow-md'
                                             : 'bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-600/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
                                     <span>S2 ออนไลน์ ({stateCounts.STATE_2_ONLINE})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_3_STANDBY_12H')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_3_STANDBY_12H'
                                             ? 'bg-emerald-700 text-white font-bold ring-2 ring-emerald-400 shadow-md'
                                             : 'bg-emerald-950/50 text-emerald-400 hover:bg-emerald-950/70 border border-emerald-700/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-emerald-600" />
-                                    <span>S3 รอบตรวจ 12h ({stateCounts.STATE_3_STANDBY_12H})</span>
+                                    <div className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                                    <span className="hidden sm:inline">S3 รอบตรวจ 12h</span>
+                                    <span className="sm:hidden">S3 ตรวจ 12h</span>
+                                    <span>({stateCounts.STATE_3_STANDBY_12H})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_4_DELAYED')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_4_DELAYED'
                                             ? 'bg-amber-500 text-black font-bold ring-2 ring-amber-300 shadow-md'
                                             : 'bg-amber-950/40 text-amber-300 hover:bg-amber-950/60 border border-amber-500/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-amber-400" />
-                                    <span>S4 เกินรอบ 12-24h ({stateCounts.STATE_4_DELAYED})</span>
+                                    <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                                    <span className="hidden sm:inline">S4 เกินรอบ 12-24h</span>
+                                    <span className="sm:hidden">S4 ขาด 24h</span>
+                                    <span>({stateCounts.STATE_4_DELAYED})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_5_DISCONNECTED')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_5_DISCONNECTED'
                                             ? 'bg-orange-600 text-white font-bold ring-2 ring-orange-400 shadow-md'
                                             : 'bg-orange-950/60 text-orange-400 hover:bg-orange-950/80 border border-orange-600/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-orange-500" />
-                                    <span>S5 หลุด 24-48h ({stateCounts.STATE_5_DISCONNECTED})</span>
+                                    <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                                    <span className="hidden sm:inline">S5 หลุด 24-48h</span>
+                                    <span className="sm:hidden">S5 หลุด 48h</span>
+                                    <span>({stateCounts.STATE_5_DISCONNECTED})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_6_STOPPED')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_6_STOPPED'
                                             ? 'bg-rose-600 text-white font-bold ring-2 ring-rose-400 shadow-md'
                                             : 'bg-rose-950/40 text-rose-300 hover:bg-rose-950/60 border border-rose-500/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                    <span>S6 หยุดรัน &gt;48h ({stateCounts.STATE_6_STOPPED})</span>
+                                    <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                    <span className="hidden sm:inline">S6 หยุดรัน &gt;48h</span>
+                                    <span className="sm:hidden">S6 หยุด &gt;48h</span>
+                                    <span>({stateCounts.STATE_6_STOPPED})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_7_DORMANT')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_7_DORMANT'
                                             ? 'bg-zinc-600 text-white font-bold ring-2 ring-zinc-400 shadow-md'
                                             : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border border-zinc-600/40'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-zinc-400" />
+                                    <div className="w-2 h-2 rounded-full bg-zinc-400 shrink-0" />
                                     <span>S7 หยุดนาน ({stateCounts.STATE_7_DORMANT})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_8_ABANDONED')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_8_ABANDONED'
                                             ? 'bg-zinc-800 text-zinc-200 font-bold ring-2 ring-zinc-600 shadow-md'
                                             : 'bg-black/60 text-zinc-500 hover:bg-zinc-900 border border-zinc-800'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full bg-zinc-600" />
-                                    <span>S8 ทิ้งร้าง ({stateCounts.STATE_8_ABANDONED})</span>
+                                    <div className="w-2 h-2 rounded-full bg-zinc-600 shrink-0" />
+                                    <span className="hidden sm:inline">S8 ทิ้งร้าง</span>
+                                    <span className="sm:hidden">S8 ร้าง</span>
+                                    <span>({stateCounts.STATE_8_ABANDONED})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('STATE_9_NEVER_CONNECTED')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'STATE_9_NEVER_CONNECTED'
                                             ? 'bg-zinc-900 text-zinc-300 font-bold ring-2 ring-zinc-500 border border-dashed border-zinc-500 shadow-md'
                                             : 'bg-zinc-950/40 text-zinc-500 hover:bg-zinc-900 border border-dashed border-zinc-700'
                                     }`}
                                 >
-                                    <div className="w-2 h-2 rounded-full border border-dashed border-zinc-500" />
-                                    <span>S9 ยังไม่เริ่ม ({stateCounts.STATE_9_NEVER_CONNECTED})</span>
+                                    <div className="w-2 h-2 rounded-full border border-dashed border-zinc-500 shrink-0" />
+                                    <span className="hidden sm:inline">S9 ยังไม่เริ่ม</span>
+                                    <span className="sm:hidden">S9 ไม่เริ่ม</span>
+                                    <span>({stateCounts.STATE_9_NEVER_CONNECTED})</span>
                                 </button>
                                 {stateCounts.weekend_standby > 0 && (
                                     <button
                                         type="button"
                                         onClick={() => setSelectedStateFilter('weekend_standby')}
-                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                             selectedStateFilter === 'weekend_standby'
                                                 ? 'bg-purple-600 text-white font-bold ring-2 ring-purple-300 shadow-md'
                                                 : 'bg-purple-950/40 text-purple-300 hover:bg-purple-950/60 border border-purple-500/40'
                                         }`}
                                     >
-                                        <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-                                        <span>Weekend พัก ({stateCounts.weekend_standby})</span>
+                                        <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse shrink-0" />
+                                        <span className="hidden sm:inline">Weekend พัก</span>
+                                        <span className="sm:hidden">วันหยุด</span>
+                                        <span>({stateCounts.weekend_standby})</span>
                                     </button>
                                 )}
                                 <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('license_active')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'license_active'
                                             ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-400 shadow-md'
                                             : 'bg-background/80 text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30'
                                     }`}
                                 >
-                                    สิทธิ์ Active ({stateCounts.license_active})
+                                    <span className="hidden sm:inline">สิทธิ์ Active</span>
+                                    <span className="sm:hidden">Active</span>
+                                    <span> ({stateCounts.license_active})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('license_inactive')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'license_inactive'
                                             ? 'bg-zinc-600 text-white font-bold ring-2 ring-zinc-400 shadow-md'
                                             : 'bg-background/80 text-zinc-400 hover:bg-zinc-500/10 border border-zinc-600/40'
                                     }`}
                                 >
-                                    สิทธิ์ Inactive ({stateCounts.license_inactive})
+                                    <span className="hidden sm:inline">สิทธิ์ Inactive</span>
+                                    <span className="sm:hidden">Inactive</span>
+                                    <span> ({stateCounts.license_inactive})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter('bal_low')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                                         selectedStateFilter === 'bal_low'
                                             ? 'bg-red-500 text-white font-bold ring-2 ring-red-300 shadow-md'
                                             : 'bg-background/80 text-red-400 hover:bg-red-500/10 border border-red-500/30'
                                     }`}
                                 >
-                                    ทุนต่ำกว่าเกณฑ์ ({stateCounts.bal_low})
+                                    <span className="hidden sm:inline">ทุนต่ำกว่าเกณฑ์</span>
+                                    <span className="sm:hidden">ทุนไม่ถึง</span>
+                                    <span> ({stateCounts.bal_low})</span>
                                 </button>
                                 <div className="h-4 w-px bg-border/60 mx-1 shrink-0" />
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter(selectedStateFilter === 'v2_3tier' ? 'all' : 'v2_3tier')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                         selectedStateFilter === 'v2_3tier'
                                             ? 'bg-cyan-600 text-white font-bold ring-2 ring-cyan-400 shadow-md'
                                             : 'bg-background/80 text-cyan-400 hover:bg-cyan-500/10 border border-cyan-500/30'
                                     }`}
                                 >
-                                    <span>⚡ v2.00 3-Tier ({stateCounts.v2_3tier})</span>
+                                    <span className="hidden sm:inline">⚡ v2.00 3-Tier</span>
+                                    <span className="sm:hidden">⚡ v2</span>
+                                    <span>({stateCounts.v2_3tier})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter(selectedStateFilter === 'legacy_2url' ? 'all' : 'legacy_2url')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                         selectedStateFilter === 'legacy_2url'
                                             ? 'bg-sky-600 text-white font-bold ring-2 ring-sky-400 shadow-md'
                                             : 'bg-background/80 text-sky-400 hover:bg-sky-500/10 border border-sky-500/30'
                                     }`}
                                 >
-                                    <span>📡 2 URLs WebSync ({stateCounts.legacy_2url})</span>
+                                    <span className="hidden sm:inline">📡 2 URLs WebSync</span>
+                                    <span className="sm:hidden">📡 2 URLs</span>
+                                    <span>({stateCounts.legacy_2url})</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSelectedStateFilter(selectedStateFilter === 'legacy_1url' ? 'all' : 'legacy_1url')}
-                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                         selectedStateFilter === 'legacy_1url'
                                             ? 'bg-amber-600 text-white font-bold ring-2 ring-amber-400 shadow-md'
                                             : 'bg-background/80 text-amber-400 hover:bg-amber-500/10 border border-amber-500/30'
                                     }`}
                                 >
-                                    <span>🔑 1 URL License ({stateCounts.legacy_1url})</span>
+                                    <span className="hidden sm:inline">🔑 1 URL License</span>
+                                    <span className="sm:hidden">🔑 1 URL</span>
+                                    <span>({stateCounts.legacy_1url})</span>
                                 </button>
                             </div>
                         </CardHeader>
@@ -4218,7 +4253,7 @@ export default function EasyMMasterDashboardPage() {
                                                     meta.colorBg
                                                 } ${
                                                     isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H' || port.isRealRunning)
-                                                        ? 'border-2 border-purple-400 ring-2 ring-purple-400/50 shadow-[0_0_12px_rgba(192,132,252,0.65)] animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]'
+                                                        ? 'border-2 animate-weekend-border'
                                                         : (pState === 'STATE_9_NEVER_CONNECTED'
                                                             ? 'border-2 border-dashed border-zinc-600/80'
                                                             : (port.isActive
@@ -4324,14 +4359,15 @@ export default function EasyMMasterDashboardPage() {
                                 const targetPort = hoveredPortForMatrix || pinnedPortForMatrix;
                                 if (!targetPort) {
                                     return (
-                                        <div className="p-3.5 bg-black/30 rounded-xl border border-border/50 text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
-                                                <span className="text-foreground/90 font-medium">
-                                                    📡 นำเมาส์ไปชี้ที่กล่องพอร์ตใดก็ได้เพื่อตรวจข้อมูลสดแบบเจาะจง หรือคลิกกล่องเพื่อค้นหาพอร์ตนั้นทันที
+                                        <div className="p-3 bg-black/30 rounded-xl border border-border/50 text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden w-full max-w-full">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="w-2 h-2 rounded-full bg-blue-400 animate-ping shrink-0" />
+                                                <span className="text-foreground/90 font-medium truncate">
+                                                    <span className="hidden sm:inline">📡 นำเมาส์ไปชี้ที่กล่องพอร์ตใดก็ได้เพื่อตรวจข้อมูลสด หรือคลิกเพื่อค้นหาทันที</span>
+                                                    <span className="sm:hidden">📡 แตะกล่องพอร์ตเพื่อดูข้อมูลสด</span>
                                                 </span>
                                             </div>
-                                            <span className="text-[11px] font-mono text-muted-foreground">
+                                            <span className="text-[11px] font-mono text-muted-foreground whitespace-nowrap shrink-0">
                                                 Active: {stateCounts.license_active} / ทุนผ่าน: {stateCounts.bal_ok}
                                             </span>
                                         </div>
@@ -4346,53 +4382,57 @@ export default function EasyMMasterDashboardPage() {
                                 const isBalOk = balUSC >= targetPort.requiredBalanceUSC && rawBal > 0;
 
                                 return (
-                                    <div className="p-4 bg-gradient-to-r from-black/80 via-black/70 to-card/90 rounded-xl border border-blue-500/40 shadow-lg space-y-3 animate-in fade-in duration-200">
+                                    <div className="p-3 sm:p-4 bg-gradient-to-r from-black/80 via-black/70 to-card/90 rounded-xl border border-blue-500/40 shadow-lg space-y-3 animate-in fade-in duration-200 overflow-hidden w-full max-w-full">
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2.5 border-b border-border/50">
-                                            <div className="flex flex-wrap items-center gap-2.5">
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2 min-w-0">
+                                                <div className="flex items-center gap-1.5 shrink-0">
                                                     <span className="text-base font-mono font-black text-foreground">
                                                         #{targetPort.portNumber}
                                                     </span>
                                                     {targetPort.portName && (
-                                                        <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded font-medium">
+                                                        <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded font-medium max-w-[120px] truncate">
                                                             {targetPort.portName}
                                                         </span>
                                                     )}
                                                 </div>
 
-                                                <Badge variant="outline" className={`${meta.badgeBg} font-medium text-xs px-2.5 py-0.5 flex items-center gap-1.5`}>
+                                                <Badge variant="outline" className={`${meta.badgeBg} font-medium text-xs px-2.5 py-0.5 flex items-center gap-1.5 shrink-0 whitespace-nowrap`}>
                                                     {meta.dotClass ? <div className={`w-2 h-2 rounded-full ${meta.dotClass}`} /> : <span>{meta.icon}</span>}
                                                     <span>{meta.label}</span>
                                                 </Badge>
 
-                                                <Badge variant="outline" className={targetPort.isActive ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 text-xs' : 'bg-zinc-800 text-zinc-400 border-zinc-700 text-xs'}>
-                                                    {targetPort.isActive ? '✅ License Active' : '⛔ License Inactive'}
+                                                <Badge variant="outline" className={`text-xs shrink-0 whitespace-nowrap ${targetPort.isActive ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                                                    <span className="hidden sm:inline">{targetPort.isActive ? '✅ License Active' : '⛔ License Inactive'}</span>
+                                                    <span className="sm:hidden">{targetPort.isActive ? 'Active' : 'Inactive'}</span>
                                                 </Badge>
 
-                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs shrink-0 whitespace-nowrap">
                                                     {targetPort.productName} ({targetPort.eaVersion || 'Universal'})
                                                 </Badge>
 
                                                 {/* Engine Tier Badge */}
                                                 {targetPort.engineTier === 'v2_3tier' ? (
-                                                    <Badge variant="outline" className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs flex items-center gap-1 font-semibold">
-                                                        <span>⚡ v2.00 (Single Domain 3-Tier)</span>
+                                                    <Badge variant="outline" className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs flex items-center gap-1 font-semibold shrink-0 whitespace-nowrap">
+                                                        <span className="hidden sm:inline">⚡ v2.00 (Single Domain 3-Tier)</span>
+                                                        <span className="sm:hidden">⚡ v2 3-Tier</span>
                                                     </Badge>
                                                 ) : targetPort.engineTier === 'legacy_2url' ? (
-                                                    <Badge variant="outline" className="bg-sky-500/20 text-sky-300 border-sky-500/40 text-xs flex items-center gap-1 font-medium">
-                                                        <span>📡 2 URLs (WebSync Telemetry)</span>
+                                                    <Badge variant="outline" className="bg-sky-500/20 text-sky-300 border-sky-500/40 text-xs flex items-center gap-1 font-medium shrink-0 whitespace-nowrap">
+                                                        <span className="hidden sm:inline">📡 2 URLs (WebSync Telemetry)</span>
+                                                        <span className="sm:hidden">📡 2 URLs</span>
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs flex items-center gap-1 font-medium">
-                                                        <span>🔑 1 URL (License Check Ping)</span>
+                                                    <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs flex items-center gap-1 font-medium shrink-0 whitespace-nowrap">
+                                                        <span className="hidden sm:inline">🔑 1 URL (License Check Ping)</span>
+                                                        <span className="sm:hidden">🔑 1 URL</span>
                                                     </Badge>
                                                 )}
                                             </div>
 
-                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                <span>ลูกค้า: <strong className="text-foreground">{targetPort.customerName}</strong></span>
-                                                <span className="text-muted-foreground/40">•</span>
-                                                <span className="font-mono text-[11px]">{targetPort.customerEmail}</span>
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                                                <span className="truncate">ลูกค้า: <strong className="text-foreground">{targetPort.customerName}</strong></span>
+                                                <span className="text-muted-foreground/40 shrink-0">•</span>
+                                                <span className="font-mono text-[11px] truncate">{targetPort.customerEmail}</span>
                                             </div>
                                         </div>
 
@@ -4400,7 +4440,7 @@ export default function EasyMMasterDashboardPage() {
                                         {targetPort.engineTier === 'v2_3tier' && (
                                             <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-xs text-cyan-200 flex items-start gap-2">
                                                 <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                                                <div className="leading-relaxed">
+                                                <div className="leading-relaxed min-w-0">
                                                     <strong className="text-cyan-300">พอร์ตนี้ใช้ EasyM v2.00 ระบบ 3-Tier (Single Domain):</strong>
                                                     <p className="text-[11px] text-muted-foreground mt-0.5">
                                                         เชื่อมต่อผ่าน <code className="text-cyan-300">https://eaeze.com</code> โดเมนเดียวจบ รองรับ Tier 1 (ตรวจสิทธิ์ 12 ชม.), Tier 2 (Smart Ping หลับประหยัดเน็ต 3 นาที) และ Tier 3 (สตรีมสด 20 วินาทีเมื่อเปิดดูหน้าฟาร์ม) ประหยัด Bandwidth สูงสุด 90%
@@ -4411,7 +4451,7 @@ export default function EasyMMasterDashboardPage() {
                                         {targetPort.engineTier === 'legacy_2url' && (
                                             <div className="p-2.5 bg-sky-500/10 border border-sky-500/30 rounded-lg text-xs text-sky-200 flex items-start gap-2">
                                                 <Radio className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                                                <div className="leading-relaxed">
+                                                <div className="leading-relaxed min-w-0">
                                                     <strong className="text-sky-300">พอร์ตนี้ใช้ EasyM v1.x (2 URLs WebSync):</strong>
                                                     <p className="text-[11px] text-muted-foreground mt-0.5">
                                                         เชื่อมต่อ WebRequest 2 URLs (<code className="text-sky-300">eaeze.com</code> + Supabase) มีระบบตรวจสิทธิ์ 12 ชม. พร้อมส่ง Telemetry สด มีโหมดหลับประหยัดเน็ต และสตรีมสด 20 วินาทีเมื่อเปิดดูหน้าฟาร์ม
@@ -4422,7 +4462,7 @@ export default function EasyMMasterDashboardPage() {
                                         {targetPort.engineTier === 'legacy_1url' && (
                                             <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-200 flex items-start gap-2">
                                                 <span className="text-sm shrink-0">ℹ️</span>
-                                                <div className="leading-relaxed">
+                                                <div className="leading-relaxed min-w-0">
                                                     <strong className="text-amber-300">พอร์ตนี้ใช้ EasyM รุ่นเดิม (1 URL ระบบตรวจสิทธิ์):</strong>
                                                     <p className="text-[11px] text-muted-foreground mt-0.5">
                                                         {targetPort.balance > 0 
@@ -4434,64 +4474,64 @@ export default function EasyMMasterDashboardPage() {
                                             </div>
                                         )}
 
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
                                              {/* Balance */}
-                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
-                                                <span className="text-muted-foreground text-[11px] block">Balance</span>
-                                                <div className="font-mono font-bold text-sm text-foreground">
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50 min-w-0 overflow-hidden">
+                                                <span className="text-muted-foreground text-[11px] block whitespace-nowrap">Balance</span>
+                                                <div className="font-mono font-bold text-sm text-foreground truncate">
                                                     {rawBal > 0
                                                         ? `${targetPort.balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${targetPort.accountType}`
                                                         : <span className="text-muted-foreground text-xs">0 {targetPort.accountType}</span>
                                                     }
                                                 </div>
-                                                <span className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
+                                                <div className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 whitespace-nowrap truncate ${
                                                     rawBal === 0 ? 'text-zinc-400' : (isBalOk ? 'text-emerald-400' : 'text-amber-400')
-                                                }`}>
+                                                }`} title={rawBal === 0 ? 'ยังไม่เติมเงิน' : (isBalOk ? 'ทุนผ่านเกณฑ์' : `ต่ำกว่าเกณฑ์ (${targetPort.requiredBalanceUSC.toLocaleString()} USC)`)}>
                                                     {rawBal === 0 
-                                                        ? '⚪ ยังไม่เติมเงิน (ทุนเป็น 0)' 
-                                                        : (isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ต่ำกว่าเกณฑ์ (ต้องการ ${targetPort.requiredBalanceUSC.toLocaleString()} USC)`)}
-                                                </span>
+                                                        ? '⚪ ทุนเป็น 0' 
+                                                        : (isBalOk ? '✅ ทุนผ่านเกณฑ์' : `⚠️ ทุนต่ำกว่าเกณฑ์`)}
+                                                </div>
                                             </div>
 
                                             {/* Equity */}
-                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
-                                                <span className="text-muted-foreground text-[11px] block">Equity</span>
-                                                <div className="font-mono font-bold text-sm text-foreground">
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50 min-w-0 overflow-hidden">
+                                                <span className="text-muted-foreground text-[11px] block whitespace-nowrap">Equity</span>
+                                                <div className="font-mono font-bold text-sm text-foreground truncate">
                                                     {targetPort.equity.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} {targetPort.accountType}
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                                <div className="text-[10px] text-muted-foreground block mt-0.5 whitespace-nowrap truncate">
                                                     Floating: {targetPort.floatingPnl > 0 ? '+' : ''}{targetPort.floatingPnl.toLocaleString()}
-                                                </span>
+                                                </div>
                                             </div>
 
                                             {/* Today PnL */}
-                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
-                                                <span className="text-muted-foreground text-[11px] block">กำไรวันนี้</span>
-                                                <div className={`font-mono font-bold text-sm ${targetPort.todayPnl > 0 ? 'text-emerald-400' : targetPort.todayPnl < 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50 min-w-0 overflow-hidden">
+                                                <span className="text-muted-foreground text-[11px] block whitespace-nowrap">กำไรวันนี้</span>
+                                                <div className={`font-mono font-bold text-sm truncate ${targetPort.todayPnl > 0 ? 'text-emerald-400' : targetPort.todayPnl < 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
                                                     {targetPort.todayPnl > 0 ? '+' : ''}{targetPort.todayPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {targetPort.accountType}
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                                <div className="text-[10px] text-muted-foreground block mt-0.5 whitespace-nowrap truncate">
                                                     {targetPort.engineTier === 'legacy_1url' 
-                                                        ? 'รอบตรวจ 12 ชม.' 
-                                                        : `ออเดอร์: ${targetPort.buyCount}B / ${targetPort.sellCount}S`
+                                                        ? 'รอบตรวจ 12h' 
+                                                        : `${targetPort.buyCount}B / ${targetPort.sellCount}S`
                                                     }
-                                                </span>
+                                                </div>
                                             </div>
 
                                             {/* Drawdown */}
-                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
-                                                <span className="text-muted-foreground text-[11px] block">Max Drawdown</span>
-                                                <div className={`font-mono font-bold text-sm ${targetPort.maxDrawdown >= 10 ? 'text-rose-400' : 'text-foreground'}`}>
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50 min-w-0 overflow-hidden">
+                                                <span className="text-muted-foreground text-[11px] block whitespace-nowrap">Max Drawdown</span>
+                                                <div className={`font-mono font-bold text-sm truncate ${targetPort.maxDrawdown >= 10 ? 'text-rose-400' : 'text-foreground'}`}>
                                                     {targetPort.maxDrawdown.toFixed(2)}%
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                                <div className="text-[10px] text-muted-foreground block mt-0.5 whitespace-nowrap truncate">
                                                     Daily DD: {targetPort.dailyMaxDrawdown.toFixed(2)}%
-                                                </span>
+                                                </div>
                                             </div>
 
                                             {/* Last Active */}
-                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50">
-                                                <span className="text-muted-foreground text-[11px] block">สื่อสารล่าสุด</span>
+                                            <div className="p-2.5 bg-background/50 rounded-lg border border-border/50 min-w-0 overflow-hidden">
+                                                <span className="text-muted-foreground text-[11px] block whitespace-nowrap">สื่อสารล่าสุด</span>
                                                 <div className="font-mono font-semibold text-xs text-foreground truncate" title={targetPort.lastPing ? new Date(targetPort.lastPing).toLocaleString('th-TH') : 'ยังไม่เคยสื่อสาร / ยังไม่เริ่มรัน'}>
                                                     {!targetPort.lastPing || targetPort.hoursSinceLastPing >= 9999
                                                         ? 'ยังไม่เคยสื่อสาร'
@@ -4502,24 +4542,26 @@ export default function EasyMMasterDashboardPage() {
                                                                 : `${Math.round(targetPort.hoursSinceLastPing / 24)} วันที่แล้ว`
                                                     }
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">
+                                                <div className="text-[10px] text-muted-foreground block mt-0.5 whitespace-nowrap truncate">
                                                     {meta.shortLabel}
-                                                </span>
+                                                </div>
                                             </div>
 
                                             {/* Action prompt */}
-                                            <div className="p-2.5 bg-blue-500/10 rounded-lg border border-blue-500/30 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-blue-500/20 transition-colors"
+                                            <div className="p-2.5 bg-blue-500/10 rounded-lg border border-blue-500/30 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-blue-500/20 transition-colors min-w-0 overflow-hidden"
                                                 onClick={() => {
                                                     setSearchQuery(targetPort.portNumber);
                                                     const targetEl = document.getElementById('port-list-section');
                                                     if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                                 }}
                                             >
-                                                <span className="text-[11px] font-bold text-blue-300 flex items-center gap-1">
-                                                    <Search className="w-3.5 h-3.5" /> ค้นหาพอร์ตนี้
+                                                <span className="text-[11px] font-bold text-blue-300 flex items-center gap-1 whitespace-nowrap">
+                                                    <Search className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="hidden sm:inline">ค้นหาพอร์ตนี้</span>
+                                                    <span className="sm:hidden">ค้นหา</span>
                                                 </span>
-                                                <span className="text-[9px] text-blue-200/70 mt-0.5">
-                                                    เลื่อนลงไปดูรายการด้านล่าง
+                                                <span className="text-[9px] text-blue-200/70 mt-0.5 whitespace-nowrap truncate">
+                                                    เลื่อนลงไปดูรายการ
                                                 </span>
                                             </div>
                                         </div>
@@ -4759,8 +4801,8 @@ export default function EasyMMasterDashboardPage() {
                             </div>
 
                             {/* Quick Filter Buttons */}
-                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
-                                <span className="text-muted-foreground font-medium mr-1 text-[11px]">
+                            <div className="flex items-center gap-1.5 pt-2 border-t border-border/40 text-xs overflow-x-auto pb-1 no-scrollbar w-full max-w-full min-w-0">
+                                <span className="text-muted-foreground font-medium mr-1 text-[11px] shrink-0 whitespace-nowrap">
                                     <span className="hidden sm:inline">ตัวกรองด่วน:</span>
                                     <span className="sm:hidden">กรอง:</span>
                                 </span>
@@ -4768,7 +4810,7 @@ export default function EasyMMasterDashboardPage() {
                                     variant={selectedStatus === 'all' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('all')}
-                                    className="h-7 text-xs px-2.5 rounded-full"
+                                    className="h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap"
                                 >
                                     ทั้งหมด ({searchFilteredPorts.length})
                                 </Button>
@@ -4776,7 +4818,7 @@ export default function EasyMMasterDashboardPage() {
                                     variant={selectedStatus === 'real_running' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('real_running')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
                                 >
                                     ⚡ รันจริง ({searchFilteredPorts.filter(p => p.isRealRunning).length})
                                 </Button>
@@ -4784,65 +4826,71 @@ export default function EasyMMasterDashboardPage() {
                                     variant={selectedStatus === 'v2_3tier' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('v2_3tier')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'v2_3tier' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'v2_3tier' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10'}`}
                                     title="พอร์ต EasyM v2.00 ระบบ Single Domain 3-Tier (ใส่ URL เดียว eaeze.com ครบทุกฟังก์ชัน)"
                                 >
-                                    ⚡ v2.00 3-Tier ({searchFilteredPorts.filter(p => p.engineTier === 'v2_3tier').length})
+                                    <span className="hidden sm:inline">⚡ v2.00 3-Tier</span>
+                                    <span className="sm:hidden">⚡ v2</span> ({searchFilteredPorts.filter(p => p.engineTier === 'v2_3tier').length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'legacy_2url' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('legacy_2url')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'legacy_2url' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'legacy_2url' ? 'bg-sky-600 hover:bg-sky-700 text-white' : 'text-sky-400 border-sky-500/30 hover:bg-sky-500/10'}`}
                                     title="พอร์ตที่มีการตั้งค่า WebRequest 2 URLs (ส่งออเดอร์, กำไร และ DD ครบถ้วน)"
                                 >
-                                    📡 2 URLs ({searchFilteredPorts.filter(p => p.engineTier === 'legacy_2url').length})
+                                    <span className="hidden sm:inline">📡 2 URLs</span>
+                                    <span className="sm:hidden">📡 2U</span> ({searchFilteredPorts.filter(p => p.engineTier === 'legacy_2url').length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'legacy_1url' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('legacy_1url')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'legacy_1url' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'legacy_1url' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
                                     title="พอร์ตที่ใส่เฉพาะ URL ตรวจสิทธิ์ 1 URL (ส่ง Balance, Equity และกำไรทุก ~12 ชม.)"
                                 >
-                                    🔑 1 URL ({searchFilteredPorts.filter(p => p.engineTier === 'legacy_1url').length})
+                                    <span className="hidden sm:inline">🔑 1 URL</span>
+                                    <span className="sm:hidden">🔑 1U</span> ({searchFilteredPorts.filter(p => p.engineTier === 'legacy_1url').length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'offline_48h' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('offline_48h')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'offline_48h' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'offline_48h' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'text-amber-400 border-amber-500/30 hover:bg-amber-500/10'}`}
                                     title="พอร์ตที่ขาดการติดต่อเกิน 48 ชม. อาจมีการถอนเงินออกแล้ว"
                                 >
-                                    ⏸️ ขาดติดต่อ &gt;48h ({searchFilteredPorts.filter(p => p.runStatus === 'offline_48h').length})
+                                    <span className="hidden sm:inline">⏸️ ขาดติดต่อ &gt;48h</span>
+                                    <span className="sm:hidden">⏸️ ขาด 48h</span> ({searchFilteredPorts.filter(p => p.runStatus === 'offline_48h').length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'insufficient_bal' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('insufficient_bal')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'insufficient_bal' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-400 border-red-500/30 hover:bg-red-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'insufficient_bal' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-400 border-red-500/30 hover:bg-red-500/10'}`}
                                 >
-                                    ⚠️ ทุนไม่ถึง ({searchFilteredPorts.filter(p => p.runStatus === 'insufficient_balance').length})
+                                    <span className="hidden sm:inline">⚠️ ทุนไม่ถึง</span>
+                                    <span className="sm:hidden">⚠️ ทุนต่ำ</span> ({searchFilteredPorts.filter(p => p.runStatus === 'insufficient_balance').length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'online' ? 'default' : 'outline'} 
                                     size="sm" 
                                     onClick={() => setSelectedStatus('online')}
-                                    className={`h-7 text-xs px-2.5 rounded-full ${selectedStatus === 'online' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-400 border-blue-500/30 hover:bg-blue-500/10'}`}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'online' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-400 border-blue-500/30 hover:bg-blue-500/10'}`}
                                 >
-                                    🟢 สด &lt;30 นาที ({searchFilteredPorts.filter(p => p.isOnline).length})
+                                    <span className="hidden sm:inline">🟢 สด &lt;30 นาที</span>
+                                    <span className="sm:hidden">🟢 สด &lt;30m</span> ({searchFilteredPorts.filter(p => p.isOnline).length})
                                 </Button>
                             </div>
                         </CardContent>
                     </Card>
 
-            {/* คั่นด้วย: ข้อมูลแถวบนสุดเดิม (จำนวนฝูงบินทั้งหมด, พลังทุน, กำไรลอยตัว, เจ้าของพอร์ต) */}
+            {/* คั่นด้วย: ข้อมูลแถวบนสุดเดิม (จำนวนฟาร์มทั้งหมด, พลังทุน, กำไรลอยตัว, เจ้าของพอร์ต) */}
             {kpiCardsElement}
 
             {/* ผลของการกรองและค้นหา */}
             {/* View Mode 1: Grouped By Customer */}
             {viewMode === 'customer' && (
-                <div className="space-y-4">
+                <div className="space-y-4 w-full max-w-full min-w-0">
                     <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
                         <span>แสดงลูกค้าทั้งหมด {customerGroups.length} ท่าน (รวม {filteredPorts.length} พอร์ต)</span>
                         <span>เรียงตามจำนวนพอร์ตที่ถือครอง</span>
@@ -4854,7 +4902,7 @@ export default function EasyMMasterDashboardPage() {
                         </Card>
                     ) : (
                         customerGroups.map(group => (
-                            <Card key={group.customerId} className="border-border shadow-sm overflow-hidden bg-card/60">
+                            <Card key={group.customerId} className="border-border shadow-sm overflow-hidden bg-card/60 w-full max-w-full min-w-0">
                                 <CardHeader className="p-4 bg-muted/20 border-b border-border/40 flex flex-col md:flex-row md:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-sm border border-blue-500/20">
@@ -5108,7 +5156,7 @@ export default function EasyMMasterDashboardPage() {
 
             {/* View Mode 2: Flat Table */}
             {viewMode === 'table' && (
-                <Card className="border-border shadow-sm">
+                <Card className="border-border shadow-sm w-full max-w-full overflow-hidden min-w-0">
                     <CardHeader className="p-4 border-b border-border/40 flex flex-row items-center justify-between">
                         <div>
                             <CardTitle className="text-base font-bold">ตารางรายพอร์ตทั้งหมด</CardTitle>
@@ -5328,7 +5376,7 @@ export default function EasyMMasterDashboardPage() {
 
             {/* View Mode 3: Grid Cards */}
             {viewMode === 'cards' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-full min-w-0">
                     {filteredPorts.map(port => (
                         <Card key={port.portNumber} className="border-border bg-card shadow-sm hover:border-blue-500/30 transition-all">
                             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">

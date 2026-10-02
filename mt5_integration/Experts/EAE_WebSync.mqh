@@ -178,16 +178,10 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
          bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
          bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
          
-         if(magicB == magicS) {
-            if(magicB != 0 && (magic < magicB || magic >= magicB + 100)) continue;
-         }
-         else {
-            if(is_buy_side) {
-               if(magicB != 0 && magic != magicB) continue;
-            }
-            else if(is_sell_side) {
-               if(magicS != 0 && magic != magicS) continue;
-            }
+         // Match TodayClosedProfit() on EA chart: in multi-currency portfolio, include all closed deals today
+         if(magicB != magicS && magicB != 0) {
+            if(is_buy_side && magic != magicB) continue;
+            if(is_sell_side && magicS != 0 && magic != magicS) continue;
          }
          
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);

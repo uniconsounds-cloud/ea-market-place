@@ -392,10 +392,9 @@ double EaezeScanTodayProfit(long magic_buy, long magic_sell, double &out_lots)
             bool is_buy = (deal_type == DEAL_TYPE_SELL);
             bool is_sell = (deal_type == DEAL_TYPE_BUY);
             
-            if(magic_buy == magic_sell) {
-               if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
-            } else {
-               if(is_buy && magic_buy != 0 && magic != magic_buy) continue;
+            // Match TodayClosedProfit() on EA chart: in multi-currency portfolio, include all closed deals today
+            if(magic_buy != magic_sell && magic_buy != 0) {
+               if(is_buy && magic != magic_buy) continue;
                if(is_sell && magic_sell != 0 && magic != magic_sell) continue;
             }
             
