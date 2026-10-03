@@ -283,9 +283,15 @@ export function resolvePortState(
     }
 
     const nowTime = _nowMs || Date.now();
-    let effectiveHours = port.hoursSinceLastPing;
+    const rawHours = port.hoursSinceLastPing;
+    const pingMs = port.lastPing ? new Date(port.lastPing).getTime() : 0;
+    const actualMinsSince = (pingMs > 0 && !isNaN(pingMs)) 
+        ? Math.max(0, (nowTime - pingMs) / (1000 * 60)) 
+        : (rawHours * 60);
 
-    // Weekend Freeze logic: If market is closed on weekend, subtract elapsed weekend hours so healthy ports do not degrade
+    // Weekend Freeze logic: If market is closed on weekend, calculate effective frozen hours
+    // to prevent healthy active ports from degrading into State 4, 5, 6, 7 (offline) during weekend market closure
+    let effectiveHours = rawHours;
     if (isWeekend) {
         const weekendElapsed = getWeekendElapsedHours(new Date(nowTime));
         if (weekendElapsed > 0 && effectiveHours > 0) {
@@ -293,31 +299,24 @@ export function resolvePortState(
         }
     }
 
-    let minsSince = effectiveHours * 60;
-    if (port.lastPing && !isWeekend) {
-        const pingMs = new Date(port.lastPing).getTime();
-        if (!isNaN(pingMs)) {
-            minsSince = Math.max(0, (nowTime - pingMs) / (1000 * 60));
-            effectiveHours = minsSince / 60;
-        }
-    }
-
-    // State 1: Live View (Viewer is actively looking at farm page within 3 mins + recent ping within 2 mins)
+    // State 1: Live View (Viewer is actively looking at farm page within 3 mins + real-time ping within 2 mins)
+    // CRITICAL: Must use actualMinsSince (real-time clock), NOT weekend frozen hours!
     const isViewerActive = port.lastViewedAt
         ? (nowTime - new Date(port.lastViewedAt).getTime() <= 3 * 60 * 1000)
         : false;
-    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && minsSince <= 2;
+    const isLiveView = port.engineTier !== 'legacy_1url' && isViewerActive && actualMinsSince <= 2;
 
-    if (isLiveView || minsSince <= 0.5) {
+    if (isLiveView || actualMinsSince <= 0.5) {
         return 'STATE_1_LIVE';
     }
 
-    // State 2: Online (Smart Sleep: ping within 15 mins)
-    if (minsSince <= 15) {
+    // State 2: Online (Smart Sleep: real ping within 15 mins)
+    if (actualMinsSince <= 15) {
         return 'STATE_2_ONLINE';
     }
 
     // State 3: Standby 12h (Regular 12h license cycle: <= 12 hours)
+    // On weekends, healthy ports freeze here in State 3 Standby
     if (effectiveHours <= 12) {
         return 'STATE_3_STANDBY_12H';
     }
