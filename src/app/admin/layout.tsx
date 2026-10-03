@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon, Key, Save, Gamepad2, Activity, Crown } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Loader2, FileText, Menu, Settings, Users, Briefcase, FileCheck, Link as LinkIcon, Key, Save, Gamepad2, Activity, Crown, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
@@ -100,6 +100,15 @@ const SidebarContent = ({
                             <span className="flex items-center truncate">
                                 <Key className="mr-2 h-4 w-4 shrink-0 text-yellow-400" />
                                 พอร์ตทดสอบพิเศษ
+                            </span>
+                            <Crown className="h-4 w-4 shrink-0 text-amber-400 fill-amber-400/40" />
+                        </Button>
+                    </Link>
+                    <Link href="/admin/easym-plans" onClick={onClose}>
+                        <Button variant="ghost" className="w-full justify-between whitespace-nowrap text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30">
+                            <span className="flex items-center truncate">
+                                <Sparkles className="mr-2 h-4 w-4 shrink-0 text-emerald-400" />
+                                แผนราคา EasyM (Private)
                             </span>
                             <Crown className="h-4 w-4 shrink-0 text-amber-400 fill-amber-400/40" />
                         </Button>
