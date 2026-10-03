@@ -109,10 +109,10 @@
   animation: box-shake 0.5s ease-in-out;
 }
 
-/* Faint checkerboard pattern for State 9 (Never connected / Transparent) */
+/* Faint checkerboard pattern for State 9 (Never connected / Transparent) - 10% brighter */
 .bg-checkerboard {
-  background-color: #121214;
-  background-image: conic-gradient(#27272a 90deg, #18181b 90deg 180deg, #27272a 180deg 270deg, #18181b 270deg);
+  background-color: #1c1c20;
+  background-image: conic-gradient(#3f3f46 90deg, #27272a 90deg 180deg, #3f3f46 180deg 270deg, #27272a 270deg);
   background-size: 8px 8px;
 }
 

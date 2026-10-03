@@ -4318,14 +4318,19 @@ export default function EasyMMasterDashboardPage() {
                                             }
                                             const isWeekendRunning = isWk && (pState === 'STATE_1_LIVE' || pState === 'STATE_2_ONLINE' || pState === 'STATE_3_STANDBY_12H' || port.isRealRunning);
 
-                                            // Outer border/glow: Prime outer cyan ring + slow pulsing weekend aura outside inner license border
-                                            const outerBorderClass = (isPrime && isWeekendRunning)
-                                                ? 'animate-weekend-prime-glow'
+                                            // Single border styling: Cyan for Prime, Green for active non-prime, Grey for inactive
+                                            const borderClass = !port.isActive
+                                                ? 'border-2 border-zinc-500/70 opacity-60'
                                                 : isPrime
-                                                    ? 'ring-prime-cyan'
-                                                    : isWeekendRunning
-                                                        ? 'animate-weekend-glow'
-                                                        : (port.isActive ? 'shadow-[0_0_6px_rgba(52,211,153,0.35)]' : '');
+                                                    ? 'border-2 border-cyan-400'
+                                                    : 'border-2 border-emerald-400';
+
+                                            // Outer aura: slow pulsing weekend glow when market closed, or soft brand glow on active ports
+                                            const outerBorderClass = isWeekendRunning
+                                                ? 'animate-weekend-glow'
+                                                : port.isActive
+                                                    ? (isPrime ? 'shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'shadow-[0_0_6px_rgba(52,211,153,0.35)]')
+                                                    : '';
 
                                             return (
                                                 <div
@@ -4339,11 +4344,7 @@ export default function EasyMMasterDashboardPage() {
                                                     }}
                                                 className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
                                                     meta.colorBg
-                                                } ${
-                                                    port.isActive
-                                                        ? 'border-2 border-emerald-400'
-                                                        : 'border-2 border-zinc-500/70 opacity-60'
-                                                } ${outerBorderClass} ${
+                                                } ${borderClass} ${outerBorderClass} ${
                                                     isHovered
                                                         ? 'scale-125 ring-2 ring-white z-30 shadow-2xl brightness-110'
                                                         : 'hover:scale-115 hover:z-20'
@@ -4737,14 +4738,23 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="font-bold text-foreground block border-b border-border/40 pb-1">
                                                 2. ขอบกล่อง (ขอบในสิทธิ์ &amp; ขอบนอก)
                                             </span>
-                                            <div className="space-y-2.5 text-[11px] pt-1">
+                                             <div className="space-y-2.5 text-[11px] pt-1">
                                                 <div className="flex items-start gap-2.5">
                                                     <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)] shrink-0 flex items-center justify-center text-[9px] font-mono text-emerald-300 font-bold">
                                                         ON
                                                     </div>
                                                     <div>
-                                                        <strong className="text-emerald-400 block">ขอบในสีเขียว (Active)</strong>
-                                                        <span className="text-muted-foreground">License เปิดใช้งานอยู่ตามปกติ มีสิทธิ์รันบน MT5</span>
+                                                        <strong className="text-emerald-400 block">ขอบสีเขียว (Active - ทั่วไป)</strong>
+                                                        <span className="text-muted-foreground">License เปิดใช้งานอยู่ตามปกติ สำหรับ EasyM MAX / Mini / Farm</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)] shrink-0 flex items-center justify-center text-[8px] font-mono text-cyan-300 font-bold">
+                                                        PRM
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-cyan-400 block">ขอบสีฟ้า (EasyM Prime)</strong>
+                                                        <span className="text-muted-foreground">พอร์ตที่เป็น Prime ขอบเป็นสีฟ้าชั้นเดียว แยกจาก mini และ MAX ชัดเจน</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start gap-2.5">
@@ -4752,17 +4762,8 @@ export default function EasyMMasterDashboardPage() {
                                                         OFF
                                                     </div>
                                                     <div>
-                                                        <strong className="text-zinc-400 block">ขอบในสีเทา (Inactive)</strong>
+                                                        <strong className="text-zinc-400 block">ขอบสีเทา (Inactive)</strong>
                                                         <span className="text-muted-foreground">License ถูกระงับหรือปิดใช้งาน สิทธิ์หยุดส่งคำสั่ง</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-2.5">
-                                                    <div className="w-6 h-6 rounded-md bg-zinc-800 border-2 border-emerald-400 ring-prime-cyan shrink-0 flex items-center justify-center text-[8px] font-mono text-cyan-300 font-bold">
-                                                        PRM
-                                                    </div>
-                                                    <div>
-                                                        <strong className="text-cyan-400 block">ขอบนอกสีฟ้า (EasyM Prime)</strong>
-                                                        <span className="text-muted-foreground">พอร์ตที่เป็น EasyM Prime แยกจาก mini และ MAX ชัดเจน</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start gap-2.5">
@@ -4770,8 +4771,8 @@ export default function EasyMMasterDashboardPage() {
                                                         WK
                                                     </div>
                                                     <div>
-                                                        <strong className="text-purple-300 block">ขอบนอกสีม่วงกระพริบช้า (Weekend)</strong>
-                                                        <span className="text-muted-foreground">ตลาดปิดเสาร์-อาทิตย์ เรืองแสงกระพริบช้านอกขอบเขียว/เทาเดิม</span>
+                                                        <strong className="text-purple-300 block">เรืองแสงสีม่วงกระพริบช้า (Weekend)</strong>
+                                                        <span className="text-muted-foreground">ตลาดปิดเสาร์-อาทิตย์ เรืองแสงกระพริบช้านอกขอบกล่อง</span>
                                                     </div>
                                                 </div>
                                             </div>
