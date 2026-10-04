@@ -962,97 +962,112 @@ export default function EasyMPlansPage() {
                                 })()}
 
                                 {/* ============================================================== */}
-                                {/* DYNAMIC PRICE DISPLAY (ราคาตัวใหญ่ ชัดเจน) */}
                                 {/* ============================================================== */}
-                                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                                {/* DYNAMIC PRICE DISPLAY (ราคาตัวใหญ่ ชัดเจน & รักษาขนาดกรอบเดิม) */}
+                                {/* ============================================================== */}
+                                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 min-h-[126px] flex flex-col justify-between">
                                     {product.id === 'easym-max' && currentEdition === 'free_no_ui' ? (
-                                        /* EasyM MAX แบบใช้ฟรี: เงื่อนไขพิเศษ พร้อม Information icon & Tooltip */
-                                        <div className="space-y-2.5">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight">
-                                                        เงื่อนไขพิเศษ
-                                                    </span>
-                                                    
-                                                    {/* Information Icon Tooltip & Popover */}
-                                                    <div className="relative group/info">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setActiveSpecialInfo(prev => prev === product.id ? null : product.id);
-                                                            }}
-                                                            className="p-1 rounded-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/40 transition flex items-center justify-center cursor-pointer shadow-sm"
-                                                            title="เงื่อนไขพิเศษ: ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น"
-                                                        >
-                                                            <Info className="w-4 h-4" />
-                                                        </button>
+                                        /* EasyM MAX แบบใช้ฟรี: จัดสัดส่วน 2 ส่วนเป๊ะเหมือนการเลือกรัน VPS ทั้งสองแบบ รักษาขนาดกรอบเดิม */
+                                        <>
+                                            {/* ส่วนบน (Upper Section: หัวข้อสถานะ + คำอธิบายย่อย) */}
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between h-8 sm:h-9">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xl sm:text-2xl font-black text-amber-400 tracking-tight leading-none">
+                                                            เงื่อนไขพิเศษ
+                                                        </span>
+                                                        
+                                                        {/* Information Icon Tooltip & Popover */}
+                                                        <div className="relative group/info">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveSpecialInfo(prev => prev === product.id ? null : product.id);
+                                                                }}
+                                                                className="p-1 rounded-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/40 transition flex items-center justify-center cursor-pointer shadow-sm"
+                                                                title="เงื่อนไขพิเศษ: ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น"
+                                                            >
+                                                                <Info className="w-3.5 h-3.5" />
+                                                            </button>
 
-                                                        {/* Tooltip on Hover */}
-                                                        <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 hidden group-hover/info:block z-30 w-72 p-2.5 rounded-xl bg-slate-950/95 border border-amber-500/60 text-amber-200 text-xs shadow-2xl backdrop-blur-md pointer-events-none text-left">
-                                                            <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-0.5">
-                                                                <Info className="w-3.5 h-3.5 text-amber-400" />
-                                                                <span>เงื่อนไขพิเศษ</span>
+                                                            {/* Tooltip on Hover */}
+                                                            <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 hidden group-hover/info:block z-30 w-72 p-2.5 rounded-xl bg-slate-950/95 border border-amber-500/60 text-amber-200 text-xs shadow-2xl backdrop-blur-md pointer-events-none text-left">
+                                                                <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-0.5">
+                                                                    <Info className="w-3.5 h-3.5 text-amber-400" />
+                                                                    <span>เงื่อนไขพิเศษ</span>
+                                                                </div>
+                                                                <p className="text-[11px] leading-relaxed text-slate-200">
+                                                                    ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
+                                                                </p>
                                                             </div>
-                                                            <p className="text-[11px] leading-relaxed text-slate-200">
-                                                                ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
-                                                            </p>
                                                         </div>
                                                     </div>
+
+                                                    <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                                        ติดต่อแอดมิน
+                                                    </span>
                                                 </div>
 
-                                                <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                                    ติดต่อแอดมิน
-                                                </span>
+                                                <div className="flex items-center justify-between text-xs text-slate-400 h-5">
+                                                    <span className="truncate pr-1">ใช้งานฟรี ไม่มี Farm UI (มอนิเตอร์บน MT5)</span>
+                                                    <span className="font-bold text-amber-300 font-mono shrink-0">฿0</span>
+                                                </div>
                                             </div>
 
-                                            {/* Interactive / Notice Box */}
-                                            <div 
-                                                onClick={() => setActiveSpecialInfo(prev => prev === product.id ? null : product.id)}
-                                                className="cursor-pointer p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 hover:bg-amber-500/15 hover:border-amber-400/50 transition"
-                                            >
-                                                <Info className="w-4 h-4 text-amber-400 shrink-0" />
-                                                <span className="font-semibold leading-tight text-[11px]">
-                                                    เงื่อนไขพิเศษ &nbsp; ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
+                                            {/* ส่วนล่าง (Lower Section: คั่นด้วย border-t สัดส่วนเดียวกับกรอบ VPS) */}
+                                            <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-amber-300 h-7">
+                                                <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                                <span className="font-semibold truncate">
+                                                    ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
                                                 </span>
                                             </div>
-                                        </div>
+                                        </>
                                     ) : priceInfo.available ? (
                                         <>
-                                            <div className="flex items-baseline gap-2">
-                                                {priceInfo.originalPrice && (
-                                                    <span className="text-xs text-slate-500 line-through font-mono">
-                                                        ฿{priceInfo.originalPrice.toLocaleString()}
+                                            {/* ส่วนบน (Upper Section: ราคาหลัก + คำอธิบายย่อย) */}
+                                            <div className="space-y-1">
+                                                <div className="flex items-baseline gap-2 h-8 sm:h-9">
+                                                    {priceInfo.originalPrice && (
+                                                        <span className="text-xs text-slate-500 line-through font-mono">
+                                                            ฿{priceInfo.originalPrice.toLocaleString()}
+                                                        </span>
+                                                    )}
+                                                    <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight leading-none">
+                                                        {priceInfo.price === 0 ? '฿0' : `฿${priceInfo.price.toLocaleString()}`}
                                                     </span>
-                                                )}
-                                                <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                                                    {priceInfo.price === 0 ? '฿0' : `฿${priceInfo.price.toLocaleString()}`}
-                                                </span>
-                                                {priceInfo.price > 0 && (
-                                                    <span className="text-xs text-slate-400 font-medium">
-                                                        / ปี
-                                                    </span>
-                                                )}
+                                                    {priceInfo.price > 0 && (
+                                                        <span className="text-xs text-slate-400 font-medium">
+                                                            / ปี
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center justify-between text-xs text-slate-400 h-5">
+                                                    <span className="truncate pr-1">{priceInfo.note}</span>
+                                                    {priceInfo.price > 0 && (
+                                                        <span className="font-bold text-amber-300 font-mono shrink-0">
+                                                            ~฿{priceInfo.monthlyAvg.toLocaleString()}/ด.
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between text-xs text-slate-400">
-                                                <span className="truncate pr-1">{priceInfo.note}</span>
-                                                {priceInfo.price > 0 && (
-                                                    <span className="font-bold text-amber-300 font-mono shrink-0">
-                                                        ~฿{priceInfo.monthlyAvg.toLocaleString()}/ด.
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {priceInfo.trialBadge && (
-                                                <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-purple-300">
+                                            {/* ส่วนล่าง (Lower Section: Trial Badge หรือสถานะฟรี) */}
+                                            {priceInfo.trialBadge ? (
+                                                <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-purple-300 h-7">
                                                     <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                                    <span className="font-semibold">{priceInfo.trialBadge}</span>
+                                                    <span className="font-semibold truncate">{priceInfo.trialBadge}</span>
+                                                </div>
+                                            ) : (
+                                                <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-emerald-400 h-7">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                                    <span className="font-semibold truncate">ไม่มีค่าบริการรายปี • ตรวจสอบผ่าน MT5</span>
                                                 </div>
                                             )}
                                         </>
                                     ) : (
-                                        <div className="py-2 text-center text-xs text-slate-400 leading-relaxed">
+                                        <div className="py-2 text-center text-xs text-slate-400 leading-relaxed my-auto">
                                             {priceInfo.note}
                                         </div>
                                     )}
