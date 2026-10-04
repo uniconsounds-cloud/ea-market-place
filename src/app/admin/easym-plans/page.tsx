@@ -404,6 +404,18 @@ export default function EasyMPlansPage() {
         checkAccessAndLicenses();
     }, [router]);
 
+    // Close modals on Escape key press
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsFarmModalOpen(false);
+                setDetailProduct(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     // Determine whether current persona qualifies as an "Existing Customer"
     const isExistingCustomer = useMemo(() => {
         if (persona === 'real_user') {
@@ -675,18 +687,26 @@ export default function EasyMPlansPage() {
                         </p>
                     </div>
 
-                    {/* Smartphone Mockup Showcase (ความสูงย่อลงมาเท่าความสูงรวมของตัวอักษร) */}
+                    {/* Realistic iPhone Mockup Showcase (ความสูงย่อลงมาเท่าความสูงรวมของตัวอักษร) */}
                     <div className="shrink-0 flex items-center justify-center">
                         <div
                             onClick={() => setIsFarmModalOpen(true)}
-                            className="group/phone relative h-28 sm:h-32 md:h-36 aspect-[9/16] rounded-2xl p-1 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-2 border-amber-400/60 shadow-[0_6px_25px_rgba(245,158,11,0.25)] cursor-pointer hover:scale-105 hover:border-amber-300 transition-all duration-300 select-none"
-                            title="คลิกเพื่อดูหน้าฟาร์ม EasyM Live Tracking"
+                            className="group/phone relative h-28 sm:h-32 md:h-36 aspect-[9/19] rounded-[22px] sm:rounded-[26px] p-[2.5px] bg-gradient-to-b from-slate-300 via-slate-600 to-slate-900 border border-slate-400/60 shadow-[0_12px_35px_rgba(0,0,0,0.6),0_0_25px_rgba(245,158,11,0.25)] cursor-pointer hover:scale-105 hover:shadow-[0_16px_40px_rgba(245,158,11,0.35)] transition-all duration-300 select-none"
+                            title="คลิกเพื่อเปิดหน้าฟาร์ม EasyM Live Tracker"
                         >
+                            {/* Realistic iPhone Hardware Side Buttons */}
+                            <div className="absolute -left-[2px] top-5 w-[2px] h-2 bg-slate-400 rounded-l-sm" /> {/* Action Button */}
+                            <div className="absolute -left-[2px] top-8 w-[2px] h-3 bg-slate-400 rounded-l-sm" /> {/* Volume Up */}
+                            <div className="absolute -left-[2px] top-12 w-[2px] h-3 bg-slate-400 rounded-l-sm" /> {/* Volume Down */}
+                            <div className="absolute -right-[2px] top-8 w-[2px] h-5 bg-slate-400 rounded-r-sm" /> {/* Power Button */}
+
                             {/* Phone Screen Bezel */}
-                            <div className="relative w-full h-full rounded-[12px] overflow-hidden bg-black border border-slate-700/80 shadow-inner">
+                            <div className="relative w-full h-full rounded-[19px] sm:rounded-[23px] overflow-hidden bg-black border border-slate-900 shadow-inner flex flex-col">
                                 
-                                {/* Dynamic Island / Top Notch Indicator */}
-                                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-6 sm:w-8 h-1.5 bg-black rounded-full z-20 border border-slate-800" />
+                                {/* Dynamic Island Pill */}
+                                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-6 sm:w-8 h-1.5 bg-black rounded-full z-30 border border-slate-800 flex items-center justify-end pr-1 pointer-events-none">
+                                    <div className="w-0.5 h-0.5 rounded-full bg-blue-950/80" />
+                                </div>
 
                                 {/* Real Farm UI Image Showcase */}
                                 <Image
@@ -698,13 +718,16 @@ export default function EasyMPlansPage() {
                                 />
 
                                 {/* Subtle Glass Gloss Reflection */}
-                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none z-10" />
+                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/15 pointer-events-none z-20" />
+
+                                {/* iOS Home Indicator Bar */}
+                                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-7 sm:w-9 h-0.5 bg-white/70 rounded-full z-30 shadow pointer-events-none" />
 
                                 {/* Interactive Hover Click Overlay */}
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/phone:opacity-100 transition-opacity flex items-center justify-center z-20 backdrop-blur-[1px]">
-                                    <span className="px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1">
+                                <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/phone:opacity-100 transition-opacity flex items-center justify-center z-30 backdrop-blur-[1px]">
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1">
                                         <Eye className="w-2.5 h-2.5" />
-                                        <span>ดูฟาร์มจริง 👆</span>
+                                        <span>ดูฟาร์มสด 👆</span>
                                     </span>
                                 </div>
                             </div>
@@ -1315,196 +1338,129 @@ export default function EasyMPlansPage() {
             )}
 
             {/* ============================================================== */}
-            {/* 6. INTERACTIVE FARM UI SIMULATION POPUP MODAL (หน้าฟาร์มเสมือนจริง) */}
+            {/* 6. EASYM LIVE TRACKER POPUP MODAL (หน้าฟาร์มเสมือนจริงสมจริง 100%) */}
             {/* ============================================================== */}
             {isFarmModalOpen && (
                 <div 
-                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+                    className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
                     onClick={() => setIsFarmModalOpen(false)}
                 >
+                    {/* Modal Inner Container */}
                     <div 
-                        className="relative w-full max-w-5xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 border-amber-500/40 rounded-3xl p-5 sm:p-8 shadow-2xl shadow-amber-500/10 space-y-6 max-h-[92vh] overflow-y-auto"
+                        className="relative w-full max-w-4xl flex flex-col items-center my-auto py-2"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Close Modal Button */}
-                        <button
-                            type="button"
-                            onClick={() => setIsFarmModalOpen(false)}
-                            className="absolute top-5 right-5 p-2 rounded-full bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 transition"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-
-                        {/* Modal Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 pr-10">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow">
-                                        LIVE SIMULATION
-                                    </span>
-                                    <span className="text-xs text-amber-300 font-bold flex items-center gap-1">
-                                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                                        EasyM Live Tracker Experience
-                                    </span>
-                                </div>
-                                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
-                                    🎮 EasyM Live Tracking (หน้าฟาร์มสด)
-                                </h2>
-                                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                                    ระบบมอนิเตอร์พอร์ตและสั่งการอัตโนมัติบนมือถือ 100% สดระดับวินาที
-                                </p>
+                        {/* Top Header Controls Bar */}
+                        <div className="w-full flex items-center justify-between mb-3 px-2 max-w-[420px] sm:max-w-[450px]">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                    ● LIVE STREAM
+                                </span>
+                                <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-1.5">
+                                    <span>🎮 EasyM Live Tracker</span>
+                                </h3>
                             </div>
 
-                            <div className="flex items-center gap-2 self-start sm:self-auto">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                                    Live Data Stream
-                                </span>
+                            <div className="flex items-center gap-2">
+                                <Link href="/farm/demo" target="_blank">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-2.5 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-slate-950 font-bold"
+                                    >
+                                        <ExternalLink className="w-3 h-3 mr-1" />
+                                        <span>เต็มจอ</span>
+                                    </Button>
+                                </Link>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFarmModalOpen(false)}
+                                    className="p-1.5 rounded-full bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+                                    title="ปิดหน้าต่าง (ESC)"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
 
-                        {/* Modal Content: 2-Column Showcase */}
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        {/* Center Stage: Authentic Life-size iPhone 16 Pro Mockup */}
+                        <div className="relative w-[310px] sm:w-[350px] md:w-[380px] aspect-[9/19] max-h-[76vh] sm:max-h-[80vh] p-2.5 sm:p-3 bg-gradient-to-b from-slate-300 via-slate-600 to-slate-900 rounded-[44px] sm:rounded-[50px] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(245,158,11,0.25)] border-2 border-slate-400/60 ring-1 ring-white/20 select-none flex flex-col">
                             
-                            {/* Left Column: High-Res Smartphone Frame */}
-                            <div className="lg:col-span-5 flex flex-col items-center">
-                                <div className="relative w-full max-w-[280px] sm:max-w-[310px] aspect-[9/16] rounded-[36px] p-2.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-4 border-amber-400/60 shadow-[0_15px_50px_rgba(245,158,11,0.25)] overflow-hidden">
-                                    
-                                    {/* Phone Screen Bezel */}
-                                    <div className="relative w-full h-full rounded-[28px] overflow-hidden bg-black border border-slate-700/80 shadow-inner">
-                                        
-                                        {/* Dynamic Island Notch */}
-                                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-3 bg-black rounded-full z-30 border border-slate-800/80 shadow" />
+                            {/* Realistic iPhone Side Buttons */}
+                            <div className="absolute -left-[3px] top-24 w-[3px] h-3.5 bg-slate-400 rounded-l-sm" /> {/* Action button */}
+                            <div className="absolute -left-[3px] top-32 w-[3px] h-8 bg-slate-400 rounded-l-sm" /> {/* Volume Up */}
+                            <div className="absolute -left-[3px] top-44 w-[3px] h-8 bg-slate-400 rounded-l-sm" /> {/* Volume Down */}
+                            <div className="absolute -right-[3px] top-32 w-[3px] h-12 bg-slate-400 rounded-r-sm" /> {/* Power Button */}
 
-                                        {/* Image View */}
+                            {/* Inner Screen Bezel */}
+                            <div className="relative w-full h-full rounded-[36px] sm:rounded-[42px] overflow-hidden bg-black border border-slate-900 shadow-inner flex flex-col">
+                                
+                                {/* iOS Status Bar */}
+                                <div className="absolute top-0 inset-x-0 h-9 z-40 flex items-center justify-between px-6 pointer-events-none">
+                                    <span className="text-[12px] font-semibold text-white tracking-tight">09:41</span>
+                                    
+                                    {/* Top Right iOS Icons (Cell, 5G, Battery) */}
+                                    <div className="flex items-center gap-1.5 text-white">
+                                        {/* Signal Bars */}
+                                        <div className="flex items-end gap-[1.5px] h-2.5">
+                                            <span className="w-[2px] h-1 bg-white rounded-[0.5px]" />
+                                            <span className="w-[2px] h-1.5 bg-white rounded-[0.5px]" />
+                                            <span className="w-[2px] h-2 bg-white rounded-[0.5px]" />
+                                            <span className="w-[2px] h-2.5 bg-white rounded-[0.5px]" />
+                                        </div>
+                                        
+                                        {/* 5G */}
+                                        <span className="text-[10px] font-bold text-white tracking-tighter">5G</span>
+
+                                        {/* Battery */}
+                                        <div className="w-5 h-2.5 rounded-[3px] border border-white/80 p-[1px] flex items-center relative ml-0.5">
+                                            <div className="w-full h-full bg-emerald-400 rounded-[1px]" />
+                                            <div className="w-[1.5px] h-1 bg-white/80 rounded-r-[0.5px] absolute -right-[2.5px]" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dynamic Island */}
+                                <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 sm:w-28 h-5 sm:h-6 bg-black rounded-full z-40 border border-slate-800/80 shadow-md flex items-center justify-between px-2.5 pointer-events-none">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#0a0a14] ring-1 ring-blue-900/50 flex items-center justify-center">
+                                        <div className="w-1 h-1 rounded-full bg-blue-500/30" />
+                                    </div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#111] ring-1 ring-slate-800" />
+                                </div>
+
+                                {/* EasyM Farm UI Screen Content (Scrollable High-Res View) */}
+                                <div className="relative w-full h-full overflow-y-auto scrollbar-none bg-[#090b10]">
+                                    <div className="relative w-full aspect-[682/1024]">
                                         <Image
                                             src="/assets/easym_farm_live_preview.png"
-                                            alt="EasyM Live Farm UI Interactive Simulation"
+                                            alt="EasyM Live Tracker Real Screen"
                                             fill
                                             className="object-cover object-top"
                                             priority
                                         />
-
-                                        {/* Glass Glare */}
-                                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none z-10" />
                                     </div>
                                 </div>
 
-                                <span className="text-[11px] text-slate-400 mt-2.5 flex items-center gap-1.5">
-                                    <Smartphone className="w-3.5 h-3.5 text-amber-400" />
-                                    จำลองมุมมองสัดส่วนบนหน้าจอสมาร์ตโฟนจริง
-                                </span>
-                            </div>
+                                {/* Subtle Glass Gloss Reflection */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none z-30" />
 
-                            {/* Right Column: Breakdown of Real Farm Indicators */}
-                            <div className="lg:col-span-7 space-y-4">
-                                
-                                {/* 1. Key Metrics Cards */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/90 shadow">
-                                        <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Balance (ยอดทุน)</span>
-                                        <span className="text-base sm:text-lg font-black text-amber-300 font-mono">151,495.92</span>
-                                        <span className="text-[10px] text-slate-500 block">USC (~$1,514.95)</span>
-                                    </div>
-
-                                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/90 shadow">
-                                        <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Equity (มูลค่าสุทธิ)</span>
-                                        <span className="text-base sm:text-lg font-black text-blue-400 font-mono">109,285.55</span>
-                                        <span className="text-[10px] text-slate-500 block">USC (~$1,092.85)</span>
-                                    </div>
-
-                                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/90 shadow col-span-2 sm:col-span-1">
-                                        <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Drawdown (DD)</span>
-                                        <span className="text-base sm:text-lg font-black text-rose-400 font-mono">-27.86%</span>
-                                        <span className="text-[10px] text-rose-400/80 block">-42,210.37 USC</span>
-                                    </div>
-                                </div>
-
-                                {/* 2. Active Orders Tracker */}
-                                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                                            <span className="text-slate-300">Buy: <strong className="text-white font-mono">54 ไม้</strong></span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                                            <span className="text-slate-300">Sell: <strong className="text-white font-mono">1 ไม้</strong></span>
-                                        </div>
-                                    </div>
-                                    <span className="text-slate-400">ขนาดรวม: <strong className="text-amber-300 font-mono">0.30 Lots</strong></span>
-                                </div>
-
-                                {/* 3. Feature Explanations */}
-                                <div className="space-y-2.5 text-xs">
-                                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-                                        <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
-                                            <Activity className="w-4 h-4" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">ทุ่งต้นไม้จำลองสุขภาพพอร์ต (Dynamic Forest)</h4>
-                                            <p className="text-slate-400 mt-0.5 leading-relaxed">
-                                                ต้นไม้เติบโต แตกกิ่งก้าน และออกดอกผลตามกำไรสะสม หากมีสถานะ Drawdown หรือความผันผวน ระบบจะแสดงสถานะใบไม้เปลี่ยนสีแจ้งเตือนอย่างเข้าใจง่าย
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-                                        <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                                            <TrendingUp className="w-4 h-4" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">ลังผลกำไรเก็บเกี่ยวรายวัน (Harvest Profit Crates)</h4>
-                                            <p className="text-slate-400 mt-0.5 leading-relaxed">
-                                                สรุปผลกำไรที่เก็บเกี่ยวได้ในแต่ละวัน เช่น <span className="text-emerald-400 font-mono font-bold">+33.44</span>, <span className="text-emerald-400 font-mono font-bold">+51.41</span>, <span className="text-emerald-400 font-mono font-bold">+38.37</span>, <span className="text-emerald-400 font-mono font-bold">+40.70 USC</span> แสดงผลชัดเจนย้อนหลัง
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-                                        <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 mt-0.5">
-                                            <Zap className="w-4 h-4" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-sm">การสั่งงาน 2 ทิศทางผ่านหน้าเว็บ (Two-way Remote Control)</h4>
-                                            <p className="text-slate-400 mt-0.5 leading-relaxed">
-                                                ไม่ต้องล็อกอิน Remote Desktop (RDP) คุณสามารถสั่งเปิด-ปิดคู่เงิน และสั่งหยุดฉุกเฉินได้ทันทีจากสมาร์ตโฟนทุกที่ทุกเวลา 24 ชั่วโมง
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
+                                {/* iOS Home Indicator */}
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 sm:w-36 h-1 bg-white/70 rounded-full z-40 shadow pointer-events-none" />
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
-                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-                            <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                                ฟีเจอร์นี้รวมอยู่ในสิทธิ์ทดลองใช้ฟรี 2 เดือนเต็มสำหรับลูกค้า EasyM
-                            </span>
-
-                            <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                                <Link href="/farm/demo" target="_blank" className="flex-1 sm:flex-initial">
-                                    <Button
-                                        variant="outline"
-                                        className="w-full text-xs border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-slate-950 font-bold"
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-                                        เปิดหน้า Farm Demo จริง
-                                    </Button>
-                                </Link>
-
-                                <Button
-                                    onClick={() => setIsFarmModalOpen(false)}
-                                    className="flex-1 sm:flex-initial text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white"
-                                >
-                                    <span>เข้าใจแล้ว กลับสู่หน้าสินค้า</span>
-                                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                                </Button>
-                            </div>
+                        {/* Bottom Actions Bar */}
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-3 text-center">
+                            <Button
+                                onClick={() => setIsFarmModalOpen(false)}
+                                className="px-6 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-lg flex items-center gap-2"
+                            >
+                                <X className="w-4 h-4" />
+                                <span>ปิดหน้าต่าง (กด ESC หรือคลิกที่ว่าง)</span>
+                            </Button>
                         </div>
-
                     </div>
                 </div>
             )}
