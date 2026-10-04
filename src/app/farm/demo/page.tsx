@@ -2,35 +2,55 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import DemoFarmClient from './DemoFarmClient';
 import { redirect } from 'next/navigation';
 
-export default async function DemoFarmPage() {
+export default async function DemoFarmPage(props: {
+    searchParams?: Promise<{ preview?: string; embed?: string }> | { preview?: string; embed?: string };
+}) {
+    const rawParams = props.searchParams ? await props.searchParams : {};
+    const isPreview = rawParams?.preview === '1' || rawParams?.preview === 'true' || rawParams?.embed === '1';
+
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!user && !isPreview) {
         redirect('/login?redirect=/farm/demo');
     }
 
     // Fetch user's demo challenge details
-    const { data: challenge, error } = await supabase
-        .from('demo_challenges')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-    if (error || !challenge) {
-        console.error("Error fetching challenge:", error);
-        // Not joined yet
-        redirect('/demo-challenge');
+    let challenge: any = null;
+    if (user) {
+        const { data } = await supabase
+            .from('demo_challenges')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+        challenge = data;
     }
 
+    if (!challenge) {
+        if (isPreview || user?.email === 'juntarasate@gmail.com') {
+            // Admin or Preview Demo Mode: Load real master port '21692434'
+            challenge = {
+                id: 'preview-challenge',
+                user_id: user?.id || '47db9b29-7688-41b5-8469-10994f9a5b1a',
+                port_name: 'EasyM Live Tracker',
+                master_port_number: '21692434',
+                risk_level: 1.0,
+                join_date: '2026-05-09',
+                created_at: '2026-05-09T00:00:00Z',
+                referrer_id: '47db9b29-7688-41b5-8469-10994f9a5b1a'
+            };
+        } else {
+            redirect('/demo-challenge');
+        }
+    }
 
     // Determine custom port name with emoji
-    const rawPortName = challenge.port_name || user.email || 'My Demo Port';
+    const rawPortName = challenge.port_name || user?.email || 'EasyM Live Tracker';
     const customName = rawPortName;
 
     // Fallback: Check if user has an upline in profiles if they don't have a referrer_id
     let finalReferrerId = challenge.referrer_id;
-    if (!finalReferrerId) {
+    if (!finalReferrerId && user) {
         const { data: profile } = await supabase
             .from('profiles')
             .select('referred_by')
@@ -42,7 +62,7 @@ export default async function DemoFarmPage() {
     }
 
     // Fetch referrer's broadcast message and master port
-    const referrerIdToCheck = finalReferrerId || user.id; // Also fallback to user's own if admin
+    const referrerIdToCheck = finalReferrerId || user?.id || '47db9b29-7688-41b5-8469-10994f9a5b1a';
     let adminMessage = null;
     let customMasterPort = null;
 
@@ -63,12 +83,12 @@ export default async function DemoFarmPage() {
     }
 
     const finalAdminMessage = adminMessage || "💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀";
-    const masterPortNumber = customMasterPort || challenge.master_port_number || '100000';
+    const masterPortNumber = customMasterPort || challenge.master_port_number || '21692434';
     const joinDateStr = challenge.join_date ? challenge.join_date.split('T')[0] : '2026-05-09';
 
     // Fetch dynamic history & status in parallel
     const [viewRes, historyRes, ordersRes, statusRes] = await Promise.all([
-        supabase.from('admin_demo_challenges_view').select('current_balance').eq('user_id', user.id).maybeSingle(),
+        user ? supabase.from('admin_demo_challenges_view').select('current_balance').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
         supabase.from('farm_daily_history').select('profit, date').eq('port_number', masterPortNumber).gte('date', joinDateStr),
         supabase.from('farm_active_orders').select('*').eq('port_number', masterPortNumber),
         supabase.from('farm_port_status').select('*').eq('port_number', masterPortNumber).single()
@@ -131,7 +151,7 @@ export default async function DemoFarmPage() {
                 customName={customName}
                 adminMessage={finalAdminMessage}
                 challengeStartDate={challenge.created_at}
-                userId={user.id}
+                userId={user?.id || '47db9b29-7688-41b5-8469-10994f9a5b1a'}
                 referrerId={referrerIdToCheck}
             />
         </div>

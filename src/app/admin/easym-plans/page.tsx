@@ -661,33 +661,9 @@ export default function EasyMPlansPage() {
                 <div className="absolute -right-8 -top-8 w-40 h-40 bg-amber-400/20 rounded-full blur-2xl pointer-events-none" />
                 <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
 
-                <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-stretch justify-between gap-4 sm:gap-6">
+                <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-stretch gap-4 sm:gap-6">
                     
-                    {/* Text Section (ยึดความสูงตัวอักษรเป็นหลัก) */}
-                    <div className="flex-1 flex flex-col justify-center space-y-1 text-center sm:text-left">
-                        <div className="flex items-center justify-center sm:justify-start gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow">
-                                ★ EXCLUSIVE FEATURE
-                            </span>
-                        </div>
-                        
-                        {/* บรรทัดที่ 1 */}
-                        <h2 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-snug">
-                            EA หนึ่งเดียว เปิดดู สั่งงาน ผ่านหน้าฟาร์ม UI บนมือถือ
-                        </h2>
-                        
-                        {/* บรรทัดที่ 2 */}
-                        <div className="text-xl sm:text-2xl md:text-3xl font-black bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent underline decoration-amber-400/80 decoration-wavy underline-offset-4 py-0.5">
-                            ทดลองใช้ฟรี 2 เดือน
-                        </div>
-                        
-                        {/* บรรทัดที่ 3 */}
-                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium max-w-2xl pt-0.5">
-                            มอนิเตอร์ Balance, Equity, Drawdown สดระดับวินาที สั่งเปิด-ปิดคู่เงินผ่านหน้าเว็บ 24 ชั่วโมง ไม่ต้องรีโมต VPS
-                        </p>
-                    </div>
-
-                    {/* Realistic iPhone 16 Pro Mockup Showcase (สัดส่วนจริง 71.5mm × 149.6mm) */}
+                    {/* Realistic iPhone 16 Pro Mockup Showcase (แสดงด้านหน้าชุดตัวอักษร) */}
                     <div className="shrink-0 flex items-center justify-center">
                         <div
                             onClick={() => setIsFarmModalOpen(true)}
@@ -732,6 +708,30 @@ export default function EasyMPlansPage() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Text Section (ยึดความสูงตัวอักษรเป็นหลัก) */}
+                    <div className="flex-1 flex flex-col justify-center space-y-1 text-center sm:text-left">
+                        <div className="flex items-center justify-center sm:justify-start gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow">
+                                ★ EXCLUSIVE FEATURE
+                            </span>
+                        </div>
+                        
+                        {/* บรรทัดที่ 1 */}
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-snug">
+                            EA หนึ่งเดียว เปิดดู สั่งงาน ผ่านหน้าฟาร์ม UI บนมือถือ
+                        </h2>
+                        
+                        {/* บรรทัดที่ 2 */}
+                        <div className="text-xl sm:text-2xl md:text-3xl font-black bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent underline decoration-amber-400/80 decoration-wavy underline-offset-4 py-0.5">
+                            ทดลองใช้ฟรี 2 เดือน
+                        </div>
+                        
+                        {/* บรรทัดที่ 3 */}
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium max-w-2xl pt-0.5">
+                            มอนิเตอร์ Balance, Equity, Drawdown สดระดับวินาที สั่งเปิด-ปิดคู่เงินผ่านหน้าเว็บ 24 ชั่วโมง ไม่ต้องรีโมต VPS
+                        </p>
                     </div>
 
                 </div>
@@ -1385,8 +1385,8 @@ export default function EasyMPlansPage() {
                             </div>
                         </div>
 
-                        {/* Center Stage: Authentic Life-size iPhone 16 Pro Mockup (สัดส่วนจริง 71.5mm x 149.6mm) */}
-                        <div className="relative h-[72vh] max-h-[710px] min-h-[500px] aspect-[71.5/149.6] p-[3.5px] sm:p-[4px] bg-gradient-to-b from-slate-300 via-slate-500 to-slate-800 rounded-[36px] sm:rounded-[38px] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_45px_rgba(245,158,11,0.22)] border-[2px] border-slate-400/80 ring-1 ring-white/20 select-none flex flex-col">
+                        {/* Center Stage: Authentic Life-size iPhone 16 Pro Mockup (สัดส่วนจริง 71.5mm x 149.6mm กว้างเป็นหลัก จัดตรงกลางจอ) */}
+                        <div className="relative w-[min(380px,94vw)] aspect-[71.5/149.6] max-h-[84vh] p-[3.5px] sm:p-[4px] bg-gradient-to-b from-slate-300 via-slate-500 to-slate-800 rounded-[36px] sm:rounded-[38px] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_45px_rgba(245,158,11,0.22)] border-[2px] border-slate-400/80 ring-1 ring-white/20 select-none flex flex-col">
                             
                             {/* Realistic iPhone Hardware Side Buttons */}
                             <div className="absolute -left-[2.5px] top-[14%] w-[2px] h-3.5 bg-slate-300 rounded-l-[1px]" /> {/* Action button */}
@@ -1396,34 +1396,16 @@ export default function EasyMPlansPage() {
                             <div className="absolute -right-[2px] top-[68%] w-[1.5px] h-7 bg-slate-400 rounded-r-[1px]" /> {/* Camera Control */}
 
                             {/* Inner Screen Display (Corner Radius = 31px-33px, Thin 1.2mm Bezel) */}
-                            <div className="relative w-full h-full rounded-[31px] sm:rounded-[33px] overflow-hidden bg-[#0d0a06] border border-black shadow-inner flex flex-col">
+                            <div className="relative w-full h-full rounded-[31px] sm:rounded-[33px] overflow-hidden bg-[#16120e] border border-black shadow-inner flex flex-col">
                                 
-                                {/* iOS Status Bar */}
-                                <div className="absolute top-0 inset-x-0 h-10 z-40 flex items-center justify-between px-6 pointer-events-none">
-                                    <span className="text-[11px] font-semibold text-white/95 tracking-tight font-sans">09:41</span>
-                                    
-                                    {/* Top Right iOS Icons (Cell, 5G, Battery) */}
-                                    <div className="flex items-center gap-1.5 text-white/90">
-                                        {/* Signal Bars */}
-                                        <div className="flex items-end gap-[1.5px] h-2.5">
-                                            <span className="w-[2px] h-1 bg-white rounded-[0.5px]" />
-                                            <span className="w-[2px] h-1.5 bg-white rounded-[0.5px]" />
-                                            <span className="w-[2px] h-2 bg-white rounded-[0.5px]" />
-                                            <span className="w-[2px] h-2.5 bg-white rounded-[0.5px]" />
-                                        </div>
-                                        
-                                        {/* 5G */}
-                                        <span className="text-[10px] font-bold text-white tracking-tighter">5G</span>
+                                {/* Real Interactive EasyM Live Tracker Page (เต็มหน้าจอด้านกว้าง 100%) */}
+                                <iframe
+                                    src="/farm/demo?embed=1&preview=1"
+                                    className="w-full h-full border-0 bg-[#16120e]"
+                                    title="EasyM Live Tracker Live Interface"
+                                />
 
-                                        {/* Battery */}
-                                        <div className="w-5 h-2.5 rounded-[3px] border border-white/80 p-[1px] flex items-center relative ml-0.5">
-                                            <div className="w-full h-full bg-emerald-400 rounded-[1px]" />
-                                            <div className="w-[1.5px] h-1 bg-white/80 rounded-r-[0.5px] absolute -right-[2.5px]" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Apple Dynamic Island (สัดส่วน 32% ของความกว้างหน้าจอ) */}
+                                {/* Apple Dynamic Island (Overlay Pointer Events None) */}
                                 <div className="absolute top-[8px] sm:top-[9px] left-1/2 -translate-x-1/2 w-[98px] sm:w-[108px] h-[25px] sm:h-[27px] bg-black rounded-full z-40 border border-slate-900 shadow-md flex items-center justify-between px-2.5 pointer-events-none">
                                     <div className="w-2.5 h-2.5 rounded-full bg-[#0a0a14] ring-1 ring-blue-900/50 flex items-center justify-center">
                                         <div className="w-1 h-1 rounded-full bg-blue-500/30" />
@@ -1431,32 +1413,18 @@ export default function EasyMPlansPage() {
                                     <div className="w-1.5 h-1.5 rounded-full bg-[#111] ring-1 ring-slate-800" />
                                 </div>
 
-                                {/* EasyM Farm UI Screen Content (เลื่อนดูสดได้เต็มรูปแบบทุกฟังก์ชัน) */}
-                                <div className="relative w-full h-full overflow-y-auto overscroll-contain scrollbar-none bg-[#0d0a06] pt-8 pb-6">
-                                    <div className="relative w-full">
-                                        <Image
-                                            src="/assets/easym_farm_live_preview.png"
-                                            alt="EasyM Live Tracker Real Screen"
-                                            width={682}
-                                            height={1024}
-                                            className="w-full h-auto block select-none"
-                                            priority
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Subtle Glass Gloss Reflection */}
+                                {/* Subtle Glass Gloss Reflection (Pointer Events None) */}
                                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none z-30" />
 
-                                {/* iOS Home Indicator */}
+                                {/* iOS Home Indicator (Pointer Events None) */}
                                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 sm:w-32 h-1 bg-white/70 rounded-full z-40 shadow pointer-events-none" />
                             </div>
                         </div>
 
                         {/* Bottom Actions Bar */}
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-3 text-center">
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-2.5 text-center">
                             <span className="text-[11px] text-slate-400 hidden sm:inline">
-                                ↕️ คุณสามารถเลื่อนหน้าจอมือถือขึ้น-ลง เพื่อดูผลกำไรรายวันและเมนูควบคุมได้
+                                🎮 หน้าจอ EasyM Live Tracker จริง (สามารถกดดูข้อมูลและใช้งานปุ่มต่างๆ ได้จริง)
                             </span>
                             <Button
                                 onClick={() => setIsFarmModalOpen(false)}
