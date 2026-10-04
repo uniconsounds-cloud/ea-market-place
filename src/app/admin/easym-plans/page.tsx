@@ -43,7 +43,8 @@ import {
     FileText,
     TrendingUp,
     Gauge,
-    Smartphone
+    Smartphone,
+    Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,20 +92,23 @@ interface ProductConfig {
             noteExisting: string;
             ctaText: string;
             unavailableReason?: string;
+            isSpecialCondition?: boolean;
+            specialConditionNote?: string;
         };
         // 2. รัน VPS เอง + ฟาร์ม UI
         self_ui: {
             available: boolean;
-            priceNew: number;
+            priceNew?: number;
             priceExisting?: number;
             originalPrice?: number;
-            noteNew: string;
-            noteExisting: string;
+            noteNew?: string;
+            noteExisting?: string;
             trialBadgeNew?: string;
             trialBadgeExisting?: string;
-            farmUi: '1u' | '2u';
-            webControl: boolean;
+            farmUi?: '1u' | '2u';
+            webControl?: boolean;
             ctaText: string;
+            unavailableReason?: string;
         };
         // 3. ให้เรารันให้ (EasyM Managed)
         managed_ui: {
@@ -142,10 +146,10 @@ const EASYM_PRODUCTS: ProductConfig[] = [
         tier: 'mini',
         name: 'EasyM mini',
         subtitle: 'Conservative Multi-Pair • จุดเริ่มต้นพอร์ตเทรดอัตโนมัติ',
-        description: 'อัลกอริทึมเทรดกระจายความเสี่ยง 5 คู่เงินหลัก ออกแบบสำหรับผู้เริ่มต้นหรือบัญชี Cent/Micro ใช้งานฟรีตลอดชีพผ่าน IB พาร์ตเนอร์',
+        description: 'อัลกอริทึมเทรดกระจายความเสี่ยง 10 คู่เงินหลัก ออกแบบสำหรับผู้เริ่มต้นหรือบัญชี Cent/Micro ใช้งานฟรีผ่าน IB พาร์ตเนอร์',
         imageBox: '/assets/easym_mini_box.png',
         imagePromote: '/assets/easym_mini_promote1.png',
-        pairsCount: '5 คู่เงินหลัก',
+        pairsCount: '10 คู่เงินหลัก',
         minCapital: '50,000 USC ($500)',
         strategyType: 'Multi-Currency Conservative',
         platform: 'MT5 Expert Advisor',
@@ -164,33 +168,26 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 available: true,
                 priceNew: 0,
                 priceExisting: 0,
-                noteNew: 'ใช้งานฟรีตลอดชีพ • ตรวจสอบผ่าน MT5',
-                noteExisting: 'สิทธิ์ใช้งานฟรีตลอดอายุการใช้งาน',
+                noteNew: 'ใช้งานฟรี (ไม่มี Farm UI) • ตรวจสอบผ่าน MT5',
+                noteExisting: 'สิทธิ์ใช้งานฟรี (ไม่มี Farm UI)',
                 ctaText: 'เริ่มต้นใช้งานฟรี (Start Free)'
             },
             self_ui: {
-                available: true,
-                priceNew: 0,
-                priceExisting: 0,
-                noteNew: 'รวม Farm UI 1U ฟรีตลอดชีพ',
-                noteExisting: 'สิทธิ์ใช้งานฟรี + Farm UI 1U',
-                trialBadgeNew: '🌱 ฟรี Farm UI 1U ตลอดชีพ',
-                trialBadgeExisting: '🌱 ฟรี Farm UI 1U ตลอดชีพ',
-                farmUi: '1u',
-                webControl: false,
-                ctaText: 'เริ่มต้นใช้งานฟรี (Start Free)'
+                available: false,
+                ctaText: 'ไม่รองรับ Farm UI',
+                unavailableReason: 'รุ่น mini ไม่มีการเปิดใช้งาน Farm UI ในทุกกรณี (รัน VPS ตนเองและดูผ่าน MT5)'
             },
             managed_ui: {
                 available: false,
                 ctaText: 'ไม่รองรับ Managed',
-                unavailableReason: 'รุ่น mini ออกแบบสำหรับติดตั้งบน VPS ส่วนตัวเท่านั้น หากต้องการให้ทีมงานดูแล แนะนำรุ่น MAX หรือ PRIME'
+                unavailableReason: 'รุ่น mini ออกแบบสำหรับติดตั้งบน VPS ส่วนตัวเท่านั้น'
             }
         },
         features: {
-            engine: 'เทรด 5 คู่เงินหลักความเสี่ยงต่ำ ป้องกันพอร์ตด้วย Drawdown Guard',
+            engine: 'เทรด 10 คู่เงินหลักความเสี่ยงต่ำ ป้องกันพอร์ตด้วย Drawdown Guard',
             hostingSelf: 'ติดตั้งและดูแลบน VPS ของลูกค้าเอง (Self-Hosted)',
             hostingManaged: 'ไม่รองรับในระบบ EasyM Managed',
-            dashboard: 'Standard Farm UI (1U) มอนิเตอร์สถิติพอร์ตพื้นฐานฟรีตลอดชีพ',
+            dashboard: 'ไม่มี Farm UI ในทุกกรณี (ตรวจสอบสถิติและออเดอร์ผ่าน MT5)',
             webControl: 'ควบคุมผ่านโปรแกรม MT5 (ไม่รองรับการสั่งเปิด-ปิดผ่านเว็บ)',
             broker: 'ใช้งานผ่านบัญชีพาร์ตเนอร์ IB ของ EasyM',
             support: 'คู่มือการติดตั้ง + ซัพพอร์ต Community'
@@ -204,11 +201,11 @@ const EASYM_PRODUCTS: ProductConfig[] = [
         id: 'easym-max',
         tier: 'max',
         name: 'EasyM MAX',
-        subtitle: 'Multi-Timeframe Recovery • กระจาย 10 คู่เงินเต็มสูบ',
-        description: 'ระบบเทรดอัจฉริยะ 10 คู่เงิน กระจายออเดอร์หลายช่วงเวลา พร้อมฟังก์ชันกู้พอร์ต Dynamic Recovery รับมือสภาวะตลาดผันผวนได้อย่างทรงพลัง',
+        subtitle: 'Multi-Timeframe Recovery • กระจาย 20 คู่เงินเต็มสูบ',
+        description: 'ระบบเทรดอัจฉริยะ 20 คู่เงิน กระจายออเดอร์หลายช่วงเวลา พร้อมฟังก์ชันกู้พอร์ต Dynamic Recovery รับมือสภาวะตลาดผันผวนได้อย่างทรงพลัง',
         imageBox: '/assets/easym_max_box.png',
         imagePromote: '/assets/easym_max_promote1.png',
-        pairsCount: '10 คู่เงินครบวงจร',
+        pairsCount: '20 คู่เงินครบวงจร',
         minCapital: '100,000 USC ($1,000)',
         strategyType: 'Multi-Timeframe Recovery',
         platform: 'MT5 Expert Advisor',
@@ -227,9 +224,11 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 available: true,
                 priceNew: 0,
                 priceExisting: 0,
-                noteNew: 'ใช้งานฟรี ไม่มี Farm UI (มอนิเตอร์บน MT5)',
-                noteExisting: 'สิทธิ์ใช้งานฟรีเดิม (มอนิเตอร์บน MT5)',
-                ctaText: 'เริ่มต้นใช้งานฟรี (Start Free)'
+                isSpecialCondition: true,
+                specialConditionNote: 'เงื่อนไขพิเศษ   ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น',
+                noteNew: 'เงื่อนไขพิเศษ (ต้องได้รับการอนุมัติจากแอดมิน)',
+                noteExisting: 'เงื่อนไขพิเศษ (ต้องได้รับการอนุมัติจากแอดมิน)',
+                ctaText: 'ติดต่อขอรับสิทธิ์เงื่อนไขพิเศษ'
             },
             self_ui: {
                 available: true,
@@ -238,7 +237,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 originalPrice: 8000,
                 noteNew: 'ระบบ MAX + Standard Farm UI (เฉลี่ย ฿667/ด.)',
                 noteExisting: 'ส่วนลด 50% สำหรับลูกค้าเดิม (เฉลี่ย ฿333/ด.)',
-                trialBadgeNew: '🎁 ทดลอง Farm UI 2U ฟรี 2 เดือน',
+                trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
                 trialBadgeExisting: '⭐ สิทธิ์ต่ออายุราคาพิเศษเฉพาะคุณ',
                 farmUi: '1u',
                 webControl: false,
@@ -251,7 +250,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 originalPrice: 12000,
                 noteNew: 'รวม Cloud VPS + ทีมงานดูแล 24/5 (เฉลี่ย ฿1,000/ด.)',
                 noteExisting: 'ส่วนลดพิเศษ 50% สำหรับลูกค้าเดิม (เฉลี่ยเพียง ฿500/ด.)',
-                trialBadgeNew: '🎁 ทดลอง Farm UI 2U ฟรี 2 เดือน',
+                trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
                 trialBadgeExisting: '⭐ สิทธิ์ลูกค้าเดิมลด 50% ประหยัด ฿6,000',
                 farmUi: '1u',
                 webControl: false,
@@ -259,7 +258,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
             }
         },
         features: {
-            engine: '10 คู่เงิน กระจายพอร์ตข้ามสกุลเงิน พร้อมระบบแก้ไม้ Dynamic Basket',
+            engine: '20 คู่เงิน กระจายพอร์ตข้ามสกุลเงิน พร้อมระบบแก้ไม้ Dynamic Basket',
             hostingSelf: 'ติดตั้งบน VPS ส่วนตัวของคุณ พร้อมสิทธิ์อัปเดตระบบตลอดปี',
             hostingManaged: 'รวม Cloud VPS สเปกสูง ทีมงานติดตั้งและเฝ้าระวังระบบตลอด 24/5',
             dashboard: 'Standard Farm UI ดูยอด Balance, Equity, Drawdown สดผ่านเว็บและมือถือ',
@@ -280,7 +279,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
         description: 'รุ่นเรือธงระดับสูงสุด ผสาน Adaptive Filter กรองข่าวและความผันผวน พร้อมควบคุมสั่งเปิด–ปิดคู่เงินผ่านหน้าเว็บได้แบบ 100% สถาปัตยกรรม Single Domain V2 ประหยัดแบนด์วิดท์',
         imageBox: '/assets/easym_prime_box.png',
         imagePromote: '/assets/easym_prime_promote1.png',
-        pairsCount: '10 คู่เงิน + Adaptive Filter',
+        pairsCount: '20 คู่เงิน + Adaptive Filter',
         minCapital: '100,000 USC ($1,000)',
         strategyType: 'Adaptive Neural Filter & Recovery',
         platform: 'MT5 Expert Advisor (v2.0)',
@@ -302,7 +301,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 noteNew: 'PRIME ต้องใช้งานคู่กับ Advanced Farm UI เพื่อสั่งงาน 2 ทิศทาง',
                 noteExisting: 'PRIME ต้องใช้งานคู่กับ Advanced Farm UI เพื่อสั่งงาน 2 ทิศทาง',
                 ctaText: 'ต้องใช้ Farm UI',
-                unavailableReason: 'รุ่น PRIME ถูกออกแบบเฉพาะสำหรับสั่งงาน 2 ทิศทางผ่าน Farm UI หากต้องการใช้งานฟรีไม่มี Farm UI แนะนำเลือกรุ่น mini หรือ MAX'
+                unavailableReason: 'รุ่น PRIME ถูกออกแบบเฉพาะสำหรับสั่งงาน 2 ทิศทางผ่าน Farm UI'
             },
             self_ui: {
                 available: true,
@@ -311,7 +310,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 originalPrice: 10000,
                 noteNew: 'ระบบเรือธงครบวงจร (เฉลี่ย ฿833/ด.)',
                 noteExisting: 'อัปเกรดลูกค้าเดิม ลด ฿2,000 (เฉลี่ย ฿667/ด.)',
-                trialBadgeNew: '🎁 ทดลอง Farm UI 2U ฟรี 2 เดือน',
+                trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
                 trialBadgeExisting: '⭐ ราคาอัปเกรดพิเศษจากรุ่น MAX/mini',
                 farmUi: '2u',
                 webControl: true,
@@ -324,7 +323,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 originalPrice: 15000,
                 noteNew: 'พรีเมียม Cloud VPS + จูนเนอร์ส่วนตัว + ดูแล 24/5 (฿1,250/ด.)',
                 noteExisting: 'จ่ายเท่า MAX Managed ของลูกค้าใหม่ แต่ได้รุ่น PRIME ทันที!',
-                trialBadgeNew: '🎁 ทดลอง Farm UI 2U ฟรี 2 เดือน',
+                trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
                 trialBadgeExisting: '⭐ Best Value: ประหยัด ฿3,000 สำหรับลูกค้าเดิม',
                 farmUi: '2u',
                 webControl: true,
@@ -332,10 +331,10 @@ const EASYM_PRODUCTS: ProductConfig[] = [
             }
         },
         features: {
-            engine: '10 คู่เงิน + Adaptive Filter กรองความผันผวน & ข่าวรุนแรงอัตโนมัติ',
+            engine: '20 คู่เงิน + Adaptive Filter กรองความผันผวน & ข่าวรุนแรงอัตโนมัติ',
             hostingSelf: 'ติดตั้งบน VPS ส่วนตัว พร้อม Single Domain V2 ประหยัดเน็ตสูงสุด 90%',
             hostingManaged: 'รวม Premium Cloud VPS + SLA 99.9% ทีมงานมืออาชีพดูแลครบ 24/5',
-            dashboard: 'Advanced Farm UI (2U) ข้อมูลสดพร้อมวิเคราะห์ Drawdown เชิงลึก',
+            dashboard: 'Advanced Farm UI ข้อมูลสดพร้อมวิเคราะห์ Drawdown เชิงลึก',
             webControl: '✨ สั่งเปิด–ปิดคู่เงินผ่านหน้าเว็บได้ 100% ไม่ต้องเข้า VPS',
             broker: 'ใช้งานฟรีผ่าน IB พาร์ตเนอร์ หรือปลดล็อกโบรกส่วนตัว (+4,000 บ./ปี)',
             support: 'VIP Direct Fast-Track Support + แจ้งเตือนความเสี่ยงส่วนบุคคล'
@@ -355,10 +354,13 @@ export default function EasyMPlansPage() {
 
     // Per-card Selected Edition / Hosting: [productId]: 'free_no_ui' | 'self_ui' | 'managed_ui'
     const [cardEditionMap, setCardEditionMap] = useState<Record<string, PlanEditionMode>>({
-        'easym-mini': 'self_ui',
+        'easym-mini': 'free_no_ui',
         'easym-max': 'self_ui',
         'easym-prime': 'managed_ui'
     });
+
+    // Special Condition Popover active state (per product id)
+    const [activeSpecialInfo, setActiveSpecialInfo] = useState<string | null>(null);
 
     // Detail Modal / Drawer State
     const [detailProduct, setDetailProduct] = useState<ProductConfig | null>(null);
@@ -436,15 +438,17 @@ export default function EasyMPlansPage() {
     const getCardPriceInfo = (product: ProductConfig, mode: PlanEditionMode) => {
         const pricingTier = product.pricing[mode];
 
-        if (!pricingTier.available) {
+        if (!pricingTier || !pricingTier.available) {
             return {
                 available: false,
                 price: 0,
                 monthlyAvg: 0,
                 originalPrice: undefined,
-                note: (pricingTier as any).unavailableReason || 'ไม่รองรับในรุ่นนี้',
+                note: (pricingTier as any)?.unavailableReason || 'ไม่รองรับในรุ่นนี้',
                 trialBadge: undefined,
-                ctaText: pricingTier.ctaText
+                ctaText: pricingTier?.ctaText || 'ไม่รองรับ',
+                isSpecialCondition: false,
+                specialConditionNote: undefined
             };
         }
 
@@ -454,6 +458,8 @@ export default function EasyMPlansPage() {
         const monthlyAvg = finalPrice > 0 ? Math.round(finalPrice / 12) : 0;
         const note = isDiscounted ? (pricingTier.noteExisting || '') : (pricingTier.noteNew || '');
         const trialBadge = isDiscounted ? (pricingTier as any).trialBadgeExisting : (pricingTier as any).trialBadgeNew;
+        const isSpecialCondition = Boolean((pricingTier as any).isSpecialCondition);
+        const specialConditionNote = (pricingTier as any).specialConditionNote as string | undefined;
 
         return {
             available: true,
@@ -462,7 +468,9 @@ export default function EasyMPlansPage() {
             originalPrice,
             note,
             trialBadge,
-            ctaText: pricingTier.ctaText
+            ctaText: pricingTier.ctaText,
+            isSpecialCondition,
+            specialConditionNote
         };
     };
 
@@ -483,14 +491,21 @@ export default function EasyMPlansPage() {
             managed_ui: 'ให้ทีมงานดูแลให้ (EasyM Managed)'
         };
 
+        const isSpecial = detailProduct.id === 'easym-max' && detailEdition === 'free_no_ui';
+        const priceLabel = isSpecial
+            ? 'เงื่อนไขพิเศษ (ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น)'
+            : detailPriceInfo?.price === 0
+                ? 'ฟรี (0 บาท)'
+                : `฿${detailPriceInfo?.price.toLocaleString()} / ปี`;
+
         const text = `[ใบเสนอราคา EasyM Ecosystem]
 สินค้า: ${detailProduct.name} (${detailProduct.subtitle})
 ประเภทลูกค้า: ${isExistingCustomer ? 'ลูกค้าเดิม (Existing Customer)' : 'ลูกค้าใหม่ (New Customer)'}
 รูปแบบการใช้งาน: ${editionLabels[detailEdition]}
-ราคาแพ็กเกจ: ${detailPriceInfo?.price === 0 ? 'ฟรี (0 บาท)' : `฿${detailPriceInfo?.price.toLocaleString()} / ปี`}
+ราคาแพ็กเกจ: ${priceLabel}
 โบรกเกอร์: ${detailBroker === 'ib' ? 'IB Partner (ฟรีไม่มีค่าธรรมเนียม)' : 'Own Broker Unlock (+฿4,000 / ปี)'}
-ยอดรวมทั้งสิ้น: ฿${detailTotalAnnual.toLocaleString()} / ปี (เฉลี่ย ฿${detailMonthlyAvg.toLocaleString()} / เดือน)
-สิทธิ์พิเศษ: ${detailPriceInfo?.trialBadge || 'ตามเงื่อนไขแพ็กเกจ'}`;
+ยอดรวมทั้งสิ้น: ${isSpecial ? 'เงื่อนไขพิเศษ (รอการอนุมัติ)' : `฿${detailTotalAnnual.toLocaleString()} / ปี (เฉลี่ย ฿${detailMonthlyAvg.toLocaleString()} / เดือน)`}
+สิทธิ์พิเศษ: ${detailPriceInfo?.trialBadge || (isSpecial ? 'ต้องได้รับการอนุมัติจากแอดมิน' : 'ตามเงื่อนไขแพ็กเกจ')}`;
 
         navigator.clipboard.writeText(text);
         setCopiedSummary(true);
@@ -765,7 +780,7 @@ export default function EasyMPlansPage() {
                                 </strong>
                             ) : (
                                 <strong className="text-blue-300 font-semibold">
-                                    ผู้ใช้งานใหม่ (รับสิทธิ์ทดลอง Farm UI 2U ฟรี 2 เดือนเต็มเมื่อเปิดใช้งาน)
+                                    ผู้ใช้งานใหม่ (รับสิทธิ์ทดลอง Farm UI ฟรี 2 เดือนเต็มเมื่อเปิดใช้งาน)
                                 </strong>
                             )
                         }
@@ -849,102 +864,160 @@ export default function EasyMPlansPage() {
                                 </div>
 
                                 {/* ============================================================== */}
-                                {/* 3-WAY IN-CARD SELECTOR: ฟรีไม่มี UI vs รัน VPS เอง vs ให้เรารันให้ */}
+                                {/* IN-CARD SELECTOR: แสดงเฉพาะตัวเลือกที่รองรับ และขยายเต็มช่อง */}
                                 {/* ============================================================== */}
-                                <div className="bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800 space-y-2">
-                                    <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                                        <span className="font-semibold flex items-center gap-1 text-slate-300">
-                                            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
-                                            เลือกแพ็กเกจ & รูปแบบการรัน
-                                        </span>
-                                        {currentEdition === 'free_no_ui' && (
-                                            <span className="text-[10px] text-emerald-400 font-bold">
-                                                ไม่มีค่าบริการ
-                                            </span>
-                                        )}
-                                        {currentEdition === 'self_ui' && (
-                                            <span className="text-[10px] text-blue-300 font-bold">
-                                                Farm UI + ทดลองฟรี
-                                            </span>
-                                        )}
-                                        {currentEdition === 'managed_ui' && (
-                                            <span className="text-[10px] text-purple-300 font-bold">
-                                                ทีมงานดูแล 24/5
-                                            </span>
-                                        )}
-                                    </div>
+                                {(() => {
+                                    const availableModes = (['free_no_ui', 'self_ui', 'managed_ui'] as PlanEditionMode[]).filter(
+                                        (mode) => product.pricing[mode]?.available
+                                    );
 
-                                    {/* 3 Buttons Grid */}
-                                    <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px]">
-                                        
-                                        {/* Button 1: ใช้ฟรี ไม่มีฟาร์ม UI */}
-                                        <button
-                                            type="button"
-                                            disabled={!product.pricing.free_no_ui.available}
-                                            onClick={() => setCardEdition(product.id, 'free_no_ui')}
-                                            className={`py-2 px-1 rounded-lg font-bold transition-all flex flex-col items-center justify-center text-center leading-tight ${
-                                                !product.pricing.free_no_ui.available
-                                                    ? 'opacity-30 cursor-not-allowed text-slate-600'
-                                                    : currentEdition === 'free_no_ui'
-                                                        ? 'bg-emerald-600 text-white shadow-md'
-                                                        : 'text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            <span>ใช้ฟรี</span>
-                                            <span className="text-[9px] font-normal opacity-80">(ไม่มี Farm UI)</span>
-                                        </button>
+                                    return (
+                                        <div className="bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800 space-y-2">
+                                            <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                                                <span className="font-semibold flex items-center gap-1 text-slate-300">
+                                                    <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                                                    เลือกแพ็กเกจ & รูปแบบการรัน
+                                                </span>
+                                                {currentEdition === 'free_no_ui' && (
+                                                    <span className="text-[10px] text-emerald-400 font-bold">
+                                                        {product.id === 'easym-max' ? 'เงื่อนไขพิเศษ' : 'ไม่มีค่าบริการ'}
+                                                    </span>
+                                                )}
+                                                {currentEdition === 'self_ui' && (
+                                                    <span className="text-[10px] text-blue-300 font-bold">
+                                                        Farm UI + ทดลองฟรี
+                                                    </span>
+                                                )}
+                                                {currentEdition === 'managed_ui' && (
+                                                    <span className="text-[10px] text-purple-300 font-bold">
+                                                        ทีมงานดูแล 24/5
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                        {/* Button 2: รัน VPS เอง (+ Farm UI) */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setCardEdition(product.id, 'self_ui')}
-                                            className={`py-2 px-1 rounded-lg font-bold transition-all flex flex-col items-center justify-center text-center leading-tight ${
-                                                currentEdition === 'self_ui'
-                                                    ? 'bg-blue-600 text-white shadow-md'
-                                                    : 'text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            <span>รัน VPS เอง</span>
-                                            <span className="text-[9px] font-normal opacity-80">(+ Farm UI)</span>
-                                        </button>
-
-                                        {/* Button 3: ให้เรารันให้ (Managed) */}
-                                        <button
-                                            type="button"
-                                            disabled={!product.pricing.managed_ui.available}
-                                            onClick={() => setCardEdition(product.id, 'managed_ui')}
-                                            className={`py-2 px-1 rounded-lg font-bold transition-all flex flex-col items-center justify-center text-center leading-tight ${
-                                                !product.pricing.managed_ui.available
-                                                    ? 'opacity-30 cursor-not-allowed text-slate-600'
-                                                    : currentEdition === 'managed_ui'
-                                                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
-                                                        : 'text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            <span>ให้เรารันให้</span>
-                                            <span className="text-[9px] font-normal opacity-80">(Managed)</span>
-                                        </button>
-
-                                    </div>
-
-                                    {/* Notice text for disabled options */}
-                                    {!product.pricing.managed_ui.available && currentEdition === 'managed_ui' && (
-                                        <p className="text-[10px] text-amber-400 px-1 leading-tight">
-                                            * รุ่น mini รองรับเฉพาะรันบน VPS ตนเอง
-                                        </p>
-                                    )}
-                                    {!product.pricing.free_no_ui.available && currentEdition === 'free_no_ui' && (
-                                        <p className="text-[10px] text-purple-300 px-1 leading-tight">
-                                            * PRIME ต้องใช้งานร่วมกับ Advanced Farm UI เพื่อสั่งงาน 2 ทิศทาง
-                                        </p>
-                                    )}
-                                </div>
+                                            {/* Dynamic Buttons Grid: เต็มความกว้างตามจำนวนตัวเลือกที่มีจริง */}
+                                            <div className={`grid gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px] ${
+                                                availableModes.length === 1 ? 'grid-cols-1' :
+                                                availableModes.length === 2 ? 'grid-cols-2' :
+                                                'grid-cols-3'
+                                            }`}>
+                                                {availableModes.map((mode) => {
+                                                    const isSelected = currentEdition === mode;
+                                                    if (mode === 'free_no_ui') {
+                                                        return (
+                                                            <button
+                                                                key={mode}
+                                                                type="button"
+                                                                onClick={() => setCardEdition(product.id, 'free_no_ui')}
+                                                                className={`py-2 px-1 rounded-lg font-bold transition-all flex flex-col items-center justify-center text-center leading-tight ${
+                                                                    isSelected
+                                                                        ? 'bg-emerald-600 text-white shadow-md'
+                                                                        : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                                                                }`}
+                                                            >
+                                                                <span>ใช้ฟรี</span>
+                                                                <span className="text-[9px] font-normal opacity-80">(ไม่มี Farm UI)</span>
+                                                            </button>
+                                                        );
+                                                    }
+                                                    if (mode === 'self_ui') {
+                                                        return (
+                                                            <button
+                                                                key={mode}
+                                                                type="button"
+                                                                onClick={() => setCardEdition(product.id, 'self_ui')}
+                                                                className={`py-2 px-1 rounded-lg font-bold transition-all flex flex-col items-center justify-center text-center leading-tight ${
+                                                                    isSelected
+                                                                        ? 'bg-blue-600 text-white shadow-md'
+                                                                        : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                                                                }`}
+                                                            >
+                                                                <span>รัน VPS เอง</span>
+                                                                <span className="text-[9px] font-normal opacity-80">(+ Farm UI)</span>
+                                                            </button>
+                                                        );
+                                                    }
+                                                    if (mode === 'managed_ui') {
+                                                        return (
+                                                            <button
+                                                                key={mode}
+                                                                type="button"
+                                                                onClick={() => setCardEdition(product.id, 'managed_ui')}
+                                                                className={`py-2 px-1 rounded-lg font-bold transition-all flex flex-col items-center justify-center text-center leading-tight ${
+                                                                    isSelected
+                                                                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                                                                        : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                                                                }`}
+                                                            >
+                                                                <span>ให้เรารันให้</span>
+                                                                <span className="text-[9px] font-normal opacity-80">(Managed)</span>
+                                                            </button>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* ============================================================== */}
                                 {/* DYNAMIC PRICE DISPLAY (ราคาตัวใหญ่ ชัดเจน) */}
                                 {/* ============================================================== */}
-                                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
-                                    {priceInfo.available ? (
+                                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                                    {product.id === 'easym-max' && currentEdition === 'free_no_ui' ? (
+                                        /* EasyM MAX แบบใช้ฟรี: เงื่อนไขพิเศษ พร้อม Information icon & Tooltip */
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight">
+                                                        เงื่อนไขพิเศษ
+                                                    </span>
+                                                    
+                                                    {/* Information Icon Tooltip & Popover */}
+                                                    <div className="relative group/info">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActiveSpecialInfo(prev => prev === product.id ? null : product.id);
+                                                            }}
+                                                            className="p-1 rounded-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/40 transition flex items-center justify-center cursor-pointer shadow-sm"
+                                                            title="เงื่อนไขพิเศษ: ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น"
+                                                        >
+                                                            <Info className="w-4 h-4" />
+                                                        </button>
+
+                                                        {/* Tooltip on Hover */}
+                                                        <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 hidden group-hover/info:block z-30 w-72 p-2.5 rounded-xl bg-slate-950/95 border border-amber-500/60 text-amber-200 text-xs shadow-2xl backdrop-blur-md pointer-events-none text-left">
+                                                            <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-0.5">
+                                                                <Info className="w-3.5 h-3.5 text-amber-400" />
+                                                                <span>เงื่อนไขพิเศษ</span>
+                                                            </div>
+                                                            <p className="text-[11px] leading-relaxed text-slate-200">
+                                                                ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                                    ติดต่อแอดมิน
+                                                </span>
+                                            </div>
+
+                                            {/* Interactive / Notice Box */}
+                                            <div 
+                                                onClick={() => setActiveSpecialInfo(prev => prev === product.id ? null : product.id)}
+                                                className="cursor-pointer p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 hover:bg-amber-500/15 hover:border-amber-400/50 transition"
+                                            >
+                                                <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                                                <span className="font-semibold leading-tight text-[11px]">
+                                                    เงื่อนไขพิเศษ &nbsp; ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : priceInfo.available ? (
                                         <>
                                             <div className="flex items-baseline gap-2">
                                                 {priceInfo.originalPrice && (
@@ -955,9 +1028,11 @@ export default function EasyMPlansPage() {
                                                 <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
                                                     {priceInfo.price === 0 ? '฿0' : `฿${priceInfo.price.toLocaleString()}`}
                                                 </span>
-                                                <span className="text-xs text-slate-400 font-medium">
-                                                    {priceInfo.price === 0 ? 'ตลอดชีพ' : '/ ปี'}
-                                                </span>
+                                                {priceInfo.price > 0 && (
+                                                    <span className="text-xs text-slate-400 font-medium">
+                                                        / ปี
+                                                    </span>
+                                                )}
                                             </div>
 
                                             <div className="flex items-center justify-between text-xs text-slate-400">
@@ -982,6 +1057,7 @@ export default function EasyMPlansPage() {
                                         </div>
                                     )}
                                 </div>
+
 
                                 {/* --- HIGHLIGHT FEATURES CHECKLIST --- */}
                                 <div className="space-y-2 pt-1 text-xs text-slate-300 flex-1">
@@ -1147,80 +1223,78 @@ export default function EasyMPlansPage() {
                                     <div className="space-y-2">
                                         
                                         {/* Option: ฟรี ไม่มี Farm UI */}
-                                        <button
-                                            type="button"
-                                            disabled={!detailProduct.pricing.free_no_ui.available}
-                                            onClick={() => setDetailEdition('free_no_ui')}
-                                            className={`w-full p-3 rounded-xl border text-left transition-all ${
-                                                !detailProduct.pricing.free_no_ui.available
-                                                    ? 'opacity-40 cursor-not-allowed bg-slate-900 border-slate-800'
-                                                    : detailEdition === 'free_no_ui'
-                                                        ? 'bg-emerald-600/20 border-emerald-500 text-white'
+                                        {detailProduct.pricing.free_no_ui.available && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setDetailEdition('free_no_ui')}
+                                                className={`w-full p-3 rounded-xl border text-left transition-all ${
+                                                    detailEdition === 'free_no_ui'
+                                                        ? 'bg-emerald-600/20 border-emerald-500 text-white shadow-md'
                                                         : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                                                    ใช้งานฟรี (ไม่มี Farm UI)
-                                                </span>
-                                                {detailEdition === 'free_no_ui' && <Check className="w-4 h-4 text-emerald-400" />}
-                                            </div>
-                                            <p className="text-[11px] text-slate-400 mt-1">
-                                                {detailProduct.pricing.free_no_ui.available
-                                                    ? 'รันบน VPS ลูกค้าเอง มอนิเตอร์บนโปรแกรม MT5 โดยตรง'
-                                                    : 'รุ่นนี้ต้องใช้งานร่วมกับ Farm UI เพื่อสั่งงาน 2 ทิศทาง'}
-                                            </p>
-                                        </button>
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                                        {detailProduct.id === 'easym-max' ? 'ใช้งานฟรี เงื่อนไขพิเศษ (ไม่มี Farm UI)' : 'ใช้งานฟรี (ไม่มี Farm UI)'}
+                                                    </span>
+                                                    {detailEdition === 'free_no_ui' && <Check className="w-4 h-4 text-emerald-400" />}
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 mt-1">
+                                                    {detailProduct.id === 'easym-max'
+                                                        ? 'เงื่อนไขพิเศษ: ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น'
+                                                        : 'รันบน VPS ลูกค้าเอง มอนิเตอร์บนโปรแกรม MT5 โดยตรง'}
+                                                </p>
+                                            </button>
+                                        )}
 
                                         {/* Option: รัน VPS เอง (+ Farm UI) */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setDetailEdition('self_ui')}
-                                            className={`w-full p-3 rounded-xl border text-left transition-all ${
-                                                detailEdition === 'self_ui'
-                                                    ? 'bg-blue-600/20 border-blue-500 text-white'
-                                                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                                    <Server className="w-3.5 h-3.5 text-blue-400" />
-                                                    รันบน VPS ของตนเอง (+ Farm UI)
-                                                </span>
-                                                {detailEdition === 'self_ui' && <Check className="w-4 h-4 text-blue-400" />}
-                                            </div>
-                                            <p className="text-[11px] text-slate-400 mt-1">
-                                                ลูกค้าดูแล VPS เอง พร้อมเชื่อมต่อ Farm Dashboard บนมือถือ
-                                            </p>
-                                        </button>
+                                        {detailProduct.pricing.self_ui.available && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setDetailEdition('self_ui')}
+                                                className={`w-full p-3 rounded-xl border text-left transition-all ${
+                                                    detailEdition === 'self_ui'
+                                                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-md'
+                                                        : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                                        <Server className="w-3.5 h-3.5 text-blue-400" />
+                                                        รันบน VPS ของตนเอง (+ Farm UI)
+                                                    </span>
+                                                    {detailEdition === 'self_ui' && <Check className="w-4 h-4 text-blue-400" />}
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 mt-1">
+                                                    ลูกค้าดูแล VPS เอง พร้อมเชื่อมต่อ Farm Dashboard บนมือถือ
+                                                </p>
+                                            </button>
+                                        )}
 
                                         {/* Option: ให้ทีมงานดูแลให้ (Managed) */}
-                                        <button
-                                            type="button"
-                                            disabled={!detailProduct.pricing.managed_ui.available}
-                                            onClick={() => setDetailEdition('managed_ui')}
-                                            className={`w-full p-3 rounded-xl border text-left transition-all ${
-                                                !detailProduct.pricing.managed_ui.available
-                                                    ? 'opacity-40 cursor-not-allowed bg-slate-900 border-slate-800'
-                                                    : detailEdition === 'managed_ui'
-                                                        ? 'bg-purple-600/20 border-purple-500 text-white'
+                                        {detailProduct.pricing.managed_ui.available && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setDetailEdition('managed_ui')}
+                                                className={`w-full p-3 rounded-xl border text-left transition-all ${
+                                                    detailEdition === 'managed_ui'
+                                                        ? 'bg-purple-600/20 border-purple-500 text-white shadow-md'
                                                         : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                                    <Cloud className="w-3.5 h-3.5 text-purple-400" />
-                                                    ให้ทีมงานดูแลให้ (EasyM Managed)
-                                                </span>
-                                                {detailEdition === 'managed_ui' && <Check className="w-4 h-4 text-purple-400" />}
-                                            </div>
-                                            <p className="text-[11px] text-slate-400 mt-1">
-                                                {detailProduct.pricing.managed_ui.available 
-                                                    ? 'รวม Cloud VPS คุณภาพสูง พร้อมทีมงานมอนิเตอร์ 24/5' 
-                                                    : 'ไม่รองรับในรุ่นนี้ (เฉพาะ MAX และ PRIME)'}
-                                            </p>
-                                        </button>
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                                        <Cloud className="w-3.5 h-3.5 text-purple-400" />
+                                                        ให้ทีมงานดูแลให้ (EasyM Managed)
+                                                    </span>
+                                                    {detailEdition === 'managed_ui' && <Check className="w-4 h-4 text-purple-400" />}
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 mt-1">
+                                                    รวม Cloud VPS คุณภาพสูง พร้อมทีมงานมอนิเตอร์ 24/5
+                                                </p>
+                                            </button>
+                                        )}
 
                                     </div>
                                 </div>
@@ -1281,28 +1355,45 @@ export default function EasyMPlansPage() {
 
                         {/* Modal Footer: Live Price Summary & Checkout */}
                         <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div>
-                                <span className="text-[11px] text-slate-400 block font-medium">
-                                    สรุปราคาสุทธิ (Annual Total) • {isExistingCustomer ? 'สิทธิ์ลูกค้าเดิม' : 'ลูกค้าใหม่'}
-                                </span>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-black text-white font-mono">
-                                        {detailTotalAnnual === 0 ? '฿0' : `฿${detailTotalAnnual.toLocaleString()}`}
+                            {detailProduct.id === 'easym-max' && detailEdition === 'free_no_ui' ? (
+                                <div>
+                                    <span className="text-[11px] text-amber-400 block font-semibold flex items-center gap-1">
+                                        <Info className="w-3.5 h-3.5 text-amber-400" />
+                                        เงื่อนไขพิเศษ
                                     </span>
-                                    <span className="text-xs text-slate-400 font-medium">/ ปี</span>
-                                    {detailTotalAnnual > 0 && (
-                                        <span className="text-xs text-amber-400 font-mono font-semibold ml-2">
-                                            (เฉลี่ย ฿{detailMonthlyAvg.toLocaleString()}/ด.)
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl font-black text-amber-400 tracking-tight">
+                                            เงื่อนไขพิเศษ
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-200 mt-1">
+                                        ต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น
+                                    </p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <span className="text-[11px] text-slate-400 block font-medium">
+                                        สรุปราคาสุทธิ (Annual Total) • {isExistingCustomer ? 'สิทธิ์ลูกค้าเดิม' : 'ลูกค้าใหม่'}
+                                    </span>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl font-black text-white font-mono">
+                                            {detailTotalAnnual === 0 ? '฿0' : `฿${detailTotalAnnual.toLocaleString()}`}
+                                        </span>
+                                        {detailTotalAnnual > 0 && <span className="text-xs text-slate-400 font-medium">/ ปี</span>}
+                                        {detailTotalAnnual > 0 && (
+                                            <span className="text-xs text-amber-400 font-mono font-semibold ml-2">
+                                                (เฉลี่ย ฿{detailMonthlyAvg.toLocaleString()}/ด.)
+                                            </span>
+                                        )}
+                                    </div>
+                                    {detailPriceInfo?.trialBadge && (
+                                        <span className="text-[11px] text-purple-300 flex items-center gap-1 mt-0.5">
+                                            <Sparkles className="w-3 h-3 text-amber-400" />
+                                            {detailPriceInfo.trialBadge}
                                         </span>
                                     )}
                                 </div>
-                                {detailPriceInfo?.trialBadge && (
-                                    <span className="text-[11px] text-purple-300 flex items-center gap-1 mt-0.5">
-                                        <Sparkles className="w-3 h-3 text-amber-400" />
-                                        {detailPriceInfo.trialBadge}
-                                    </span>
-                                )}
-                            </div>
+                            )}
 
                             <div className="flex items-center gap-2.5 w-full sm:w-auto">
                                 <Button
@@ -1323,13 +1414,23 @@ export default function EasyMPlansPage() {
                                     )}
                                 </Button>
 
-                                <Button
-                                    onClick={() => alert(`จำลองการสั่งซื้อสำเร็จ!\nสินค้า: ${detailProduct.name}\nตัวเลือก: ${detailEdition}\nยอดรวม: ฿${detailTotalAnnual.toLocaleString()} / ปี\nพร้อมเชื่อมต่อไปยังหน้า Checkout หลักของระบบแล้วครับ`)}
-                                    className={`text-xs sm:text-sm font-bold flex-1 sm:flex-initial ${detailProduct.theme.btnPrimary}`}
-                                >
-                                    <span>ยืนยันการสั่งซื้อจำลอง</span>
-                                    <ArrowRight className="w-4 h-4 ml-1.5" />
-                                </Button>
+                                {detailProduct.id === 'easym-max' && detailEdition === 'free_no_ui' ? (
+                                    <Button
+                                        onClick={() => alert(`เงื่อนไขพิเศษ: EasyM MAX (ใช้ฟรี ไม่มีฟาร์ม UI)\n\nต้องได้รับการอนุมัติจากแอดมินผู้แนะนำเท่านั้น\nกรุณาติดต่อแอดมินผู้แนะนำของท่านเพื่อขอรับสิทธิ์`)}
+                                        className="text-xs sm:text-sm font-bold flex-1 sm:flex-initial bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30"
+                                    >
+                                        <span>ติดต่อขอรับสิทธิ์เงื่อนไขพิเศษ</span>
+                                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        onClick={() => alert(`จำลองการสั่งซื้อสำเร็จ!\nสินค้า: ${detailProduct.name}\nตัวเลือก: ${detailEdition}\nยอดรวม: ฿${detailTotalAnnual.toLocaleString()} / ปี\nพร้อมเชื่อมต่อไปยังหน้า Checkout หลักของระบบแล้วครับ`)}
+                                        className={`text-xs sm:text-sm font-bold flex-1 sm:flex-initial ${detailProduct.theme.btnPrimary}`}
+                                    >
+                                        <span>ยืนยันการสั่งซื้อจำลอง</span>
+                                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                                    </Button>
+                                )}
                             </div>
                         </div>
 
