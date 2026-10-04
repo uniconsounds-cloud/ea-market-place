@@ -276,7 +276,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
         tier: 'prime',
         name: 'EasyM PRIME',
         subtitle: 'Flagship Adaptive Architecture • สั่งการและควบคุมสมบูรณ์แบบ',
-        description: 'รุ่นเรือธงระดับสูงสุด ผสาน Adaptive Filter กรองข่าวและความผันผวน พร้อมควบคุมสั่งเปิด–ปิดคู่เงินผ่านหน้าเว็บได้แบบ 100% สถาปัตยกรรม Single Domain V2 ประหยัดแบนด์วิดท์',
+        description: 'รุ่นเรือธงระดับสูงสุด ผสาน Adaptive Filter กรองข่าว, สั่งเปิด–ปิดคู่เงินผ่านเว็บ 100%, พร้อม Safe Liquidation Protocol ดูแลปิดรวบออเดอร์ปลอดภัยเมื่อหมดสัญญา',
         imageBox: '/assets/easym_prime_box.png',
         imagePromote: '/assets/easym_prime_promote1.png',
         pairsCount: '20 คู่เงิน + Adaptive Filter',
@@ -337,7 +337,7 @@ const EASYM_PRODUCTS: ProductConfig[] = [
             dashboard: 'Advanced Farm UI ข้อมูลสดพร้อมวิเคราะห์ Drawdown เชิงลึก',
             webControl: '✨ สั่งเปิด–ปิดคู่เงินผ่านหน้าเว็บได้ 100% ไม่ต้องเข้า VPS',
             broker: 'ใช้งานฟรีผ่าน IB พาร์ตเนอร์ หรือปลดล็อกโบรกส่วนตัว (+4,000 บ./ปี)',
-            support: 'VIP Direct Fast-Track Support + แจ้งเตือนความเสี่ยงส่วนบุคคล'
+            support: 'VIP Direct Support + Safe Liquidation (ปิดจบปลอดภัยเมื่อหมดสัญญา)'
         }
     }
 ];
