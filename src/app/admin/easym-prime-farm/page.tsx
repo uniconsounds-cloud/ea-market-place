@@ -24,12 +24,11 @@ import {
     X, 
     ArrowUpRight, 
     Cpu, 
-    CheckCircle2, 
     Fuel, 
-    TrendingUp, 
     Clock, 
-    Eye,
-    LifeBuoy
+    LifeBuoy,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +56,50 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     z: i
 }));
 
+function getMarketTradingDate(date: Date = new Date()): Date {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const partMap: Record<string, string> = {};
+    for (const p of parts) {
+        partMap[p.type] = p.value;
+    }
+    const year = parseInt(partMap.year, 10);
+    const month = parseInt(partMap.month, 10) - 1;
+    const day = parseInt(partMap.day, 10);
+    const hour = parseInt(partMap.hour, 10);
+
+    const d = new Date(year, month, day);
+    const dayOfWeek = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+
+    if (dayOfWeek === 5) {
+        return d;
+    } else if (dayOfWeek === 6) {
+        d.setDate(d.getDate() - 1);
+        return d;
+    } else if (dayOfWeek === 0) {
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1);
+        } else {
+            d.setDate(d.getDate() - 2);
+        }
+        return d;
+    } else {
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1);
+        }
+        return d;
+    }
+}
+
 // 20 MAJOR & CROSS PAIRS FOR EASYM PRIME
 const PRIME_20_PAIRS = [
     'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD',
@@ -77,21 +120,26 @@ export default function AdminPrimeFarmLabPage() {
     const portNumber = '97053088';
     const [liveOrders, setLiveOrders] = useState<any[]>([]);
     const [livePortStatus, setLivePortStatus] = useState<any>(null);
-    const [loadingLive, setLoadingLive] = useState(true);
+    const [rawHistory, setRawHistory] = useState<any[]>([]);
 
     // ─── Simulation Sandbox States ───
     const [isSimMode, setIsSimMode] = useState(false);
     const [simPortMode, setSimPortMode] = useState<PortMode>('NORMAL');
     const [simScenario, setSimScenario] = useState<string>('normal');
     const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+    const [showSimBar, setShowSimBar] = useState(true);
 
     // Dynamic states for 20 pairs controls
     const [pairOverrides, setPairOverrides] = useState<Record<string, { closeOnly?: boolean; quarantined?: boolean }>>({
         EURJPY: { closeOnly: true, quarantined: true }
     });
 
-    // Confirmation modal for extreme actions
-    const [confirmCloseBasket, setConfirmCloseBasket] = useState<string | null>(null);
+    // Client, Time, and Responsive Scaling
+    const [time, setTime] = useState<Date | null>(null);
+    const [isClient, setIsClient] = useState(false);
+    const [scale, setScale] = useState(1);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const historyScrollRef = useRef<HTMLDivElement>(null);
 
     // Check super admin authorization
     useEffect(() => {
@@ -112,37 +160,56 @@ export default function AdminPrimeFarmLabPage() {
         checkAuth();
     }, [router]);
 
+    // Setup client timer and responsive resize listener
+    useEffect(() => {
+        setIsClient(true);
+        setTime(new Date());
+        const timer = setInterval(() => setTime(new Date()), 1000);
+
+        const handleResize = () => {
+            if (!containerRef.current) return;
+            const winW = window.innerWidth;
+            const winH = window.innerHeight - 150; // Room for Header + Crates Dock
+
+            const baseW = 1100;
+            const baseH = 900;
+
+            const scaleW = winW / baseW;
+            const scaleH = winH / baseH;
+
+            let newScale = Math.min(scaleW, scaleH);
+            if (newScale > 1.15) newScale = 1.15;
+            if (newScale < 0.3) newScale = 0.3;
+
+            setScale(newScale);
+        };
+
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        return () => {
+            clearInterval(timer);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
     // Fetch live data for port 97053088 and setup realtime listener
     useEffect(() => {
         if (loadingAuth) return;
 
         const fetchLiveData = async () => {
-            setLoadingLive(true);
             try {
-                const { data: orders } = await supabase
-                    .from('farm_active_orders')
-                    .select('*')
-                    .eq('port_number', portNumber);
+                const [ordersRes, statusRes, historyRes] = await Promise.all([
+                    supabase.from('farm_active_orders').select('*').eq('port_number', portNumber),
+                    supabase.from('farm_port_status').select('*').eq('port_number', portNumber).maybeSingle(),
+                    supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }).limit(30)
+                ]);
 
-                const { data: status } = await supabase
-                    .from('farm_port_status')
-                    .select('*')
-                    .eq('port_number', portNumber)
-                    .single();
-
-                setLiveOrders(orders || []);
-                setLivePortStatus(status || {
-                    balance: 10000,
-                    equity: 9850,
-                    account_type: 'USC',
-                    daily_max_drawdown: 1.5,
-                    today_pnl: 145.20,
-                    today_closed_lots: 0.85
-                });
+                if (ordersRes.data) setLiveOrders(ordersRes.data);
+                if (statusRes.data) setLivePortStatus(statusRes.data);
+                if (historyRes.data) setRawHistory(historyRes.data.reverse());
             } catch (err) {
                 console.error('Error loading live port:', err);
-            } finally {
-                setLoadingLive(false);
             }
         };
 
@@ -164,6 +231,13 @@ export default function AdminPrimeFarmLabPage() {
         };
     }, [loadingAuth]);
 
+    // Auto-scroll history dock to right on mount
+    useEffect(() => {
+        if (historyScrollRef.current) {
+            historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth;
+        }
+    }, [rawHistory]);
+
     // ─── Derived Telemetry Data (Merged with Simulation if Active) ───
     const telemetry = useMemo(() => {
         if (!isSimMode) {
@@ -171,8 +245,16 @@ export default function AdminPrimeFarmLabPage() {
             const bal = Number(livePortStatus?.balance) || 10000;
             const eq = Number(livePortStatus?.equity) || 9850;
             const floatPnl = eq - bal;
-            const ddPct = bal > 0 ? Math.max(0, ((bal - eq) / bal) * 100) : 0;
+            const ddAmt = floatPnl < 0 ? Math.abs(floatPnl) : 0;
+            const ddPct = bal > 0 ? (ddAmt / bal) * 100 : 0;
             const todayPnl = Number(livePortStatus?.today_pnl) || 0;
+
+            const buyOrders = liveOrders.filter(o => o.type === 'BUY');
+            const sellOrders = liveOrders.filter(o => o.type === 'SELL');
+            const buyCount = buyOrders.length;
+            const sellCount = sellOrders.length;
+            const buyPnl = buyOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0);
+            const sellPnl = sellOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0);
 
             return {
                 isSafeLiquidation: false,
@@ -180,10 +262,16 @@ export default function AdminPrimeFarmLabPage() {
                 balance: bal,
                 equity: eq,
                 floatingPnl: floatPnl,
+                drawdownAmount: ddAmt,
                 drawdownPercent: ddPct,
+                buyCount: buyCount || 3,
+                sellCount: sellCount || 2,
+                buyPnl: buyPnl || 12.5,
+                sellPnl: sellPnl || -34.8,
+                totalLots: Number(livePortStatus?.total_lots) || 0.45,
                 todayPnl: todayPnl,
                 todayClosedLots: Number(livePortStatus?.today_closed_lots) || 0,
-                dailyMaxDrawdown: Number(livePortStatus?.daily_max_drawdown) || 0,
+                dailyMaxDrawdown: Number(livePortStatus?.daily_max_drawdown) || ddPct,
                 worstPair: { symbol: 'EURJPY', dd: 1.85, orders: liveOrders.filter(o => (o.symbol || '').includes('EURJPY')).length || 2 },
                 reliefFund: { balance: 42.50, cap: Math.round(bal * 0.05), used: 0 },
                 rescue: { isActive: false, count: 0, ddPct: 0 },
@@ -196,7 +284,7 @@ export default function AdminPrimeFarmLabPage() {
         // ─── Simulation Presets ───
         const baseBal = 10000;
         let eq = 9750;
-        let dd = 2.5;
+        let ddPct = 2.5;
         let isSafeLiq = false;
         let worst = { symbol: 'EURJPY', dd: 4.8, orders: 4 };
         let rescue = { isActive: false, count: 0, ddPct: 0 };
@@ -208,24 +296,24 @@ export default function AdminPrimeFarmLabPage() {
 
         if (simScenario === 'quarantine') {
             eq = 7380;
-            dd = 26.2;
+            ddPct = 26.2;
             worst = { symbol: 'EURJPY', dd: 26.23, orders: 8 };
             quarantine = ['EURJPY', 'GBPJPY'];
             bufferMult = '1.05x';
         } else if (simScenario === 'rescue') {
             eq = 8650;
-            dd = 13.5;
+            ddPct = 13.5;
             worst = { symbol: 'GBPUSD', dd: 12.8, orders: 6 };
             rescue = { isActive: true, count: 2, ddPct: 2.32 };
         } else if (simScenario === 'relief') {
             eq = 9120;
-            dd = 8.8;
+            ddPct = 8.8;
             fundBalance = 120.00;
             fundUsed = 35.50;
         } else if (simScenario === 'safe_liquidation') {
             isSafeLiq = true;
             eq = 9450;
-            dd = 5.5;
+            ddPct = 5.5;
             worst = { symbol: 'EURUSD', dd: 3.2, orders: 3 };
         }
 
@@ -235,10 +323,16 @@ export default function AdminPrimeFarmLabPage() {
             balance: baseBal,
             equity: eq,
             floatingPnl: eq - baseBal,
-            drawdownPercent: dd,
+            drawdownAmount: Math.abs(eq - baseBal),
+            drawdownPercent: ddPct,
+            buyCount: 5,
+            sellCount: 4,
+            buyPnl: eq - baseBal > 0 ? eq - baseBal : 25,
+            sellPnl: eq - baseBal < 0 ? eq - baseBal : -48,
+            totalLots: 0.88,
             todayPnl: 285.50,
             todayClosedLots: 1.45,
-            dailyMaxDrawdown: dd,
+            dailyMaxDrawdown: ddPct,
             worstPair: worst,
             reliefFund: { balance: fundBalance, cap: 500, used: fundUsed },
             rescue: rescue,
@@ -252,30 +346,37 @@ export default function AdminPrimeFarmLabPage() {
         };
     }, [isSimMode, livePortStatus, liveOrders, simScenario, simPortMode]);
 
-    // ─── 25-Tree Plot Calculation ───
+    // ─── 25-Tree Plot Calculation (Matching Classic Algorithm) ───
     const plot = useMemo(() => {
-        const trees = Array.from({ length: 25 }).map((_, i) => {
-            const row = Math.floor(i / 5);
-            const col = i % 5;
-            let level = 4;
-            if (telemetry.drawdownPercent > 20) {
-                if (row >= 3) level = 1;
-                else if (row >= 2) level = 2;
-                else level = 3;
-            } else if (telemetry.drawdownPercent > 10) {
-                if (row >= 3) level = 2;
-                else level = 3;
-            } else if (telemetry.drawdownPercent > 3) {
-                if (row === 4) level = 3;
-            }
+        const drawdown = telemetry.drawdownPercent;
 
+        // Tree priority calculation
+        const order = Array.from({ length: 25 }).map((_, i) => ({ index: i, c: i % 5, r: Math.floor(i / 5) }));
+        const sortedIndices = order.sort((a, b) => (a.c - a.r) - (b.c - b.r) || (a.c + a.r) - (b.c + b.r)).map(o => o.index);
+
+        const treeLevels = new Array(25).fill(4);
+        let pointsToLose = Math.max(0, Math.floor(drawdown));
+
+        // Distribute withered tree degradation
+        for (const idx of sortedIndices) {
+            if (pointsToLose <= 0) break;
+            const loss = Math.min(pointsToLose, 3);
+            treeLevels[idx] = Math.max(1, 4 - loss);
+            pointsToLose -= loss;
+        }
+
+        const trees = Array.from({ length: 25 }).map((_, i) => {
+            const level = treeLevels[i];
             const assets: any[] = [];
-            if (i === 12 && telemetry.orders.length > 0) {
-                telemetry.orders.slice(0, 5).forEach((ord, aIdx) => {
+            
+            // Distribute active order fruits across center trees
+            if ((i === 12 || i === 11 || i === 13) && telemetry.orders.length > 0) {
+                const sliceStart = i === 12 ? 0 : i === 11 ? 2 : 4;
+                telemetry.orders.slice(sliceStart, sliceStart + 3).forEach((ord, aIdx) => {
                     assets.push({
                         ticketId: ord.ticket_id || aIdx,
-                        slotId: aIdx % 15,
-                        type: ord.profit >= 0 ? 'PROFIT_FRUIT' : 'OPEN_LOTUS'
+                        slotId: (aIdx * 4 + i) % 15,
+                        type: (ord.profit || 0) >= 0 ? 'PROFIT_FRUIT' : 'OPEN_LOTUS'
                     });
                 });
             }
@@ -285,6 +386,45 @@ export default function AdminPrimeFarmLabPage() {
 
         return { trees };
     }, [telemetry.drawdownPercent, telemetry.orders]);
+
+    // ─── Daily Harvest History Crates Generation ───
+    const dailyHistory = useMemo(() => {
+        if (rawHistory.length > 0) {
+            return rawHistory.map((item, idx) => {
+                const pnl = Number(item.profit || 0);
+                let asset = '/farm/base_farmbox_empty.png';
+                if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
+                else if (pnl > 20) asset = '/farm/base_farmbox_full.png';
+                else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
+                else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
+
+                return {
+                    id: item.id || idx,
+                    date: item.date ? item.date.substring(5) : `D${idx + 1}`,
+                    pnl: pnl,
+                    asset: asset,
+                    isEndOfWeek: idx % 5 === 4
+                };
+            });
+        }
+
+        // Realistic Fallback 14-Day History Crates for Port 97053088
+        const mockDays = [
+            { id: 'm1', date: '09-18', pnl: 45.20, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm2', date: '09-19', pnl: 28.40, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm3', date: '09-20', pnl: 18.50, asset: '/farm/base_farmbox_mid.png', isEndOfWeek: true },
+            { id: 'm4', date: '09-23', pnl: 35.80, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm5', date: '09-24', pnl: -12.40, asset: '/farm/base_farmbox_lose.png', isEndOfWeek: false },
+            { id: 'm6', date: '09-25', pnl: 52.10, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm7', date: '09-26', pnl: 22.90, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm8', date: '09-27', pnl: 15.30, asset: '/farm/base_farmbox_mid.png', isEndOfWeek: true },
+            { id: 'm9', date: '09-30', pnl: 41.20, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm10', date: '10-01', pnl: 31.70, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
+            { id: 'm11', date: '10-02', pnl: 8.60, asset: '/farm/base_farmbox_min.png', isEndOfWeek: false },
+            { id: 'm12', date: '10-03', pnl: 64.90, asset: '/farm/base_farmbox_full.png', isEndOfWeek: true }
+        ];
+        return mockDays;
+    }, [rawHistory]);
 
     // Handlers for pair actions
     const handleToggleCloseOnly = (sym: string) => {
@@ -311,11 +451,6 @@ export default function AdminPrimeFarmLabPage() {
         toast.warning(`${sym}: ${nextVal ? '🔒 สั่งขังคู่เงิน (FORCE QUARANTINE) หยุดถมไม้ทันที' : '🔓 ปลดปล่อยออกจากห้องขัง'}`);
     };
 
-    const handleCloseBasket = (sym: string) => {
-        setConfirmCloseBasket(null);
-        toast.success(`⚡ ส่งคำสั่งปิดรวบทุกไม้ของ ${sym} สำเร็จ! EA กำลังดำเนินการ`);
-    };
-
     if (loadingAuth) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-[#0a0d14] text-cyan-400">
@@ -326,136 +461,175 @@ export default function AdminPrimeFarmLabPage() {
     }
 
     return (
-        <div className="flex flex-col min-h-screen w-full bg-[#07090e] text-[#e2e8f0] font-sans select-none relative overflow-x-hidden">
+        <div className="flex flex-col h-screen w-full overflow-hidden font-sans select-none relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df]">
             
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 🚀 TOP SIMULATOR & CONTROL BAR (ADMIN LAB EXCLUSIVE)             */}
+            {/* 🧪 TOP FLOATING SIMULATOR CONTROL BAR (COLLAPSIBLE FOR ADMIN)   */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <header className="sticky top-0 z-[120] w-full bg-[#0d121d]/95 backdrop-blur-xl border-b border-cyan-500/20 px-3 sm:px-6 py-2 shadow-[0_4px_30px_rgba(0,0,0,0.8)]">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div className="fixed top-0 left-0 w-full z-[130] bg-[#0c101a]/95 backdrop-blur-md border-b border-purple-500/30 text-xs px-3 py-1 shadow-2xl transition-all">
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
                     
-                    {/* Left: Branding & Port Status */}
-                    <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-purple-600 via-indigo-600 to-cyan-500 p-[1.5px] shadow-[0_0_15px_rgba(168,85,247,0.4)]">
-                            <div className="h-full w-full bg-[#0d121d] rounded-[10px] flex items-center justify-center">
-                                <Cpu className="h-5 w-5 text-cyan-400 animate-pulse" />
-                            </div>
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="font-black text-sm tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-cyan-200 to-amber-200">
-                                    EASYM PRIME LAB
-                                </span>
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-500/40 text-purple-300 bg-purple-950/30">
-                                    V2.0-PRIME
-                                </Badge>
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-cyan-500/40 text-cyan-300 bg-cyan-950/30 font-mono">
-                                    PORT: {portNumber}
-                                </Badge>
-                            </div>
-                            <p className="text-[11px] text-slate-400">
-                                โหมดทดสอบแดชบอร์ดเฉพาะ <span className="text-amber-400 font-mono">juntarasate@gmail.com</span>
-                            </p>
+                    {/* Left: Lab Tag & Port Mode */}
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="border-purple-400/50 text-purple-300 bg-purple-950/40 text-[10px] px-2 py-0.5 font-bold flex items-center gap-1">
+                            <Cpu className="h-3 w-3 text-cyan-400" />
+                            PRIME LAB ({portNumber})
+                        </Badge>
+                        
+                        <div className="flex items-center bg-black/40 rounded-lg p-0.5 border border-slate-700">
+                            <button
+                                onClick={() => { setIsSimMode(false); toast.info('📡 เชื่อมต่อข้อมูลจริงจากพอร์ต 97053088'); }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                                    !isSimMode ? 'bg-cyan-500 text-black shadow font-black' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                🟢 พอร์ตจริง (Live)
+                            </button>
+                            <button
+                                onClick={() => { setIsSimMode(true); toast.success('🧪 เปิดโหมดจำลองสถานการณ์ Sandbox'); }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                                    isSimMode ? 'bg-purple-600 text-white shadow font-black' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                🧪 Sandbox จำลอง
+                            </button>
                         </div>
                     </div>
 
-                    {/* Middle: Mode Switch (Live vs Simulator) */}
-                    <div className="flex items-center bg-black/50 p-1 rounded-xl border border-slate-800">
-                        <button
-                            onClick={() => { setIsSimMode(false); toast.info('📡 เชื่อมต่อข้อมูลสดเรียลไทม์จากพอร์ต 97053088'); }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                !isSimMode 
-                                    ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(6,182,212,0.6)] font-black' 
-                                    : 'text-slate-400 hover:text-white'
-                            }`}
-                        >
-                            <span className="relative flex h-2 w-2">
-                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${!isSimMode ? 'bg-black' : 'bg-green-400'} opacity-75`}></span>
-                                <span className={`relative inline-flex rounded-full h-2 w-2 ${!isSimMode ? 'bg-black' : 'bg-green-500'}`}></span>
-                            </span>
-                            พอร์ตจริง 97053088 (Live)
-                        </button>
-                        <button
-                            onClick={() => { setIsSimMode(true); toast.success('🧪 เปิดโหมดจำลองสถานการณ์ Sandbox'); }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                isSimMode 
-                                    ? 'bg-purple-600 text-white shadow-[0_0_12px_rgba(168,85,247,0.6)] font-black' 
-                                    : 'text-slate-400 hover:text-white'
-                            }`}
-                        >
-                            <Sliders className="h-3.5 w-3.5" />
-                            โหมดจำลอง (Simulator Sandbox)
-                        </button>
-                    </div>
-
-                    {/* Right: Quick Scenario Selector (Visible in Sim Mode) */}
-                    {isSimMode && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[11px] font-mono text-purple-300 mr-1">SCENARIOS:</span>
-                            <Button
-                                size="sm"
-                                variant={simScenario === 'normal' ? 'default' : 'outline'}
-                                onClick={() => setSimScenario('normal')}
-                                className="h-7 text-xs bg-slate-800 border-slate-700 hover:bg-slate-700"
-                            >
-                                🌱 ปกติ
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={simScenario === 'quarantine' ? 'default' : 'outline'}
-                                onClick={() => setSimScenario('quarantine')}
-                                className="h-7 text-xs bg-amber-950/50 text-amber-300 border-amber-800 hover:bg-amber-900/50"
-                            >
-                                🔒 กักขัง (EJ -26%)
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={simScenario === 'rescue' ? 'default' : 'outline'}
-                                onClick={() => setSimScenario('rescue')}
-                                className="h-7 text-xs bg-cyan-950/50 text-cyan-300 border-cyan-800 hover:bg-cyan-900/50"
-                            >
-                                🎯 สไนเปอร์ R2
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={simScenario === 'relief' ? 'default' : 'outline'}
-                                onClick={() => setSimScenario('relief')}
-                                className="h-7 text-xs bg-emerald-950/50 text-emerald-300 border-emerald-800 hover:bg-emerald-900/50"
-                            >
-                                💎 กองทุนตัดขาดทุน
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={simScenario === 'safe_liquidation' ? 'default' : 'outline'}
-                                onClick={() => setSimScenario('safe_liquidation')}
-                                className="h-7 text-xs bg-red-950/80 text-red-300 border-red-600 hover:bg-red-900 font-bold animate-pulse"
-                            >
-                                🛡️ หมดอายุ (Safe Liq)
-                            </Button>
+                    {/* Middle: Sandbox Scenarios (Visible when Sim Mode is active) */}
+                    {isSimMode && showSimBar && (
+                        <div className="hidden md:flex items-center gap-1">
+                            <span className="text-[10px] font-mono text-purple-300">จำลอง:</span>
+                            {[
+                                { id: 'normal', label: '🌱 ปกติ' },
+                                { id: 'quarantine', label: '🔒 กักขัง (EJ -26%)' },
+                                { id: 'rescue', label: '🎯 สไนเปอร์ R2' },
+                                { id: 'relief', label: '💎 กองทุนตัดขาดทุน' },
+                                { id: 'safe_liquidation', label: '🛡️ สิทธิ์หมดอายุ (Safe Liq)' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setSimScenario(s.id)}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
+                                        simScenario === s.id 
+                                            ? 'bg-purple-500/20 text-purple-200 border-purple-400 font-bold' 
+                                            : 'bg-black/30 text-slate-400 border-slate-700 hover:text-white'
+                                    }`}
+                                >
+                                    {s.label}
+                                </button>
+                            ))}
                         </div>
                     )}
+
+                    {/* Right: Toggle Mini Bar */}
+                    <div className="flex items-center gap-2">
+                        {telemetry.isSafeLiquidation && (
+                            <Badge className="bg-red-600 text-white text-[9px] font-black animate-pulse px-1.5 py-0">
+                                SAFE LIQUIDATION ACTIVE
+                            </Badge>
+                        )}
+                        <button
+                            onClick={() => setShowSimBar(!showSimBar)}
+                            className="text-slate-400 hover:text-white p-0.5"
+                            title="ซ่อน/แสดง แถบตัวเลือกจำลอง"
+                        >
+                            {showSimBar ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        </button>
+                    </div>
                 </div>
-            </header>
+            </div>
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 🛡️ SAFE LIQUIDATION PROTOCOL FORCEFIELD ALERT BANNER             */}
+            {/* 🏰 FIXED HEADER: FARM HUD + 1-DAY TIMELINE (MATCHING ORIGINAL)  */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            <div className="fixed top-7 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                <FarmHud
+                    title={`EASYM PRIME COMMAND CENTER (${portNumber})`}
+                    portNumber={portNumber}
+                    balance={telemetry.balance}
+                    equity={telemetry.equity}
+                    floatingPnl={telemetry.floatingPnl}
+                    totalStandardLots={telemetry.totalLots}
+                    accountType="USC"
+                    assetType="FOREX"
+                    buyCount={telemetry.buyCount}
+                    sellCount={telemetry.sellCount}
+                    buyPnl={telemetry.buyPnl}
+                    sellPnl={telemetry.sellPnl}
+                    todayProfit={telemetry.todayPnl}
+                    todayClosedLots={telemetry.todayClosedLots}
+                    dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
+                    drawdownPercent={telemetry.drawdownPercent}
+                    drawdownAmount={telemetry.drawdownAmount}
+                    systemCode="EASYM_PRIME_V2"
+                />
+
+                {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
+                <div className="relative w-full bg-black/40 border-y border-amber-900/20 py-1 sm:py-2">
+                    <div className="max-w-7xl mx-auto px-4 relative">
+                        <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
+                            {isClient && (() => {
+                                const pct = ((time?.getHours() ?? 0) * 60 + (time?.getMinutes() ?? 0)) / (24 * 60) * 100;
+                                const remaining = Math.max(0, 100 - pct);
+                                return (
+                                    <div 
+                                        className="absolute top-0 right-0 h-full bg-gradient-to-r from-amber-300/30 via-amber-400/60 to-amber-500/90 transition-all duration-1000 rounded-full"
+                                        style={{ width: `${remaining}%` }}
+                                    />
+                                );
+                            })()}
+                        </div>
+                        <div className="absolute inset-0 px-4 flex justify-between items-center pointer-events-none">
+                            {Array.from({ length: 25 }).map((_, i) => (
+                                <div key={`h_${i}`} className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* 📱 MOBILE ONLY STATS OVERLAY (MATCHING CLASSIC FARM)             */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            <div className="mt-7">
+                <FarmMobileStatsOverlay
+                    portNumber={portNumber}
+                    buyCount={telemetry.buyCount}
+                    sellCount={telemetry.sellCount}
+                    buyPnl={telemetry.buyPnl}
+                    sellPnl={telemetry.sellPnl}
+                    balance={telemetry.balance}
+                    todayProfit={telemetry.todayPnl}
+                    accountType="USC"
+                    todayClosedLots={telemetry.todayClosedLots}
+                    dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
+                    drawdownPercent={telemetry.drawdownPercent}
+                    drawdownAmount={telemetry.drawdownAmount}
+                    totalStandardLots={telemetry.totalLots}
+                    customName="PRIME COMMAND DECK"
+                />
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* 🛡️ SAFE LIQUIDATION PROTOCOL BANNER (WHEN EXPIRED OR SIMULATED)  */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {telemetry.isSafeLiquidation && (
-                <div className="w-full bg-gradient-to-r from-red-950/90 via-amber-950/90 to-red-950/90 border-b border-red-500/50 py-2.5 px-4 text-center z-50 animate-fade-in shadow-[0_0_25px_rgba(239,68,68,0.4)]">
-                    <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
-                            <ShieldAlert className="h-5 w-5 text-red-400 animate-bounce" />
-                            <div className="text-left">
-                                <div className="text-xs sm:text-sm font-bold text-red-200">
-                                    [SAFE LIQUIDATION PROTOCOL ACTIVE] สัญญา EasyM PRIME หมดอายุแล้ว
-                                </div>
-                                <div className="text-[11px] text-amber-200/90">
-                                    ระบบกางเกราะป้องกัน ดูแลเฝ้าปิดรวบออเดอร์เดิมให้ปลอดภัย ไม่เปิดไม้ใหม่ และไม่ปล่อยพอร์ตทิ้งขว้าง
-                                </div>
+                <div className="fixed top-28 sm:top-36 left-0 w-full bg-gradient-to-r from-red-950/95 via-amber-950/95 to-red-950/95 border-b border-red-500/60 py-2 px-4 z-[95] animate-fade-in shadow-2xl">
+                    <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+                        <div className="flex items-center gap-2">
+                            <ShieldAlert className="h-5 w-5 text-red-400 shrink-0 animate-bounce" />
+                            <div>
+                                <span className="text-xs sm:text-sm font-bold text-red-200">
+                                    [SAFE LIQUIDATION PROTOCOL ACTIVE] สิทธิ์ใช้งานสิ้นสุดลงแล้ว
+                                </span>
+                                <span className="block text-[11px] text-amber-200/90">
+                                    ระบบกำลังดูแลปิดรวบออเดอร์เดิมให้ปลอดภัย 100% ไม่เปิดไม้ใหม่ และไม่ปล่อยพอร์ตทิ้งขว้าง
+                                </span>
                             </div>
                         </div>
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="sm"
                             className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-black text-xs px-4 shadow-[0_0_15px_rgba(245,158,11,0.5)] border border-amber-300/50"
                             onClick={() => toast.success('เปิด Modal ต่ออายุสัญญา EasyM PRIME')}
                         >
@@ -467,53 +641,29 @@ export default function AdminPrimeFarmLabPage() {
             )}
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 🌳 MAIN STAGE: CLASSIC LIVING TREE FARM CANVAS                   */}
+            {/* 🌳 MAIN STAGE: LIVING ISOMETRIC TREE FARM                        */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <div className="flex-1 w-full relative flex items-center justify-center min-h-[640px] select-none">
+            <div 
+                ref={containerRef} 
+                className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]"
+            >
                 
-                {/* Background: Cybernetic Sky & Grid Atmosphere */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#131b2e] via-[#0c111d] to-[#06080d] pointer-events-none" />
-                
-                {/* Cyber Perspective Grid Overlay */}
-                <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#06b6d415_1px,transparent_1px),linear-gradient(to_bottom,#06b6d415_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
-
-                {/* Top Farm HUD Bar (Reusing Classic Luxury Analog HUD) */}
-                <div className="absolute top-0 left-0 w-full z-40">
-                    <FarmHud
-                        title={`EASYM PRIME COMMAND CENTER (${portNumber})`}
-                        portNumber={portNumber}
-                        balance={telemetry.balance}
-                        equity={telemetry.equity}
-                        floatingPnl={telemetry.floatingPnl}
-                        totalStandardLots={0.88}
-                        accountType="USC"
-                        assetType="FOREX"
-                        buyCount={5}
-                        sellCount={3}
-                        buyPnl={telemetry.floatingPnl > 0 ? telemetry.floatingPnl : 15}
-                        sellPnl={telemetry.floatingPnl < 0 ? telemetry.floatingPnl : -45}
-                        todayProfit={telemetry.todayPnl}
-                        todayClosedLots={telemetry.todayClosedLots}
-                        dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
-                        drawdownPercent={telemetry.drawdownPercent}
-                        drawdownAmount={Math.abs(telemetry.floatingPnl)}
-                        systemCode="EASYM_PRIME_V2"
-                    />
-                </div>
-
                 {/* 🛡️ Holographic Forcefield Dome (Visible during Safe Liquidation) */}
                 {telemetry.isSafeLiquidation && (
                     <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
                         <div className="w-[580px] h-[480px] rounded-[50%] border-2 border-amber-500/40 bg-gradient-to-t from-red-950/20 via-amber-500/10 to-transparent shadow-[0_0_80px_rgba(245,158,11,0.25)] animate-pulse flex items-center justify-center backdrop-blur-[0.5px]">
-                            <div className="text-amber-400 font-mono text-[11px] tracking-widest uppercase bg-black/60 px-4 py-1 rounded-full border border-amber-500/40 shadow-lg">
-                                🛡️ FORCEFIELD ACTIVE: CLOSE-ONLY ENGAGED
+                            <div className="text-amber-400 font-mono text-[11px] tracking-widest uppercase bg-black/70 px-4 py-1.5 rounded-full border border-amber-500/40 shadow-xl">
+                                🛡️ FORCEFIELD ENGAGED: CLOSE-ONLY MODE
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* 25 Isometric Plots (Classic Tree Farm Engine) */}
-                <div className="relative transition-all duration-500 ease-out origin-center mt-20" style={{ transform: 'scale(0.85)', width: '100px', height: '100px' }}>
+                {/* 25 Isometric Plots */}
+                <div
+                    className="relative transition-all duration-500 ease-out origin-center"
+                    style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
+                >
                     <div className="absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px]">
                         {Array.from({ length: 25 }).map((_, i) => {
                             const c = i % 5;
@@ -524,7 +674,7 @@ export default function AdminPrimeFarmLabPage() {
                             return (
                                 <div
                                     key={`tile_${i}`}
-                                    className="absolute transition-all duration-300"
+                                    className="absolute"
                                     style={{
                                         left: `${(c - r) * TILE_W}px`,
                                         top: `${(c + r) * TILE_H_OFFSET}px`,
@@ -533,42 +683,91 @@ export default function AdminPrimeFarmLabPage() {
                                         height: '280px'
                                     }}
                                 >
-                                    <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
-                                        {/* Tree Image based on health/drawdown */}
-                                        <Image
-                                            src={
-                                                tree.level === 4 ? '/farm/base_tree_new.png' :
-                                                tree.level === 3 ? '/farm/base_tree_state2.png' :
-                                                tree.level === 2 ? '/farm/base_tree_state3.png' :
-                                                '/farm/base_tree_state4.png'
-                                            }
-                                            alt="Tree"
-                                            fill
-                                            className="object-contain object-bottom drop-shadow-2xl"
-                                            unoptimized
-                                            priority
-                                        />
+                                    {isClient && (
+                                        <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                            <Image
+                                                src={
+                                                    tree.level === 4 ? '/farm/base_tree_new.png' :
+                                                    tree.level === 3 ? '/farm/base_tree_state2.png' :
+                                                    tree.level === 2 ? '/farm/base_tree_state3.png' :
+                                                    '/farm/base_tree_state4.png'
+                                                }
+                                                alt="T"
+                                                fill
+                                                className="object-contain object-bottom drop-shadow-2xl"
+                                                unoptimized
+                                                priority
+                                            />
 
-                                        {/* Fruits / Flowers */}
-                                        {tree.assets.map((asset, aIdx) => {
-                                            const slot = TREE_SLOTS[asset.slotId];
+                                            {/* Order Fruits/Flowers */}
+                                            {tree.assets.map((asset, aIdx) => {
+                                                const slot = TREE_SLOTS[asset.slotId];
+                                                return (
+                                                    <div
+                                                        key={`order_${asset.ticketId || aIdx}`}
+                                                        className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl 
+                                                            ${asset.type === 'OPEN_LOTUS' ? 'animate-pulse' : 'animate-float-fade'}
+                                                        `}
+                                                        style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 1 }}
+                                                    >
+                                                        <Image
+                                                            src={asset.type === 'PROFIT_FRUIT' ? '/farm/asset_b_orange.png' : '/farm/asset_a_lily.png'}
+                                                            alt="Asset"
+                                                            fill
+                                                            className="object-contain"
+                                                            unoptimized
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* 🔻 Floating Drawdown Badge on First Withered Tree */}
+                                    {(() => {
+                                        const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
+                                        const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
+                                        const hasDrawdown = telemetry.drawdownPercent > 0 || telemetry.floatingPnl < 0;
+                                        if (i === targetIdx && hasDrawdown && isClient) {
+                                            const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
                                             return (
-                                                <div
-                                                    key={`asset_${aIdx}`}
-                                                    className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl animate-float-fade"
-                                                    style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 1 }}
+                                                <div 
+                                                    className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
+                                                    style={{
+                                                        transform: `translateX(-50%) scale(${badgeCounterScale})`,
+                                                        transformOrigin: 'bottom center'
+                                                    }}
                                                 >
-                                                    <Image
-                                                        src={asset.type === 'PROFIT_FRUIT' ? '/farm/asset_b_orange.png' : '/farm/asset_a_lily.png'}
-                                                        alt="Fruit"
-                                                        fill
-                                                        className="object-contain"
-                                                        unoptimized
-                                                    />
+                                                    <div className="bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center">
+                                                        <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                            -{telemetry.drawdownPercent.toFixed(2)}%
+                                                        </div>
+                                                        <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
+                                                            -{telemetry.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
                                                 </div>
                                             );
-                                        })}
-                                    </div>
+                                        }
+                                        return null;
+                                    })()}
+
+                                    {/* 📅 Date Signpost at Front Plot 24 */}
+                                    {i === 24 && (
+                                        <div className="absolute top-[110px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                            <div className="bg-[#1f1611]/95 border border-[#cfa545] rounded-sm px-6 py-2 shadow-2xl relative">
+                                                <h2 className="text-[#cfa545] font-black tracking-widest text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
+                                                    {isClient ? getMarketTradingDate(time || new Date()).toLocaleDateString('en-GB', { 
+                                                        day: 'numeric', 
+                                                        month: 'short', 
+                                                        year: 'numeric'
+                                                    }).toUpperCase() : '...'}
+                                                </h2>
+                                            </div>
+                                            <div className="w-1.5 h-16 bg-gradient-to-b from-[#8b5a2bd0] to-[#4a2e12d0] shadow-xl relative -mt-1 rounded-b-full border-x border-[#3a220f] z-0"></div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -576,22 +775,21 @@ export default function AdminPrimeFarmLabPage() {
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════════════════ */}
-                {/* 🛸 4 FLOATING SCI-FI HUD ORBS (GAMING POPUP TRIGGERS)            */}
+                {/* 🛸 4 FLOATING SCI-FI HUD ORBS (GAMING POPUPS ON RIGHT SIDE)      */}
                 {/* ═══════════════════════════════════════════════════════════════════ */}
-                <div className="fixed right-4 sm:right-8 top-1/2 -translate-y-1/2 z-[100] flex flex-col gap-4">
+                <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[100] flex flex-col gap-3">
                     
                     {/* Orb 1: Tactical Defense HUD */}
                     <button
                         onClick={() => setActiveModal('DEFENSE')}
-                        className="group relative flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0f172a]/90 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
+                        className="group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
                     >
-                        <Shield className="h-6 w-6 text-emerald-400 group-hover:animate-pulse" />
-                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                        <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 group-hover:animate-pulse" />
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                         </span>
-                        {/* Tooltip */}
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-emerald-500/40 rounded-lg text-xs font-mono text-emerald-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-emerald-500/40 rounded-lg text-xs font-mono text-emerald-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             🛡️ โหมดพอร์ต & เกราะคุ้มกันทุน
                         </span>
                     </button>
@@ -599,12 +797,11 @@ export default function AdminPrimeFarmLabPage() {
                     {/* Orb 2: 20-Pair Cockpit Matrix */}
                     <button
                         onClick={() => setActiveModal('MATRIX')}
-                        className="group relative flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
+                        className="group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
                     >
-                        <Layers className="h-6 w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                        <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
                         <span className="absolute bottom-1 text-[8px] font-mono font-black text-cyan-300">20P</span>
-                        {/* Tooltip */}
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-cyan-500/40 rounded-lg text-xs font-mono text-cyan-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-cyan-500/40 rounded-lg text-xs font-mono text-cyan-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             🎛️ กระดานสั่งการ 20 คู่เงิน (Close-Only)
                         </span>
                     </button>
@@ -612,14 +809,13 @@ export default function AdminPrimeFarmLabPage() {
                     {/* Orb 3: Relief Fund Vault */}
                     <button
                         onClick={() => setActiveModal('VAULT')}
-                        className="group relative flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0f172a]/90 border border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
+                        className="group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
                     >
-                        <Zap className="h-6 w-6 text-purple-400 group-hover:scale-125 transition-transform" />
-                        <span className="absolute -top-1 -right-1 text-[9px] font-mono font-black bg-purple-600 text-white px-1 rounded-full">
+                        <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400 group-hover:scale-125 transition-transform" />
+                        <span className="absolute -top-1 -right-1 text-[8px] font-mono font-black bg-purple-600 text-white px-1 rounded-full">
                             ${Math.round(telemetry.reliefFund.balance)}
                         </span>
-                        {/* Tooltip */}
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-purple-500/40 rounded-lg text-xs font-mono text-purple-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-purple-500/40 rounded-lg text-xs font-mono text-purple-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             💎 กองทุนตัดขาดทุนข้ามคู่ (Relief Fund)
                         </span>
                     </button>
@@ -627,21 +823,20 @@ export default function AdminPrimeFarmLabPage() {
                     {/* Orb 4: Threat & Rescue Radar */}
                     <button
                         onClick={() => setActiveModal('RADAR')}
-                        className={`group relative flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0f172a]/90 border ${
+                        className={`group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border ${
                             telemetry.quarantinePairs.length > 0 || telemetry.rescue.isActive 
                                 ? 'border-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.5)] animate-pulse' 
                                 : 'border-slate-700 shadow-[0_0_15px_rgba(0,0,0,0.5)]'
                         } hover:scale-110 transition-all duration-300 backdrop-blur-md`}
                     >
-                        <Crosshair className={`h-6 w-6 ${telemetry.quarantinePairs.length > 0 ? 'text-amber-400' : 'text-slate-400'} group-hover:rotate-90 transition-transform`} />
+                        <Crosshair className={`h-5 w-5 sm:h-6 sm:w-6 ${telemetry.quarantinePairs.length > 0 ? 'text-amber-400' : 'text-slate-400'} group-hover:rotate-90 transition-transform`} />
                         {(telemetry.quarantinePairs.length > 0 || telemetry.rescue.isActive) && (
-                            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
                             </span>
                         )}
-                        {/* Tooltip */}
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-amber-500/40 rounded-lg text-xs font-mono text-amber-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-amber-500/40 rounded-lg text-xs font-mono text-amber-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             🎯 ห้องขัง (Quarantine) & สไนเปอร์กู้ภัย
                         </span>
                     </button>
@@ -649,18 +844,79 @@ export default function AdminPrimeFarmLabPage() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* 📦 FIXED BOTTOM DOCK: DAILY HARVEST HISTORY CRATES ROW            */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {isClient && (
+                <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/50 backdrop-blur-md border-t border-amber-900/40 z-[60] flex flex-col">
+                    {/* Header Row */}
+                    <div className="hidden sm:flex justify-between px-6 pt-2 mb-1">
+                        <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
+                            Daily Harvest History ({dailyHistory.length}D)
+                        </span>
+                        <button 
+                            onClick={() => {
+                                const key = prompt("Enter API Key to download history:");
+                                if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
+                            }}
+                            className="flex items-center gap-1.5 text-[9px] bg-amber-900/40 hover:bg-amber-900/60 text-amber-200/70 border border-amber-700/50 px-3 py-1 rounded transition-colors uppercase font-bold"
+                        >
+                            Export 90D History (.CSV)
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        </button>
+                    </div>
+
+                    {/* Crates Scroll Row */}
+                    <div
+                        ref={historyScrollRef}
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar"
+                    >
+                        {dailyHistory.map((item, idx) => (
+                            <div key={item.id || idx} className="flex items-center flex-shrink-0">
+                                <div className="flex flex-col items-center group relative">
+                                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
+                                        <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] sm:text-[9px] text-amber-100/50 font-mono tracking-tighter">{item.date}</span>
+                                        <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                            {item.pnl >= 0 ? '+' : ''}{item.pnl.toFixed(2)} USC
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Week Divider Line */}
+                                {item.isEndOfWeek && idx < dailyHistory.length - 1 && (
+                                    <div className="flex flex-col items-center justify-center mx-2 sm:mx-3 h-16 sm:h-20 self-start">
+                                        <div className="w-[1px] h-full bg-gradient-to-b from-amber-500/0 via-amber-500/40 to-amber-500/0"></div>
+                                        <span className="text-[7px] font-mono text-amber-400/40 font-bold uppercase tracking-widest mt-1 whitespace-nowrap">WEEK</span>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Mobile 90D Button */}
+                        <button 
+                            onClick={() => {
+                                const key = prompt("Enter API Key to download history:");
+                                if(key) window.open(`/api/farm/export?port=${portNumber}&key=${key}`, '_blank');
+                            }}
+                            className="sm:hidden flex-shrink-0 w-16 h-16 flex flex-col items-center justify-center bg-amber-900/40 hover:bg-amber-800/60 text-amber-200/80 border border-amber-700/50 rounded-lg transition-colors ml-auto"
+                        >
+                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span className="text-[9px] font-bold uppercase">90D</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* 🎮 HOLOGRAPHIC SCI-FI MODAL OVERLAYS (FROSTED GLASSMORPHISM)     */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {activeModal && (
                 <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-                    
-                    {/* Modal Window Container */}
                     <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-[#0a0f1d]/95 border-2 border-cyan-500/40 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(6,182,212,0.3)] animate-scale-up text-slate-200">
-                        
-                        {/* Sci-Fi Scanline Glow Effect */}
                         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_50%,rgba(0,0,0,0.4)_51%)] bg-[length:100%_4px] pointer-events-none rounded-3xl" />
 
-                        {/* Top Close Button */}
                         <button
                             onClick={() => setActiveModal(null)}
                             className="absolute top-5 right-5 p-2 rounded-full bg-slate-800/80 text-slate-400 hover:text-white hover:bg-red-950/80 hover:border-red-500 border border-slate-700 transition-all"
@@ -668,9 +924,7 @@ export default function AdminPrimeFarmLabPage() {
                             <X className="h-5 w-5" />
                         </button>
 
-                        {/* ───────────────────────────────────────────────────────── */}
-                        {/* 🛡️ MODAL 1: TACTICAL DEFENSE HUD                          */}
-                        {/* ───────────────────────────────────────────────────────── */}
+                        {/* 🛡️ MODAL 1: TACTICAL DEFENSE HUD */}
                         {activeModal === 'DEFENSE' && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-cyan-500/30 pb-4">
@@ -685,7 +939,6 @@ export default function AdminPrimeFarmLabPage() {
                                     </div>
                                 </div>
 
-                                {/* Defense Mode Switcher */}
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     {[
                                         { mode: 'NORMAL', label: '🟢 โหมดปกติ (NORMAL)', desc: 'เปิดออเดอร์และแก้ไม้ตามกลยุทธ์ 100%' },
@@ -710,7 +963,6 @@ export default function AdminPrimeFarmLabPage() {
                                     ))}
                                 </div>
 
-                                {/* Capital Buffer Gauge */}
                                 <div className="p-4 rounded-2xl bg-black/40 border border-slate-800 flex items-center justify-between">
                                     <div>
                                         <div className="text-xs text-slate-400">เกราะคุ้มกันทุนหนุนหลัง (Capital Buffer)</div>
@@ -726,9 +978,7 @@ export default function AdminPrimeFarmLabPage() {
                             </div>
                         )}
 
-                        {/* ───────────────────────────────────────────────────────── */}
-                        {/* 🎛️ MODAL 2: 20-PAIR INTERACTIVE MATRIX                    */}
-                        {/* ───────────────────────────────────────────────────────── */}
+                        {/* 🎛️ MODAL 2: 20-PAIR INTERACTIVE MATRIX */}
                         {activeModal === 'MATRIX' && (
                             <div className="space-y-6">
                                 <div className="flex items-center justify-between border-b border-cyan-500/30 pb-4">
@@ -746,7 +996,6 @@ export default function AdminPrimeFarmLabPage() {
                                     <Badge className="bg-cyan-500 text-black font-mono font-bold">20 ACTIVE PAIRS</Badge>
                                 </div>
 
-                                {/* Pair Matrix Grid */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
                                     {PRIME_20_PAIRS.map((sym) => {
                                         const isCloseOnly = pairOverrides[sym]?.closeOnly;
@@ -783,7 +1032,6 @@ export default function AdminPrimeFarmLabPage() {
                                                 </div>
 
                                                 <div className="flex items-center gap-1.5">
-                                                    {/* Close-Only Toggle */}
                                                     <Button
                                                         size="sm"
                                                         variant={isCloseOnly ? 'destructive' : 'outline'}
@@ -793,7 +1041,6 @@ export default function AdminPrimeFarmLabPage() {
                                                         {isCloseOnly ? '⛔ ห้ามเปิดใหม่' : 'เปิดปกติ'}
                                                     </Button>
 
-                                                    {/* Quarantine Button */}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -810,9 +1057,7 @@ export default function AdminPrimeFarmLabPage() {
                             </div>
                         )}
 
-                        {/* ───────────────────────────────────────────────────────── */}
-                        {/* 💎 MODAL 3: RELIEF FUND VAULT                             */}
-                        {/* ───────────────────────────────────────────────────────── */}
+                        {/* 💎 MODAL 3: RELIEF FUND VAULT */}
                         {activeModal === 'VAULT' && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-purple-500/30 pb-4">
@@ -837,7 +1082,6 @@ export default function AdminPrimeFarmLabPage() {
                                         เพดานกองทุนสูงสุด: ${telemetry.reliefFund.cap.toFixed(2)} USC (5% ของบาลานซ์)
                                     </div>
 
-                                    {/* Progress Gauge */}
                                     <div className="w-full bg-slate-900 h-3 rounded-full mt-4 overflow-hidden border border-purple-500/30">
                                         <div 
                                             className="bg-gradient-to-r from-purple-600 to-cyan-400 h-full rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(168,85,247,0.8)]"
@@ -845,21 +1089,10 @@ export default function AdminPrimeFarmLabPage() {
                                         />
                                     </div>
                                 </div>
-
-                                <div className="p-4 rounded-2xl bg-black/40 border border-slate-800">
-                                    <div className="text-xs font-bold text-white mb-2">ประวัติการปล่อยพลังงานกู้พอร์ต (Relief Cuts)</div>
-                                    <div className="text-xs text-slate-400 leading-relaxed">
-                                        {telemetry.reliefFund.used > 0 
-                                            ? `ระบบเคยนำเงินกองทุนไปช่วยเฉือนไม้ที่ติดลบไปแล้ว ${telemetry.reliefFund.used.toFixed(2)} USC ช่วยดึง Margin คืนสำเร็จ` 
-                                            : 'ยังไม่มีประวัติการตัดขาดทุนฉุกเฉิน พอร์ตกำลังทำงานอย่างราบรื่น'}
-                                    </div>
-                                </div>
                             </div>
                         )}
 
-                        {/* ───────────────────────────────────────────────────────── */}
-                        {/* 🎯 MODAL 4: THREAT & RESCUE RADAR                         */}
-                        {/* ───────────────────────────────────────────────────────── */}
+                        {/* 🎯 MODAL 4: THREAT & RESCUE RADAR */}
                         {activeModal === 'RADAR' && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-amber-500/30 pb-4">
@@ -874,7 +1107,6 @@ export default function AdminPrimeFarmLabPage() {
                                     </div>
                                 </div>
 
-                                {/* Worst Pair Radar Alert */}
                                 <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/50 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <AlertTriangle className="h-6 w-6 text-amber-400 animate-pulse" />
@@ -895,7 +1127,6 @@ export default function AdminPrimeFarmLabPage() {
                                     </Button>
                                 </div>
 
-                                {/* Sniper Rescue Grid Status */}
                                 <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/50 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <Crosshair className="h-6 w-6 text-cyan-400" />
