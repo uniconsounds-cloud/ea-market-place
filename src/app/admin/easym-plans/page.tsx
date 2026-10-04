@@ -687,25 +687,25 @@ export default function EasyMPlansPage() {
                         </p>
                     </div>
 
-                    {/* Realistic iPhone Mockup Showcase (ความสูงย่อลงมาเท่าความสูงรวมของตัวอักษร) */}
+                    {/* Realistic iPhone 16 Pro Mockup Showcase (สัดส่วนจริง 71.5mm × 149.6mm) */}
                     <div className="shrink-0 flex items-center justify-center">
                         <div
                             onClick={() => setIsFarmModalOpen(true)}
-                            className="group/phone relative h-28 sm:h-32 md:h-36 aspect-[9/19] rounded-[22px] sm:rounded-[26px] p-[2.5px] bg-gradient-to-b from-slate-300 via-slate-600 to-slate-900 border border-slate-400/60 shadow-[0_12px_35px_rgba(0,0,0,0.6),0_0_25px_rgba(245,158,11,0.25)] cursor-pointer hover:scale-105 hover:shadow-[0_16px_40px_rgba(245,158,11,0.35)] transition-all duration-300 select-none"
+                            className="group/phone relative h-[130px] sm:h-[142px] md:h-[150px] aspect-[71.5/149.6] rounded-[8px] sm:rounded-[9px] p-[2px] bg-gradient-to-b from-slate-300 via-slate-500 to-slate-800 border-[1.5px] border-slate-400/70 shadow-[0_10px_25px_rgba(0,0,0,0.6),0_0_20px_rgba(245,158,11,0.2)] cursor-pointer hover:scale-105 hover:shadow-[0_14px_30px_rgba(245,158,11,0.35)] transition-all duration-300 select-none"
                             title="คลิกเพื่อเปิดหน้าฟาร์ม EasyM Live Tracker"
                         >
                             {/* Realistic iPhone Hardware Side Buttons */}
-                            <div className="absolute -left-[2px] top-5 w-[2px] h-2 bg-slate-400 rounded-l-sm" /> {/* Action Button */}
-                            <div className="absolute -left-[2px] top-8 w-[2px] h-3 bg-slate-400 rounded-l-sm" /> {/* Volume Up */}
-                            <div className="absolute -left-[2px] top-12 w-[2px] h-3 bg-slate-400 rounded-l-sm" /> {/* Volume Down */}
-                            <div className="absolute -right-[2px] top-8 w-[2px] h-5 bg-slate-400 rounded-r-sm" /> {/* Power Button */}
+                            <div className="absolute -left-[1.5px] top-5 w-[1.5px] h-1.5 bg-slate-300 rounded-l-[0.5px]" /> {/* Action Button */}
+                            <div className="absolute -left-[1.5px] top-8 w-[1.5px] h-3 bg-slate-300 rounded-l-[0.5px]" /> {/* Volume Up */}
+                            <div className="absolute -left-[1.5px] top-12 w-[1.5px] h-3 bg-slate-300 rounded-l-[0.5px]" /> {/* Volume Down */}
+                            <div className="absolute -right-[1.5px] top-8 w-[1.5px] h-4.5 bg-slate-300 rounded-r-[0.5px]" /> {/* Power Button */}
 
-                            {/* Phone Screen Bezel */}
-                            <div className="relative w-full h-full rounded-[19px] sm:rounded-[23px] overflow-hidden bg-black border border-slate-900 shadow-inner flex flex-col">
+                            {/* Phone Screen Bezel (สัดส่วนมุมมนสมจริง Inner Radius = 6px-7px) */}
+                            <div className="relative w-full h-full rounded-[6px] sm:rounded-[7px] overflow-hidden bg-[#0d0a06] border border-black shadow-inner flex flex-col">
                                 
-                                {/* Dynamic Island Pill */}
-                                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-6 sm:w-8 h-1.5 bg-black rounded-full z-30 border border-slate-800 flex items-center justify-end pr-1 pointer-events-none">
-                                    <div className="w-0.5 h-0.5 rounded-full bg-blue-950/80" />
+                                {/* Dynamic Island */}
+                                <div className="absolute top-[3px] left-1/2 -translate-x-1/2 w-5 sm:w-6 h-[4.5px] bg-black rounded-full z-30 border border-slate-900 flex items-center justify-end pr-0.5 pointer-events-none">
+                                    <div className="w-[1.5px] h-[1.5px] rounded-full bg-blue-950" />
                                 </div>
 
                                 {/* Real Farm UI Image Showcase */}
@@ -721,11 +721,11 @@ export default function EasyMPlansPage() {
                                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/15 pointer-events-none z-20" />
 
                                 {/* iOS Home Indicator Bar */}
-                                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-7 sm:w-9 h-0.5 bg-white/70 rounded-full z-30 shadow pointer-events-none" />
+                                <div className="absolute bottom-[2px] left-1/2 -translate-x-1/2 w-6 sm:w-7 h-[1.5px] bg-white/70 rounded-full z-30 shadow pointer-events-none" />
 
                                 {/* Interactive Hover Click Overlay */}
                                 <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/phone:opacity-100 transition-opacity flex items-center justify-center z-30 backdrop-blur-[1px]">
-                                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1">
+                                    <span className="px-1.5 py-0.5 rounded-md bg-amber-400 text-slate-950 font-black text-[8px] shadow-lg flex items-center gap-1">
                                         <Eye className="w-2.5 h-2.5" />
                                         <span>ดูฟาร์มสด 👆</span>
                                     </span>
@@ -1351,7 +1351,7 @@ export default function EasyMPlansPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Top Header Controls Bar */}
-                        <div className="w-full flex items-center justify-between mb-3 px-2 max-w-[420px] sm:max-w-[450px]">
+                        <div className="w-full flex items-center justify-between mb-2 sm:mb-3 px-2 max-w-[360px] sm:max-w-[400px]">
                             <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -1385,24 +1385,25 @@ export default function EasyMPlansPage() {
                             </div>
                         </div>
 
-                        {/* Center Stage: Authentic Life-size iPhone 16 Pro Mockup */}
-                        <div className="relative w-[310px] sm:w-[350px] md:w-[380px] aspect-[9/19] max-h-[76vh] sm:max-h-[80vh] p-2.5 sm:p-3 bg-gradient-to-b from-slate-300 via-slate-600 to-slate-900 rounded-[44px] sm:rounded-[50px] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(245,158,11,0.25)] border-2 border-slate-400/60 ring-1 ring-white/20 select-none flex flex-col">
+                        {/* Center Stage: Authentic Life-size iPhone 16 Pro Mockup (สัดส่วนจริง 71.5mm x 149.6mm) */}
+                        <div className="relative h-[72vh] max-h-[710px] min-h-[500px] aspect-[71.5/149.6] p-[3.5px] sm:p-[4px] bg-gradient-to-b from-slate-300 via-slate-500 to-slate-800 rounded-[36px] sm:rounded-[38px] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_45px_rgba(245,158,11,0.22)] border-[2px] border-slate-400/80 ring-1 ring-white/20 select-none flex flex-col">
                             
-                            {/* Realistic iPhone Side Buttons */}
-                            <div className="absolute -left-[3px] top-24 w-[3px] h-3.5 bg-slate-400 rounded-l-sm" /> {/* Action button */}
-                            <div className="absolute -left-[3px] top-32 w-[3px] h-8 bg-slate-400 rounded-l-sm" /> {/* Volume Up */}
-                            <div className="absolute -left-[3px] top-44 w-[3px] h-8 bg-slate-400 rounded-l-sm" /> {/* Volume Down */}
-                            <div className="absolute -right-[3px] top-32 w-[3px] h-12 bg-slate-400 rounded-r-sm" /> {/* Power Button */}
+                            {/* Realistic iPhone Hardware Side Buttons */}
+                            <div className="absolute -left-[2.5px] top-[14%] w-[2px] h-3.5 bg-slate-300 rounded-l-[1px]" /> {/* Action button */}
+                            <div className="absolute -left-[2.5px] top-[19%] w-[2px] h-8 bg-slate-300 rounded-l-[1px]" /> {/* Volume Up */}
+                            <div className="absolute -left-[2.5px] top-[26%] w-[2px] h-8 bg-slate-300 rounded-l-[1px]" /> {/* Volume Down */}
+                            <div className="absolute -right-[2.5px] top-[20%] w-[2px] h-12 bg-slate-300 rounded-r-[1px]" /> {/* Power Button */}
+                            <div className="absolute -right-[2px] top-[68%] w-[1.5px] h-7 bg-slate-400 rounded-r-[1px]" /> {/* Camera Control */}
 
-                            {/* Inner Screen Bezel */}
-                            <div className="relative w-full h-full rounded-[36px] sm:rounded-[42px] overflow-hidden bg-black border border-slate-900 shadow-inner flex flex-col">
+                            {/* Inner Screen Display (Corner Radius = 31px-33px, Thin 1.2mm Bezel) */}
+                            <div className="relative w-full h-full rounded-[31px] sm:rounded-[33px] overflow-hidden bg-[#0d0a06] border border-black shadow-inner flex flex-col">
                                 
                                 {/* iOS Status Bar */}
-                                <div className="absolute top-0 inset-x-0 h-9 z-40 flex items-center justify-between px-6 pointer-events-none">
-                                    <span className="text-[12px] font-semibold text-white tracking-tight">09:41</span>
+                                <div className="absolute top-0 inset-x-0 h-10 z-40 flex items-center justify-between px-6 pointer-events-none">
+                                    <span className="text-[11px] font-semibold text-white/95 tracking-tight font-sans">09:41</span>
                                     
                                     {/* Top Right iOS Icons (Cell, 5G, Battery) */}
-                                    <div className="flex items-center gap-1.5 text-white">
+                                    <div className="flex items-center gap-1.5 text-white/90">
                                         {/* Signal Bars */}
                                         <div className="flex items-end gap-[1.5px] h-2.5">
                                             <span className="w-[2px] h-1 bg-white rounded-[0.5px]" />
@@ -1422,22 +1423,23 @@ export default function EasyMPlansPage() {
                                     </div>
                                 </div>
 
-                                {/* Dynamic Island */}
-                                <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 sm:w-28 h-5 sm:h-6 bg-black rounded-full z-40 border border-slate-800/80 shadow-md flex items-center justify-between px-2.5 pointer-events-none">
+                                {/* Apple Dynamic Island (สัดส่วน 32% ของความกว้างหน้าจอ) */}
+                                <div className="absolute top-[8px] sm:top-[9px] left-1/2 -translate-x-1/2 w-[98px] sm:w-[108px] h-[25px] sm:h-[27px] bg-black rounded-full z-40 border border-slate-900 shadow-md flex items-center justify-between px-2.5 pointer-events-none">
                                     <div className="w-2.5 h-2.5 rounded-full bg-[#0a0a14] ring-1 ring-blue-900/50 flex items-center justify-center">
                                         <div className="w-1 h-1 rounded-full bg-blue-500/30" />
                                     </div>
                                     <div className="w-1.5 h-1.5 rounded-full bg-[#111] ring-1 ring-slate-800" />
                                 </div>
 
-                                {/* EasyM Farm UI Screen Content (Scrollable High-Res View) */}
-                                <div className="relative w-full h-full overflow-y-auto scrollbar-none bg-[#090b10]">
-                                    <div className="relative w-full aspect-[682/1024]">
+                                {/* EasyM Farm UI Screen Content (เลื่อนดูสดได้เต็มรูปแบบทุกฟังก์ชัน) */}
+                                <div className="relative w-full h-full overflow-y-auto overscroll-contain scrollbar-none bg-[#0d0a06] pt-8 pb-6">
+                                    <div className="relative w-full">
                                         <Image
                                             src="/assets/easym_farm_live_preview.png"
                                             alt="EasyM Live Tracker Real Screen"
-                                            fill
-                                            className="object-cover object-top"
+                                            width={682}
+                                            height={1024}
+                                            className="w-full h-auto block select-none"
                                             priority
                                         />
                                     </div>
@@ -1447,18 +1449,21 @@ export default function EasyMPlansPage() {
                                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none z-30" />
 
                                 {/* iOS Home Indicator */}
-                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 sm:w-36 h-1 bg-white/70 rounded-full z-40 shadow pointer-events-none" />
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 sm:w-32 h-1 bg-white/70 rounded-full z-40 shadow pointer-events-none" />
                             </div>
                         </div>
 
                         {/* Bottom Actions Bar */}
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-3 text-center">
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-3 text-center">
+                            <span className="text-[11px] text-slate-400 hidden sm:inline">
+                                ↕️ คุณสามารถเลื่อนหน้าจอมือถือขึ้น-ลง เพื่อดูผลกำไรรายวันและเมนูควบคุมได้
+                            </span>
                             <Button
                                 onClick={() => setIsFarmModalOpen(false)}
-                                className="px-6 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-lg flex items-center gap-2"
+                                className="px-5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-lg flex items-center gap-1.5"
                             >
                                 <X className="w-4 h-4" />
-                                <span>ปิดหน้าต่าง (กด ESC หรือคลิกที่ว่าง)</span>
+                                <span>ปิดหน้าต่าง (ESC)</span>
                             </Button>
                         </div>
                     </div>
