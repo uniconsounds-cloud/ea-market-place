@@ -643,61 +643,57 @@ export default function EasyMPlansPage() {
             </div>
 
             {/* ============================================================== */}
-            {/* 2. PROMINENT TOP HIGHLIGHT BANNER (ข้อความไฮไลต์โดดเด่นมองเห็นชัดเจน) */}
+            {/* 2. PROMINENT TOP HIGHLIGHT BANNER (แบนเนอร์โฆษณาส่วนหัวกระชับ สัดส่วนภาพเท่าตัวอักษร) */}
             {/* ============================================================== */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/20 via-purple-600/25 to-blue-600/20 border-2 border-amber-400/60 p-5 sm:p-6 shadow-2xl shadow-amber-500/15">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/20 via-purple-600/25 to-blue-600/20 border-2 border-amber-400/60 p-4 sm:p-5 shadow-2xl shadow-amber-500/15">
                 <div className="absolute -right-8 -top-8 w-40 h-40 bg-amber-400/20 rounded-full blur-2xl pointer-events-none" />
                 <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
 
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+                <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-stretch justify-between gap-4 sm:gap-6">
                     
-                    {/* Text Section (ข้อความส่วนหัวกระชับ และขึ้นบรรทัดใหม่ตามที่ผู้ใช้กำหนด) */}
-                    <div className="flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                            <span className="px-3 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow">
+                    {/* Text Section (ยึดความสูงตัวอักษรเป็นหลัก) */}
+                    <div className="flex-1 flex flex-col justify-center space-y-1 text-center sm:text-left">
+                        <div className="flex items-center justify-center sm:justify-start gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow">
                                 ★ EXCLUSIVE FEATURE
-                            </span>
-                            <span className="text-xs text-amber-300 font-bold flex items-center gap-1">
-                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                                Single Domain V2 Dashboard
                             </span>
                         </div>
                         
                         {/* บรรทัดที่ 1 */}
-                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-snug">
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-snug">
                             EA หนึ่งเดียว เปิดดู สั่งงาน ผ่านหน้าฟาร์ม UI บนมือถือ
                         </h2>
                         
                         {/* บรรทัดที่ 2 */}
-                        <div className="text-2xl sm:text-3xl md:text-4xl font-black bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent underline decoration-amber-400/80 decoration-wavy underline-offset-8 py-0.5">
+                        <div className="text-xl sm:text-2xl md:text-3xl font-black bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent underline decoration-amber-400/80 decoration-wavy underline-offset-4 py-0.5">
                             ทดลองใช้ฟรี 2 เดือน
                         </div>
                         
                         {/* บรรทัดที่ 3 */}
-                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium max-w-2xl pt-1">
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium max-w-2xl pt-0.5">
                             มอนิเตอร์ Balance, Equity, Drawdown สดระดับวินาที สั่งเปิด-ปิดคู่เงินผ่านหน้าเว็บ 24 ชั่วโมง ไม่ต้องรีโมต VPS
                         </p>
                     </div>
 
-                    {/* Smartphone Mockup Showcase (ภาพโฆษณาจำลองหน้าฟาร์มจริงบนมือถือ พร้อมคลิกดู Popup) */}
-                    <div className="shrink-0 flex flex-col items-center gap-2">
+                    {/* Smartphone Mockup Showcase (ความสูงย่อลงมาเท่าความสูงรวมของตัวอักษร) */}
+                    <div className="shrink-0 flex items-center justify-center">
                         <div
                             onClick={() => setIsFarmModalOpen(true)}
-                            className="group/phone relative w-36 sm:w-44 aspect-[9/16] rounded-[24px] sm:rounded-[28px] p-2 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-2 border-amber-400/60 shadow-[0_10px_35px_rgba(245,158,11,0.25)] cursor-pointer hover:scale-105 hover:border-amber-300 transition-all duration-300 select-none"
-                            title="คลิกเพื่อดูหน้าฟาร์มจำลองเสมือนจริง"
+                            className="group/phone relative h-28 sm:h-32 md:h-36 aspect-[9/16] rounded-2xl p-1 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-2 border-amber-400/60 shadow-[0_6px_25px_rgba(245,158,11,0.25)] cursor-pointer hover:scale-105 hover:border-amber-300 transition-all duration-300 select-none"
+                            title="คลิกเพื่อดูหน้าฟาร์ม EasyM Live Tracking"
                         >
                             {/* Phone Screen Bezel */}
-                            <div className="relative w-full h-full rounded-[18px] sm:rounded-[22px] overflow-hidden bg-black border border-slate-700/60 shadow-inner">
+                            <div className="relative w-full h-full rounded-[12px] overflow-hidden bg-black border border-slate-700/80 shadow-inner">
                                 
                                 {/* Dynamic Island / Top Notch Indicator */}
-                                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-10 sm:w-12 h-2.5 bg-black rounded-full z-20 border border-slate-800/80 shadow" />
+                                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-6 sm:w-8 h-1.5 bg-black rounded-full z-20 border border-slate-800" />
 
                                 {/* Real Farm UI Image Showcase */}
                                 <Image
                                     src="/assets/easym_farm_live_preview.png"
                                     alt="EasyM Live Farm UI Interactive Preview"
                                     fill
-                                    className="object-cover object-top group-hover/phone:scale-110 transition-transform duration-700"
+                                    className="object-cover object-top group-hover/phone:scale-105 transition-transform duration-500"
                                     priority
                                 />
 
@@ -706,24 +702,13 @@ export default function EasyMPlansPage() {
 
                                 {/* Interactive Hover Click Overlay */}
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/phone:opacity-100 transition-opacity flex items-center justify-center z-20 backdrop-blur-[1px]">
-                                    <div className="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-black text-[11px] shadow-xl flex items-center gap-1.5 transform translate-y-2 group-hover/phone:translate-y-0 transition-transform">
-                                        <Eye className="w-3.5 h-3.5" />
-                                        <span>เปิดดูฟาร์มจริง</span>
-                                    </div>
+                                    <span className="px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1">
+                                        <Eye className="w-2.5 h-2.5" />
+                                        <span>ดูฟาร์มจริง 👆</span>
+                                    </span>
                                 </div>
                             </div>
                         </div>
-
-                        {/* Interactive Tap Pill below phone */}
-                        <button
-                            type="button"
-                            onClick={() => setIsFarmModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-slate-950/90 text-amber-300 border border-amber-400/40 hover:bg-amber-400 hover:text-slate-950 hover:border-amber-400 transition-all shadow-md group"
-                        >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            <span>แตะเพื่อดูหน้าฟาร์มจริง</span>
-                            <Maximize2 className="w-3 h-3 group-hover:scale-110 transition-transform" />
-                        </button>
                     </div>
 
                 </div>
@@ -1363,10 +1348,10 @@ export default function EasyMPlansPage() {
                                     </span>
                                 </div>
                                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
-                                    หน้าฟาร์มจำลองข้อมูลเสมือนจริง (Farm UI 2U)
+                                    🎮 EasyM Live Tracking (หน้าฟาร์มสด)
                                 </h2>
                                 <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                                    สัมผัสประสบการณ์มอนิเตอร์และสั่งการระบบเทรดสดระดับวินาที ผ่านหน้าจอมือถือจริง
+                                    ระบบมอนิเตอร์พอร์ตและสั่งการอัตโนมัติบนมือถือ 100% สดระดับวินาที
                                 </p>
                             </div>
 
