@@ -21,7 +21,7 @@ uint     g_eae_last_sync_ticks = 0;
 int      g_eae_sync_interval  = 20; // Default: Sync every 20 seconds
 int      g_eae_active_sync_interval = 0; // Dynamic server override (0 = use g_eae_sync_interval)
 bool     g_eae_full_sync_mode = true; // Start with true to ensure initial data
-string   g_eae_api_url        = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data";
+string   g_eae_api_url        = "https://eaeze.com/api/sync-dashboard";
 
 // Internal System Key (Do not change)
 string   g_eae_system_key     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo";

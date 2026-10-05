@@ -290,7 +290,8 @@ void EaezeCheckLicensePeriodic(string product_id, string api_key = "KHUCHAI_SUPH
 // =====================================================================
 #ifdef EAEZE_SYNC_ENABLED
 
-#define EAE_SYNC_URL "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data"
+// Single URL Whitelist: eaeze.com only (no Supabase URL required in MT5)
+#define EAE_SYNC_URL "https://eaeze.com/api/sync-dashboard"
 #define EAE_SYSTEM_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo"
 
 // Helper to scan positions
@@ -735,6 +736,12 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
 {
    // 1. Check license status first
    EaezeCheckLicensePeriodic(product_id, "KHUCHAI_SUPHAKORN");
+   
+   // [Single WebRequest Architecture]:
+   // mini and Farm only verify license, no live farm UI streaming needed
+   if(product_id == "EZM-MIN-V1" || product_id == "EZM-FARM-V1") {
+      return;
+   }
    
    // --- [NEW] Self-Healing 30-Day Sync Check ---
    EaezeWebSyncCheckAndPushHistory(magic_buy, magic_sell);
