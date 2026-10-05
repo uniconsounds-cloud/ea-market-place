@@ -202,7 +202,7 @@ export default function AdminPrimeFarmLabPage() {
                 const [ordersRes, statusRes, historyRes] = await Promise.all([
                     supabase.from('farm_active_orders').select('*').eq('port_number', portNumber),
                     supabase.from('farm_port_status').select('*').eq('port_number', portNumber).maybeSingle(),
-                    supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }).limit(30)
+                    supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }).limit(90)
                 ]);
 
                 if (ordersRes.data) setLiveOrders(ordersRes.data);
@@ -223,6 +223,10 @@ export default function AdminPrimeFarmLabPage() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_active_orders', filter: `port_number=eq.${portNumber}` }, async () => {
                 const { data: orders } = await supabase.from('farm_active_orders').select('*').eq('port_number', portNumber);
                 setLiveOrders(orders || []);
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_daily_history', filter: `port_number=eq.${portNumber}` }, async () => {
+                const { data: hist } = await supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }).limit(90);
+                if (hist) setRawHistory(hist.reverse());
             })
             .subscribe();
 
@@ -387,44 +391,139 @@ export default function AdminPrimeFarmLabPage() {
         return { trees };
     }, [telemetry.drawdownPercent, telemetry.orders]);
 
-    // ─── Daily Harvest History Crates Generation ───
-    const dailyHistory = useMemo(() => {
-        if (rawHistory.length > 0) {
-            return rawHistory.map((item, idx) => {
-                const pnl = Number(item.profit || 0);
-                let asset = '/farm/base_farmbox_empty.png';
-                if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
-                else if (pnl > 20) asset = '/farm/base_farmbox_full.png';
-                else if (pnl > 10) asset = '/farm/base_farmbox_mid.png';
-                else if (pnl > 0) asset = '/farm/base_farmbox_min.png';
+    // ─── Market Trading Date String (Rolls over at 05:00 AM Bangkok / 17:00 NY) ───
+    const brokerDateStr = useMemo(() => {
+        const mDate = getMarketTradingDate(time || new Date());
+        const yyyy = mDate.getFullYear();
+        const mm = String(mDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(mDate.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }, [time]);
 
-                return {
-                    id: item.id || idx,
-                    date: item.date ? item.date.substring(5) : `D${idx + 1}`,
-                    pnl: pnl,
-                    asset: asset,
-                    isEndOfWeek: idx % 5 === 4
-                };
-            });
+    // ─── Daily Harvest History Crates Generation (Matching Classic EasyM Farm 100%) ───
+    const dailyHistory = useMemo(() => {
+        // Filter out today's active trading date and any future dates (only show past completed days before today)
+        let filteredData = rawHistory.filter(item => item.date < brokerDateStr);
+
+        // Sort ascending by date
+        const sorted = [...filteredData].sort((a, b) => a.date.localeCompare(b.date));
+
+        // --- AUTOMATIC MISSING-DAY CHECKER & GAP FILLER ---
+        const historyMap = new Map(sorted.map(item => [item.date.split('T')[0], item]));
+        
+        const filledList: any[] = [];
+        if (sorted.length > 0) {
+            const firstDateStr = sorted[0].date.split('T')[0];
+            const startDate = new Date(firstDateStr + 'T00:00:00');
+
+            // History crates represent completed days strictly prior to today's active trading date (brokerDateStr)
+            const lastCompletedDate = new Date(brokerDateStr + 'T00:00:00');
+            lastCompletedDate.setDate(lastCompletedDate.getDate() - 1);
+
+            const curr = new Date(startDate);
+            while (curr <= lastCompletedDate) {
+                const yyyy = curr.getFullYear();
+                const mm = String(curr.getMonth() + 1).padStart(2, '0');
+                const dd = String(curr.getDate()).padStart(2, '0');
+                const dateStr = `${yyyy}-${mm}-${dd}`;
+                
+                const dayOfWeek = curr.getDay(); // 0: Sun, 6: Sat
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+                if (historyMap.has(dateStr)) {
+                    const item = historyMap.get(dateStr)!;
+                    // Forex markets are strictly closed on Saturday & Sunday -> skip weekends
+                    if (!isWeekend) {
+                        filledList.push(item);
+                    }
+                } else if (!isWeekend) {
+                    // MISSING WEEKDAY DETECTED -> Auto-fill missing weekday with 0 profit record
+                    filledList.push({
+                        id: `missing_${dateStr}`,
+                        date: dateStr,
+                        profit: 0,
+                        isAutoFilled: true
+                    });
+                }
+
+                curr.setDate(curr.getDate() + 1);
+            }
+        } else {
+            // Realistic Fallback if port has no past history records
+            const fallbackDays = [
+                { date: '2026-09-14', profit: 4520 },
+                { date: '2026-09-15', profit: 2840 },
+                { date: '2026-09-16', profit: 1850 },
+                { date: '2026-09-17', profit: 3580 },
+                { date: '2026-09-18', profit: 2190 },
+                { date: '2026-09-21', profit: -1240 },
+                { date: '2026-09-22', profit: 5210 },
+                { date: '2026-09-23', profit: 2290 },
+                { date: '2026-09-24', profit: 1530 },
+                { date: '2026-09-25', profit: 3120 },
+                { date: '2026-09-28', profit: 4120 },
+                { date: '2026-09-29', profit: 3170 },
+                { date: '2026-09-30', profit: 860 },
+                { date: '2026-10-01', profit: 4070 },
+                { date: '2026-10-02', profit: 2490 }
+            ];
+            filledList.push(...fallbackDays.map((d, i) => ({ id: `fb_${i}`, ...d })));
         }
 
-        // Realistic Fallback 14-Day History Crates for Port 97053088
-        const mockDays = [
-            { id: 'm1', date: '09-18', pnl: 45.20, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm2', date: '09-19', pnl: 28.40, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm3', date: '09-20', pnl: 18.50, asset: '/farm/base_farmbox_mid.png', isEndOfWeek: true },
-            { id: 'm4', date: '09-23', pnl: 35.80, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm5', date: '09-24', pnl: -12.40, asset: '/farm/base_farmbox_lose.png', isEndOfWeek: false },
-            { id: 'm6', date: '09-25', pnl: 52.10, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm7', date: '09-26', pnl: 22.90, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm8', date: '09-27', pnl: 15.30, asset: '/farm/base_farmbox_mid.png', isEndOfWeek: true },
-            { id: 'm9', date: '09-30', pnl: 41.20, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm10', date: '10-01', pnl: 31.70, asset: '/farm/base_farmbox_full.png', isEndOfWeek: false },
-            { id: 'm11', date: '10-02', pnl: 8.60, asset: '/farm/base_farmbox_min.png', isEndOfWeek: false },
-            { id: 'm12', date: '10-03', pnl: 64.90, asset: '/farm/base_farmbox_full.png', isEndOfWeek: true }
-        ];
-        return mockDays;
-    }, [rawHistory]);
+        // Extra guarantee: ensure no item equals or exceeds today's active market trading date
+        const safeFilledList = filledList.filter(item => item.date < brokerDateStr);
+
+        const MARKET_HOLIDAYS: Record<string, string> = {
+            '12-25': 'Christmas Day',
+            '01-01': 'New Year\'s Day',
+            '2026-04-03': 'Good Friday',
+            '2027-03-26': 'Good Friday'
+        };
+
+        return safeFilledList.map((item, idx) => {
+            const pnl = Number(item.profit || 0);
+            
+            // Crate tier rule in dollars: 1000 USC = 10 USD, 2000 USC = 20 USD
+            // (e.g. 1000 USC -> $10, 2000 USC -> $20)
+            const pnlInDollars = pnl / 100;
+            
+            let asset = '/farm/base_farmbox_empty.png';
+            if (pnlInDollars < 0) asset = '/farm/base_farmbox_lose.png';
+            else if (pnlInDollars > 20) asset = '/farm/base_farmbox_full.png'; // > $20 (2000 USC)
+            else if (pnlInDollars > 10) asset = '/farm/base_farmbox_mid.png';  // > $10 (1000 USC)
+            else if (pnlInDollars > 0) asset = '/farm/base_farmbox_min.png';   // > $0 (1-1000 USC)
+
+            // Market holiday check
+            const dateMD = item.date.substring(5);
+            const holidayName = MARKET_HOLIDAYS[dateMD] || MARKET_HOLIDAYS[item.date];
+            const isHoliday = !!(holidayName && Math.abs(pnl) < 0.01);
+
+            // Localized Date string: Mon-Fri e.g. "28 SEP", "01 OCT"
+            const localDate = new Date(item.date + 'T00:00:00');
+            const dayOfWeek = localDate.getDay();
+            
+            // Week boundary detection (End of trading week / Friday / Gap before next item)
+            let isEndOfWeek = dayOfWeek === 5;
+            if (idx < safeFilledList.length - 1) {
+                const nextDate = new Date(safeFilledList[idx + 1].date + 'T00:00:00');
+                const diffDays = Math.round((nextDate.getTime() - localDate.getTime()) / (1000 * 3600 * 24));
+                if (diffDays > 2 || nextDate.getDay() < dayOfWeek) {
+                    isEndOfWeek = true;
+                }
+            }
+
+            return {
+                id: item.id || idx,
+                dateStr: item.date,
+                date: localDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase(),
+                pnl,
+                asset,
+                isHoliday,
+                holidayName,
+                isEndOfWeek
+            };
+        });
+    }, [rawHistory, brokerDateStr]);
 
     // Handlers for pair actions
     const handleToggleCloseOnly = (sym: string) => {
@@ -495,7 +594,11 @@ export default function AdminPrimeFarmLabPage() {
                     <div className="max-w-7xl mx-auto px-4 relative">
                         <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
                             {isClient && (() => {
-                                const pct = ((time?.getHours() ?? 0) * 60 + (time?.getMinutes() ?? 0)) / (24 * 60) * 100;
+                                const raw = Number(livePortStatus?.server_time);
+                                const brokerDayPercent = raw ? ((raw % 86400) / 86400) * 100 : null;
+                                const pct = brokerDayPercent !== null
+                                    ? brokerDayPercent
+                                    : ((time?.getHours() ?? 0) * 60 + (time?.getMinutes() ?? 0)) / (24 * 60) * 100;
                                 const remaining = Math.max(0, 100 - pct);
                                 return (
                                     <div 
@@ -900,9 +1003,15 @@ export default function AdminPrimeFarmLabPage() {
                                     </div>
                                     <div className="flex flex-col items-center">
                                         <span className="text-[8px] sm:text-[9px] text-amber-100/50 font-mono tracking-tighter">{item.date}</span>
-                                        <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                            {item.pnl >= 0 ? '+' : ''}{item.pnl.toFixed(2)} USC
-                                        </span>
+                                        {item.isHoliday ? (
+                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>
+                                                CLOSED
+                                            </span>
+                                        ) : (
+                                            <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
+                                                {item.pnl >= 0 ? '+' : ''}{item.pnl.toFixed(2)}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
