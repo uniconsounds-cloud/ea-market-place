@@ -75,6 +75,10 @@
   * ใช้ **Single WebRequest: `https://eaeze.com`** 100%
   * ซิงค์ข้อมูลละเอียดสูง (Full Telemetry + Prime Telemetry) ไปที่ `/api/sync-dashboard`
   * **Two-Way Remote Interactive:** รับคำสั่งจากหน้าเว็บเพื่อสั่งเปิด-ปิดโหมด `Close-Only` และ `Force Quarantine` รายคู่เงิน
+  * **20-Pair Mean-Reversion Basket Rebalancing:**
+    * ปรับตะกร้า 20 คู่เงินใหม่: เพิ่ม **`AUDNZD`**, **`CADCHF`**, **`NZDCAD`** แทนที่ **`AUDCAD`**, **`EURCHF`**, **`GBPCHF`**
+    * **Graceful Shutdown & Auto-Collapse:** คู่ที่นำออกถูกตั้งเป็น Close-Only อัตโนมัติเพื่อเคลียร์ออเดอร์เก่า และเมื่อออเดอร์หมด แถวบนแดชบอร์ด MT5 จะยุบตัวหายไปเองทันที
+  * **Interactive 3D On-Chart Controls:** ปุ่มกดเปิด-ปิดการทำงานรายคู่เงินแบบ 3 มิติ (ปุ่มนูน/ยุบ) บนกราฟ MT5
   * **Safe Liquidation Protocol (เอกสิทธิ์เฉพาะ PRIME):**
     * เมื่อสิทธิ์ License สิ้นสุดลงหรือถูกเพิกถอน EA จะไม่ทิ้งพอร์ตให้เคว้งคว้าง
     * บล็อกการเปิดไม้แรกและไม้แก้ใหม่ 100%
@@ -88,6 +92,11 @@
 ### 📌 Version 2.00-1001 (ตุลาคม 2026)
 * **Prime Architecture Upgrade:**
   * อัปเกรดไฟล์หลักเป็น `EASY_M_Prime_v200_1001.mq5`
+  * **20-Pair Currency Basket Rebalancing:**
+    * นำ 3 คู่เสี่ยงสูงออก: `AUDCAD` (ลากเทรนด์น้ำมัน), `EURCHF` (Range แคบ เสี่ยงแทรกแซงค่าเงิน), `GBPCHF` (Tail-risk กระชากรุนแรง)
+    * เพิ่ม 3 คู่พฤติกรรม Mean-Reversion สูง: `AUDNZD` (#1 Grid pair), `CADCHF` (สวิงสมดุล), `NZDCAD` (รอบนุ่มนวล)
+    * รองรับ Graceful Shutdown & Auto-Collapse แถวบนแดชบอร์ด MT5 เมื่อเคลียร์ไม้เก่าหมด
+  * **Interactive 3D On-Chart Deck:** ปุ่มกด 3 มิตินูน/ยุบ สั่งเปิด-ปิดคู่เงินบนกราฟ MT5
   * ผนวกระบบความปลอดภัย **Safe Liquidation Protocol** (`ExpertRemove()` เมื่อเคลียร์ออเดอร์หมด)
   * รองรับหน้าฟาร์มไซไฟโฮโลแกรม Next-Gen Cyber Farm UI (4 Floating Orbs & 4 Glassmorphic HUD Overlays)
   * สลับการส่ง Farm Sync เข้า `https://eaeze.com/api/sync-dashboard` เป็น Single WebRequest 100%
