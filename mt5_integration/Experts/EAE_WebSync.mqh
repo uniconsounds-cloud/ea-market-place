@@ -236,7 +236,7 @@ void EAE_WebSyncPushDailySummary(const EAE_DailySummary &sum)
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    Print("EAE: Sending Daily Summary for ", TimeToString(sum.date, TIME_DATE));
-   WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
+   WebRequest("POST", g_eae_api_url, headers, 10000, data, result, result_headers);
 }
 
 //+------------------------------------------------------------------+
@@ -355,7 +355,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    ResetLastError();
-   int res = WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
+   int res = WebRequest("POST", g_eae_api_url, headers, 10000, data, result, result_headers);
    if(res == -1) {
       int err = GetLastError();
       g_eae_sync_status = "ERR: CONN";
@@ -374,6 +374,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    }
    
    if(res != 200) {
+      if(res == 1003) {
+         // Transient internet network timeout (MQL5 internal code 1003)
+         g_eae_sync_status = "NET_TIMEOUT";
+         g_eae_sync_message = "Network Timeout (1003) - Auto Retrying";
+         return false; // Silent auto-retry on next cycle without spamming log
+      }
       g_eae_sync_status = "ERR: " + IntegerToString(res);
       string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
       g_eae_sync_message = "HTTP " + IntegerToString(res);
@@ -721,7 +727,7 @@ void EAE_WebSyncTriggerEvent(string type, int total_orders, double total_lots, d
    string headers = "Content-Type: application/json\r\n" + 
                     "apikey: " + g_eae_system_key + "\r\n" +
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
-   WebRequest("POST", g_eae_api_url, headers, 2000, data, result, result_headers);
+   WebRequest("POST", g_eae_api_url, headers, 5000, data, result, result_headers);
 }
 
 #endif // __EAE_WEB_SYNC_MQH__
