@@ -464,88 +464,11 @@ export default function AdminPrimeFarmLabPage() {
         <div className="flex flex-col h-screen w-full overflow-hidden font-sans select-none relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#e3f0ff] via-[#b5d6f4] to-[#7fb2df]">
             
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 🧪 TOP FLOATING SIMULATOR CONTROL BAR (COLLAPSIBLE FOR ADMIN)   */}
+            {/* 🏰 FIXED HEADER: FARM HUD + 1-DAY TIMELINE (MATCHING ORIGINAL 100%) */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <div className="fixed top-0 left-0 w-full z-[130] bg-[#0c101a]/95 backdrop-blur-md border-b border-purple-500/30 text-xs px-3 py-1 shadow-2xl transition-all">
-                <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
-                    
-                    {/* Left: Lab Tag & Port Mode */}
-                    <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="border-purple-400/50 text-purple-300 bg-purple-950/40 text-[10px] px-2 py-0.5 font-bold flex items-center gap-1">
-                            <Cpu className="h-3 w-3 text-cyan-400" />
-                            PRIME LAB ({portNumber})
-                        </Badge>
-                        
-                        <div className="flex items-center bg-black/40 rounded-lg p-0.5 border border-slate-700">
-                            <button
-                                onClick={() => { setIsSimMode(false); toast.info('📡 เชื่อมต่อข้อมูลจริงจากพอร์ต 97053088'); }}
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                                    !isSimMode ? 'bg-cyan-500 text-black shadow font-black' : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                🟢 พอร์ตจริง (Live)
-                            </button>
-                            <button
-                                onClick={() => { setIsSimMode(true); toast.success('🧪 เปิดโหมดจำลองสถานการณ์ Sandbox'); }}
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                                    isSimMode ? 'bg-purple-600 text-white shadow font-black' : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                🧪 Sandbox จำลอง
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Middle: Sandbox Scenarios (Visible when Sim Mode is active) */}
-                    {isSimMode && showSimBar && (
-                        <div className="hidden md:flex items-center gap-1">
-                            <span className="text-[10px] font-mono text-purple-300">จำลอง:</span>
-                            {[
-                                { id: 'normal', label: '🌱 ปกติ' },
-                                { id: 'quarantine', label: '🔒 กักขัง (EJ -26%)' },
-                                { id: 'rescue', label: '🎯 สไนเปอร์ R2' },
-                                { id: 'relief', label: '💎 กองทุนตัดขาดทุน' },
-                                { id: 'safe_liquidation', label: '🛡️ สิทธิ์หมดอายุ (Safe Liq)' },
-                            ].map((s) => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => setSimScenario(s.id)}
-                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
-                                        simScenario === s.id 
-                                            ? 'bg-purple-500/20 text-purple-200 border-purple-400 font-bold' 
-                                            : 'bg-black/30 text-slate-400 border-slate-700 hover:text-white'
-                                    }`}
-                                >
-                                    {s.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Right: Toggle Mini Bar */}
-                    <div className="flex items-center gap-2">
-                        {telemetry.isSafeLiquidation && (
-                            <Badge className="bg-red-600 text-white text-[9px] font-black animate-pulse px-1.5 py-0">
-                                SAFE LIQUIDATION ACTIVE
-                            </Badge>
-                        )}
-                        <button
-                            onClick={() => setShowSimBar(!showSimBar)}
-                            className="text-slate-400 hover:text-white p-0.5"
-                            title="ซ่อน/แสดง แถบตัวเลือกจำลอง"
-                        >
-                            {showSimBar ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 🏰 FIXED HEADER: FARM HUD + 1-DAY TIMELINE (MATCHING ORIGINAL)  */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            <div className="fixed top-7 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+            <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
-                    title={`EASYM PRIME COMMAND CENTER (${portNumber})`}
+                    title={`EASYM PRIME (${portNumber})`}
                     portNumber={portNumber}
                     balance={telemetry.balance}
                     equity={telemetry.equity}
@@ -562,7 +485,9 @@ export default function AdminPrimeFarmLabPage() {
                     dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
                     drawdownPercent={telemetry.drawdownPercent}
                     drawdownAmount={telemetry.drawdownAmount}
-                    systemCode="EASYM_PRIME_V2"
+                    systemCode="EasyM Prime"
+                    adminMessage="ติดต่อผ่าน line ID : @jharvest"
+                    customName="EASYM PRIME"
                 />
 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -590,25 +515,122 @@ export default function AdminPrimeFarmLabPage() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 📱 MOBILE ONLY STATS OVERLAY (MATCHING CLASSIC FARM)             */}
+            {/* 📱 MOBILE ONLY STATS OVERLAY (EXACT FIT BELOW TIMELINE BAR)      */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <div className="mt-7">
-                <FarmMobileStatsOverlay
-                    portNumber={portNumber}
-                    buyCount={telemetry.buyCount}
-                    sellCount={telemetry.sellCount}
-                    buyPnl={telemetry.buyPnl}
-                    sellPnl={telemetry.sellPnl}
-                    balance={telemetry.balance}
-                    todayProfit={telemetry.todayPnl}
-                    accountType="USC"
-                    todayClosedLots={telemetry.todayClosedLots}
-                    dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
-                    drawdownPercent={telemetry.drawdownPercent}
-                    drawdownAmount={telemetry.drawdownAmount}
-                    totalStandardLots={telemetry.totalLots}
-                    customName="PRIME COMMAND DECK"
-                />
+            <FarmMobileStatsOverlay
+                portNumber={portNumber}
+                buyCount={telemetry.buyCount}
+                sellCount={telemetry.sellCount}
+                buyPnl={telemetry.buyPnl}
+                sellPnl={telemetry.sellPnl}
+                balance={telemetry.balance}
+                todayProfit={telemetry.todayPnl}
+                accountType="USC"
+                todayClosedLots={telemetry.todayClosedLots}
+                dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
+                drawdownPercent={telemetry.drawdownPercent}
+                drawdownAmount={telemetry.drawdownAmount}
+                totalStandardLots={telemetry.totalLots}
+                customName="EASYM PRIME"
+                adminMessage="ติดต่อผ่าน line ID : @jharvest"
+            />
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* 🧪 FLOATING SANDBOX LAB CONTROLLER (OVERLAY - DOES NOT BLOCK FARM) */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            <div className="fixed top-[188px] sm:top-[148px] left-3 sm:left-6 z-[120] font-sans select-none animate-fade-in pointer-events-auto">
+                {!showSimBar ? (
+                    /* Collapsed Floating Pill */
+                    <button
+                        onClick={() => setShowSimBar(true)}
+                        className="flex items-center gap-2 bg-[#0a0f1d]/90 hover:bg-[#111728] border border-purple-500/50 hover:border-purple-400 text-purple-200 px-3.5 py-1.5 rounded-full shadow-[0_6px_25px_rgba(0,0,0,0.8)] backdrop-blur-md transition-all duration-300 group cursor-pointer hover:scale-105"
+                        title="คลิกเพื่อเปิดแถบควบคุมพอร์ตจริง / Sandbox"
+                    >
+                        <span className={`w-2.5 h-2.5 rounded-full ${!isSimMode ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse' : 'bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse'}`} />
+                        <span className="text-[11px] font-bold font-mono">
+                            {!isSimMode ? `🟢 LIVE (${portNumber})` : `🧪 SANDBOX: ${
+                                simScenario === 'normal' ? 'ปกติ' :
+                                simScenario === 'quarantine' ? 'กักขัง EJ' :
+                                simScenario === 'rescue' ? 'สไนเปอร์' :
+                                simScenario === 'relief' ? 'กองทุน' : 'Safe Liq'
+                            }`}
+                        </span>
+                        <Sliders className="h-3.5 w-3.5 text-purple-300/70 group-hover:rotate-45 transition-transform ml-1" />
+                    </button>
+                ) : (
+                    /* Expanded Floating Sci-Fi Dock */
+                    <div className="bg-[#0a0f1d]/95 border-2 border-purple-500/50 rounded-2xl p-2.5 sm:p-3 shadow-[0_12px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl flex flex-col gap-2 max-w-[94vw] sm:max-w-xl animate-fade-in text-xs">
+                        {/* Header Inside Floating Dock */}
+                        <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-purple-500/20">
+                            <div className="flex items-center gap-2">
+                                <Cpu className="h-4 w-4 text-cyan-400 animate-pulse" />
+                                <span className="font-mono font-black text-[11px] text-purple-200 tracking-wider">
+                                    PRIME LAB CONTROLLER ({portNumber})
+                                </span>
+                                {telemetry.isSafeLiquidation && (
+                                    <Badge className="bg-red-600 text-white text-[9px] font-black animate-pulse px-1.5 py-0">
+                                        SAFE LIQ
+                                    </Badge>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setShowSimBar(false)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                                title="ย่อแถบควบคุมแบบลอยตัว"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Mode Switch & Scenario Selector */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Live vs Sandbox Switch */}
+                            <div className="flex items-center bg-black/60 rounded-xl p-0.5 border border-slate-700">
+                                <button
+                                    onClick={() => { setIsSimMode(false); toast.info('📡 เชื่อมต่อข้อมูลจริงจากพอร์ต 97053088'); }}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                        !isSimMode ? 'bg-cyan-500 text-black shadow font-black' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    🟢 พอร์ตจริง (Live)
+                                </button>
+                                <button
+                                    onClick={() => { setIsSimMode(true); toast.success('🧪 เปิดโหมดจำลองสถานการณ์ Sandbox'); }}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                        isSimMode ? 'bg-purple-600 text-white shadow font-black' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    🧪 Sandbox จำลอง
+                                </button>
+                            </div>
+
+                            {/* Scenarios (Visible when Sandbox Mode is active) */}
+                            {isSimMode && (
+                                <div className="flex flex-wrap items-center gap-1">
+                                    {[
+                                        { id: 'normal', label: '🌱 ปกติ' },
+                                        { id: 'quarantine', label: '🔒 กักขัง (EJ -26%)' },
+                                        { id: 'rescue', label: '🎯 สไนเปอร์ R2' },
+                                        { id: 'relief', label: '💎 กองทุนตัดขาดทุน' },
+                                        { id: 'safe_liquidation', label: '🛡️ ปิดรอบ (Safe Liq)' },
+                                    ].map((s) => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => setSimScenario(s.id)}
+                                            className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all border ${
+                                                simScenario === s.id 
+                                                    ? 'bg-purple-500/30 text-purple-200 border-purple-400 font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]' 
+                                                    : 'bg-black/40 text-slate-400 border-slate-700 hover:text-white'
+                                            }`}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════════ */}

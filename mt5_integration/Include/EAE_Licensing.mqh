@@ -588,7 +588,7 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
    string headers = "Content-Type: application/json\r\n";
                     
    ResetLastError();
-   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   int res = WebRequest("POST", url, headers, 10000, data, result, result_headers);
    
    if(res == 200) {
       string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
@@ -596,6 +596,10 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
          Print("EAEZE History Sync: Successfully pushed ", days_to_sync, " days of history. Response: ", response);
          return true;
       }
+   }
+   if(res == 1003) {
+      Print("EAEZE History Sync: Temporary network timeout (1003). Will retry in next interval.");
+      return false;
    }
    Print("EAEZE History Sync: Failed to push batch history. Code: ", res);
    return false;
