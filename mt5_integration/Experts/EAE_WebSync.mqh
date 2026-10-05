@@ -364,7 +364,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
       if(err == 4060 || err == 4014) {
          static bool printed_sync_warning = false;
          if(!printed_sync_warning) {
-            Print("[EAE_SYSTEM WARNING] Supabase WebRequest is not whitelisted. Web Dashboard Sync is disabled. Please add 'https://mfrspvzxmpksqnzcrysz.supabase.co' to MT5 WebRequest options if you wish to see the Web Dashboard.");
+            Print("[EAE_SYSTEM WARNING] WebRequest is not whitelisted. Web Dashboard Sync is disabled. Please add 'https://eaeze.com' to MT5 WebRequest options if you wish to see the Web Dashboard.");
             printed_sync_warning = true;
          }
       } else {
@@ -603,10 +603,8 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
    StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, ArraySize(data) - 1);
    
-   string url = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_history_batch";
-   string headers = "Content-Type: application/json\r\n" + 
-                    "apikey: " + g_eae_system_key + "\r\n" +
-                    "Authorization: Bearer " + g_eae_system_key + "\r\n";
+   string url = "https://eaeze.com/api/sync-dashboard";
+   string headers = "Content-Type: application/json\r\n";
                     
    ResetLastError();
    int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);

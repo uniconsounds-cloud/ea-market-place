@@ -33,6 +33,7 @@ export async function POST(req: Request) {
 
         const portNumber = String(
             payload.port_number || 
+            rawData.p_port_number ||
             snapshot?.account?.account_login || 
             rawData.port_number || 
             ''
@@ -134,7 +135,30 @@ export async function POST(req: Request) {
             });
         }
 
-        // 6. Return response matching both MQL5 WebSync and Licensing expectation
+        // 6. Process Batch Daily History (From p_history_array)
+        const historyArray = rawData.p_history_array || payload.p_history_array || payload.history_array;
+        if (historyArray && Array.isArray(historyArray) && historyArray.length > 0) {
+            const { error: histErr } = await supabase.rpc('sync_ea_history_batch', {
+                p_api_key: 'LICENSE_AUTO',
+                p_port_number: portNumber,
+                p_history_array: historyArray
+            });
+            if (histErr) {
+                console.error('Error syncing history batch via RPC:', histErr);
+                // Fallback direct upsert into farm_daily_history
+                const historyUpsertData = historyArray.map((item: any) => ({
+                    port_number: portNumber,
+                    date: item.date,
+                    profit: Number(item.profit || 0),
+                    max_drawdown: Number(item.max_dd || 0),
+                    closed_lots: Number(item.lots || 0),
+                    updated_at: nowIso
+                }));
+                await supabase.from('farm_daily_history').upsert(historyUpsertData, { onConflict: 'port_number,date' });
+            }
+        }
+
+        // 7. Return response matching both MQL5 WebSync and Licensing expectation
         return NextResponse.json({
             status: 'success',
             success: true,
