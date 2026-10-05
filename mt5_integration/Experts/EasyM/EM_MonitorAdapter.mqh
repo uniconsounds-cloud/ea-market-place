@@ -114,11 +114,22 @@ void EM_CollectRuntimeState()
 // Init monitoring module
 void EM_MonitorInit(long magicBase)
 {
+   // [Single WebRequest Architecture]:
+   // mini and Farm only verify license, no live farm UI streaming needed to save resources
+#ifdef EA_PRODUCT_ID
+   if(StringFind(EA_PRODUCT_ID, "MIN") >= 0 || StringFind(EA_PRODUCT_ID, "FARM") >= 0)
+   {
+      g_em_initialized = false;
+      return;
+   }
+#endif
+
    EM_BuildIdentity(g_em_identity, magicBase);
    EAE_InitSideState(g_em_buy_state,  EAE_SIDE_BUY);
    EAE_InitSideState(g_em_sell_state, EAE_SIDE_SELL);
 
-   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", 20);
+   // Single URL Whitelist: eaeze.com only (no Supabase URL required in MT5)
+   EAE_WebSyncInit("https://eaeze.com/api/sync-dashboard", 20);
    
    // Set a Global Variable to signal that Universal EA monitor is active
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
