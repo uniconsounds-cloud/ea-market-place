@@ -260,27 +260,69 @@ export default function AdminPrimeFarmLabPage() {
             const buyPnl = buyOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0);
             const sellPnl = sellOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0);
 
+            // Pair stats calculation
+            const pairStats: Record<string, { pnl: number; count: number }> = {};
+            liveOrders.forEach(o => {
+                const sym = o.symbol || 'UNKNOWN';
+                if (!pairStats[sym]) pairStats[sym] = { pnl: 0, count: 0 };
+                pairStats[sym].pnl += Number(o.current_pnl) || 0;
+                pairStats[sym].count += 1;
+            });
+
+            let worstSym = 'EURJPY';
+            let worstDdAmt = 0;
+            let worstOrders = 0;
+
+            Object.entries(pairStats).forEach(([sym, st]) => {
+                if (st.pnl < 0 && Math.abs(st.pnl) > worstDdAmt) {
+                    worstDdAmt = Math.abs(st.pnl);
+                    worstSym = sym;
+                    worstOrders = st.count;
+                }
+            });
+            const worstPairDdPct = bal > 0 ? Number(((worstDdAmt / bal) * 100).toFixed(2)) : 0;
+
+            const quarantined = Object.entries(pairStats)
+                .filter(([_, st]) => bal > 0 && ((Math.abs(st.pnl < 0 ? st.pnl : 0) / bal) * 100) >= 10)
+                .map(([sym]) => sym);
+
+            const livePortMode: PortMode = ddPct >= 30 ? 'FREEZE' : ddPct >= 15 ? 'SLOW' : 'NORMAL';
+            const isRescueActive = ddPct >= 25;
+            const isSafeLiq = ddPct >= 40;
+
             return {
-                isSafeLiquidation: false,
-                portMode: 'NORMAL' as PortMode,
+                isSafeLiquidation: isSafeLiq,
+                portMode: livePortMode,
                 balance: bal,
                 equity: eq,
                 floatingPnl: floatPnl,
                 drawdownAmount: ddAmt,
-                drawdownPercent: ddPct,
-                buyCount: buyCount || 3,
-                sellCount: sellCount || 2,
-                buyPnl: buyPnl || 12.5,
-                sellPnl: sellPnl || -34.8,
-                totalLots: Number(livePortStatus?.total_lots) || 0.45,
+                drawdownPercent: Number(ddPct.toFixed(2)),
+                buyCount: buyCount,
+                sellCount: sellCount,
+                buyPnl: Number(buyPnl.toFixed(2)),
+                sellPnl: Number(sellPnl.toFixed(2)),
+                totalLots: Number(livePortStatus?.total_lots) || 0,
                 todayPnl: todayPnl,
                 todayClosedLots: Number(livePortStatus?.today_closed_lots) || 0,
-                dailyMaxDrawdown: Number(livePortStatus?.daily_max_drawdown) || ddPct,
-                worstPair: { symbol: 'EURJPY', dd: 1.85, orders: liveOrders.filter(o => (o.symbol || '').includes('EURJPY')).length || 2 },
-                reliefFund: { balance: 42.50, cap: Math.round(bal * 0.05), used: 0 },
-                rescue: { isActive: false, count: 0, ddPct: 0 },
-                quarantinePairs: [] as string[],
-                capitalBuffer: '1.2x',
+                dailyMaxDrawdown: Number(livePortStatus?.daily_max_drawdown) || Number(ddPct.toFixed(2)),
+                worstPair: {
+                    symbol: worstSym,
+                    dd: worstPairDdPct,
+                    orders: worstOrders || liveOrders.filter(o => (o.symbol || '').includes(worstSym)).length
+                },
+                reliefFund: {
+                    balance: Math.max(0, Number((todayPnl * 0.40).toFixed(2))),
+                    cap: Math.round(bal * 0.05),
+                    used: 0
+                },
+                rescue: {
+                    isActive: isRescueActive,
+                    count: isRescueActive ? 1 : 0,
+                    ddPct: isRescueActive ? Number((ddPct * 0.15).toFixed(2)) : 0
+                },
+                quarantinePairs: quarantined,
+                capitalBuffer: ddPct >= 15 ? '1.5x' : '1.2x',
                 orders: liveOrders
             };
         }

@@ -1,15 +1,16 @@
 # 👑 สรุปฟีเจอร์และระบบการทำงานทั้งหมดของ EasyM Prime v2.00 (ล่าสุด)
 
 > **เอกสารสรุปคุณสมบัติผลิตภัณฑ์สำหรับฝ่ายการตลาดและผู้ใช้งาน (Product Features & Marketing Summary)**  
-> **รุ่น:** EasyM Prime Universal (Version 2.00 Build 1001)  
+> **รุ่น:** EasyM Prime Universal (Version 2.00 Build 1006)  
 > **สถานะ:** รุ่นเรือธงสูงสุด (Flagship Enterprise Edition)  
 > **การเชื่อมต่อ:** Single WebRequest Gateway (`https://eaeze.com` 100%)  
-> **ปรับปรุงล่าสุด:** ตุลาคม 2026  
+> **ปรับปรุงล่าสุด:** 6 ตุลาคม 2026  
 
 ---
 
 ## 🌟 จุดเด่นหลักระดับเรือธง (Key Highlights)
 * เทรดกระจายความเสี่ยงพร้อมกันสูงสุด **20 คู่เงิน (Forex Major & Cross Pairs)**
+* ขยายขีดความสามารถสร้างกระแสเงินสด (**Cash Flow Booster**): ปรับเพิ่มโควตากลุ่มสกุลเงินร่วม (`Currency Cluster`) เป็น **3 คู่** เพื่อการเปิดรอบทำกำไรที่ต่อเนื่อง
 * ปลอดภัยสูงสุดด้วย **Single WebRequest** อนุญาตแค่ `https://eaeze.com` เพียง URL เดียวใน MT5
 * แดชบอร์ดบนกราฟ MT5 โต้ตอบได้จริง (**Interactive Clickable 3D Buttons**) สั่งเปิด/ปิดรายคู่เงินได้ทันที
 * ระบบความปลอดภัย 5 ชั้น: **Quarantine (ห้องขัง) ➔ Sniper Rescue (สไนเปอร์กู้ภัย) ➔ Relief Fund (กองทุนตัดขาดทุน) ➔ Auto-Hedge (ล็อกความเสี่ยง) ➔ Safe Liquidation (ปิดพอร์ตปลอดภัยเมื่อหมดสัญญา)**
@@ -30,7 +31,7 @@
 ### 2. เครื่องยนต์การเทรด 20 คู่เงิน (20-Pair Multi-Currency Engine)
 * [x] **20 Major & Cross Currency Basket:** บรรจุคู่เงินคัดสรรคุณภาพ 20 คู่ กระจายความเสี่ยงเต็มแผง ลดการพึ่งพากำไรจากคู่ใดคู่หนึ่ง (EURUSD, GBPUSD, AUDUSD, NZDUSD, USDJPY, USDCHF, EURJPY, GBPJPY, USDCAD, AUDNZD, CADCHF, NZDCAD, EURCAD, GBPCAD, EURAUD, GBPAUD, AUDJPY, NZDJPY, EURNZD, GBPNZD)
 * [x] **Adaptive Volatility Filter:** คัดกรองจังหวะเข้าออเดอร์ด้วยการคำนวณ RSI Oversold/Overbought ควบคู่กับรูปแบบแท่งเทียน Reversal ไส้ยาว เพื่อเข้าไม้แรกที่จุดกลับตัวของราคา
-* [x] **Currency Cluster Limiter:** ระบบควบคุมความเสี่ยงเชิงลึก จำกัดไม่ให้ถือครองออเดอร์ในกลุ่มสกุลเงินเดียวกัน (Currency Exposure) เกิน 2 คู่พร้อมกัน ป้องกันพอร์ตติดลากหนักเวลาสกุลเงินใดสกุลเงินหนึ่งผันผวนแรงจากข่าว
+* [x] **Currency Cluster Limiter (ปลดล็อกเป็น 3 คู่ใน Build 1006):** ระบบควบคุมความเสี่ยงเชิงลึก จำกัดไม่ให้ถือครองออเดอร์ในกลุ่มสกุลเงินเดียวกัน (Currency Exposure) เกิน 3 คู่พร้อมกัน เพิ่มโอกาสสร้างกระแสเงินสด (Cash Flow) ให้พอร์ตอย่างเต็มประสิทธิภาพ โดยไม่ถูกบล็อกโอกาสจากสกุลเงินร่วมที่มีมากถึง 7 คู่ (USD), 6 คู่ (NZD), 5 คู่ (JPY, EUR, GBP, AUD, CAD) ขณะที่ยังคงความปลอดภัยระดับสูงสุดด้วยระบบนิรภัย 5 ชั้นของ Prime
 * [x] **Smart Dynamic Grid Spacing:** ปรับระยะห่างของการเปิดไม้แก้ (Averaging Step) ยืดหยุ่นตามระยะทางและความผันผวนของกราฟ ไม่ถมไม้ถี่เกินไปในภาวะเทรนด์รุนแรง
 * [x] **Basket Take Profit Consolidation:** รวมต้นทุนไม้แก้ทั้งหมดและคำนวณจุด Take Profit สุทธิเพียงจุดเดียว เมื่อราคาเด้งกลับเพียงเล็กน้อยระบบจะปิดรวบทั้งตะกร้าทันที
 

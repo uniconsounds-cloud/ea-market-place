@@ -25,7 +25,7 @@
 | คุณสมบัติ / รายละเอียด | 🟢 EasyM mini | 🌾 EasyM Farm | 🔵 EasyM MAX | 👑 EasyM PRIME |
 | :--- | :---: | :---: | :---: | :---: |
 | **Product ID (Macro)** | `EZM-MIN-V1` | `EZM-FARM-V1` | `EZM-MAX-V1` | `EZM-PRIME-V1` |
-| **เวอร์ชันล่าสุด** | `v2.00-0928` | `v2.00-0928` | `v2.00-0928` | `v2.00-1001` |
+| **เวอร์ชันล่าสุด** | `v2.00-0928` | `v2.00-0928` | `v2.00-0928` | `v2.00-1006` |
 | **จำนวนคู่เงินที่เทรด** | **10 คู่เงิน** | **10 คู่เงิน** (5 พอร์ต) | **20 คู่เงิน** | **20 คู่เงิน** + Adaptive Filter |
 | **วัตถุประสงค์หลัก** | เทรดพอร์ตเล็ก / รัน VPS เอง | ฟาร์ม 5 พอร์ตกระจายเสี่ยง | กระดาน 20 คู่ กระจายความเสี่ยง | รุ่นเรือธง สั่งการ & ควบคุม 100% |
 | **MT5 WebRequest ที่ต้องใส่** | `https://eaeze.com` | `https://eaeze.com` | `https://eaeze.com` | `https://eaeze.com` |
@@ -69,7 +69,7 @@
   * มีระบบ **Smart Sleep/Wake:** ส่ง Heartbeat ทุก 3 นาทีเมื่อไม่มีคนดูเว็บ และสลับมาส่งทุก 20 วินาทีอัตโนมัติเฉพาะตอนลูกค้าเปิดดูหน้าฟาร์ม
 
 ### 4. EasyM PRIME (`EZM-PRIME-V1`)
-* **ไฟล์หลัก:** `EASY_M_Prime_v200_1001.mq5` / `.ex5`
+* **ไฟล์หลัก:** `EASY_M_Prime_v200_1006.mq5` / `.ex5`
 * **กลยุทธ์:** Multi-Currency 20 คู่เงิน + Adaptive Filter + Sniper Rescue Grid + Cross-Pair Relief Fund
 * **พฤติกรรมเครือข่าย:**
   * ใช้ **Single WebRequest: `https://eaeze.com`** 100%
@@ -88,6 +88,16 @@
 ---
 
 ## 📝 บันทึกประวัติเวอร์ชัน (Changelog History)
+
+### 📌 Version 2.00-1006 (6 ตุลาคม 2026)
+* **Cash Flow Optimization & Telemetry Web Sync Upgrade:**
+  * ปรับค่าพารามิเตอร์คลัสเตอร์สกุลเงิน `InpMaxCurrencyCluster` จาก **`2` เป็น `3`**
+    * **เหตุผล:** ในพอร์ต 20 คู่เงิน มีสกุลเงินร่วมกันหนาแน่น (เช่น USD มีถึง 7 คู่, NZD 6 คู่, JPY 5 คู่) การจำกัดไว้ที่ 2 คู่เดิมทำให้พอร์ตถูกตัดโอกาสสร้างกระแสเงินสดมากเกินไป (บล็อกคู่ USD อื่นๆ ถึง 5 คู่เมื่อถืออยู่แล้ว 2 คู่)
+    * การปรับเป็น 3 คู่ทำให้พอร์ตเก็บรอบกำไรสร้าง Cash Flow ได้ต่อเนื่องและเต็มประสิทธิภาพ ขณะที่ความเสี่ยงยังถูกควบคุมอย่างรัดกุมผ่านเกราะป้องกัน 5 ชั้นของ Prime (Quarantine 10% DD, Sniper Rescue R1/R2, กองทุน Relief Fund 40%, Portfolio Safety Slow/Freeze, และ Safe Liquidation Delta=0 Hedge)
+  * **Full Telemetry Web Integration (`https://eaeze.com`):**
+    * ปรับปรุงหน้าเว็บ `admin/easym-prime-farm` ให้ดึงค่า Real Telemetry จาก MT5 และคำนวณสถานะพอร์ตแบบ Dynamic 100%
+    * ซิงค์ค่า Port Mode (`NORMAL`, `SLOW`, `FREEZE`), Drawdown Amount/Percent, Relief Fund Balance (40% ของกำไรวัน), Worst Pair และ Quarantine Pairs อัตโนมัติ
+  * คอมไพล์ไฟล์โปรดักชัน `EASY_M_Prime_v200_1006.ex5` (0 errors, 0 warnings) เรียบร้อยสมบูรณ์
 
 ### 📌 Version 2.00-1001 (ตุลาคม 2026)
 * **Prime Architecture Upgrade:**
@@ -117,7 +127,7 @@
    * `EASY_M_mini_v200_0928.mq5` (mini)
    * `EASY_M_Farm_v200_0928.mq5` (Farm 5 พอร์ต)
    * `EASY_M_Max_v200_0928.mq5` (MAX)
-   * `EASY_M_Prime_v200_1001.mq5` (PRIME ตัวท็อปล่าสุด)
+   * `EASY_M_Prime_v200_1006.mq5` (PRIME ตัวท็อปล่าสุด)
    * `EM_MonitorAdapter.mqh` (ตัวคุมการซิงค์ข้อมูล — ชี้ไปที่ `https://eaeze.com/api/sync-dashboard` และ bypass ให้ mini/Farm)
 2. **ฝั่ง Include Library (`ea-market-place/mt5_integration/Include/`):**
    * `EAE_Licensing.mqh` (ตัวตรวจสิทธิ์หลัก — ชี้ไปที่ `https://eaeze.com/api/verify-license` และ `https://eaeze.com/api/sync-dashboard`)
