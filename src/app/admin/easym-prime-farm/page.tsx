@@ -127,7 +127,7 @@ export default function AdminPrimeFarmLabPage() {
     const [simPortMode, setSimPortMode] = useState<PortMode>('NORMAL');
     const [simScenario, setSimScenario] = useState<string>('normal');
     const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-    const [showSimBar, setShowSimBar] = useState(true);
+    const [showSimBar, setShowSimBar] = useState(false);
 
     // Dynamic states for 20 pairs controls
     const [pairOverrides, setPairOverrides] = useState<Record<string, { closeOnly?: boolean; quarantined?: boolean }>>({
@@ -169,17 +169,38 @@ export default function AdminPrimeFarmLabPage() {
         const handleResize = () => {
             if (!containerRef.current) return;
             const winW = window.innerWidth;
-            const winH = window.innerHeight - 150; // Room for Header + Crates Dock
+            const winH = window.innerHeight;
+            const isMobile = winW < 640;
 
-            const baseW = 1100;
-            const baseH = 900;
+            // Space occupied by headers and docks:
+            // Mobile: Top (~182px for header + stats overlay) + Bottom (~112px for crates) => ~294px
+            // Desktop: Top (~86px) + Bottom (~160px) => ~246px
+            const verticalOccupied = isMobile ? 295 : 245;
+            // Horizontal margins: ensure no side clipping with screen edges or floating orbs
+            const horizontalPadding = isMobile ? 36 : 100;
 
-            const scaleW = winW / baseW;
-            const scaleH = winH / baseH;
+            const availW = Math.max(260, winW - horizontalPadding);
+            const availH = Math.max(260, winH - verticalOccupied);
+
+            // Bounding box of the 25-plot isometric farm:
+            // Width: ~1064px (from left -392px to right +672px)
+            // Height: ~740px
+            const baseW = 1080;
+            const baseH = 750;
+
+            const scaleW = availW / baseW;
+            const scaleH = availH / baseH;
 
             let newScale = Math.min(scaleW, scaleH);
-            if (newScale > 1.15) newScale = 1.15;
-            if (newScale < 0.3) newScale = 0.3;
+
+            if (isMobile) {
+                // Mobile constraint: strictly fit screen width and height
+                if (newScale > 0.35) newScale = 0.35;
+                if (newScale < 0.22) newScale = 0.22;
+            } else {
+                if (newScale > 1.15) newScale = 1.15;
+                if (newScale < 0.30) newScale = 0.30;
+            }
 
             setScale(newScale);
         };
@@ -813,7 +834,7 @@ export default function AdminPrimeFarmLabPage() {
             {/* ═══════════════════════════════════════════════════════════════════ */}
             <div 
                 ref={containerRef} 
-                className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]"
+                className="flex-1 w-full relative flex items-center justify-center overflow-hidden pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]"
             >
                 
                 {/* 🛡️ Holographic Forcefield Dome (Visible during Safe Liquidation) */}
@@ -929,7 +950,7 @@ export default function AdminPrimeFarmLabPage() {
                                                     {isClient ? getMarketTradingDate(time || new Date()).toLocaleDateString('en-GB', { 
                                                         day: 'numeric', 
                                                         month: 'short', 
-                                                        year: 'numeric'
+                                                        year: 'numeric' 
                                                     }).toUpperCase() : '...'}
                                                 </h2>
                                             </div>
@@ -939,25 +960,41 @@ export default function AdminPrimeFarmLabPage() {
                                 </div>
                             );
                         })}
+
+                        {/* 👑 EasyM Prime Centerpiece Emblem Logo */}
+                        <div 
+                            className="absolute left-[140px] top-[340px] -translate-x-1/2 -translate-y-1/2 z-[52] pointer-events-none select-none flex flex-col items-center"
+                        >
+                            <div className="relative w-[115px] h-[58px] sm:w-[130px] sm:h-[65px] drop-shadow-[0_8px_20px_rgba(0,0,0,0.8)] drop-shadow-[0_0_15px_rgba(245,158,11,0.45)] transition-transform duration-300">
+                                <Image
+                                    src="/farm/easym_prime_logo.png"
+                                    alt="EasyM Prime Logo"
+                                    fill
+                                    className="object-contain"
+                                    priority
+                                    unoptimized
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════════════════ */}
                 {/* 🛸 4 FLOATING SCI-FI HUD ORBS (GAMING POPUPS ON RIGHT SIDE)      */}
                 {/* ═══════════════════════════════════════════════════════════════════ */}
-                <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[100] flex flex-col gap-3">
+                <div className="fixed right-2 sm:right-6 top-1/2 -translate-y-1/2 z-[100] flex flex-col gap-2 sm:gap-3">
                     
                     {/* Orb 1: Tactical Defense HUD */}
                     <button
                         onClick={() => setActiveModal('DEFENSE')}
-                        className="group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
+                        className="group relative flex items-center justify-center w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-[#0f172a]/90 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
                     >
-                        <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 group-hover:animate-pulse" />
-                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <Shield className="h-4 w-4 sm:h-6 sm:w-6 text-emerald-400 group-hover:animate-pulse" />
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 sm:h-3 sm:w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-emerald-500"></span>
                         </span>
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-emerald-500/40 rounded-lg text-xs font-mono text-emerald-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
+                        <span className="absolute right-14 sm:right-16 px-2.5 py-1 bg-black/90 border border-emerald-500/40 rounded-lg text-xs font-mono text-emerald-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             🛡️ โหมดพอร์ต & เกราะคุ้มกันทุน
                         </span>
                     </button>
@@ -965,11 +1002,11 @@ export default function AdminPrimeFarmLabPage() {
                     {/* Orb 2: 20-Pair Cockpit Matrix */}
                     <button
                         onClick={() => setActiveModal('MATRIX')}
-                        className="group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
+                        className="group relative flex items-center justify-center w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-[#0f172a]/90 border border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
                     >
-                        <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
-                        <span className="absolute bottom-1 text-[8px] font-mono font-black text-cyan-300">20P</span>
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-cyan-500/40 rounded-lg text-xs font-mono text-cyan-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
+                        <Layers className="h-4 w-4 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                        <span className="absolute bottom-0.5 sm:bottom-1 text-[7px] sm:text-[8px] font-mono font-black text-cyan-300">20P</span>
+                        <span className="absolute right-14 sm:right-16 px-2.5 py-1 bg-black/90 border border-cyan-500/40 rounded-lg text-xs font-mono text-cyan-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             🎛️ กระดานสั่งการ 20 คู่เงิน (Close-Only)
                         </span>
                     </button>
@@ -977,13 +1014,13 @@ export default function AdminPrimeFarmLabPage() {
                     {/* Orb 3: Relief Fund Vault */}
                     <button
                         onClick={() => setActiveModal('VAULT')}
-                        className="group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
+                        className="group relative flex items-center justify-center w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-[#0f172a]/90 border border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] hover:scale-110 transition-all duration-300 backdrop-blur-md"
                     >
-                        <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400 group-hover:scale-125 transition-transform" />
-                        <span className="absolute -top-1 -right-1 text-[8px] font-mono font-black bg-purple-600 text-white px-1 rounded-full">
+                        <Zap className="h-4 w-4 sm:h-6 sm:w-6 text-purple-400 group-hover:scale-125 transition-transform" />
+                        <span className="absolute -top-1 -right-1 text-[7px] sm:text-[8px] font-mono font-black bg-purple-600 text-white px-1 rounded-full">
                             ${Math.round(telemetry.reliefFund.balance)}
                         </span>
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-purple-500/40 rounded-lg text-xs font-mono text-purple-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
+                        <span className="absolute right-14 sm:right-16 px-2.5 py-1 bg-black/90 border border-purple-500/40 rounded-lg text-xs font-mono text-purple-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             💎 กองทุนตัดขาดทุนข้ามคู่ (Relief Fund)
                         </span>
                     </button>
@@ -991,20 +1028,20 @@ export default function AdminPrimeFarmLabPage() {
                     {/* Orb 4: Threat & Rescue Radar */}
                     <button
                         onClick={() => setActiveModal('RADAR')}
-                        className={`group relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border ${
+                        className={`group relative flex items-center justify-center w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-[#0f172a]/90 border ${
                             telemetry.quarantinePairs.length > 0 || telemetry.rescue.isActive 
                                 ? 'border-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.5)] animate-pulse' 
                                 : 'border-slate-700 shadow-[0_0_15px_rgba(0,0,0,0.5)]'
                         } hover:scale-110 transition-all duration-300 backdrop-blur-md`}
                     >
-                        <Crosshair className={`h-5 w-5 sm:h-6 sm:w-6 ${telemetry.quarantinePairs.length > 0 ? 'text-amber-400' : 'text-slate-400'} group-hover:rotate-90 transition-transform`} />
+                        <Crosshair className={`h-4 w-4 sm:h-6 sm:w-6 ${telemetry.quarantinePairs.length > 0 ? 'text-amber-400' : 'text-slate-400'} group-hover:rotate-90 transition-transform`} />
                         {(telemetry.quarantinePairs.length > 0 || telemetry.rescue.isActive) && (
-                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 sm:h-3 sm:w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-amber-500"></span>
                             </span>
                         )}
-                        <span className="absolute right-16 px-2.5 py-1 bg-black/90 border border-amber-500/40 rounded-lg text-xs font-mono text-amber-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
+                        <span className="absolute right-14 sm:right-16 px-2.5 py-1 bg-black/90 border border-amber-500/40 rounded-lg text-xs font-mono text-amber-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
                             🎯 ห้องขัง (Quarantine) & สไนเปอร์กู้ภัย
                         </span>
                     </button>
