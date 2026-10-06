@@ -1641,8 +1641,8 @@ export default function FarmClient({
                                                     ค่าของพอร์ต
                                                 </div>
 
-                                                <div className="relative w-full h-14 sm:h-16 flex items-center justify-center my-0.5">
-                                                    <svg viewBox="0 0 130 75" className="w-full h-full overflow-visible">
+                                                <div className="relative w-full h-11 sm:h-13 flex items-center justify-center my-1">
+                                                    <svg viewBox="0 0 130 65" className="w-full h-full overflow-visible">
                                                         <defs>
                                                             <linearGradient id="primeGaugeGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                                                                 <stop offset="0%" stopColor="#10b981" />
@@ -1652,126 +1652,124 @@ export default function FarmClient({
                                                             </linearGradient>
                                                         </defs>
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="#1e293b"
-                                                            strokeWidth="10"
+                                                            strokeWidth="9"
                                                             strokeLinecap="round"
                                                         />
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="url(#primeGaugeGrad1)"
-                                                            strokeWidth="10"
+                                                            strokeWidth="9"
                                                             strokeLinecap="round"
-                                                            strokeDasharray="147.6"
-                                                            strokeDashoffset={147.6 * (1 - Math.min(1, Math.max(0, primeTelemetry.ddPct / 50)))}
+                                                            strokeDasharray="141.4"
+                                                            strokeDashoffset={141.4 * (1 - Math.min(1, Math.max(0, primeTelemetry.ddPct / 50)))}
                                                             className="transition-all duration-700 ease-out"
                                                         />
                                                         {(() => {
                                                             const p = Math.min(1, Math.max(0, primeTelemetry.ddPct / 50));
                                                             const angleDeg = -90 + p * 180;
                                                             return (
-                                                                <g transform={`rotate(${angleDeg}, 65, 68)`} className="transition-transform duration-700 ease-out">
-                                                                    <line x1="65" y1="68" x2="65" y2="25" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
-                                                                    <circle cx="65" cy="68" r="4.5" fill="#f8fafc" />
-                                                                    <circle cx="65" cy="68" r="2" fill="#0f172a" />
+                                                                <g transform={`rotate(${angleDeg}, 65, 60)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="65" y1="60" x2="65" y2="18" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
+                                                                    <circle cx="65" cy="60" r="4.5" fill="#f8fafc" />
+                                                                    <circle cx="65" cy="60" r="2" fill="#0f172a" />
                                                                 </g>
                                                             );
                                                         })()}
                                                     </svg>
-
-                                                    <div className="absolute bottom-0 inset-x-0 text-center">
-                                                        <div className="text-xs sm:text-sm font-mono font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
-                                                            {primeTelemetry.ddPct.toFixed(1)}%
-                                                        </div>
-                                                    </div>
                                                 </div>
 
-                                                <div className="text-[8px] sm:text-[9px] font-mono text-white/50 truncate w-full">
-                                                    DD รวมพอร์ต
+                                                <div className="text-sm sm:text-base font-mono font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] w-full">
+                                                    {primeTelemetry.ddPct.toFixed(1)}%
                                                 </div>
                                             </div>
 
                                             {/* Dial 2: ค่าของโหมด (Table D Mode) */}
                                             <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-2 sm:p-2.5 flex flex-col items-center justify-between text-center relative overflow-hidden backdrop-blur-md">
-                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider truncate w-full">
-                                                    ค่าของโหมด
+                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider truncate w-full flex items-center justify-center gap-1">
+                                                    <span>ค่าของโหมด</span>
+                                                    <span className={`text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-black border ${
+                                                        primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 text-red-300 border-red-500/50' :
+                                                        primeTelemetry.portMode === 'SLOW' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
+                                                        'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                                    }`}>
+                                                        {primeTelemetry.portMode}
+                                                    </span>
                                                 </div>
 
-                                                <div className="relative w-full h-14 sm:h-16 flex items-center justify-center my-0.5">
-                                                    <svg viewBox="0 0 130 75" className="w-full h-full overflow-visible">
+                                                <div className="relative w-full h-11 sm:h-13 flex items-center justify-center my-1">
+                                                    <svg viewBox="0 0 130 65" className="w-full h-full overflow-visible">
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="#1e293b"
-                                                            strokeWidth="10"
+                                                            strokeWidth="9"
                                                             strokeLinecap="round"
                                                         />
                                                         {/* 3 Zone Tracks: Normal(Green), Slow(Orange), Freeze(Red) */}
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="#10b981"
-                                                            strokeWidth="10"
-                                                            strokeDasharray="49.2 98.4"
+                                                            strokeWidth="9"
+                                                            strokeDasharray="47.1 94.3"
                                                             strokeDashoffset="0"
                                                             className="opacity-80"
                                                         />
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="#f59e0b"
-                                                            strokeWidth="10"
-                                                            strokeDasharray="49.2 98.4"
-                                                            strokeDashoffset="-49.2"
+                                                            strokeWidth="9"
+                                                            strokeDasharray="47.1 94.3"
+                                                            strokeDashoffset="-47.1"
                                                             className="opacity-80"
                                                         />
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="#ef4444"
-                                                            strokeWidth="10"
-                                                            strokeDasharray="49.2 98.4"
-                                                            strokeDashoffset="-98.4"
+                                                            strokeWidth="9"
+                                                            strokeDasharray="47.1 94.3"
+                                                            strokeDashoffset="-94.2"
                                                             className="opacity-80"
                                                         />
                                                         {(() => {
                                                             const angleDeg = primeTelemetry.portMode === 'FREEZE' ? 55 : primeTelemetry.portMode === 'SLOW' ? 0 : -55;
                                                             return (
-                                                                <g transform={`rotate(${angleDeg}, 65, 68)`} className="transition-transform duration-700 ease-out">
-                                                                    <line x1="65" y1="68" x2="65" y2="25" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
-                                                                    <circle cx="65" cy="68" r="4.5" fill="#f8fafc" />
-                                                                    <circle cx="65" cy="68" r="2" fill="#0f172a" />
+                                                                <g transform={`rotate(${angleDeg}, 65, 60)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="65" y1="60" x2="65" y2="18" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
+                                                                    <circle cx="65" cy="60" r="4.5" fill="#f8fafc" />
+                                                                    <circle cx="65" cy="60" r="2" fill="#0f172a" />
                                                                 </g>
                                                             );
                                                         })()}
                                                     </svg>
-
-                                                    <div className="absolute bottom-0 inset-x-0 text-center">
-                                                        <div className={`text-[10px] sm:text-xs font-mono font-black tracking-tight ${
-                                                            primeTelemetry.portMode === 'FREEZE' ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]' :
-                                                            primeTelemetry.portMode === 'SLOW' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]' :
-                                                            'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]'
-                                                        }`}>
-                                                            {primeTelemetry.portMode}
-                                                        </div>
-                                                    </div>
                                                 </div>
 
-                                                <div className="text-[8px] sm:text-[9px] font-mono text-white/50 truncate w-full">
-                                                    {primeTelemetry.portMode === 'FREEZE' ? 'หยุดไม้ใหม่' : primeTelemetry.portMode === 'SLOW' ? 'ขยายกริด 1.5x' : 'รันไม้ปกติ'}
+                                                <div className={`text-sm sm:text-base font-mono font-black tracking-tight w-full ${
+                                                    primeTelemetry.portMode === 'FREEZE' ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]' :
+                                                    primeTelemetry.portMode === 'SLOW' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]' :
+                                                    'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                                                }`}>
+                                                    {primeTelemetry.portMode === 'FREEZE' ? '28.0%' : primeTelemetry.portMode === 'SLOW' ? '15.0%' : '0.0%'}
                                                 </div>
                                             </div>
 
                                             {/* Dial 3: ค่าของคู่เงินที่ถูกขัง (Locked/Quarantined Pair DD) */}
                                             <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-2 sm:p-2.5 flex flex-col items-center justify-between text-center relative overflow-hidden backdrop-blur-md">
-                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider truncate w-full">
-                                                    คู่เงินที่ถูกขัง
+                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider truncate w-full flex items-center justify-center gap-1">
+                                                    <span>คู่เงินที่ถูกขัง</span>
+                                                    <span className="text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                                        {primeTelemetry.worstPair.sym}
+                                                    </span>
                                                 </div>
 
-                                                <div className="relative w-full h-14 sm:h-16 flex items-center justify-center my-0.5">
-                                                    <svg viewBox="0 0 130 75" className="w-full h-full overflow-visible">
+                                                <div className="relative w-full h-11 sm:h-13 flex items-center justify-center my-1">
+                                                    <svg viewBox="0 0 130 65" className="w-full h-full overflow-visible">
                                                         <defs>
                                                             <linearGradient id="primeGaugeGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
                                                                 <stop offset="0%" stopColor="#f59e0b" />
@@ -1780,44 +1778,38 @@ export default function FarmClient({
                                                             </linearGradient>
                                                         </defs>
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="#1e293b"
-                                                            strokeWidth="10"
+                                                            strokeWidth="9"
                                                             strokeLinecap="round"
                                                         />
                                                         <path
-                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            d="M 20 60 A 45 45 0 0 1 110 60"
                                                             fill="none"
                                                             stroke="url(#primeGaugeGrad3)"
-                                                            strokeWidth="10"
+                                                            strokeWidth="9"
                                                             strokeLinecap="round"
-                                                            strokeDasharray="147.6"
-                                                            strokeDashoffset={147.6 * (1 - Math.min(1, Math.max(0, primeTelemetry.worstPair.ddPct / 20)))}
+                                                            strokeDasharray="141.4"
+                                                            strokeDashoffset={141.4 * (1 - Math.min(1, Math.max(0, primeTelemetry.worstPair.ddPct / 20)))}
                                                             className="transition-all duration-700 ease-out"
                                                         />
                                                         {(() => {
                                                             const p = Math.min(1, Math.max(0, primeTelemetry.worstPair.ddPct / 20));
                                                             const angleDeg = -90 + p * 180;
                                                             return (
-                                                                <g transform={`rotate(${angleDeg}, 65, 68)`} className="transition-transform duration-700 ease-out">
-                                                                    <line x1="65" y1="68" x2="65" y2="25" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
-                                                                    <circle cx="65" cy="68" r="4.5" fill="#f8fafc" />
-                                                                    <circle cx="65" cy="68" r="2" fill="#0f172a" />
+                                                                <g transform={`rotate(${angleDeg}, 65, 60)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="65" y1="60" x2="65" y2="18" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
+                                                                    <circle cx="65" cy="60" r="4.5" fill="#f8fafc" />
+                                                                    <circle cx="65" cy="60" r="2" fill="#0f172a" />
                                                                 </g>
                                                             );
                                                         })()}
                                                     </svg>
-
-                                                    <div className="absolute bottom-0 inset-x-0 text-center">
-                                                        <div className="text-xs sm:text-sm font-mono font-black text-amber-300 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]">
-                                                            -{primeTelemetry.worstPair.ddPct.toFixed(1)}%
-                                                        </div>
-                                                    </div>
                                                 </div>
 
-                                                <div className="text-[8px] sm:text-[9px] font-mono text-amber-300/80 truncate w-full font-bold">
-                                                    {primeTelemetry.worstPair.sym} [{primeTelemetry.worstPair.status === 'F' ? 'F' : primeTelemetry.worstPair.status === 'S' ? 'S' : 'QT'}]
+                                                <div className="text-sm sm:text-base font-mono font-black text-amber-300 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] w-full">
+                                                    -{primeTelemetry.worstPair.ddPct.toFixed(1)}%
                                                 </div>
                                             </div>
                                         </div>
