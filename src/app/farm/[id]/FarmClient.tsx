@@ -1570,22 +1570,22 @@ export default function FarmClient({
                     {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
                     {primeActiveOrb !== null && (
                         <div 
-                            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[160] flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+                            className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-[160] flex items-center justify-center p-3 animate-fade-in"
                             onClick={() => setPrimeActiveOrb(null)}
                         >
                             <div 
-                                className={`relative w-full max-w-lg sm:max-w-2xl max-h-[88vh] flex flex-col rounded-3xl p-4 sm:p-6 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
-                                    primeActiveOrb === 1 ? 'bg-[#061512]/90 border-emerald-500/60 shadow-[0_0_60px_rgba(16,185,129,0.35)]' :
-                                    primeActiveOrb === 2 ? 'bg-[#06121a]/90 border-cyan-500/60 shadow-[0_0_60px_rgba(6,182,212,0.35)]' :
-                                    primeActiveOrb === 3 ? 'bg-[#12081d]/90 border-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.35)]' :
-                                    'bg-[#1a0f06]/90 border-amber-500/60 shadow-[0_0_60px_rgba(245,158,11,0.35)]'
+                                className={`relative w-[90vw] sm:w-[70vw] max-w-xl max-h-[70vh] sm:max-h-[72vh] flex flex-col rounded-3xl p-3.5 sm:p-5 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
+                                    primeActiveOrb === 1 ? 'bg-[#061512]/90 border-emerald-500/60 shadow-[0_0_50px_rgba(16,185,129,0.35)]' :
+                                    primeActiveOrb === 2 ? 'bg-[#06121a]/90 border-cyan-500/60 shadow-[0_0_50px_rgba(6,182,212,0.35)]' :
+                                    primeActiveOrb === 3 ? 'bg-[#12081d]/90 border-purple-500/60 shadow-[0_0_50px_rgba(168,85,247,0.35)]' :
+                                    'bg-[#1a0f06]/90 border-amber-500/60 shadow-[0_0_50px_rgba(245,158,11,0.35)]'
                                 }`}
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {/* Header */}
-                                <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-white/10 shrink-0">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg ${
+                                <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-white/10 shrink-0">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border shadow-lg ${
                                             primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
                                             primeActiveOrb === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' :
                                             primeActiveOrb === 3 ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' :
@@ -1598,12 +1598,12 @@ export default function FarmClient({
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h2 className="text-base sm:text-lg font-mono font-black text-white tracking-wider">
+                                                <h2 className="text-sm sm:text-base font-mono font-black text-white tracking-wider">
                                                     {primeActiveOrb === 1 ? 'SAFETY & RESILIENCE HUD' :
                                                      primeActiveOrb === 2 ? '20-PAIR COCKPIT MATRIX' :
                                                      `PRIME MENU ${primeActiveOrb}`}
                                                 </h2>
-                                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold ${
+                                                <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border font-bold ${
                                                     primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' :
                                                     primeActiveOrb === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' :
                                                     'bg-white/10 border-white/20 text-white/60'
@@ -1612,7 +1612,7 @@ export default function FarmClient({
                                                      primeActiveOrb === 2 ? 'CONTROL' : 'COMING SOON'}
                                                 </span>
                                             </div>
-                                            <p className="text-[11px] text-white/50 font-sans">
+                                            <p className="text-[10px] sm:text-[11px] text-white/50 font-sans">
                                                 {primeActiveOrb === 1 ? 'มาตรวัดและสเกลความปลอดภัยพอร์ต Real-time' :
                                                  primeActiveOrb === 2 ? 'ควบคุมสั่งการเปิด-ปิดคู่เงิน (Active vs Close-Only)' :
                                                  'ระบบสั่งการ EasyM Prime'}
@@ -1623,135 +1623,201 @@ export default function FarmClient({
                                     {/* Close button */}
                                     <button
                                         onClick={() => setPrimeActiveOrb(null)}
-                                        className="text-white/60 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                        className="text-white/60 hover:text-white p-1.5 sm:p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
                                         aria-label="Close"
                                     >
-                                        <X className="w-5 h-5" />
+                                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </button>
                                 </div>
 
                                 {/* 🛡️ ORB 1: TABLE D & E TACTICAL HUD */}
                                 {primeActiveOrb === 1 && (
-                                    <div className="overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 pr-1 no-scrollbar">
-                                        {/* TOP ROW: SPEEDOMETER DIAL & PORT MODE */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-                                            {/* Speedometer Arc Gauge */}
-                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden backdrop-blur-md">
-                                                <div className="absolute top-2 left-3 flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
-                                                    <Activity className="w-3.5 h-3.5 animate-pulse" />
-                                                    <span>PORTFOLIO DD DIAL</span>
+                                    <div className="overflow-y-auto py-3 space-y-3 pr-1 no-scrollbar flex-1">
+                                        {/* TOP ROW: 3 DIALS (PORT DD, PORT MODE, LOCKED PAIR DD) */}
+                                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 items-stretch">
+                                            {/* Dial 1: ค่าของพอร์ต (Portfolio DD) */}
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-2 sm:p-2.5 flex flex-col items-center justify-between text-center relative overflow-hidden backdrop-blur-md">
+                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider truncate w-full">
+                                                    ค่าของพอร์ต
                                                 </div>
 
-                                                {/* SVG Semi-Circle Dial */}
-                                                <div className="relative mt-2 w-48 sm:w-52 h-28 flex items-center justify-center">
-                                                    <svg viewBox="0 0 200 115" className="w-full h-full overflow-visible">
+                                                <div className="relative w-full h-14 sm:h-16 flex items-center justify-center my-0.5">
+                                                    <svg viewBox="0 0 130 75" className="w-full h-full overflow-visible">
                                                         <defs>
-                                                            <linearGradient id="primeGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                            <linearGradient id="primeGaugeGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                                                                 <stop offset="0%" stopColor="#10b981" />
                                                                 <stop offset="35%" stopColor="#10b981" />
-                                                                <stop offset="55%" stopColor="#f59e0b" />
-                                                                <stop offset="85%" stopColor="#ef4444" />
+                                                                <stop offset="60%" stopColor="#f59e0b" />
+                                                                <stop offset="90%" stopColor="#ef4444" />
                                                             </linearGradient>
                                                         </defs>
-                                                        {/* Background track (semi circle arc from 180 to 0 deg) */}
                                                         <path
-                                                            d="M 25 100 A 75 75 0 0 1 175 100"
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
                                                             fill="none"
                                                             stroke="#1e293b"
-                                                            strokeWidth="14"
+                                                            strokeWidth="10"
                                                             strokeLinecap="round"
                                                         />
-                                                        {/* Colored progress arc */}
                                                         <path
-                                                            d="M 25 100 A 75 75 0 0 1 175 100"
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
                                                             fill="none"
-                                                            stroke="url(#primeGaugeGrad)"
-                                                            strokeWidth="14"
+                                                            stroke="url(#primeGaugeGrad1)"
+                                                            strokeWidth="10"
                                                             strokeLinecap="round"
-                                                            strokeDasharray="235.6"
-                                                            strokeDashoffset={235.6 * (1 - Math.min(1, Math.max(0, primeTelemetry.ddPct / 50)))}
+                                                            strokeDasharray="147.6"
+                                                            strokeDashoffset={147.6 * (1 - Math.min(1, Math.max(0, primeTelemetry.ddPct / 50)))}
                                                             className="transition-all duration-700 ease-out"
                                                         />
-                                                        {/* Needle */}
                                                         {(() => {
                                                             const p = Math.min(1, Math.max(0, primeTelemetry.ddPct / 50));
                                                             const angleDeg = -90 + p * 180;
                                                             return (
-                                                                <g transform={`rotate(${angleDeg}, 100, 100)`} className="transition-transform duration-700 ease-out">
-                                                                    <line x1="100" y1="100" x2="100" y2="35" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" />
-                                                                    <circle cx="100" cy="100" r="7" fill="#f8fafc" />
-                                                                    <circle cx="100" cy="100" r="3" fill="#0f172a" />
+                                                                <g transform={`rotate(${angleDeg}, 65, 68)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="65" y1="68" x2="65" y2="25" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
+                                                                    <circle cx="65" cy="68" r="4.5" fill="#f8fafc" />
+                                                                    <circle cx="65" cy="68" r="2" fill="#0f172a" />
                                                                 </g>
                                                             );
                                                         })()}
                                                     </svg>
 
-                                                    {/* Digital center readout */}
                                                     <div className="absolute bottom-0 inset-x-0 text-center">
-                                                        <div className="text-2xl sm:text-3xl font-mono font-black text-white tracking-tight drop-shadow-[0_0_12px_rgba(16,185,129,0.5)]">
-                                                            {primeTelemetry.ddPct.toFixed(2)}%
-                                                        </div>
-                                                        <div className="text-[10px] font-mono text-white/50 tracking-wider">
-                                                            CURRENT DD
+                                                        <div className="text-xs sm:text-sm font-mono font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
+                                                            {primeTelemetry.ddPct.toFixed(1)}%
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* 3-Zone scale ticks */}
-                                                <div className="w-full flex justify-between items-center px-4 mt-2 text-[9px] font-mono">
-                                                    <span className="text-emerald-400 font-bold">0% NORM</span>
-                                                    <span className="text-amber-400 font-bold">15% SLOW</span>
-                                                    <span className="text-rose-400 font-bold">28%+ FREEZE</span>
+                                                <div className="text-[8px] sm:text-[9px] font-mono text-white/50 truncate w-full">
+                                                    DD รวมพอร์ต
                                                 </div>
                                             </div>
 
-                                            {/* Mode & Worst Symbol (Table D) */}
-                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-md">
-                                                <div>
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-[10px] font-mono text-white/50 font-bold tracking-wider">PORT MODE (TABLE D)</span>
-                                                        <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black border shadow-lg flex items-center gap-1.5 ${
-                                                            primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' :
-                                                            primeTelemetry.portMode === 'SLOW' ? 'bg-amber-500/20 border-amber-500 text-amber-400' :
-                                                            'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                                        }`}>
-                                                            <span className="w-2 h-2 rounded-full bg-current animate-ping" />
-                                                            {primeTelemetry.portMode}
-                                                        </div>
-                                                    </div>
+                                            {/* Dial 2: ค่าของโหมด (Table D Mode) */}
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-2 sm:p-2.5 flex flex-col items-center justify-between text-center relative overflow-hidden backdrop-blur-md">
+                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider truncate w-full">
+                                                    ค่าของโหมด
+                                                </div>
 
-                                                    <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 mb-3">
-                                                        <div className="text-[11px] font-mono text-white/80 font-bold">
-                                                            {primeTelemetry.portMode === 'FREEZE' ? '⛔ แช่แข็งพอร์ต: ปิดกั้นการเปิดไม้ใหม่ทุกคู่เงิน' :
-                                                             primeTelemetry.portMode === 'SLOW' ? '⚠️ ชะลอการออกไม้: ขยายระยะห่างตารางกริด 1.5 เท่า' :
-                                                             '✅ ระบบทำงานปกติ: รันกลยุทธ์กริดและสไนเปอร์เต็มกำลัง'}
+                                                <div className="relative w-full h-14 sm:h-16 flex items-center justify-center my-0.5">
+                                                    <svg viewBox="0 0 130 75" className="w-full h-full overflow-visible">
+                                                        <path
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            fill="none"
+                                                            stroke="#1e293b"
+                                                            strokeWidth="10"
+                                                            strokeLinecap="round"
+                                                        />
+                                                        {/* 3 Zone Tracks: Normal(Green), Slow(Orange), Freeze(Red) */}
+                                                        <path
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            fill="none"
+                                                            stroke="#10b981"
+                                                            strokeWidth="10"
+                                                            strokeDasharray="49.2 98.4"
+                                                            strokeDashoffset="0"
+                                                            className="opacity-80"
+                                                        />
+                                                        <path
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            fill="none"
+                                                            stroke="#f59e0b"
+                                                            strokeWidth="10"
+                                                            strokeDasharray="49.2 98.4"
+                                                            strokeDashoffset="-49.2"
+                                                            className="opacity-80"
+                                                        />
+                                                        <path
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            fill="none"
+                                                            stroke="#ef4444"
+                                                            strokeWidth="10"
+                                                            strokeDasharray="49.2 98.4"
+                                                            strokeDashoffset="-98.4"
+                                                            className="opacity-80"
+                                                        />
+                                                        {(() => {
+                                                            const angleDeg = primeTelemetry.portMode === 'FREEZE' ? 55 : primeTelemetry.portMode === 'SLOW' ? 0 : -55;
+                                                            return (
+                                                                <g transform={`rotate(${angleDeg}, 65, 68)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="65" y1="68" x2="65" y2="25" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
+                                                                    <circle cx="65" cy="68" r="4.5" fill="#f8fafc" />
+                                                                    <circle cx="65" cy="68" r="2" fill="#0f172a" />
+                                                                </g>
+                                                            );
+                                                        })()}
+                                                    </svg>
+
+                                                    <div className="absolute bottom-0 inset-x-0 text-center">
+                                                        <div className={`text-[10px] sm:text-xs font-mono font-black tracking-tight ${
+                                                            primeTelemetry.portMode === 'FREEZE' ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]' :
+                                                            primeTelemetry.portMode === 'SLOW' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]' :
+                                                            'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                                                        }`}>
+                                                            {primeTelemetry.portMode}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Worst Symbol Throttle */}
-                                                <div className="border-t border-white/10 pt-3">
-                                                    <div className="flex items-center justify-between text-xs font-mono mb-1.5">
-                                                        <span className="text-white/60">WORST LAGGING PAIR</span>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="font-bold text-amber-300 font-mono">{primeTelemetry.worstPair.sym}</span>
-                                                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40">
-                                                                {primeTelemetry.worstPair.status === 'F' ? 'FREEZE' : primeTelemetry.worstPair.status === 'S' ? 'SLOW' : 'NORMAL'}
-                                                            </span>
+                                                <div className="text-[8px] sm:text-[9px] font-mono text-white/50 truncate w-full">
+                                                    {primeTelemetry.portMode === 'FREEZE' ? 'หยุดไม้ใหม่' : primeTelemetry.portMode === 'SLOW' ? 'ขยายกริด 1.5x' : 'รันไม้ปกติ'}
+                                                </div>
+                                            </div>
+
+                                            {/* Dial 3: ค่าของคู่เงินที่ถูกขัง (Locked/Quarantined Pair DD) */}
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-2 sm:p-2.5 flex flex-col items-center justify-between text-center relative overflow-hidden backdrop-blur-md">
+                                                <div className="text-[9px] sm:text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider truncate w-full">
+                                                    คู่เงินที่ถูกขัง
+                                                </div>
+
+                                                <div className="relative w-full h-14 sm:h-16 flex items-center justify-center my-0.5">
+                                                    <svg viewBox="0 0 130 75" className="w-full h-full overflow-visible">
+                                                        <defs>
+                                                            <linearGradient id="primeGaugeGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                                <stop offset="0%" stopColor="#f59e0b" />
+                                                                <stop offset="50%" stopColor="#f97316" />
+                                                                <stop offset="100%" stopColor="#ef4444" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <path
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            fill="none"
+                                                            stroke="#1e293b"
+                                                            strokeWidth="10"
+                                                            strokeLinecap="round"
+                                                        />
+                                                        <path
+                                                            d="M 18 68 A 47 47 0 0 1 112 68"
+                                                            fill="none"
+                                                            stroke="url(#primeGaugeGrad3)"
+                                                            strokeWidth="10"
+                                                            strokeLinecap="round"
+                                                            strokeDasharray="147.6"
+                                                            strokeDashoffset={147.6 * (1 - Math.min(1, Math.max(0, primeTelemetry.worstPair.ddPct / 20)))}
+                                                            className="transition-all duration-700 ease-out"
+                                                        />
+                                                        {(() => {
+                                                            const p = Math.min(1, Math.max(0, primeTelemetry.worstPair.ddPct / 20));
+                                                            const angleDeg = -90 + p * 180;
+                                                            return (
+                                                                <g transform={`rotate(${angleDeg}, 65, 68)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="65" y1="68" x2="65" y2="25" stroke="#f8fafc" strokeWidth="2.5" strokeLinecap="round" />
+                                                                    <circle cx="65" cy="68" r="4.5" fill="#f8fafc" />
+                                                                    <circle cx="65" cy="68" r="2" fill="#0f172a" />
+                                                                </g>
+                                                            );
+                                                        })()}
+                                                    </svg>
+
+                                                    <div className="absolute bottom-0 inset-x-0 text-center">
+                                                        <div className="text-xs sm:text-sm font-mono font-black text-amber-300 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]">
+                                                            -{primeTelemetry.worstPair.ddPct.toFixed(1)}%
                                                         </div>
                                                     </div>
+                                                </div>
 
-                                                    {/* Segmented bar for worst pair drag */}
-                                                    <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-white/10 flex">
-                                                        <div 
-                                                            className="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
-                                                            style={{ width: `${Math.min(100, (primeTelemetry.worstPair.ddPct / 20) * 100)}%` }}
-                                                        />
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-[10px] font-mono text-white/40 mt-1">
-                                                        <span>Pair Drag: -{primeTelemetry.worstPair.ddPct.toFixed(2)}%</span>
-                                                        <span>Threshold: 8.0%</span>
-                                                    </div>
+                                                <div className="text-[8px] sm:text-[9px] font-mono text-amber-300/80 truncate w-full font-bold">
+                                                    {primeTelemetry.worstPair.sym} [{primeTelemetry.worstPair.status === 'F' ? 'F' : primeTelemetry.worstPair.status === 'S' ? 'S' : 'QT'}]
                                                 </div>
                                             </div>
                                         </div>
