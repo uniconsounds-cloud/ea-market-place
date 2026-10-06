@@ -960,22 +960,6 @@ export default function AdminPrimeFarmLabPage() {
                                 </div>
                             );
                         })}
-
-                        {/* 👑 EasyM Prime Centerpiece Emblem Logo */}
-                        <div 
-                            className="absolute left-[140px] top-[340px] -translate-x-1/2 -translate-y-1/2 z-[52] pointer-events-none select-none flex flex-col items-center"
-                        >
-                            <div className="relative w-[115px] h-[58px] sm:w-[130px] sm:h-[65px] drop-shadow-[0_8px_20px_rgba(0,0,0,0.8)] drop-shadow-[0_0_15px_rgba(245,158,11,0.45)] transition-transform duration-300">
-                                <Image
-                                    src="/farm/easym_prime_logo.png"
-                                    alt="EasyM Prime Logo"
-                                    fill
-                                    className="object-contain"
-                                    priority
-                                    unoptimized
-                                />
-                            </div>
-                        </div>
                     </div>
                 </div>
 
