@@ -7,6 +7,7 @@ import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 import AdminFarmDiagnosticOverlay from '@/components/AdminFarmDiagnosticOverlay';
 import { toast } from 'sonner';
+import { Shield, Layers, Zap, Crosshair, X } from 'lucide-react';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -129,6 +130,7 @@ export default function FarmClient({
     const prodKey = (licenseInfo?.productKey || '').toUpperCase();
     const prodName = (licenseInfo?.productName || '').toLowerCase();
     const sysCode = (initialPortStatus?.system_code || portStatus?.system_code || '').toLowerCase();
+    const eaVer = (initialPortStatus?.ea_version || portStatus?.ea_version || '').toLowerCase();
     const rawAsset = portStatus?.asset_type || (prodName.includes('gold') || prodKey.includes('GOLD') || prodKey.includes('EZG') ? 'GOLD' : 'FOREX');
     const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
 
@@ -138,6 +140,14 @@ export default function FarmClient({
                     sysCode.includes('easym') ||
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
+
+    // EasyM Prime Auto-Detection (Product Key, DB System Code, or Live EA Version)
+    const isPrime = prodKey.includes('PRIME') || 
+                    prodName.includes('prime') || 
+                    sysCode.includes('prime') || 
+                    eaVer.includes('prime');
+
+    const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);
 
     const isEasyGold = !isEasyM && (
         prodKey.includes('GOLD') || 
@@ -1349,6 +1359,123 @@ export default function FarmClient({
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* 🔮 PRIME EDITION: 4 FLOATING GLOWING ORBS (RIGHT DOCK)           */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {isPrime && (
+                <>
+                    <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto">
+                        {/* Orb 1: Emerald/Green Glow */}
+                        <button
+                            onClick={() => setPrimeActiveOrb(1)}
+                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_35px_rgba(16,185,129,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
+                            title="Prime menu 1"
+                        >
+                            <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 group-hover:animate-pulse transition-transform" />
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            </span>
+                        </button>
+
+                        {/* Orb 2: Cyan/Blue Glow */}
+                        <button
+                            onClick={() => setPrimeActiveOrb(2)}
+                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
+                            title="Prime menu 2"
+                        >
+                            <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                        </button>
+
+                        {/* Orb 3: Purple/Violet Glow */}
+                        <button
+                            onClick={() => setPrimeActiveOrb(3)}
+                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
+                            title="Prime menu 3"
+                        >
+                            <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400 group-hover:scale-125 transition-transform" />
+                        </button>
+
+                        {/* Orb 4: Amber/Orange Glow */}
+                        <button
+                            onClick={() => setPrimeActiveOrb(4)}
+                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
+                            title="Prime menu 4"
+                        >
+                            <Crosshair className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400 group-hover:rotate-90 transition-transform" />
+                        </button>
+                    </div>
+
+                    {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
+                    {primeActiveOrb !== null && (
+                        <div 
+                            className="fixed inset-0 bg-black/40 backdrop-blur-[3px] z-[160] flex items-center justify-center p-4 animate-fade-in"
+                            onClick={() => setPrimeActiveOrb(null)}
+                        >
+                            <div 
+                                className={`relative w-full max-w-md sm:max-w-lg rounded-3xl p-6 sm:p-8 backdrop-blur-xl border-2 shadow-2xl animate-fade-in transition-all ${
+                                    primeActiveOrb === 1 ? 'bg-[#061512]/85 border-emerald-500/60 shadow-[0_0_60px_rgba(16,185,129,0.35)]' :
+                                    primeActiveOrb === 2 ? 'bg-[#06121a]/85 border-cyan-500/60 shadow-[0_0_60px_rgba(6,182,212,0.35)]' :
+                                    primeActiveOrb === 3 ? 'bg-[#12081d]/85 border-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.35)]' :
+                                    'bg-[#1a0f06]/85 border-amber-500/60 shadow-[0_0_60px_rgba(245,158,11,0.35)]'
+                                }`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                                            primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                                            primeActiveOrb === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' :
+                                            primeActiveOrb === 3 ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' :
+                                            'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                                        }`}>
+                                            {primeActiveOrb === 1 && <Shield className="w-5 h-5" />}
+                                            {primeActiveOrb === 2 && <Layers className="w-5 h-5" />}
+                                            {primeActiveOrb === 3 && <Zap className="w-5 h-5" />}
+                                            {primeActiveOrb === 4 && <Crosshair className="w-5 h-5" />}
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg sm:text-xl font-mono font-black text-white tracking-wider">
+                                                Prime menu {primeActiveOrb}
+                                            </h2>
+                                            <p className="text-[11px] text-white/50 font-sans">
+                                                EasyM Prime Interactive Console
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Close button */}
+                                    <button
+                                        onClick={() => setPrimeActiveOrb(null)}
+                                        className="text-white/60 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Body */}
+                                <div className="py-8 text-center">
+                                    <div className="inline-block px-4 py-2 rounded-xl bg-white/5 border border-white/10 mb-3">
+                                        <span className={`font-mono text-sm font-bold ${
+                                            primeActiveOrb === 1 ? 'text-emerald-400' :
+                                            primeActiveOrb === 2 ? 'text-cyan-400' :
+                                            primeActiveOrb === 3 ? 'text-purple-400' :
+                                            'text-amber-400'
+                                        }`}>
+                                            [ Prime menu {primeActiveOrb} Active ]
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-white/60">
+                                        กรอบโปร่งแสงเรืองแสง สไตล์ Cyber Glassmorphism พร้อมเชื่อมต่อข้อมูล
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Premium Syncing Loader Overlay */}
