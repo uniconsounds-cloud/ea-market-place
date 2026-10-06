@@ -288,7 +288,8 @@ export default function AdminPrimeFarmLabPage() {
 
             const livePortMode: PortMode = ddPct >= 30 ? 'FREEZE' : ddPct >= 15 ? 'SLOW' : 'NORMAL';
             const isRescueActive = ddPct >= 25;
-            const isSafeLiq = ddPct >= 40;
+            // Safe Liquidation is only for expired licenses, not for high drawdown on active accounts
+            const isSafeLiq = false;
 
             return {
                 isSafeLiquidation: isSafeLiq,
