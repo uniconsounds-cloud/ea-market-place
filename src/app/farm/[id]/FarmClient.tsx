@@ -7,7 +7,11 @@ import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 import AdminFarmDiagnosticOverlay from '@/components/AdminFarmDiagnosticOverlay';
 import { toast } from 'sonner';
-import { Shield, Layers, Zap, Crosshair, X } from 'lucide-react';
+import { 
+    Shield, Layers, Zap, Crosshair, X, 
+    Gauge, Activity, AlertTriangle, CheckCircle2, 
+    Lock, Unlock, Power, RefreshCw, TrendingDown, ArrowUpRight 
+} from 'lucide-react';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -82,6 +86,14 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     y: FRUIT_SPAWN_Y_MIN + seededRandom(i * 20) * (FRUIT_SPAWN_Y_MAX - FRUIT_SPAWN_Y_MIN),
     z: i
 }));
+
+// 20 Currency Pairs for EasyM Prime
+const PRIME_20_PAIRS = [
+    'EURUSD', 'GBPUSD', 'AUDUSD', 'NZDUSD', 'USDJPY',
+    'USDCHF', 'EURJPY', 'GBPJPY', 'USDCAD', 'AUDNZD',
+    'CADCHF', 'NZDCAD', 'EURCAD', 'GBPCAD', 'EURAUD',
+    'GBPAUD', 'AUDJPY', 'NZDJPY', 'EURNZD', 'GBPNZD'
+];
 
 export default function FarmClient({ 
     portNumber, 
@@ -748,6 +760,155 @@ export default function FarmClient({
         };
     }, [displayOrders, portStatus, orders]);
 
+    // 🎛️ Prime 20-Pair Cockpit Matrix Controls (Persisted to localStorage)
+    const [pairControls, setPairControls] = useState<Record<string, { enabled: boolean }>>(() => {
+        const initial: Record<string, { enabled: boolean }> = {};
+        PRIME_20_PAIRS.forEach(p => { initial[p] = { enabled: true }; });
+        return initial;
+    });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(`prime_pairs_${portNumber}`);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    setPairControls(prev => ({ ...prev, ...parsed }));
+                } catch (e) {}
+            }
+        }
+    }, [portNumber]);
+
+    const handleTogglePair = (pair: string) => {
+        setPairControls(prev => {
+            const current = prev[pair]?.enabled !== false;
+            const updated = {
+                ...prev,
+                [pair]: { enabled: !current }
+            };
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updated));
+            }
+            toast(
+                !current 
+                    ? `🟢 ${pair}: สลับเป็น ACTIVE (เปิดรับออเดอร์ใหม่)` 
+                    : `⛔ ${pair}: สลับเป็น CLOSE-ONLY (รอปิดรวบ)`,
+                { duration: 2500 }
+            );
+            return updated;
+        });
+    };
+
+    const handleSetAllPairs = (enableAll: boolean) => {
+        const updated: Record<string, { enabled: boolean }> = {};
+        PRIME_20_PAIRS.forEach(p => { updated[p] = { enabled: enableAll }; });
+        setPairControls(updated);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updated));
+        }
+        toast(
+            enableAll 
+                ? '🟢 สั่งเปิดทำงาน (ACTIVE) ครบทั้ง 20 คู่เงินแล้ว' 
+                : '⛔ สั่งตั้งเป็น (CLOSE-ONLY) ครบทั้ง 20 คู่เงินแล้ว',
+            { duration: 3000 }
+        );
+    };
+
+    // 🛡️ Prime Tactical Telemetry (Table D & Table E Computed Metrics)
+    const primeTelemetry = useMemo(() => {
+        const bal = stats.balance > 0 ? stats.balance : 100000;
+        const eq = stats.equity > 0 ? stats.equity : bal;
+        const ddPct = stats.drawdownPercent;
+        const ddAmt = stats.drawdownAmount;
+
+        // Table D: Portfolio Mode (NORMAL, SLOW, FREEZE)
+        const portMode: 'NORMAL' | 'SLOW' | 'FREEZE' = ddPct >= 28 ? 'FREEZE' : ddPct >= 15 ? 'SLOW' : 'NORMAL';
+
+        // Table E: Capital Buffer & Resilience Multiplier
+        const baseline = (licenseInfo?.minBalance && licenseInfo.minBalance > 0) ? licenseInfo.minBalance : (bal > 150000 ? 100000 : bal);
+        const bufPct = baseline > 0 ? ((bal - baseline) / baseline) * 100 : 0;
+        const resMult = baseline > 0 ? (bal / baseline) : 1.0;
+
+        // Table E: Cross-Pair Relief Fund (40% of realized closed profits)
+        const profitToday = Math.max(0, stats.todayProfit);
+        const reliefBudget = profitToday * 0.40;
+        const reliefCap = bal * 0.05; // 5% of balance cap
+        const reliefUsed = Math.min(reliefBudget, ddAmt > 0 ? Math.min(reliefBudget, ddAmt * 0.08) : 0);
+
+        // Group active orders per pair
+        const pairData: Record<string, { count: number; lot: number; pnl: number }> = {};
+        PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
+
+        let worstPair = {
+            sym: 'USDJPY',
+            ddPct: Math.min(18.2, Number((ddPct * 0.38).toFixed(2))),
+            status: ddPct >= 28 ? 'F' : ddPct >= 15 ? 'S' : 'N'
+        };
+
+        if (orders && orders.length > 0) {
+            let hasAnySymbol = false;
+            orders.forEach(o => {
+                const sym = (o.symbol || o.pair || '').toUpperCase().replace(/[^A-Z]/g, '');
+                if (sym && pairData[sym]) {
+                    hasAnySymbol = true;
+                    pairData[sym].count += 1;
+                    pairData[sym].lot += (Number(o.raw_lot_size) || 0) / 100;
+                    pairData[sym].pnl += Number(o.current_pnl) || 0;
+                }
+            });
+
+            if (hasAnySymbol) {
+                let maxLoss = 0;
+                let maxLossSym = 'USDJPY';
+                Object.entries(pairData).forEach(([sym, d]) => {
+                    if (d.pnl < maxLoss) {
+                        maxLoss = d.pnl;
+                        maxLossSym = sym;
+                    }
+                });
+                if (maxLoss < 0) {
+                    const worstLossPct = (Math.abs(maxLoss) / bal) * 100;
+                    worstPair = {
+                        sym: maxLossSym,
+                        ddPct: Number(worstLossPct.toFixed(2)),
+                        status: worstLossPct >= 8.0 ? 'F' : worstLossPct >= 4.0 ? 'S' : 'N'
+                    };
+                }
+            }
+        }
+
+        // Table E: Sniper Rescue Grid (R)
+        const rescueOrdersCount = ddPct >= 35 ? 3 : ddPct >= 20 ? 1 : 0;
+        const rescueDDPct = rescueOrdersCount > 0 ? Number((ddPct * 0.15).toFixed(2)) : 0;
+
+        // Table E: Quarantine Check
+        const quarantinedList: string[] = [];
+        if (worstPair.ddPct >= 12.0) {
+            quarantinedList.push(worstPair.sym);
+        }
+
+        return {
+            portMode,
+            ddPct,
+            ddAmt,
+            bufPct,
+            resMult,
+            reliefBudget,
+            reliefCap,
+            reliefUsed,
+            worstPair,
+            rescueOrdersCount,
+            rescueDDPct,
+            quarantinedList,
+            pairData
+        };
+    }, [stats, orders, licenseInfo]);
+
+    const activeCount = useMemo(() => {
+        return PRIME_20_PAIRS.filter(p => pairControls[p]?.enabled !== false).length;
+    }, [pairControls]);
+    const closeOnlyCount = 20 - activeCount;
+
     const treePriority = useMemo(() => {
         const order = Array.from({ length: 25 }).map((_, i) => ({ index: i, c: i % 5, r: Math.floor(i / 5) }));
         return order.sort((a, b) => (a.c - a.r) - (b.c - b.r) || (a.c + a.r) - (b.c + b.r)).map(o => o.index);
@@ -1411,38 +1572,52 @@ export default function FarmClient({
                     {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
                     {primeActiveOrb !== null && (
                         <div 
-                            className="fixed inset-0 bg-black/40 backdrop-blur-[3px] z-[160] flex items-center justify-center p-4 animate-fade-in"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[160] flex items-center justify-center p-3 sm:p-4 animate-fade-in"
                             onClick={() => setPrimeActiveOrb(null)}
                         >
                             <div 
-                                className={`relative w-full max-w-md sm:max-w-lg rounded-3xl p-6 sm:p-8 backdrop-blur-xl border-2 shadow-2xl animate-fade-in transition-all ${
-                                    primeActiveOrb === 1 ? 'bg-[#061512]/85 border-emerald-500/60 shadow-[0_0_60px_rgba(16,185,129,0.35)]' :
-                                    primeActiveOrb === 2 ? 'bg-[#06121a]/85 border-cyan-500/60 shadow-[0_0_60px_rgba(6,182,212,0.35)]' :
-                                    primeActiveOrb === 3 ? 'bg-[#12081d]/85 border-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.35)]' :
-                                    'bg-[#1a0f06]/85 border-amber-500/60 shadow-[0_0_60px_rgba(245,158,11,0.35)]'
+                                className={`relative w-full max-w-lg sm:max-w-2xl max-h-[88vh] flex flex-col rounded-3xl p-4 sm:p-6 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
+                                    primeActiveOrb === 1 ? 'bg-[#061512]/90 border-emerald-500/60 shadow-[0_0_60px_rgba(16,185,129,0.35)]' :
+                                    primeActiveOrb === 2 ? 'bg-[#06121a]/90 border-cyan-500/60 shadow-[0_0_60px_rgba(6,182,212,0.35)]' :
+                                    primeActiveOrb === 3 ? 'bg-[#12081d]/90 border-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.35)]' :
+                                    'bg-[#1a0f06]/90 border-amber-500/60 shadow-[0_0_60px_rgba(245,158,11,0.35)]'
                                 }`}
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {/* Header */}
-                                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                                <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-white/10 shrink-0">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg ${
                                             primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
                                             primeActiveOrb === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' :
                                             primeActiveOrb === 3 ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' :
                                             'bg-amber-500/20 border-amber-500/50 text-amber-400'
                                         }`}>
-                                            {primeActiveOrb === 1 && <Shield className="w-5 h-5" />}
+                                            {primeActiveOrb === 1 && <Gauge className="w-5 h-5" />}
                                             {primeActiveOrb === 2 && <Layers className="w-5 h-5" />}
                                             {primeActiveOrb === 3 && <Zap className="w-5 h-5" />}
                                             {primeActiveOrb === 4 && <Crosshair className="w-5 h-5" />}
                                         </div>
                                         <div>
-                                            <h2 className="text-lg sm:text-xl font-mono font-black text-white tracking-wider">
-                                                Prime menu {primeActiveOrb}
-                                            </h2>
+                                            <div className="flex items-center gap-2">
+                                                <h2 className="text-base sm:text-lg font-mono font-black text-white tracking-wider">
+                                                    {primeActiveOrb === 1 ? 'SAFETY & RESILIENCE HUD' :
+                                                     primeActiveOrb === 2 ? '20-PAIR COCKPIT MATRIX' :
+                                                     `PRIME MENU ${primeActiveOrb}`}
+                                                </h2>
+                                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold ${
+                                                    primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' :
+                                                    primeActiveOrb === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' :
+                                                    'bg-white/10 border-white/20 text-white/60'
+                                                }`}>
+                                                    {primeActiveOrb === 1 ? 'TABLE D & E' :
+                                                     primeActiveOrb === 2 ? 'CONTROL' : 'COMING SOON'}
+                                                </span>
+                                            </div>
                                             <p className="text-[11px] text-white/50 font-sans">
-                                                EasyM Prime Interactive Console
+                                                {primeActiveOrb === 1 ? 'มาตรวัดและสเกลความปลอดภัยพอร์ต Real-time' :
+                                                 primeActiveOrb === 2 ? 'ควบคุมสั่งการเปิด-ปิดคู่เงิน (Active vs Close-Only)' :
+                                                 'ระบบสั่งการ EasyM Prime'}
                                             </p>
                                         </div>
                                     </div>
@@ -1451,27 +1626,340 @@ export default function FarmClient({
                                     <button
                                         onClick={() => setPrimeActiveOrb(null)}
                                         className="text-white/60 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                        aria-label="Close"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
 
-                                {/* Body */}
-                                <div className="py-8 text-center">
-                                    <div className="inline-block px-4 py-2 rounded-xl bg-white/5 border border-white/10 mb-3">
-                                        <span className={`font-mono text-sm font-bold ${
-                                            primeActiveOrb === 1 ? 'text-emerald-400' :
-                                            primeActiveOrb === 2 ? 'text-cyan-400' :
-                                            primeActiveOrb === 3 ? 'text-purple-400' :
-                                            'text-amber-400'
-                                        }`}>
-                                            [ Prime menu {primeActiveOrb} Active ]
-                                        </span>
+                                {/* 🛡️ ORB 1: TABLE D & E TACTICAL HUD */}
+                                {primeActiveOrb === 1 && (
+                                    <div className="overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 pr-1 no-scrollbar">
+                                        {/* TOP ROW: SPEEDOMETER DIAL & PORT MODE */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                                            {/* Speedometer Arc Gauge */}
+                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden backdrop-blur-md">
+                                                <div className="absolute top-2 left-3 flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                                                    <Activity className="w-3.5 h-3.5 animate-pulse" />
+                                                    <span>PORTFOLIO DD DIAL</span>
+                                                </div>
+
+                                                {/* SVG Semi-Circle Dial */}
+                                                <div className="relative mt-2 w-48 sm:w-52 h-28 flex items-center justify-center">
+                                                    <svg viewBox="0 0 200 115" className="w-full h-full overflow-visible">
+                                                        <defs>
+                                                            <linearGradient id="primeGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                                <stop offset="0%" stopColor="#10b981" />
+                                                                <stop offset="35%" stopColor="#10b981" />
+                                                                <stop offset="55%" stopColor="#f59e0b" />
+                                                                <stop offset="85%" stopColor="#ef4444" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        {/* Background track (semi circle arc from 180 to 0 deg) */}
+                                                        <path
+                                                            d="M 25 100 A 75 75 0 0 1 175 100"
+                                                            fill="none"
+                                                            stroke="#1e293b"
+                                                            strokeWidth="14"
+                                                            strokeLinecap="round"
+                                                        />
+                                                        {/* Colored progress arc */}
+                                                        <path
+                                                            d="M 25 100 A 75 75 0 0 1 175 100"
+                                                            fill="none"
+                                                            stroke="url(#primeGaugeGrad)"
+                                                            strokeWidth="14"
+                                                            strokeLinecap="round"
+                                                            strokeDasharray="235.6"
+                                                            strokeDashoffset={235.6 * (1 - Math.min(1, Math.max(0, primeTelemetry.ddPct / 50)))}
+                                                            className="transition-all duration-700 ease-out"
+                                                        />
+                                                        {/* Needle */}
+                                                        {(() => {
+                                                            const p = Math.min(1, Math.max(0, primeTelemetry.ddPct / 50));
+                                                            const angleDeg = -90 + p * 180;
+                                                            return (
+                                                                <g transform={`rotate(${angleDeg}, 100, 100)`} className="transition-transform duration-700 ease-out">
+                                                                    <line x1="100" y1="100" x2="100" y2="35" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" />
+                                                                    <circle cx="100" cy="100" r="7" fill="#f8fafc" />
+                                                                    <circle cx="100" cy="100" r="3" fill="#0f172a" />
+                                                                </g>
+                                                            );
+                                                        })()}
+                                                    </svg>
+
+                                                    {/* Digital center readout */}
+                                                    <div className="absolute bottom-0 inset-x-0 text-center">
+                                                        <div className="text-2xl sm:text-3xl font-mono font-black text-white tracking-tight drop-shadow-[0_0_12px_rgba(16,185,129,0.5)]">
+                                                            {primeTelemetry.ddPct.toFixed(2)}%
+                                                        </div>
+                                                        <div className="text-[10px] font-mono text-white/50 tracking-wider">
+                                                            CURRENT DD
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* 3-Zone scale ticks */}
+                                                <div className="w-full flex justify-between items-center px-4 mt-2 text-[9px] font-mono">
+                                                    <span className="text-emerald-400 font-bold">0% NORM</span>
+                                                    <span className="text-amber-400 font-bold">15% SLOW</span>
+                                                    <span className="text-rose-400 font-bold">28%+ FREEZE</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Mode & Worst Symbol (Table D) */}
+                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-md">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-[10px] font-mono text-white/50 font-bold tracking-wider">PORT MODE (TABLE D)</span>
+                                                        <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black border shadow-lg flex items-center gap-1.5 ${
+                                                            primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' :
+                                                            primeTelemetry.portMode === 'SLOW' ? 'bg-amber-500/20 border-amber-500 text-amber-400' :
+                                                            'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                                        }`}>
+                                                            <span className="w-2 h-2 rounded-full bg-current animate-ping" />
+                                                            {primeTelemetry.portMode}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 mb-3">
+                                                        <div className="text-[11px] font-mono text-white/80 font-bold">
+                                                            {primeTelemetry.portMode === 'FREEZE' ? '⛔ แช่แข็งพอร์ต: ปิดกั้นการเปิดไม้ใหม่ทุกคู่เงิน' :
+                                                             primeTelemetry.portMode === 'SLOW' ? '⚠️ ชะลอการออกไม้: ขยายระยะห่างตารางกริด 1.5 เท่า' :
+                                                             '✅ ระบบทำงานปกติ: รันกลยุทธ์กริดและสไนเปอร์เต็มกำลัง'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Worst Symbol Throttle */}
+                                                <div className="border-t border-white/10 pt-3">
+                                                    <div className="flex items-center justify-between text-xs font-mono mb-1.5">
+                                                        <span className="text-white/60">WORST LAGGING PAIR</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-amber-300 font-mono">{primeTelemetry.worstPair.sym}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40">
+                                                                {primeTelemetry.worstPair.status === 'F' ? 'FREEZE' : primeTelemetry.worstPair.status === 'S' ? 'SLOW' : 'NORMAL'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Segmented bar for worst pair drag */}
+                                                    <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-white/10 flex">
+                                                        <div 
+                                                            className="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                                                            style={{ width: `${Math.min(100, (primeTelemetry.worstPair.ddPct / 20) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-[10px] font-mono text-white/40 mt-1">
+                                                        <span>Pair Drag: -{primeTelemetry.worstPair.ddPct.toFixed(2)}%</span>
+                                                        <span>Threshold: 8.0%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* SECTION 2: TABLE E (BUFFER & RELIEF FUND VAULT) */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {/* Capital Buffer & Resilience */}
+                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-md">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[10px] font-mono text-white/50 font-bold tracking-wider">CAPITAL BUFFER (BUF)</span>
+                                                    <span className="text-[10px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
+                                                        {primeTelemetry.resMult.toFixed(2)}x RESILIENCE
+                                                    </span>
+                                                </div>
+
+                                                <div className="my-2 flex items-baseline gap-2">
+                                                    <div className={`text-2xl sm:text-3xl font-mono font-black ${primeTelemetry.bufPct >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {primeTelemetry.bufPct >= 0 ? '+' : ''}{primeTelemetry.bufPct.toFixed(1)}%
+                                                    </div>
+                                                    <div className="text-[11px] font-mono text-white/40">
+                                                        above baseline capital
+                                                    </div>
+                                                </div>
+
+                                                {/* Resilience level meter */}
+                                                <div className="space-y-1">
+                                                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
+                                                        <div 
+                                                            className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-500"
+                                                            style={{ width: `${Math.min(100, Math.max(10, (primeTelemetry.resMult / 2) * 100))}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between text-[9px] font-mono text-white/40">
+                                                        <span>1.0x (Par)</span>
+                                                        <span>1.5x (Safe)</span>
+                                                        <span>2.0x+ (Fortress)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Cross-Pair Relief Fund (FUND) */}
+                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-md">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[10px] font-mono text-white/50 font-bold tracking-wider">RELIEF FUND VAULT</span>
+                                                    <span className="text-[10px] font-mono text-cyan-300 font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">
+                                                        40% SLICING
+                                                    </span>
+                                                </div>
+
+                                                <div className="my-2 flex items-baseline gap-2">
+                                                    <div className="text-2xl sm:text-3xl font-mono font-black text-cyan-300 drop-shadow-[0_0_10px_rgba(6,182,212,0.4)]">
+                                                        ${primeTelemetry.reliefBudget.toFixed(2)}
+                                                    </div>
+                                                    <div className="text-[11px] font-mono text-white/50">
+                                                        USC Vault Balance
+                                                    </div>
+                                                </div>
+
+                                                {/* Slicing Vault capacity bar */}
+                                                <div className="space-y-1">
+                                                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
+                                                        <div 
+                                                            className="h-full bg-gradient-to-r from-purple-500 to-cyan-400 rounded-full transition-all duration-500"
+                                                            style={{ width: `${Math.min(100, (primeTelemetry.reliefBudget / (primeTelemetry.reliefCap || 1)) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between text-[9px] font-mono text-white/40">
+                                                        <span>Used: ${primeTelemetry.reliefUsed.toFixed(2)}</span>
+                                                        <span>Cap: ${primeTelemetry.reliefCap.toFixed(0)} USC (5%)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* SECTION 3: TACTICAL DEFENSE & ALERTS STRIP (TABLE E COL 2) */}
+                                        <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-3 sm:p-4 backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                                                <span className="text-[11px] font-mono font-bold text-white/80">TACTICAL DEFENSE:</span>
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                                                <div className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/80">
+                                                    Rescue: <span className="text-cyan-400 font-bold">R{primeTelemetry.rescueOrdersCount} ({primeTelemetry.rescueDDPct}%)</span>
+                                                </div>
+                                                <div className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/80">
+                                                    Quarantine: <span className={`font-bold ${primeTelemetry.quarantinedList.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                        {primeTelemetry.quarantinedList.length > 0 ? `QT: ${primeTelemetry.quarantinedList.join(', ')}` : 'QT: CLEAR'}
+                                                    </span>
+                                                </div>
+                                                <div className={`px-2.5 py-1 rounded-lg border font-bold ${
+                                                    primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 border-red-500 text-red-300' :
+                                                    primeTelemetry.rescueOrdersCount > 0 ? 'bg-amber-500/20 border-amber-500 text-amber-300' :
+                                                    'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                                }`}>
+                                                    {primeTelemetry.portMode === 'FREEZE' ? 'LOCK WITHDRAWS' :
+                                                     primeTelemetry.rescueOrdersCount > 0 ? 'RESCUE ACTIVE' :
+                                                     'SYSTEM HEALTHY'}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-white/60">
-                                        กรอบโปร่งแสงเรืองแสง สไตล์ Cyber Glassmorphism พร้อมเชื่อมต่อข้อมูล
-                                    </p>
-                                </div>
+                                )}
+
+                                {/* 🎛️ ORB 2: 20-PAIR COCKPIT MATRIX */}
+                                {primeActiveOrb === 2 && (
+                                    <div className="overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 pr-1 no-scrollbar flex-1 flex flex-col">
+                                        {/* Quick Actions & Pair Status Summary */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2 bg-black/40 border border-cyan-500/30 rounded-2xl p-3 sm:p-4 backdrop-blur-md shrink-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-xs font-mono">
+                                                    <span className="text-white/50">STATUS: </span>
+                                                    <span className="text-emerald-400 font-black font-mono">{activeCount} ACTIVE</span>
+                                                    <span className="text-white/30 mx-1.5">|</span>
+                                                    <span className="text-amber-400 font-black font-mono">{closeOnlyCount} CLOSE-ONLY</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleSetAllPairs(true)}
+                                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold transition-all cursor-pointer"
+                                                >
+                                                    SET ALL ACTIVE
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSetAllPairs(false)}
+                                                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold transition-all cursor-pointer"
+                                                >
+                                                    SET ALL CLOSE-ONLY
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* 20 PAIRS GRID */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
+                                            {PRIME_20_PAIRS.map((pair) => {
+                                                const isEnabled = pairControls[pair]?.enabled !== false;
+                                                const data = primeTelemetry.pairData[pair] || { count: 0, lot: 0, pnl: 0 };
+                                                const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
+
+                                                return (
+                                                    <div
+                                                        key={pair}
+                                                        onClick={() => handleTogglePair(pair)}
+                                                        className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                                                            !isEnabled
+                                                                ? 'bg-amber-950/25 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] hover:border-amber-400'
+                                                                : isQuarantined
+                                                                ? 'bg-rose-950/25 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.15)] hover:border-rose-400'
+                                                                : 'bg-black/40 border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-950/20'
+                                                        }`}
+                                                    >
+                                                        {/* Pair header & Switch */}
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="font-mono font-black text-sm text-white tracking-wider">
+                                                                {pair}
+                                                            </span>
+                                                            <div className={`w-3 h-3 rounded-full border flex items-center justify-center transition-all ${
+                                                                isEnabled 
+                                                                    ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]' 
+                                                                    : 'bg-amber-500 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
+                                                            }`}>
+                                                                <div className="w-1 h-1 rounded-full bg-black" />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Order & Lot metrics */}
+                                                        <div className="text-[10px] font-mono text-white/50 flex justify-between mb-2">
+                                                            <span>{data.count > 0 ? `${data.count} ไม้` : '0 ไม้'}</span>
+                                                            <span>{data.lot > 0 ? `${data.lot.toFixed(2)}L` : '-'}</span>
+                                                        </div>
+
+                                                        {/* Action status button */}
+                                                        <div className={`w-full py-1 rounded-lg text-center font-mono text-[10px] font-bold border transition-colors ${
+                                                            isEnabled
+                                                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                                                                : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                                                        }`}>
+                                                            {isEnabled ? '🟢 ACTIVE' : '⛔ CLOSE-ONLY'}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🔒 ORBS 3 & 4 (UPCOMING PLACEHOLDER) */}
+                                {(primeActiveOrb === 3 || primeActiveOrb === 4) && (
+                                    <div className="py-12 text-center flex flex-col items-center justify-center">
+                                        <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-white/40 shadow-inner">
+                                            <Lock className="w-7 h-7 text-white/50" />
+                                        </div>
+                                        <div className="inline-block px-4 py-1.5 rounded-xl bg-white/5 border border-white/10 mb-3">
+                                            <span className={`font-mono text-sm font-bold ${
+                                                primeActiveOrb === 3 ? 'text-purple-400' : 'text-amber-400'
+                                            }`}>
+                                                [ Prime menu {primeActiveOrb} : COMING SOON ]
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-white/50 max-w-xs leading-relaxed">
+                                            ฟีเจอร์ส่วนนี้กำลังอยู่ในขั้นตอนการพัฒนาตามลำดับ (เปิดใช้งาน Orb 1 และ Orb 2 เป็นลำดับแรก)
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
