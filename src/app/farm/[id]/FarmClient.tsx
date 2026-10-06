@@ -153,11 +153,9 @@ export default function FarmClient({
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
 
-    // EasyM Prime Auto-Detection (Product Key, DB System Code, or Live EA Version)
-    const isPrime = prodKey.includes('PRIME') || 
-                    prodName.includes('prime') || 
-                    sysCode.includes('prime') || 
-                    eaVer.includes('prime');
+    // EasyM Prime Dev Gate: Restrict Prime floating orbs and cockpit exclusively to master port 97053088
+    // Other users using Prime will safely see the standard stable farm until UI/testing is finalized.
+    const isPrime = String(portNumber) === '97053088';
 
     const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);
 
