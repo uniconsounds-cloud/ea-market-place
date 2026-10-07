@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import DemoFarmClient from './DemoFarmClient';
 import { redirect } from 'next/navigation';
+import { parsePoolConfig, getSyntheticLiveTrackerData } from '@/lib/liveTrackerSynthetic';
 
 export default async function DemoFarmPage(props: {
     searchParams?: Promise<{ preview?: string; embed?: string }> | { preview?: string; embed?: string };
@@ -84,32 +85,45 @@ export default async function DemoFarmPage(props: {
 
     const finalAdminMessage = adminMessage || "💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀";
     const masterPortNumber = customMasterPort || challenge.master_port_number || '21692434';
+    const poolConfig = parsePoolConfig(customMasterPort || challenge.master_port_number);
     const joinDateStr = challenge.join_date ? challenge.join_date.split('T')[0] : '2026-05-09';
 
-    // Fetch dynamic history & status in parallel
-    const [viewRes, historyRes, ordersRes, statusRes] = await Promise.all([
-        user ? supabase.from('admin_demo_challenges_view').select('current_balance').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-        supabase.from('farm_daily_history').select('profit, date').eq('port_number', masterPortNumber).gte('date', joinDateStr),
-        supabase.from('farm_active_orders').select('*').eq('port_number', masterPortNumber),
-        supabase.from('farm_port_status').select('*').eq('port_number', masterPortNumber).single()
-    ]);
+    let initialOrders: any[] = [];
+    let portStatus: any = null;
+    let dailyHistory: any[] = [];
+    let currentBalance = 100000;
 
-    const initialOrders = ordersRes.data || [];
-    const portStatus = statusRes.data;
-    const dailyHistory = historyRes.data || [];
-    const challengeView = viewRes.data;
+    if (poolConfig.mode === 'synthetic_10') {
+        // High-fidelity 10-port synthetic model
+        const synthetic = await getSyntheticLiveTrackerData(supabase, poolConfig, joinDateStr);
+        initialOrders = synthetic.activeOrders;
+        portStatus = synthetic.portStatus;
+        dailyHistory = synthetic.dailyHistory;
+        currentBalance = synthetic.portStatus.balance;
+    } else {
+        // Fallback to legacy single master port
+        const [viewRes, historyRes, ordersRes, statusRes] = await Promise.all([
+            user ? supabase.from('admin_demo_challenges_view').select('current_balance').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+            supabase.from('farm_daily_history').select('profit, date').eq('port_number', masterPortNumber).gte('date', joinDateStr),
+            supabase.from('farm_active_orders').select('*').eq('port_number', masterPortNumber),
+            supabase.from('farm_port_status').select('*').eq('port_number', masterPortNumber).single()
+        ]);
 
-    // Calculate dynamic balance (100,000 + profits accumulated since user's join_date + unrecorded today_pnl)
-    const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-    const historyProfitSum = dailyHistory.reduce((sum, h) => sum + (Number(h.profit) || 0), 0);
-    const isTodayRecorded = dailyHistory.some(h => h.date === bkkTodayStr);
-    const todayPnlToAdd = isTodayRecorded ? 0 : (Number(portStatus?.today_pnl) || 0);
+        initialOrders = ordersRes.data || [];
+        portStatus = statusRes.data;
+        dailyHistory = historyRes.data || [];
+        const challengeView = viewRes.data;
 
-    const computedCumulativeBalance = 100000 + historyProfitSum + todayPnlToAdd;
-    let currentBalance = Number(challengeView?.current_balance || computedCumulativeBalance) || 100000;
+        const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        const historyProfitSum = dailyHistory.reduce((sum, h) => sum + (Number(h.profit) || 0), 0);
+        const isTodayRecorded = dailyHistory.some(h => h.date === bkkTodayStr);
+        const todayPnlToAdd = isTodayRecorded ? 0 : (Number(portStatus?.today_pnl) || 0);
+
+        const computedCumulativeBalance = 100000 + historyProfitSum + todayPnlToAdd;
+        currentBalance = Number(challengeView?.current_balance || computedCumulativeBalance) || 100000;
+    }
 
     // 1:1 Replication with Master Port
-    const scaleFactor = 1.0;
     const proportionalRatio = 1.0;
     const masterBalance = Number(portStatus?.balance) || 100000;
 
@@ -126,12 +140,12 @@ export default async function DemoFarmPage(props: {
         ...portStatus,
         master_balance: masterBalance, // Keep reference to original balance
         floating_pnl: floatingPnl,
-        total_lots: Number(portStatus.total_lots) * proportionalRatio,
-        buy_pnl: Number(portStatus.buy_pnl) * proportionalRatio,
-        sell_pnl: Number(portStatus.sell_pnl) * proportionalRatio,
-        today_pnl: Number(portStatus.today_pnl) * proportionalRatio,
-        today_closed_lots: Number(portStatus.today_closed_lots) * proportionalRatio,
-        daily_max_drawdown: Number(portStatus.daily_max_drawdown),
+        total_lots: Number(portStatus.total_lots || 0) * proportionalRatio,
+        buy_pnl: Number(portStatus.buy_pnl || 0) * proportionalRatio,
+        sell_pnl: Number(portStatus.sell_pnl || 0) * proportionalRatio,
+        today_pnl: Number(portStatus.today_pnl || 0) * proportionalRatio,
+        today_closed_lots: Number(portStatus.today_closed_lots || 0) * proportionalRatio,
+        daily_max_drawdown: Number(portStatus.daily_max_drawdown || 0),
         balance: currentBalance,
         equity: currentBalance + floatingPnl
     } : {
@@ -146,7 +160,7 @@ export default async function DemoFarmPage(props: {
                 portNumber={masterPortNumber}
                 initialOrders={scaledOrders}
                 initialPortStatus={scaledPortStatus}
-                scaleFactor={scaleFactor}
+                scaleFactor={proportionalRatio}
                 demoBalance={currentBalance}
                 customName={customName}
                 adminMessage={finalAdminMessage}
