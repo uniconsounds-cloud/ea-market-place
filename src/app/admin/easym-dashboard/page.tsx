@@ -1145,10 +1145,14 @@ export default function EasyMMasterDashboardPage() {
                     const pnl = Number(s.today_pnl) || 0;
                     const dd = Number(s.daily_max_drawdown) || 0;
                     const existing = todayHistoryRecords.find(r => r.port_number === accNum);
-                    if (!existing && (pnl > 0 || dd > 0)) {
+                    if (!existing && (pnl !== 0 || dd > 0)) {
                         todayHistoryRecords.push({ port_number: accNum, profit: pnl, max_dd: dd, max_drawdown: dd, date: day1DateStr });
-                    } else if (existing && pnl > Number(existing.profit)) {
-                        existing.profit = pnl;
+                    } else if (existing) {
+                        if (pnl < 0) {
+                            existing.profit = pnl;
+                        } else if (pnl > Number(existing.profit)) {
+                            existing.profit = pnl;
+                        }
                     }
                 });
             }
@@ -1349,7 +1353,23 @@ export default function EasyMMasterDashboardPage() {
                     const pingMarketDateStr = status?.last_ping ? getMarketTradingDateStr(new Date(status.last_ping)) : '';
                     const isPingToday = !isWeekend && pingMarketDateStr === day1DateStr && hoursSinceLastPing <= 24;
                     const statusTodayPnl = (isPingToday && !isGoldMismatch) ? (Number(status?.today_pnl) || 0) : 0;
-                    const resolvedTodayPnl = isGoldMismatch ? 0 : Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
+                    const histPnl = Number(histToday?.profit) || 0;
+                    let resolvedTodayPnl = 0;
+                    if (isGoldMismatch) {
+                        resolvedTodayPnl = 0;
+                    } else if (isPingToday && status?.today_pnl !== undefined && status?.today_pnl !== null) {
+                        if (statusTodayPnl < 0) {
+                            resolvedTodayPnl = statusTodayPnl;
+                        } else if (statusTodayPnl > 0 && histPnl > 0) {
+                            resolvedTodayPnl = Math.max(statusTodayPnl, histPnl);
+                        } else if (statusTodayPnl > 0) {
+                            resolvedTodayPnl = statusTodayPnl;
+                        } else {
+                            resolvedTodayPnl = histPnl;
+                        }
+                    } else if (histToday?.profit !== undefined && histToday?.profit !== null) {
+                        resolvedTodayPnl = histPnl;
+                    }
 
                     // Fallback Floating PnL & DD if status has equity & balance but floating_pnl is 0
                     const rawBalVal = Number(status?.balance) || 0;
@@ -1565,7 +1585,17 @@ export default function EasyMMasterDashboardPage() {
 
                         const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
                         const statusTodayPnl = Number(status.today_pnl) || 0;
-                        const resolvedTodayPnl = Math.max(statusTodayPnl, Number(histToday?.profit) || 0);
+                        const histPnl = Number(histToday?.profit) || 0;
+                        let resolvedTodayPnl = 0;
+                        if (statusTodayPnl < 0) {
+                            resolvedTodayPnl = statusTodayPnl;
+                        } else if (statusTodayPnl > 0 && histPnl > 0) {
+                            resolvedTodayPnl = Math.max(statusTodayPnl, histPnl);
+                        } else if (statusTodayPnl > 0) {
+                            resolvedTodayPnl = statusTodayPnl;
+                        } else {
+                            resolvedTodayPnl = histPnl;
+                        }
 
                         const rawBalVal = Number(status.balance) || 0;
                         const rawEqVal = Number(status.equity) || 0;
@@ -4373,7 +4403,7 @@ export default function EasyMMasterDashboardPage() {
                                                         : '0 (ยังไม่เติมทุน)'
                                                 }\nEquity: ${port.equity > 0 ? `${port.equity.toLocaleString()} ${port.accountType}` : '-'}\nFloating PnL: ${
                                                     port.floatingPnl !== 0 ? `${port.floatingPnl > 0 ? '+' : ''}${port.floatingPnl.toLocaleString()} ${port.accountType}` : '0'
-                                                }\nกำไรวันนี้: ${port.todayPnl > 0 ? `+${port.todayPnl.toLocaleString()} USC` : '0'}\nสิทธิ์: ${
+                                                }\nกำไรวันนี้: ${port.todayPnl > 0 ? `+${port.todayPnl.toLocaleString()} USC` : port.todayPnl < 0 ? `${port.todayPnl.toLocaleString()} USC` : '0'}\nสิทธิ์: ${
                                                     port.isActive ? 'Active' : 'Inactive'
                                                 }\nคลิกเพื่อดูรายละเอียด`}
                                             >
@@ -5179,6 +5209,8 @@ export default function EasyMMasterDashboardPage() {
                                                     <TableCell className="text-right font-mono text-xs">
                                                         {port.todayPnl > 0 ? (
                                                             <span className="text-emerald-400 font-bold">+{port.todayPnl.toFixed(2)}</span>
+                                                        ) : port.todayPnl < 0 ? (
+                                                            <span className="text-rose-400 font-bold">{port.todayPnl.toFixed(2)}</span>
                                                         ) : (
                                                             <span className="text-muted-foreground">0.00</span>
                                                         )}
@@ -5407,6 +5439,8 @@ export default function EasyMMasterDashboardPage() {
                                         <TableCell className="text-right font-mono text-xs">
                                             {port.todayPnl > 0 ? (
                                                 <span className="text-emerald-400 font-bold">+{port.todayPnl.toFixed(2)}</span>
+                                            ) : port.todayPnl < 0 ? (
+                                                <span className="text-rose-400 font-bold">{port.todayPnl.toFixed(2)}</span>
                                             ) : (
                                                 <span className="text-muted-foreground">0.00</span>
                                             )}

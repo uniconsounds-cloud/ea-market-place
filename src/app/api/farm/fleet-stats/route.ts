@@ -325,12 +325,16 @@ export async function GET() {
                     const pnl = Number(s.today_pnl) || 0;
                     const dd = Number(s.daily_max_drawdown) || 0;
                     const existing = records.find(r => String(r.port_number) === String(s.port_number));
-                    if (!existing && (pnl > 0 || dd > 0)) {
+                    if (!existing && (pnl !== 0 || dd > 0)) {
                         records.push({ port_number: s.port_number, profit: pnl, max_dd: dd, max_drawdown: dd, date: dateStr });
                         profits.push(pnl);
                         if (dd > 0) dds.push(dd);
-                    } else if (existing && pnl > Number(existing.profit)) {
-                        existing.profit = pnl;
+                    } else if (existing) {
+                        if (pnl < 0) {
+                            existing.profit = pnl;
+                        } else if (pnl > Number(existing.profit)) {
+                            existing.profit = pnl;
+                        }
                     }
                 });
             }
