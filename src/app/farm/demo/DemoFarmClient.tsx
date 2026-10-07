@@ -576,7 +576,7 @@ export default function DemoFarmClient({
     }, [portNumber, isTabVisible, isIdle, scaleFactor, demoBalance, userId, referrerId]);
 
     // --- Dynamic Theming ---
-    const rawAsset = portStatus?.asset_type || 'GOLD';
+    const rawAsset = isSynthetic ? 'FOREX' : (portStatus?.asset_type || 'GOLD');
     const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
     const theme = useMemo(() => ({
         open: assetType === 'FOREX' ? '/farm/asset_a_lily.png' : '/farm/asset_a_lotus.png',
@@ -766,9 +766,16 @@ export default function DemoFarmClient({
     }, [portNumber, isTabVisible, isIdle, isSynthetic]);
 
     const liveUserBalance = useMemo(() => {
-        if (isSynthetic && portStatus?.balance) {
-            return Number(portStatus.balance);
+        // If viewing 'master' tab (พอร์ตหลัก), show the full Master Model balance (from beginning of Live Tracker)
+        if (historyTab === 'master') {
+            const masterProfitSum = history.reduce((sum, item) => sum + Number(item.profit || 0), 0);
+            const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            const isTodayRecorded = history.some(item => item.date?.split('T')[0] === bkkTodayStr);
+            const todayPnl = isTodayRecorded ? 0 : Number(portStatus?.today_pnl || 0);
+            return 100000 + masterProfitSum + todayPnl;
         }
+
+        // When viewing 'my' tab (พอร์ตติดตาม), calculate from user's join date
         if (!challengeStartDate) return demoBalance || 100000;
         
         const startD = new Date(challengeStartDate);
@@ -796,7 +803,7 @@ export default function DemoFarmClient({
         
         const computed = 100000 + sumProfit;
         return (computed > 100000 || history.length > 0) ? computed : (demoBalance || computed);
-    }, [history, challengeStartDate, portStatus?.today_pnl, portStatus?.balance, demoBalance, isSynthetic]);
+    }, [history, challengeStartDate, portStatus?.today_pnl, portStatus?.balance, demoBalance, isSynthetic, historyTab]);
 
     const stats = useMemo(() => {
         // If EA is sending data to farm_port_status, use that directly
@@ -807,16 +814,21 @@ export default function DemoFarmClient({
             const drawdownAmt = floatingPnl < 0 ? Math.abs(floatingPnl) : 0;
             const drawdownPct = currentBalanceValue > 0 ? (drawdownAmt / currentBalanceValue) * 100 : 0;
             
+            const buyOrders = orders.filter(o => o.type?.toUpperCase() === 'BUY' || o.order_type === 'BUY');
+            const sellOrders = orders.filter(o => o.type?.toUpperCase() === 'SELL' || o.order_type === 'SELL');
+            const rawBuyCount = portStatus.buy_count !== undefined && portStatus.buy_count !== null ? Number(portStatus.buy_count) : buyOrders.length;
+            const rawSellCount = portStatus.sell_count !== undefined && portStatus.sell_count !== null ? Number(portStatus.sell_count) : sellOrders.length;
+
             return {
                 openOrdersCount: orders.length,
                 floatingPnl,
                 drawdownAmount: drawdownAmt,
                 drawdownPercent: drawdownPct,
-                totalLots: Number(portStatus.total_lots),
-                buyCount: Number(portStatus.buy_count),
-                sellCount: Number(portStatus.sell_count),
-                buyPnl: Number(portStatus.buy_pnl),
-                sellPnl: Number(portStatus.sell_pnl),
+                totalLots: Number(portStatus.total_lots || 0),
+                buyCount: isNaN(rawBuyCount) ? buyOrders.length : rawBuyCount,
+                sellCount: isNaN(rawSellCount) ? sellOrders.length : rawSellCount,
+                buyPnl: Number(portStatus.buy_pnl || 0),
+                sellPnl: Number(portStatus.sell_pnl || 0),
                 balance: currentBalanceValue,
                 equity: currentEquityValue,
                 maxDrawdown: currentBalanceValue > 0 ? (Number(portStatus.max_drawdown || 0) * Number(portStatus.master_balance || portStatus.balance || 10000) / currentBalanceValue) : 0,
@@ -942,7 +954,7 @@ export default function DemoFarmClient({
         let filteredData = history.filter(item => item.date < brokerDateStr);
         
         // Filter out history before the user joined the challenge if viewing 'my' tab
-        if (historyTab === 'my' && challengeStartDate && !isSynthetic) {
+        if (historyTab === 'my' && challengeStartDate) {
             const startD = new Date(challengeStartDate);
             // Convert to YYYY-MM-DD in BKK timezone for accurate comparison
             const startStr = startD.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -1161,7 +1173,7 @@ export default function DemoFarmClient({
                     title="EASYM LIVE TRACKER"
                     customName={currentCustomName}
                     adminMessage={currentAdminMessage}
-                    portNumber={portNumber}
+                    portNumber={isSynthetic ? '10-PORT MODEL' : portNumber}
                     balance={stats.balance}
                     equity={stats.equity}
                     floatingPnl={stats.floatingPnl}
@@ -1211,7 +1223,7 @@ export default function DemoFarmClient({
 
             {/* MOBILE ONLY OVERLAY DOCKED BELOW HEADER */}
             <FarmMobileStatsOverlay
-                portNumber={portNumber}
+                portNumber={isSynthetic ? '10-PORT MODEL' : portNumber}
                 buyCount={stats.buyCount}
                 sellCount={stats.sellCount}
                 buyPnl={stats.buyPnl}

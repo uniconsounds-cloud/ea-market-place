@@ -168,6 +168,34 @@ export async function evaluateAndAutoSwap(
 }
 
 /**
+ * Fetches all daily history records using range pagination to bypass Supabase 1,000 row limit
+ */
+async function fetchAllDailyHistory(
+    supabase: SupabaseClient,
+    ports: string[],
+    startDate: string
+): Promise<any[]> {
+    let allRows: any[] = [];
+    let from = 0;
+    const step = 1000;
+    while (true) {
+        const { data, error } = await supabase
+            .from('farm_daily_history')
+            .select('port_number, date, profit')
+            .in('port_number', ports)
+            .gte('date', startDate)
+            .order('date', { ascending: true })
+            .range(from, from + step - 1);
+
+        if (!data || data.length === 0) break;
+        allRows.push(...data);
+        if (data.length < step) break;
+        from += step;
+    }
+    return allRows;
+}
+
+/**
  * Computes synthetic combined history & status for Live Tracker
  */
 export async function getSyntheticLiveTrackerData(
@@ -178,21 +206,17 @@ export async function getSyntheticLiveTrackerData(
     const startDate = config.startDate || '2026-06-22';
     const activePorts = config.activePorts.length > 0 ? config.activePorts : DEFAULT_LIVE_TRACKER_CONFIG.activePorts;
 
-    // 1. Fetch pre-June 22 history from 21692434
-    const [preHistRes, postHistRes, statusesRes, ordersRes] = await Promise.all([
+    // 1. Fetch pre-June 22 history from 21692434 and active port statuses/orders
+    const [preHistRes, postHistRows, statusesRes, ordersRes] = await Promise.all([
         supabase
             .from('farm_daily_history')
             .select('date, profit')
             .eq('port_number', '21692434')
             .gte('date', joinDateStr)
             .lt('date', startDate)
-            .order('date', { ascending: true }),
-        supabase
-            .from('farm_daily_history')
-            .select('port_number, date, profit')
-            .in('port_number', activePorts)
-            .gte('date', startDate)
-            .order('date', { ascending: true }),
+            .order('date', { ascending: true })
+            .limit(1000),
+        fetchAllDailyHistory(supabase, activePorts, startDate),
         supabase
             .from('farm_port_status')
             .select('*')
@@ -207,7 +231,7 @@ export async function getSyntheticLiveTrackerData(
 
     // Group post-June 22 daily profits by date
     const dateMap = new Map<string, number[]>();
-    (postHistRes.data || []).forEach(h => {
+    postHistRows.forEach(h => {
         if (!dateMap.has(h.date)) dateMap.set(h.date, []);
         dateMap.get(h.date)!.push(Number(h.profit) || 0);
     });
@@ -223,11 +247,11 @@ export async function getSyntheticLiveTrackerData(
         });
     });
 
-    // Add post-June 22 synthetic average history
+    const totalActiveModelPorts = Math.max(1, activePorts.length);
     Array.from(dateMap.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([date, profits]) => {
-            const avgProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / profits.length : 0;
+            const avgProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / totalActiveModelPorts : 0;
             combinedDailyHistory.push({
                 id: `synth-${date}`,
                 date,
@@ -245,6 +269,8 @@ export async function getSyntheticLiveTrackerData(
     const avgTodayClosedLots = statuses.reduce((sum, s) => sum + (Number(s.today_closed_lots) || 0), 0) / validCount;
     const avgBuyPnl = statuses.reduce((sum, s) => sum + (Number(s.buy_pnl) || 0), 0) / validCount;
     const avgSellPnl = statuses.reduce((sum, s) => sum + (Number(s.sell_pnl) || 0), 0) / validCount;
+    const avgBuyCount = Math.round(statuses.reduce((sum, s) => sum + (Number(s.buy_count) || 0), 0) / validCount);
+    const avgSellCount = Math.round(statuses.reduce((sum, s) => sum + (Number(s.sell_count) || 0), 0) / validCount);
 
     const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
     const isTodayRecorded = combinedDailyHistory.some(h => h.date === bkkTodayStr);
@@ -264,6 +290,9 @@ export async function getSyntheticLiveTrackerData(
         today_closed_lots: Number(avgTodayClosedLots.toFixed(2)),
         buy_pnl: Number(avgBuyPnl.toFixed(2)),
         sell_pnl: Number(avgSellPnl.toFixed(2)),
+        buy_count: avgBuyCount,
+        sell_count: avgSellCount,
+        asset_type: 'FOREX',
         account_type: 'USC',
         currency: 'USC',
         system_code: 'EasyM Live Tracker (10-Port Model)',

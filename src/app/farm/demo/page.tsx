@@ -167,7 +167,7 @@ export default async function DemoFarmPage(props: {
                 demoBalance={currentBalance}
                 customName={customName}
                 adminMessage={finalAdminMessage}
-                challengeStartDate={isSynthetic ? '2026-04-08' : challenge.created_at}
+                challengeStartDate={challenge.created_at || challenge.join_date || '2026-05-09'}
                 userId={user?.id || '47db9b29-7688-41b5-8469-10994f9a5b1a'}
                 referrerId={referrerIdToCheck}
             />
