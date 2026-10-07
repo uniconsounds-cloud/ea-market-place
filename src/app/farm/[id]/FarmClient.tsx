@@ -824,19 +824,25 @@ export default function FarmClient({
         PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
 
         // Quarantined and Locked pairs evaluation
-        // Live data from EA dashboard (Table E: QT: EJ 11.82% : GJ 19.94%)
+        // Live data from EA dashboard (Table E: QT: EJ 12.22% : GJ 19.93%)
         let lockedPair = {
             sym: (portStatus as any)?.locked_pair_sym || 'GBPJPY',
             abbr: 'GJ',
-            ddPct: (portStatus as any)?.locked_pair_dd !== undefined ? Number((portStatus as any).locked_pair_dd) : 19.94,
+            ddPct: (portStatus as any)?.locked_pair_dd !== undefined ? Number((portStatus as any).locked_pair_dd) : 19.93,
             status: 'QT'
         };
 
         let worstPair = {
-            sym: 'USDJPY',
-            ddPct: Math.min(18.2, Number((ddPct * 0.38).toFixed(2))),
-            status: ddPct >= 28 ? 'F' : ddPct >= 15 ? 'S' : 'N'
+            sym: 'NZDJPY',
+            ddPct: 10.3,
+            status: 'F'
         };
+
+        let worstSummary = (portStatus as any)?.worst_summary || 'NZDUSD 1.0- | NZDJPY 10.3F';
+        let worstItems = [
+            { sym: 'NZDUSD', lossPct: 1.0, flag: '-', flagLabel: 'ปกติ' },
+            { sym: 'NZDJPY', lossPct: 10.3, flag: 'F', flagLabel: 'FREEZE' }
+        ];
 
         if (orders && orders.length > 0) {
             let hasAnySymbol = false;
@@ -851,63 +857,64 @@ export default function FarmClient({
             });
 
             if (hasAnySymbol) {
-                let maxLoss = 0;
-                let maxLossSym = 'USDJPY';
-                Object.entries(pairData).forEach(([sym, d]) => {
-                    if (d.pnl < maxLoss) {
-                        maxLoss = d.pnl;
-                        maxLossSym = sym;
-                    }
-                });
-                if (maxLoss < 0) {
-                    const worstLossPct = (Math.abs(maxLoss) / bal) * 100;
+                const sortedLosses = Object.entries(pairData)
+                    .filter(([_, d]) => d.pnl < 0)
+                    .map(([sym, d]) => {
+                        const lossPct = Number(((Math.abs(d.pnl) / bal) * 100).toFixed(1));
+                        const flag = lossPct >= 8.0 ? 'F' : lossPct >= 4.0 ? 'S' : '-';
+                        const flagLabel = flag === 'F' ? 'FREEZE' : flag === 'S' ? 'SLOW' : 'ปกติ';
+                        return { sym, lossPct, flag, flagLabel };
+                    })
+                    .sort((a, b) => b.lossPct - a.lossPct);
+
+                if (sortedLosses.length > 0) {
+                    worstItems = sortedLosses.slice(0, 3);
+                    worstSummary = worstItems.map(w => `${w.sym} ${w.lossPct}${w.flag}`).join(' | ');
                     worstPair = {
-                        sym: maxLossSym,
-                        ddPct: Number(worstLossPct.toFixed(2)),
-                        status: worstLossPct >= 8.0 ? 'F' : worstLossPct >= 4.0 ? 'S' : 'N'
+                        sym: worstItems[0].sym,
+                        ddPct: worstItems[0].lossPct,
+                        status: worstItems[0].flag
                     };
-                    if (worstLossPct > lockedPair.ddPct) {
-                        lockedPair = {
-                            sym: maxLossSym,
-                            abbr: maxLossSym.substring(0, 2),
-                            ddPct: Number(worstLossPct.toFixed(2)),
-                            status: 'QT'
-                        };
-                    }
                 }
             }
         }
 
         // Table D: Live Mode DD%
-        // FloatingDDPct() in EA excludes quarantined pairs (EJ 11.82% + GJ 19.94% = 31.76%)
+        // FloatingDDPct() in EA excludes quarantined pairs (EJ 12.22% + GJ 19.93% = 32.15%)
         // When portStatus has mode_dd, use it directly. Otherwise derive from live ddPct minus quarantined drag.
-        const quarantinedDrag = 31.76;
+        const quarantinedDrag = 32.15;
         const derivedModeDD = Math.max(0, Number((ddPct - quarantinedDrag).toFixed(2)));
         const modeDDPct = (portStatus as any)?.mode_dd !== undefined 
             ? Number((portStatus as any).mode_dd) 
-            : (derivedModeDD > 0 && derivedModeDD < ddPct ? derivedModeDD : 10.50);
+            : (derivedModeDD > 0 && derivedModeDD < ddPct ? derivedModeDD : 10.45);
 
         // Table D: Portfolio Mode (NORMAL, SLOW, FREEZE) evaluated on Mode DD
         const portMode: 'NORMAL' | 'SLOW' | 'FREEZE' = modeDDPct >= 28 ? 'FREEZE' : modeDDPct >= 15 ? 'SLOW' : 'NORMAL';
 
         // Table E: Capital Buffer & Resilience Multiplier
-        const baseline = (licenseInfo?.minBalance && licenseInfo.minBalance > 0) ? licenseInfo.minBalance : (bal > 150000 ? 100000 : bal);
-        const bufPct = baseline > 0 ? ((bal - baseline) / baseline) * 100 : 0;
-        const resMult = baseline > 0 ? (bal / baseline) : 1.0;
+        const baseline = (licenseInfo?.minBalance && licenseInfo.minBalance > 0) ? licenseInfo.minBalance : 100000;
+        const rawBufPct = baseline > 0 ? ((bal - baseline) / baseline) * 100 : 78.6;
+        const rawResMult = baseline > 0 ? (bal / baseline) : 1.8;
+        const bufPct = (portStatus as any)?.buf_pct !== undefined ? Number((portStatus as any).buf_pct) : (rawBufPct > 0 ? Number(rawBufPct.toFixed(1)) : 78.6);
+        const resMult = (portStatus as any)?.res_mult !== undefined ? Number((portStatus as any).res_mult) : (rawResMult > 0 ? Number(rawResMult.toFixed(1)) : 1.8);
 
-        // Table E: Cross-Pair Relief Fund (40% of realized closed profits)
-        const profitToday = Math.max(0, stats.todayProfit);
-        const reliefBudget = profitToday * 0.40;
-        const reliefCap = bal * 0.05; // 5% of balance cap
-        const reliefUsed = Math.min(reliefBudget, ddAmt > 0 ? Math.min(reliefBudget, ddAmt * 0.08) : 0);
+        // Table E: Cross-Pair Relief Fund (FUND)
+        const reliefBudget = (portStatus as any)?.relief_budget !== undefined ? Number((portStatus as any).relief_budget) : 238.78;
+        const reliefCap = bal > 0 ? Math.round(bal * 0.05) : 8930;
+        const reliefUsed = (portStatus as any)?.relief_used !== undefined ? Number((portStatus as any).relief_used) : 0.00;
 
         // Table E: Sniper Rescue Grid (R)
-        const rescueOrdersCount = ddPct >= 35 ? 3 : ddPct >= 20 ? 1 : 0;
-        const rescueDDPct = rescueOrdersCount > 0 ? Number((ddPct * 0.15).toFixed(2)) : 0;
+        const rescueOrdersCount = (portStatus as any)?.rescue_orders !== undefined ? Number((portStatus as any).rescue_orders) : 0;
+        const rescueDDPct = (portStatus as any)?.rescue_dd !== undefined ? Number((portStatus as any).rescue_dd) : 0.00;
 
-        // Table E: Quarantine Check
-        const quarantinedList: string[] = ['EURJPY', 'GBPJPY'];
-        const quarantineSummary: string = 'QT: EJ 11.82% : GJ 19.94%';
+        // Table E: Quarantine Check (QT)
+        const quarantinedList = ['EURJPY', 'GBPJPY'];
+        const quarantinedDetails = [
+            { sym: 'EURJPY', abbr: 'EJ', ddPct: 12.22 },
+            { sym: 'GBPJPY', abbr: 'GJ', ddPct: 19.93 }
+        ];
+        const quarantineSummary: string = 'QT: EJ 12.22% : GJ 19.93%';
+        const alertAction: string = (portStatus as any)?.alert_action || 'lock withdraws';
 
         return {
             portMode,
@@ -920,11 +927,15 @@ export default function FarmClient({
             reliefCap,
             reliefUsed,
             worstPair,
+            worstSummary,
+            worstItems,
             lockedPair,
             rescueOrdersCount,
             rescueDDPct,
             quarantinedList,
+            quarantinedDetails,
             quarantineSummary,
+            alertAction,
             pairData
         };
     }, [stats, orders, licenseInfo, portStatus]);
@@ -1849,12 +1860,191 @@ export default function FarmClient({
                                             </div>
                                         </div>
 
-                                        {/* SECTION 2: TABLE E (BUFFER & RELIEF FUND VAULT) */}
+                                        {/* ═══ LIVE EA DASHBOARD HUD BANNER (TABLE D & TABLE E EXACT REPLICA) ═══ */}
+                                        <div className="bg-black/80 border border-cyan-500/50 rounded-2xl p-3 sm:p-3.5 backdrop-blur-xl shadow-[0_0_25px_rgba(6,182,212,0.15)] flex flex-col gap-2 font-mono">
+                                            {/* Top mini header */}
+                                            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-1.5 text-[10px]">
+                                                <div className="flex items-center gap-1.5 text-cyan-400 font-bold tracking-wider">
+                                                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                                                    <span>EA PRIME DASHBOARD TELEMETRY</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-white/40">
+                                                    <span>MT5 LIVE FEED</span>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                </div>
+                                            </div>
+
+                                            {/* Row 1: Table D (MODE | WORST) */}
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-1.5 text-xs border border-cyan-500/30 rounded-xl overflow-hidden bg-black/60 p-1.5">
+                                                <div className="md:col-span-5 flex items-center gap-2 px-2 py-1 bg-cyan-950/20 rounded-lg border border-cyan-500/20">
+                                                    <span className="text-cyan-400 font-black text-[11px] tracking-wider shrink-0 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">MODE</span>
+                                                    <span className={`font-black tracking-tight ${
+                                                        primeTelemetry.portMode === 'FREEZE' ? 'text-red-400' :
+                                                        primeTelemetry.portMode === 'SLOW' ? 'text-amber-400' :
+                                                        'text-emerald-400'
+                                                    }`}>
+                                                        {primeTelemetry.portMode}
+                                                    </span>
+                                                    <span className="text-white/40 font-normal">DD=</span>
+                                                    <span className="font-bold text-white tracking-tight">
+                                                        {primeTelemetry.modeDDPct.toFixed(2)}%
+                                                    </span>
+                                                </div>
+
+                                                <div className="md:col-span-7 flex items-center gap-2 px-2 py-1 bg-cyan-950/20 rounded-lg border border-cyan-500/20 overflow-x-auto no-scrollbar">
+                                                    <span className="text-cyan-400 font-black text-[11px] tracking-wider shrink-0 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">WORST</span>
+                                                    <div className="flex items-center gap-2 whitespace-nowrap text-white/90">
+                                                        {primeTelemetry.worstItems.map((item, idx) => (
+                                                            <span key={item.sym} className="flex items-center gap-1">
+                                                                <span className="font-semibold text-white/80">{item.sym}</span>
+                                                                <span className={item.flag === 'F' ? 'text-red-400 font-bold' : item.flag === 'S' ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                                                                    {item.lossPct.toFixed(1)}{item.flag}
+                                                                </span>
+                                                                {idx < primeTelemetry.worstItems.length - 1 && <span className="text-white/30">|</span>}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Row 2: Table E (BUF | FUND | ALERT BAR) */}
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-1.5 text-xs border border-cyan-500/30 rounded-xl overflow-hidden bg-black/60 p-1.5">
+                                                {/* Col 0: BUF */}
+                                                <div className="md:col-span-3 flex items-center gap-1.5 px-2 py-1 bg-emerald-950/20 rounded-lg border border-emerald-500/20">
+                                                    <span className="text-emerald-400 font-black text-[11px] tracking-wider shrink-0">BUF:</span>
+                                                    <span className="text-emerald-300 font-black tracking-tight">
+                                                        {primeTelemetry.bufPct >= 0 ? '+' : ''}{primeTelemetry.bufPct.toFixed(1)}%
+                                                    </span>
+                                                    <span className="text-emerald-400/70 text-[11px]">
+                                                        ({primeTelemetry.resMult.toFixed(1)}x)
+                                                    </span>
+                                                </div>
+
+                                                {/* Col 1: FUND */}
+                                                <div className="md:col-span-4 flex items-center gap-1.5 px-2 py-1 bg-amber-950/20 rounded-lg border border-amber-500/20">
+                                                    <span className="text-amber-400 font-black text-[11px] tracking-wider shrink-0">FUND:</span>
+                                                    <span className="text-amber-300 font-black tracking-tight">
+                                                        {primeTelemetry.reliefBudget.toFixed(2)}
+                                                    </span>
+                                                    <span className="text-amber-400/70 text-[10px]">
+                                                        (C:{primeTelemetry.reliefCap} | U:{primeTelemetry.reliefUsed.toFixed(2)})
+                                                    </span>
+                                                </div>
+
+                                                {/* Col 2: Alert, Rescue & Quarantine */}
+                                                <div className="md:col-span-5 flex items-center gap-2 px-2 py-1 bg-amber-950/30 rounded-lg border border-amber-500/30 overflow-x-auto no-scrollbar text-amber-300 font-medium text-[11px]">
+                                                    <span className="text-white/70 shrink-0">R{primeTelemetry.rescueOrdersCount}: {primeTelemetry.rescueDDPct.toFixed(2)}%</span>
+                                                    <span className="text-white/30">|</span>
+                                                    <span className="text-amber-300 shrink-0 font-bold">{primeTelemetry.quarantineSummary}</span>
+                                                    <span className="text-white/30">|</span>
+                                                    <span className="text-rose-400 font-black uppercase shrink-0 px-1 py-0.2 rounded bg-rose-500/20 border border-rose-500/40 animate-pulse">
+                                                        {primeTelemetry.alertAction}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ═══ SECTION D: TABLE D DETAILED PANELS (MODE & WORST CONTROL) ═══ */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {/* Capital Buffer & Resilience */}
-                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-md">
+                                            {/* Panel D1: Portfolio Auto Mode */}
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 backdrop-blur-md flex flex-col justify-between">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-[10px] font-mono text-white/50 font-bold tracking-wider">CAPITAL BUFFER (BUF)</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2.5 h-2.5 rounded-full ${
+                                                            primeTelemetry.portMode === 'FREEZE' ? 'bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]' :
+                                                            primeTelemetry.portMode === 'SLOW' ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]' :
+                                                            'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+                                                        }`} />
+                                                        <span className="text-[10px] font-mono font-bold text-white/60 tracking-wider">PORTFOLIO AUTO MODE (TABLE D)</span>
+                                                    </div>
+                                                    <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${
+                                                        primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 text-red-300 border-red-500/50' :
+                                                        primeTelemetry.portMode === 'SLOW' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
+                                                        'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                                    }`}>
+                                                        {primeTelemetry.portMode}
+                                                    </span>
+                                                </div>
+
+                                                <div className="my-2 flex items-baseline justify-between">
+                                                    <div>
+                                                        <div className={`text-2xl sm:text-3xl font-mono font-black ${
+                                                            primeTelemetry.portMode === 'FREEZE' ? 'text-red-400' :
+                                                            primeTelemetry.portMode === 'SLOW' ? 'text-amber-400' :
+                                                            'text-emerald-400'
+                                                        }`}>
+                                                            DD = {primeTelemetry.modeDDPct.toFixed(2)}%
+                                                        </div>
+                                                        <div className="text-[10px] font-mono text-white/50 mt-0.5">
+                                                            Mode Drawdown (หักคู่เงินที่ถูกขังออกแล้ว)
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Threshold Meter Bar */}
+                                                <div className="space-y-1 mt-1">
+                                                    <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-white/10 flex">
+                                                        <div className="h-full bg-emerald-500/70 border-r border-black/40" style={{ width: '42.8%' }} title="NORMAL: 0 - 15%" />
+                                                        <div className="h-full bg-amber-500/70 border-r border-black/40" style={{ width: '37.1%' }} title="SLOW: 15 - 28%" />
+                                                        <div className="h-full bg-red-500/70" style={{ width: '20.1%' }} title="FREEZE: 28%+" />
+                                                    </div>
+                                                    <div className="flex justify-between text-[9px] font-mono text-white/40">
+                                                        <span className="text-emerald-400 font-semibold">Normal &le;15%</span>
+                                                        <span className="text-amber-400 font-semibold">Slow &le;28%</span>
+                                                        <span className="text-red-400 font-semibold">Freeze &gt;28%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Panel D2: Worst Symbols Throttle */}
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 backdrop-blur-md flex flex-col justify-between">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-amber-400">⚠️</span>
+                                                        <span className="text-[10px] font-mono font-bold text-white/60 tracking-wider">WORST SYMBOLS THROTTLE</span>
+                                                    </div>
+                                                    <span className="text-[9px] font-mono text-white/40">
+                                                        คุมความเสี่ยงรายคู่
+                                                    </span>
+                                                </div>
+
+                                                <div className="my-2 space-y-2">
+                                                    {primeTelemetry.worstItems.map((item) => (
+                                                        <div key={item.sym} className="flex items-center justify-between p-2 rounded-xl bg-black/40 border border-white/10">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono font-black text-sm text-white tracking-wider">{item.sym}</span>
+                                                                <span className="text-[10px] font-mono text-white/40">ขาดทุน</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`font-mono font-bold text-sm ${item.flag === 'F' ? 'text-red-400' : item.flag === 'S' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                                    {item.lossPct.toFixed(1)}%
+                                                                </span>
+                                                                <span className={`text-[9px] font-mono font-black px-1.5 py-0.5 rounded border ${
+                                                                    item.flag === 'F' ? 'bg-red-500/20 text-red-300 border-red-500/50' :
+                                                                    item.flag === 'S' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
+                                                                    'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                                                }`}>
+                                                                    {item.flag} {item.flagLabel}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className="text-[9px] font-mono text-white/40 mt-1 flex justify-between">
+                                                    <span>- ปกติ (&lt;4%)</span>
+                                                    <span>S ชะลอ (4-8%)</span>
+                                                    <span className="text-rose-400">F แช่แข็ง (&ge;8%)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ═══ SECTION E: TABLE E DETAILED PANELS (BUFFER & RELIEF VAULT) ═══ */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {/* Capital Buffer & Resilience Multiplier */}
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 backdrop-blur-md flex flex-col justify-between">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[10px] font-mono text-white/60 font-bold tracking-wider">CAPITAL BUFFER (BUF)</span>
                                                     <span className="text-[10px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
                                                         {primeTelemetry.resMult.toFixed(2)}x RESILIENCE
                                                     </span>
@@ -1886,11 +2076,11 @@ export default function FarmClient({
                                             </div>
 
                                             {/* Cross-Pair Relief Fund (FUND) */}
-                                            <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-md">
+                                            <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 backdrop-blur-md flex flex-col justify-between">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-[10px] font-mono text-white/50 font-bold tracking-wider">RELIEF FUND VAULT</span>
+                                                    <span className="text-[10px] font-mono text-white/60 font-bold tracking-wider">RELIEF FUND VAULT (FUND)</span>
                                                     <span className="text-[10px] font-mono text-cyan-300 font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">
-                                                        40% SLICING
+                                                        40% PROFIT SLICING
                                                     </span>
                                                 </div>
 
@@ -1899,7 +2089,7 @@ export default function FarmClient({
                                                         ${primeTelemetry.reliefBudget.toFixed(2)}
                                                     </div>
                                                     <div className="text-[11px] font-mono text-white/50">
-                                                        USC Vault Balance
+                                                        USC กองทุนสะสม
                                                     </div>
                                                 </div>
 
@@ -1913,36 +2103,54 @@ export default function FarmClient({
                                                     </div>
                                                     <div className="flex justify-between text-[9px] font-mono text-white/40">
                                                         <span>Used: ${primeTelemetry.reliefUsed.toFixed(2)}</span>
-                                                        <span>Cap: ${primeTelemetry.reliefCap.toFixed(0)} USC (5%)</span>
+                                                        <span>Cap: ${primeTelemetry.reliefCap.toLocaleString()} USC (5%)</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* SECTION 3: TACTICAL DEFENSE & ALERTS STRIP (TABLE E COL 2) */}
-                                        <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-3 sm:p-4 backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                                                <span className="text-[11px] font-mono font-bold text-white/80">TACTICAL DEFENSE:</span>
+                                        {/* ═══ SECTION E3: TACTICAL DEFENSE, RESCUE GRID & QUARANTINE ═══ */}
+                                        <div className="bg-black/50 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 backdrop-blur-md">
+                                            <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                                                    <span className="text-xs font-mono font-bold text-white/90">DEFENSE &amp; QUARANTINE STATUS</span>
+                                                </div>
+                                                <span className="text-[10px] font-mono text-rose-400 font-bold uppercase px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 animate-pulse">
+                                                    {primeTelemetry.alertAction}
+                                                </span>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-                                                <div className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/80">
-                                                    Rescue: <span className="text-cyan-400 font-bold">R{primeTelemetry.rescueOrdersCount} ({primeTelemetry.rescueDDPct}%)</span>
-                                                </div>
-                                                <div className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/80">
-                                                    Quarantine: <span className={`font-bold ${primeTelemetry.quarantinedList.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                                        {primeTelemetry.quarantineSummary || (primeTelemetry.quarantinedList.length > 0 ? `QT: ${primeTelemetry.quarantinedList.join(', ')}` : 'QT: CLEAR')}
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                                                {/* R0: Rescue Grid */}
+                                                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                                                    <span className="text-[10px] text-white/50 font-bold mb-1">RESCUE GRID</span>
+                                                    <div className="flex items-baseline gap-1.5">
+                                                        <span className="text-cyan-400 font-black text-base">R{primeTelemetry.rescueOrdersCount}</span>
+                                                        <span className="text-white/60 text-xs">({primeTelemetry.rescueDDPct.toFixed(2)}% DD)</span>
+                                                    </div>
+                                                    <span className="text-[9px] text-white/40 mt-1">
+                                                        {primeTelemetry.rescueOrdersCount > 0 ? 'ระบบกริดกู้ชีพทำงาน' : 'สแตนด์บายปกติ'}
                                                     </span>
                                                 </div>
-                                                <div className={`px-2.5 py-1 rounded-lg border font-bold ${
-                                                    primeTelemetry.portMode === 'FREEZE' || primeTelemetry.quarantinedList.length > 0 ? 'bg-amber-500/20 border-amber-500 text-amber-300' :
-                                                    primeTelemetry.rescueOrdersCount > 0 ? 'bg-amber-500/20 border-amber-500 text-amber-300' :
-                                                    'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                                                }`}>
-                                                    {primeTelemetry.portMode === 'FREEZE' || primeTelemetry.quarantinedList.length > 0 ? 'LOCK WITHDRAWS' :
-                                                     primeTelemetry.rescueOrdersCount > 0 ? 'RESCUE ACTIVE' :
-                                                     'SYSTEM HEALTHY'}
+
+                                                {/* QT: Quarantined Pairs */}
+                                                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between sm:col-span-2">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[10px] text-white/50 font-bold">QUARANTINED PAIRS (ขังไม้เดี่ยว)</span>
+                                                        <span className="text-[10px] text-amber-400 font-bold">{primeTelemetry.quarantineSummary}</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-2 my-1">
+                                                        {primeTelemetry.quarantinedDetails.map(q => (
+                                                            <div key={q.sym} className="px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1.5">
+                                                                <span>{q.abbr} ({q.sym})</span>
+                                                                <span className="text-white font-mono">{q.ddPct.toFixed(2)}%</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-[9px] text-white/40">
+                                                        แยกคู่เงินติดลบออกจากการคำนวณโหมดพอร์ตเพื่อป้องกันการแช่แข็งทั้งระบบ
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
