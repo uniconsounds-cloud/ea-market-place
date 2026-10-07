@@ -212,11 +212,12 @@ export async function getSyntheticLiveTrackerData(
         dateMap.get(h.date)!.push(Number(h.profit) || 0);
     });
 
-    const combinedDailyHistory: Array<{ date: string; profit: number }> = [];
+    const combinedDailyHistory: Array<{ id: string; date: string; profit: number }> = [];
 
     // Add pre-June 22 history
     (preHistRes.data || []).forEach(h => {
         combinedDailyHistory.push({
+            id: (h as any).id || `pre-${h.date}`,
             date: h.date,
             profit: Number(Number(h.profit || 0).toFixed(2))
         });
@@ -228,6 +229,7 @@ export async function getSyntheticLiveTrackerData(
         .forEach(([date, profits]) => {
             const avgProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / profits.length : 0;
             combinedDailyHistory.push({
+                id: `synth-${date}`,
                 date,
                 profit: Number(avgProfit.toFixed(2))
             });
@@ -239,6 +241,10 @@ export async function getSyntheticLiveTrackerData(
     const avgTodayProfit = statuses.reduce((sum, s) => sum + (Number(s.today_pnl) || 0), 0) / validCount;
     const avgFloatingPnl = statuses.reduce((sum, s) => sum + (Number(s.floating_pnl) || 0), 0) / validCount;
     const avgDD = statuses.reduce((sum, s) => sum + (Number(s.daily_max_drawdown) || 0), 0) / validCount;
+    const avgTotalLots = statuses.reduce((sum, s) => sum + (Number(s.total_lots) || 0), 0) / validCount;
+    const avgTodayClosedLots = statuses.reduce((sum, s) => sum + (Number(s.today_closed_lots) || 0), 0) / validCount;
+    const avgBuyPnl = statuses.reduce((sum, s) => sum + (Number(s.buy_pnl) || 0), 0) / validCount;
+    const avgSellPnl = statuses.reduce((sum, s) => sum + (Number(s.sell_pnl) || 0), 0) / validCount;
 
     const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
     const isTodayRecorded = combinedDailyHistory.some(h => h.date === bkkTodayStr);
@@ -248,11 +254,16 @@ export async function getSyntheticLiveTrackerData(
 
     const syntheticStatus = {
         port_number: 'SYNTHETIC-MASTER',
-        balance: currentBalance,
-        equity: currentBalance + avgFloatingPnl,
-        floating_pnl: avgFloatingPnl,
-        today_pnl: avgTodayProfit,
-        daily_max_drawdown: avgDD,
+        master_balance: 100000,
+        balance: Number(currentBalance.toFixed(2)),
+        equity: Number((currentBalance + avgFloatingPnl).toFixed(2)),
+        floating_pnl: Number(avgFloatingPnl.toFixed(2)),
+        today_pnl: Number(avgTodayProfit.toFixed(2)),
+        daily_max_drawdown: Number(avgDD.toFixed(2)),
+        total_lots: Number(avgTotalLots.toFixed(2)),
+        today_closed_lots: Number(avgTodayClosedLots.toFixed(2)),
+        buy_pnl: Number(avgBuyPnl.toFixed(2)),
+        sell_pnl: Number(avgSellPnl.toFixed(2)),
         account_type: 'USC',
         currency: 'USC',
         system_code: 'EasyM Live Tracker (10-Port Model)',

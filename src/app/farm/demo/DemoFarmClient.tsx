@@ -82,7 +82,33 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     z: i
 }));
 
-export default function DemoFarmClient({ portNumber, initialOrders, initialPortStatus, scaleFactor = 1.0, demoBalance = 100000, customName, adminMessage, challengeStartDate, userId, referrerId }: { portNumber: string, initialOrders: any[], initialPortStatus?: any, scaleFactor: number, demoBalance: number, customName?: string, adminMessage?: string | null, challengeStartDate?: string, userId?: string, referrerId?: string }) {
+export default function DemoFarmClient({
+    portNumber,
+    initialOrders,
+    initialPortStatus,
+    scaleFactor = 1.0,
+    demoBalance = 100000,
+    customName,
+    adminMessage,
+    challengeStartDate,
+    userId,
+    referrerId,
+    isSynthetic = false,
+    initialDailyHistory = []
+}: {
+    portNumber: string;
+    initialOrders: any[];
+    initialPortStatus?: any;
+    scaleFactor: number;
+    demoBalance: number;
+    customName?: string;
+    adminMessage?: string | null;
+    challengeStartDate?: string;
+    userId?: string;
+    referrerId?: string;
+    isSynthetic?: boolean;
+    initialDailyHistory?: any[];
+}) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '100000.00', equity: '100000.00', account_type: 'USC' });
     const [currentCustomName, setCurrentCustomName] = useState(customName || '');
@@ -196,8 +222,8 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             setLoadingLeaderboard(true);
             const [usersRes, histRes, statusRes] = await Promise.all([
                 supabase.from('admin_demo_challenges_view').select('*'),
-                supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }),
-                supabase.from('farm_port_status').select('*').eq('port_number', portNumber).single()
+                !isSynthetic ? supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }) : Promise.resolve({ data: null }),
+                !isSynthetic ? supabase.from('farm_port_status').select('*').eq('port_number', portNumber).single() : Promise.resolve({ data: null })
             ]);
             if (usersRes.data) setLeaderboardUsers(usersRes.data);
             if (histRes.data) setAllHistoryData(histRes.data);
@@ -334,7 +360,18 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                     // Send ping immediately
                     await supabase.rpc('ping_farm_view', { p_port_number: portNumber });
                     
-                    // Fetch latest data
+                    if (isSynthetic) {
+                        const res = await fetch('/api/farm/demo-synthetic');
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.portStatus) setPortStatus(data.portStatus);
+                            if (data.activeOrders) setOrders(data.activeOrders);
+                            if (data.dailyHistory) setHistory(data.dailyHistory);
+                        }
+                        return;
+                    }
+
+                    // Fetch latest data (legacy single master)
                     const [statusRes, ordersRes] = await Promise.all([
                         supabase.from('farm_port_status').select('*').eq('port_number', portNumber).maybeSingle(),
                         supabase.from('farm_active_orders').select('*').eq('port_number', portNumber)
@@ -421,7 +458,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
 
     // --- Real-time Subscription ---
     useEffect(() => {
-        if (!isTabVisible || isIdle) return;
+        if (!isTabVisible || isIdle || isSynthetic) return;
 
         const channel = supabase
             .channel(`farm_updates_${portNumber}`)
@@ -675,11 +712,32 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
     };
 
     // --- Fetch Real History ---
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<any[]>(initialDailyHistory || []);
     useEffect(() => {
         if (!isTabVisible || isIdle) return;
 
         const fetchHistory = async () => {
+            if (isSynthetic) {
+                try {
+                    const res = await fetch('/api/farm/demo-synthetic');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.dailyHistory && Array.isArray(data.dailyHistory)) {
+                            setHistory(data.dailyHistory);
+                        }
+                        if (data.portStatus) {
+                            setPortStatus(data.portStatus);
+                        }
+                        if (data.activeOrders) {
+                            setOrders(data.activeOrders);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch synthetic history:', e);
+                }
+                return;
+            }
+
             const { data, error } = await supabase
                 .from('farm_daily_history')
                 .select('*')
@@ -692,6 +750,11 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         };
 
         fetchHistory();
+
+        if (isSynthetic) {
+            const interval = setInterval(fetchHistory, 15000);
+            return () => clearInterval(interval);
+        }
         
         // Listen for history updates
         const historyChannel = supabase
@@ -700,9 +763,12 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
             .subscribe();
 
         return () => { supabase.removeChannel(historyChannel); };
-    }, [portNumber, isTabVisible, isIdle]);
+    }, [portNumber, isTabVisible, isIdle, isSynthetic]);
 
     const liveUserBalance = useMemo(() => {
+        if (isSynthetic && portStatus?.balance) {
+            return Number(portStatus.balance);
+        }
         if (!challengeStartDate) return demoBalance || 100000;
         
         const startD = new Date(challengeStartDate);
@@ -730,7 +796,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         
         const computed = 100000 + sumProfit;
         return (computed > 100000 || history.length > 0) ? computed : (demoBalance || computed);
-    }, [history, challengeStartDate, portStatus?.today_pnl, demoBalance]);
+    }, [history, challengeStartDate, portStatus?.today_pnl, portStatus?.balance, demoBalance, isSynthetic]);
 
     const stats = useMemo(() => {
         // If EA is sending data to farm_port_status, use that directly
@@ -876,7 +942,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
         let filteredData = history.filter(item => item.date < brokerDateStr);
         
         // Filter out history before the user joined the challenge if viewing 'my' tab
-        if (historyTab === 'my' && challengeStartDate) {
+        if (historyTab === 'my' && challengeStartDate && !isSynthetic) {
             const startD = new Date(challengeStartDate);
             // Convert to YYYY-MM-DD in BKK timezone for accurate comparison
             const startStr = startD.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -989,7 +1055,7 @@ export default function DemoFarmClient({ portNumber, initialOrders, initialPortS
                 isEndOfWeek
             };
         });
-    }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab]);
+    }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab, isSynthetic]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     const [isScrolledLeft, setIsScrolledLeft] = useState(false);

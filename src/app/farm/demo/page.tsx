@@ -86,14 +86,15 @@ export default async function DemoFarmPage(props: {
     const finalAdminMessage = adminMessage || "💬 ADMIN: ยินดีต้อนรับสู่โครงการ EasyM Live Tracker! 🚀";
     const masterPortNumber = customMasterPort || challenge.master_port_number || '21692434';
     const poolConfig = parsePoolConfig(customMasterPort || challenge.master_port_number);
-    const joinDateStr = challenge.join_date ? challenge.join_date.split('T')[0] : '2026-05-09';
+    const isSynthetic = poolConfig.mode === 'synthetic_10';
+    const joinDateStr = isSynthetic ? '2026-04-01' : (challenge.join_date ? challenge.join_date.split('T')[0] : '2026-05-09');
 
     let initialOrders: any[] = [];
     let portStatus: any = null;
     let dailyHistory: any[] = [];
     let currentBalance = 100000;
 
-    if (poolConfig.mode === 'synthetic_10') {
+    if (isSynthetic) {
         // High-fidelity 10-port synthetic model
         const synthetic = await getSyntheticLiveTrackerData(supabase, poolConfig, joinDateStr);
         initialOrders = synthetic.activeOrders;
@@ -160,11 +161,13 @@ export default async function DemoFarmPage(props: {
                 portNumber={masterPortNumber}
                 initialOrders={scaledOrders}
                 initialPortStatus={scaledPortStatus}
+                initialDailyHistory={dailyHistory}
+                isSynthetic={isSynthetic}
                 scaleFactor={proportionalRatio}
                 demoBalance={currentBalance}
                 customName={customName}
                 adminMessage={finalAdminMessage}
-                challengeStartDate={challenge.created_at}
+                challengeStartDate={isSynthetic ? '2026-04-08' : challenge.created_at}
                 userId={user?.id || '47db9b29-7688-41b5-8469-10994f9a5b1a'}
                 referrerId={referrerIdToCheck}
             />
