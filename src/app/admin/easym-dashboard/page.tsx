@@ -291,7 +291,7 @@ export function resolvePortState(
 
     // Weekend Freeze logic: If market is closed on weekend, calculate effective frozen hours
     // to prevent healthy active ports from degrading into State 4, 5, 6, 7 (offline) during weekend market closure
-    let effectiveHours = rawHours;
+    let effectiveHours = (pingMs > 0 && !isNaN(pingMs)) ? (actualMinsSince / 60) : rawHours;
     if (isWeekend) {
         const weekendElapsed = getWeekendElapsedHours(new Date(nowTime));
         if (weekendElapsed > 0 && effectiveHours > 0) {
@@ -299,14 +299,15 @@ export function resolvePortState(
         }
     }
 
-    // State 1: Live View (Viewer is actively looking at farm page within 3 mins + real-time ping within 2 mins)
-    // CRITICAL: Must use actualMinsSince (real-time clock), NOT weekend frozen hours!
-    const isViewerActive = port.lastViewedAt
-        ? (nowTime - new Date(port.lastViewedAt).getTime() <= 3 * 60 * 1000)
+    // State 1: Live View (Viewer is actively looking at farm page within 2.5 mins + real-time ping within 3 mins)
+    // CRITICAL: Strictly require an active viewer looking at the farm page!
+    // If no viewer is looking, the 3-minute smart ping will fall through to State 2 (Online / Solid Dot).
+    const isViewerActive = (port.lastViewedAt && !isNaN(new Date(port.lastViewedAt).getTime()))
+        ? (nowTime - new Date(port.lastViewedAt).getTime() <= 2.5 * 60 * 1000)
         : false;
-    const isLiveView = (port.engineTier === 'v2_3tier' || port.engineTier === 'legacy_2url') && isViewerActive && actualMinsSince <= 2;
+    const isLiveView = (port.engineTier === 'v2_3tier' || port.engineTier === 'legacy_2url') && isViewerActive && actualMinsSince <= 3;
 
-    if (isLiveView || actualMinsSince <= 0.5) {
+    if (isLiveView) {
         return 'STATE_1_LIVE';
     }
 
@@ -1997,7 +1998,7 @@ export default function EasyMMasterDashboardPage() {
             // Fleet State Filter
             if (selectedStateFilter !== 'all') {
                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                const portSt = p.state || resolvePortState(p, isWk, currentTime);
+                const portSt = resolvePortState(p, isWk, currentTime);
                 const rawBal = Number(p.balance) || 0;
                 const balUSC = p.accountType === 'USD' ? rawBal * 100 : rawBal;
                 const isBalOk = balUSC >= p.requiredBalanceUSC && rawBal > 0;
@@ -2033,7 +2034,7 @@ export default function EasyMMasterDashboardPage() {
             // Status filter
             if (selectedStatus !== 'all') {
                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                const portSt = p.state || resolvePortState(p, isWk, currentTime);
+                const portSt = resolvePortState(p, isWk, currentTime);
                 if (selectedStatus === 'real_running' && !p.isRealRunning) return false;
                 if (selectedStatus === 'mismatch_gold' && p.runStatus !== 'mismatch_gold') return false;
                 if (selectedStatus === 'offline_48h' && p.runStatus !== 'offline_48h') return false;
@@ -2092,7 +2093,7 @@ export default function EasyMMasterDashboardPage() {
         };
 
         searchFilteredPorts.forEach(p => {
-            const st = p.state || resolvePortState(p, isWk, currentTime);
+            const st = resolvePortState(p, isWk, currentTime);
             counts[st] = (counts[st] || 0) + 1;
             if (isWk && (st === 'STATE_1_LIVE' || st === 'STATE_2_ONLINE' || st === 'STATE_3_STANDBY_12H' || p.isRealRunning)) {
                 counts.weekend_standby++;
@@ -4317,7 +4318,7 @@ export default function EasyMMasterDashboardPage() {
                                     <div className="flex flex-wrap gap-2.5 items-center justify-start">
                                         {searchFilteredPorts.map(port => {
                                             const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                                            const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                            const pState = resolvePortState(port, isWk, currentTime);
                                             const meta = PORT_STATE_META[pState];
                                             const rawBal = Number(port.balance) || 0;
                                             const balUSC = port.accountType === 'USD' ? rawBal * 100 : rawBal;
@@ -4495,7 +4496,7 @@ export default function EasyMMasterDashboardPage() {
                                 }
 
                                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                                const pState = targetPort.state || resolvePortState(targetPort, isWk, currentTime);
+                                const pState = resolvePortState(targetPort, isWk, currentTime);
                                 const meta = PORT_STATE_META[pState];
                                 const rawBal = Number(targetPort.balance) || 0;
                                 const balUSC = targetPort.accountType === 'USD' ? rawBal * 100 : rawBal;
@@ -5243,7 +5244,7 @@ export default function EasyMMasterDashboardPage() {
                                                         <div className="flex flex-col items-center gap-1">
                                                             {(() => {
                                                                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                                                                const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                                                const pState = resolvePortState(port, isWk, currentTime);
                                                                 const meta = PORT_STATE_META[pState] || PORT_STATE_META.STATE_3_STANDBY_12H;
                                                                 return (
                                                                     <>
@@ -5473,7 +5474,7 @@ export default function EasyMMasterDashboardPage() {
                                             <div className="flex flex-col items-center gap-1">
                                                 {(() => {
                                                     const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                                                    const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                                    const pState = resolvePortState(port, isWk, currentTime);
                                                     const meta = PORT_STATE_META[pState] || PORT_STATE_META.STATE_3_STANDBY_12H;
                                                     return (
                                                         <>
@@ -5690,7 +5691,7 @@ export default function EasyMMasterDashboardPage() {
 
                                     {(() => {
                                         const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
-                                        const pState = port.state || resolvePortState(port, isWk, currentTime);
+                                        const pState = resolvePortState(port, isWk, currentTime);
                                         const meta = PORT_STATE_META[pState] || PORT_STATE_META.STATE_3_STANDBY_12H;
                                         const checkInfo = getLicenseCheckInfo(port.lastLicenseCheck, currentTime);
                                         const lastCommStr = formatLastCommunication(port.lastPing, port.hoursSinceLastPing);
