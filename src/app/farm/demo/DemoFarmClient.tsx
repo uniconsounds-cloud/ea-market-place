@@ -1073,6 +1073,7 @@ export default function DemoFarmClient({
     const [isScrolledLeft, setIsScrolledLeft] = useState(false);
 
     const hasInitialScrolled = useRef(false);
+    const prevHistoryTab = useRef<'my' | 'master'>(historyTab);
 
     useEffect(() => {
         hasInitialScrolled.current = false;
@@ -1084,6 +1085,33 @@ export default function DemoFarmClient({
             hasInitialScrolled.current = true;
         }
     }, [isClient, dailyHistory]);
+
+    // Handle scroll position when switching between "ของฉัน" and "พอร์ตหลัก"
+    useEffect(() => {
+        if (prevHistoryTab.current !== historyTab) {
+            prevHistoryTab.current = historyTab;
+            const el = historyScrollRef.current;
+            if (!el) return;
+
+            const timer = setTimeout(() => {
+                const maxScroll = el.scrollWidth - el.clientWidth;
+                if (historyTab === 'master') {
+                    // เมื่อกด "พอร์ตหลัก": ถอยย้อนกลับไปแค่ 2-3 ลัง (~220px) ให้เห็นว่ามีประวัติเพิ่มขึ้นมา
+                    const target = Math.max(0, maxScroll - 220);
+                    // ตั้งให้อยู่ขวาสุดก่อน แล้วเลื่อนถอยหลังแบบ smooth
+                    el.scrollLeft = maxScroll;
+                    requestAnimationFrame(() => {
+                        el.scrollTo({ left: target, behavior: 'smooth' });
+                    });
+                } else {
+                    // เมื่อกด "ของฉัน": เลื่อนกลับไปขวาสุดที่วันล่าสุดแบบ smooth
+                    el.scrollTo({ left: maxScroll, behavior: 'smooth' });
+                }
+            }, 60);
+
+            return () => clearTimeout(timer);
+        }
+    }, [historyTab, dailyHistory]);
 
     useEffect(() => {
         const el = historyScrollRef.current;
