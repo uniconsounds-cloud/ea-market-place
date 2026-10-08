@@ -818,12 +818,6 @@ export default function FarmClient({
     const primeTelemetry = useMemo(() => {
         const bal = stats.balance > 0 ? stats.balance : 100000;
         const eq = stats.equity > 0 ? stats.equity : bal;
-        const ddPct = stats.drawdownPercent;
-        const ddAmt = stats.drawdownAmount;
-
-        // Group active orders per pair
-        const pairData: Record<string, { count: number; lot: number; pnl: number }> = {};
-        PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
 
         // Extract Realtime Prime Telemetry from MT5 EA Heartbeat (supports native column or embedded fallback)
         let primeData = (portStatus as any)?.prime_data;
@@ -835,6 +829,15 @@ export default function FarmClient({
                 console.error('Failed to parse embedded prime_data from system_code:', e);
             }
         }
+
+        const liveTotalDD = primeData?.total_dd !== undefined 
+            ? Number(primeData.total_dd) 
+            : stats.drawdownPercent;
+        const ddPct = liveTotalDD;
+
+        // Group active orders per pair
+        const pairData: Record<string, { count: number; lot: number; pnl: number }> = {};
+        PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
 
         // Dynamic Settings transmitted from MT5 EA (learns user's custom thresholds)
         const settings = {
@@ -874,12 +877,15 @@ export default function FarmClient({
             quarantineSummary = 'QT: EJ 12.22% : GJ 19.93%';
         }
 
-        // Locked pair for Dial 3: Top quarantined pair
+        // Locked pair for Dial 3: Top quarantined pair with highest DD
+        const sortedQuarantined = [...quarantinedDetails].sort((a, b) => b.ddPct - a.ddPct);
+        const topQuarantined = sortedQuarantined.length > 0 ? sortedQuarantined[0] : null;
+
         let lockedPair = {
-            sym: quarantinedDetails.length > 0 ? quarantinedDetails[0].sym : '-',
-            abbr: quarantinedDetails.length > 0 ? quarantinedDetails[0].abbr : '-',
-            ddPct: quarantinedDetails.length > 0 ? quarantinedDetails[0].ddPct : 0.0,
-            status: quarantinedDetails.length > 0 ? (quarantinedDetails[0].isHedged ? 'HEDGE' : 'QT') : 'NORMAL'
+            sym: topQuarantined ? topQuarantined.sym : '-',
+            abbr: topQuarantined ? topQuarantined.abbr : '-',
+            ddPct: topQuarantined ? topQuarantined.ddPct : 0.0,
+            status: topQuarantined ? (topQuarantined.isHedged ? 'HEDGE' : 'QT') : 'NORMAL'
         };
 
         let worstPair = {
@@ -985,8 +991,8 @@ export default function FarmClient({
         return {
             portMode,
             modeDDPct,
-            ddPct,
-            ddAmt,
+            ddPct: liveTotalDD,
+            ddAmt: (bal > 0 ? (liveTotalDD / 100) * bal : 0),
             bufPct,
             resMult,
             reliefBudget,
@@ -1358,7 +1364,7 @@ export default function FarmClient({
                     todayProfit={smoothedTodayProfit}
                     todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                     dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
-                    drawdownPercent={stats.drawdownPercent}
+                    drawdownPercent={primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent}
                     drawdownAmount={stats.drawdownAmount}
                     assetType={assetType}
                     isShaking={isShaking}
@@ -1405,7 +1411,7 @@ export default function FarmClient({
                 accountType={portStatus?.account_type || 'USC'}
                 todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
-                drawdownPercent={stats.drawdownPercent}
+                drawdownPercent={primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent}
                 drawdownAmount={stats.drawdownAmount}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
@@ -1491,7 +1497,7 @@ export default function FarmClient({
                                                     <div className="bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center">
                                                         {/* Line 1: Percentage (compact on mobile to match right corner DD) */}
                                                         <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
-                                                            -{stats.drawdownPercent.toFixed(2)}%
+                                                            -{(primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent).toFixed(2)}%
                                                         </div>
                                                         {/* Line 2: DD Amount */}
                                                         <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
@@ -1788,7 +1794,7 @@ export default function FarmClient({
                                                 </div>
 
                                                 <div className="text-sm sm:text-base font-mono font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] w-full">
-                                                    {primeTelemetry.ddPct.toFixed(1)}%
+                                                    {primeTelemetry.ddPct.toFixed(2)}%
                                                 </div>
                                             </div>
 
