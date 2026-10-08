@@ -236,7 +236,7 @@ void EAE_WebSyncPushDailySummary(const EAE_DailySummary &sum)
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    Print("EAE: Sending Daily Summary for ", TimeToString(sum.date, TIME_DATE));
-   WebRequest("POST", g_eae_api_url, headers, 10000, data, result, result_headers);
+   WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
 }
 
 //+------------------------------------------------------------------+
@@ -355,7 +355,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    ResetLastError();
-   int res = WebRequest("POST", g_eae_api_url, headers, 10000, data, result, result_headers);
+   int res = WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
    if(res == -1) {
       int err = GetLastError();
       g_eae_sync_status = "ERR: CONN";
@@ -374,12 +374,6 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    }
    
    if(res != 200) {
-      if(res == 1003) {
-         // Transient internet network timeout (MQL5 internal code 1003)
-         g_eae_sync_status = "NET_TIMEOUT";
-         g_eae_sync_message = "Network Timeout (1003) - Auto Retrying";
-         return false; // Silent auto-retry on next cycle without spamming log
-      }
       g_eae_sync_status = "ERR: " + IntegerToString(res);
       string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
       g_eae_sync_message = "HTTP " + IntegerToString(res);
@@ -544,16 +538,10 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
             bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
             bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
             
-            if(magicB == magicS) {
-               if(magicB != 0 && (magic < magicB || magic >= magicB + 100)) continue;
-            }
-            else {
-               if(is_buy_side) {
-                  if(magicB != 0 && magic != magicB) continue;
-               }
-               else if(is_sell_side) {
-                  if(magicS != 0 && magic != magicS) continue;
-               }
+            // Match TodayClosedProfit(): in portfolio mode (magicB == magicS), include all closed deals
+            if(magicB != magicS && magicB != 0) {
+               if(is_buy_side && magic != magicB) continue;
+               if(is_sell_side && magicS != 0 && magic != magicS) continue;
             }
             
             summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
@@ -641,14 +629,12 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
    static datetime scheduled_sync_time = 0;
    static bool boot_scheduled = false;
 
-   // 1. Initial Boot Check: Schedule with staggered delay
+   // 1. Initial Boot Check / Timeframe Refresh: Sync immediately in 2s
    if(!boot_scheduled)
    {
       boot_scheduled = true;
-      MathSrand((uint)GetTickCount() + (uint)login);
-      int boot_delay = (int)(login % 120) + (MathRand() % 60);
-      scheduled_sync_time = now + boot_delay;
-      Print("EAE WebSync: [2026-08-20] Boot detected. Staggered history sync scheduled in ", boot_delay, "s.");
+      scheduled_sync_time = now + 2;
+      Print("EAE WebSync: Boot/Refresh detected. Immediate 14-day history sync scheduled in 2s.");
    }
 
    // 2. Day-Change Rollover Detection: When server time crosses into new day
@@ -669,7 +655,7 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
       int day_delay = (int)(login % 180) + (MathRand() % 120);
       scheduled_sync_time = current_day + day_delay;
       last_synced_day = current_day;
-      Print("EAE WebSync: [2026-08-20] Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
+      Print("EAE WebSync: Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
    }
 
    // 3. Check if scheduled time has arrived
@@ -678,8 +664,8 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
    // Reset scheduled time so it executes once per trigger
    scheduled_sync_time = 0;
 
-   // Calculate self-healing gap
-   int days_to_sync = 7; // Sync past 7 days to wrap up yesterday & heal missing records
+   // Calculate self-healing gap (default: last 14 days)
+   int days_to_sync = 14; // Sync past 14 days to wrap up yesterday & heal missing records
    string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
    if(GlobalVariableCheck(gv_last_history))
    {
@@ -727,7 +713,7 @@ void EAE_WebSyncTriggerEvent(string type, int total_orders, double total_lots, d
    string headers = "Content-Type: application/json\r\n" + 
                     "apikey: " + g_eae_system_key + "\r\n" +
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
-   WebRequest("POST", g_eae_api_url, headers, 5000, data, result, result_headers);
+   WebRequest("POST", g_eae_api_url, headers, 2000, data, result, result_headers);
 }
 
 #endif // __EAE_WEB_SYNC_MQH__

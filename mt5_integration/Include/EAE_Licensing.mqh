@@ -447,16 +447,10 @@ bool EaezeScanHistoryDailySummary(datetime targetDay, long magic_buy, long magic
          bool is_buy = (deal_type == DEAL_TYPE_SELL);
          bool is_sell = (deal_type == DEAL_TYPE_BUY);
          
-         if(magic_buy == magic_sell) {
-            if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
-         }
-         else {
-            if(is_buy) {
-               if(magic_buy != 0 && magic != magic_buy) continue;
-            }
-            else if(is_sell) {
-               if(magic_sell != 0 && magic != magic_sell) continue;
-            }
+         // Match TodayClosedProfit(): in portfolio mode (magic_buy == magic_sell), include all closed deals
+         if(magic_buy != magic_sell && magic_buy != 0) {
+            if(is_buy && magic != magic_buy) continue;
+            if(is_sell && magic_sell != 0 && magic != magic_sell) continue;
          }
          
          out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
@@ -537,16 +531,10 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
             bool is_buy = (deal_type == DEAL_TYPE_SELL);
             bool is_sell = (deal_type == DEAL_TYPE_BUY);
             
-            if(magic_buy == magic_sell) {
-               if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
-            }
-            else {
-               if(is_buy) {
-                  if(magic_buy != 0 && magic != magic_buy) continue;
-               }
-               else if(is_sell) {
-                  if(magic_sell != 0 && magic != magic_sell) continue;
-               }
+            // Match TodayClosedProfit(): in portfolio mode (magic_buy == magic_sell), include all closed deals
+            if(magic_buy != magic_sell && magic_buy != 0) {
+               if(is_buy && magic != magic_buy) continue;
+               if(is_sell && magic_sell != 0 && magic != magic_sell) continue;
             }
             
             summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
@@ -588,7 +576,7 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
    string headers = "Content-Type: application/json\r\n";
                     
    ResetLastError();
-   int res = WebRequest("POST", url, headers, 10000, data, result, result_headers);
+   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
    
    if(res == 200) {
       string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
@@ -596,10 +584,6 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
          Print("EAEZE History Sync: Successfully pushed ", days_to_sync, " days of history. Response: ", response);
          return true;
       }
-   }
-   if(res == 1003) {
-      Print("EAEZE History Sync: Temporary network timeout (1003). Will retry in next interval.");
-      return false;
    }
    Print("EAEZE History Sync: Failed to push batch history. Code: ", res);
    return false;
@@ -620,14 +604,12 @@ void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
    static datetime scheduled_sync_time = 0;
    static bool boot_scheduled = false;
 
-   // 1. Initial Boot Check: Schedule with staggered delay
+   // 1. Initial Boot Check / Timeframe Refresh: Sync immediately in 2s
    if(!boot_scheduled)
    {
       boot_scheduled = true;
-      MathSrand((uint)GetTickCount() + (uint)login);
-      int boot_delay = (int)(login % 120) + (MathRand() % 60);
-      scheduled_sync_time = now + boot_delay;
-      Print("EAEZE History Sync: [2026-08-20] Boot detected. Staggered history sync scheduled in ", boot_delay, "s.");
+      scheduled_sync_time = now + 2;
+      Print("EAEZE History Sync: Boot/Refresh detected. Immediate 14-day history sync scheduled in 2s.");
    }
 
    // 2. Day-Change Rollover Detection: When server time crosses into new day
@@ -648,7 +630,7 @@ void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
       int day_delay = (int)(login % 180) + (MathRand() % 120);
       scheduled_sync_time = current_day + day_delay;
       last_synced_day = current_day;
-      Print("EAEZE History Sync: [2026-08-20] Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
+      Print("EAEZE History Sync: Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
    }
 
    // 3. Check if scheduled time has arrived
@@ -657,8 +639,8 @@ void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
    // Reset scheduled time so it executes once per trigger
    scheduled_sync_time = 0;
 
-   // Calculate self-healing gap
-   int days_to_sync = 7; // Sync past 7 days to wrap up yesterday & heal missing records
+   // Calculate self-healing gap (default: last 14 days)
+   int days_to_sync = 14; // Sync past 14 days to wrap up yesterday & heal missing records
    string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
    if(GlobalVariableCheck(gv_last_history))
    {
