@@ -716,7 +716,7 @@ string EaezeBuildOrdersJson(long magic_buy = 0, long magic_sell = 0)
 }
 
 // Unified licensing check + smart sync
-void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_version, int sync_interval_sec, long magic_buy = 0, long magic_sell = 0)
+void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_version, int sync_interval_sec, long magic_buy = 0, long magic_sell = 0, string extra_payload_json = "")
 {
    // 1. Check license status first
    EaezeCheckLicensePeriodic(product_id, "KHUCHAI_SUPHAKORN");
@@ -800,6 +800,10 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    payload += "},";
    
    payload += "\"orders\":" + orders_json;
+   if(StringLen(extra_payload_json) > 0)
+   {
+      payload += ",\"prime_data\":" + extra_payload_json;
+   }
    payload += "}, \"p_api_key\":\"LICENSE_AUTO\" }";
    
    char data[]; char result[]; string result_headers;
