@@ -300,14 +300,8 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
    payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
    
-   // Dual-pack prime telemetry into system_code as robust fallback
-   string sys_code = snap.identity.system_code;
-   if(StringLen(extra_payload_json) > 0)
-   {
-      sys_code = sys_code + ":::" + extra_payload_json;
-   }
-
    // Snapshot
+   string sys_code = snap.identity.system_code;
    payload += "\"snapshot\":{";
    payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
    payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
