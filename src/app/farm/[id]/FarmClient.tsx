@@ -153,11 +153,9 @@ export default function FarmClient({
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
 
-    // EasyM Prime Mode: Master ports 97053088, 21692434 or any port with Prime system_code / prime_data telemetry
-    const isPrime = String(portNumber) === '97053088' || 
-                    String(portNumber) === '21692434' || 
-                    (Boolean(portStatus?.system_code) && portStatus!.system_code.toLowerCase().includes('prime')) ||
-                    Boolean((portStatus as any)?.prime_data);
+    // EasyM Prime Dev Gate: Restrict Prime floating orbs and cockpit exclusively to user's ports (21692434 & 97053088)
+    // Other users running Prime will safely see the standard stable farm view until testing is finalized.
+    const isPrime = String(portNumber) === '21692434' || String(portNumber) === '97053088';
 
     const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);
 
