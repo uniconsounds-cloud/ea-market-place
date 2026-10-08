@@ -153,9 +153,11 @@ export default function FarmClient({
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
 
-    // EasyM Prime Dev Gate: Restrict Prime floating orbs and cockpit exclusively to master port 97053088
-    // Other users using Prime will safely see the standard stable farm until UI/testing is finalized.
-    const isPrime = String(portNumber) === '97053088';
+    // EasyM Prime Mode: Master ports 97053088, 21692434 or any port with Prime system_code / prime_data telemetry
+    const isPrime = String(portNumber) === '97053088' || 
+                    String(portNumber) === '21692434' || 
+                    (Boolean(portStatus?.system_code) && portStatus!.system_code.toLowerCase().includes('prime')) ||
+                    Boolean((portStatus as any)?.prime_data);
 
     const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);
 
@@ -823,13 +825,53 @@ export default function FarmClient({
         const pairData: Record<string, { count: number; lot: number; pnl: number }> = {};
         PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
 
+        // Extract Realtime Prime Telemetry from MT5 EA Heartbeat (if available)
+        const primeData = (portStatus as any)?.prime_data;
+
+        // Dynamic Settings transmitted from MT5 EA (learns user's custom thresholds)
+        const settings = {
+            slowDD: Number(primeData?.settings?.slow_dd ?? 15),
+            freezeDD: Number(primeData?.settings?.freeze_dd ?? 28),
+            resumeDD: Number(primeData?.settings?.resume_dd ?? 12),
+            quarantineIn: Number(primeData?.settings?.quarantine_in ?? 18),
+            quarantineOut: Number(primeData?.settings?.quarantine_out ?? 12),
+            maxQuarantined: Number(primeData?.settings?.max_quarantined ?? 2),
+            hedgeTrigger: Number(primeData?.settings?.hedge_trigger ?? 35),
+            maxActive: Number(primeData?.settings?.max_active ?? 10)
+        };
+
         // Quarantined and Locked pairs evaluation
-        // Live data from EA dashboard (Table E: QT: EJ 12.22% : GJ 19.93%)
+        let quarantinedDetails: Array<{ sym: string; abbr: string; ddPct: number; isHedged: boolean }> = [];
+        let quarantinedList: string[] = [];
+        let quarantineSummary = 'QT: -';
+
+        if (primeData?.quarantined && Array.isArray(primeData.quarantined)) {
+            quarantinedDetails = primeData.quarantined.map((q: any) => ({
+                sym: q.sym,
+                abbr: q.abbr || q.sym.substring(0, 2),
+                ddPct: Number(q.loss_pct || 0),
+                isHedged: Boolean(q.is_hedged)
+            }));
+            quarantinedList = quarantinedDetails.map(q => q.sym);
+            quarantineSummary = quarantinedDetails.length > 0 
+                ? ('QT: ' + quarantinedDetails.map(q => `${q.abbr} ${q.ddPct.toFixed(2)}%`).join(' : ')) 
+                : 'QT: -';
+        } else {
+            // Default fallback if prime_data has not synced yet
+            quarantinedList = ['EURJPY', 'GBPJPY'];
+            quarantinedDetails = [
+                { sym: 'EURJPY', abbr: 'EJ', ddPct: 12.22, isHedged: false },
+                { sym: 'GBPJPY', abbr: 'GJ', ddPct: 19.93, isHedged: false }
+            ];
+            quarantineSummary = 'QT: EJ 12.22% : GJ 19.93%';
+        }
+
+        // Locked pair for Dial 3: Top quarantined pair
         let lockedPair = {
-            sym: (portStatus as any)?.locked_pair_sym || 'GBPJPY',
-            abbr: 'GJ',
-            ddPct: (portStatus as any)?.locked_pair_dd !== undefined ? Number((portStatus as any).locked_pair_dd) : 19.93,
-            status: 'QT'
+            sym: quarantinedDetails.length > 0 ? quarantinedDetails[0].sym : '-',
+            abbr: quarantinedDetails.length > 0 ? quarantinedDetails[0].abbr : '-',
+            ddPct: quarantinedDetails.length > 0 ? quarantinedDetails[0].ddPct : 0.0,
+            status: quarantinedDetails.length > 0 ? (quarantinedDetails[0].isHedged ? 'HEDGE' : 'QT') : 'NORMAL'
         };
 
         let worstPair = {
@@ -838,7 +880,10 @@ export default function FarmClient({
             status: 'F'
         };
 
-        let worstSummary = (portStatus as any)?.worst_summary || 'NZDUSD 1.0- | NZDJPY 10.3F';
+        let worstSummary = primeData?.worst && primeData.worst !== '-' 
+            ? primeData.worst 
+            : ((portStatus as any)?.worst_summary || 'NZDUSD 1.0- | NZDJPY 10.3F');
+            
         let worstItems = [
             { sym: 'NZDUSD', lossPct: 1.0, flag: '-', flagLabel: 'ปกติ' },
             { sym: 'NZDJPY', lossPct: 10.3, flag: 'F', flagLabel: 'FREEZE' }
@@ -869,7 +914,9 @@ export default function FarmClient({
 
                 if (sortedLosses.length > 0) {
                     worstItems = sortedLosses.slice(0, 3);
-                    worstSummary = worstItems.map(w => `${w.sym} ${w.lossPct}${w.flag}`).join(' | ');
+                    if (!primeData?.worst || primeData.worst === '-') {
+                        worstSummary = worstItems.map(w => `${w.sym} ${w.lossPct}${w.flag}`).join(' | ');
+                    }
                     worstPair = {
                         sym: worstItems[0].sym,
                         ddPct: worstItems[0].lossPct,
@@ -880,41 +927,52 @@ export default function FarmClient({
         }
 
         // Table D: Live Mode DD%
-        // FloatingDDPct() in EA excludes quarantined pairs (EJ 12.22% + GJ 19.93% = 32.15%)
-        // When portStatus has mode_dd, use it directly. Otherwise derive from live ddPct minus quarantined drag.
+        // FloatingDDPct() in EA excludes quarantined pairs dynamically
         const quarantinedDrag = 32.15;
         const derivedModeDD = Math.max(0, Number((ddPct - quarantinedDrag).toFixed(2)));
-        const modeDDPct = (portStatus as any)?.mode_dd !== undefined 
-            ? Number((portStatus as any).mode_dd) 
-            : (derivedModeDD > 0 && derivedModeDD < ddPct ? derivedModeDD : 10.45);
+        const modeDDPct = primeData?.mode_dd !== undefined 
+            ? Number(primeData.mode_dd)
+            : ((portStatus as any)?.mode_dd !== undefined 
+                ? Number((portStatus as any).mode_dd) 
+                : (derivedModeDD > 0 && derivedModeDD < ddPct ? derivedModeDD : 10.45));
 
         // Table D: Portfolio Mode (NORMAL, SLOW, FREEZE) evaluated on Mode DD
-        const portMode: 'NORMAL' | 'SLOW' | 'FREEZE' = modeDDPct >= 28 ? 'FREEZE' : modeDDPct >= 15 ? 'SLOW' : 'NORMAL';
+        const portMode: 'NORMAL' | 'SLOW' | 'FREEZE' = primeData?.mode
+            ? (primeData.mode.toUpperCase() as 'NORMAL' | 'SLOW' | 'FREEZE')
+            : (modeDDPct >= settings.freezeDD ? 'FREEZE' : modeDDPct >= settings.slowDD ? 'SLOW' : 'NORMAL');
 
         // Table E: Capital Buffer & Resilience Multiplier
         const baseline = (licenseInfo?.minBalance && licenseInfo.minBalance > 0) ? licenseInfo.minBalance : 100000;
         const rawBufPct = baseline > 0 ? ((bal - baseline) / baseline) * 100 : 78.6;
         const rawResMult = baseline > 0 ? (bal / baseline) : 1.8;
-        const bufPct = (portStatus as any)?.buf_pct !== undefined ? Number((portStatus as any).buf_pct) : (rawBufPct > 0 ? Number(rawBufPct.toFixed(1)) : 78.6);
-        const resMult = (portStatus as any)?.res_mult !== undefined ? Number((portStatus as any).res_mult) : (rawResMult > 0 ? Number(rawResMult.toFixed(1)) : 1.8);
+        const bufPct = primeData?.buf_pct !== undefined 
+            ? Number(primeData.buf_pct) 
+            : ((portStatus as any)?.buf_pct !== undefined ? Number((portStatus as any).buf_pct) : (rawBufPct > 0 ? Number(rawBufPct.toFixed(1)) : 78.6));
+        const resMult = primeData?.res_mult !== undefined 
+            ? Number(primeData.res_mult) 
+            : ((portStatus as any)?.res_mult !== undefined ? Number((portStatus as any).res_mult) : (rawResMult > 0 ? Number(rawResMult.toFixed(1)) : 1.8));
 
         // Table E: Cross-Pair Relief Fund (FUND)
-        const reliefBudget = (portStatus as any)?.relief_budget !== undefined ? Number((portStatus as any).relief_budget) : 238.78;
-        const reliefCap = bal > 0 ? Math.round(bal * 0.05) : 8930;
-        const reliefUsed = (portStatus as any)?.relief_used !== undefined ? Number((portStatus as any).relief_used) : 0.00;
+        const reliefBudget = primeData?.relief_budget !== undefined 
+            ? Number(primeData.relief_budget) 
+            : ((portStatus as any)?.relief_budget !== undefined ? Number((portStatus as any).relief_budget) : 238.78);
+        const reliefCap = primeData?.relief_cap !== undefined 
+            ? Number(primeData.relief_cap) 
+            : (bal > 0 ? Math.round(bal * 0.05) : 8930);
+        const reliefUsed = primeData?.relief_used !== undefined 
+            ? Number(primeData.relief_used) 
+            : ((portStatus as any)?.relief_used !== undefined ? Number((portStatus as any).relief_used) : 0.00);
 
         // Table E: Sniper Rescue Grid (R)
-        const rescueOrdersCount = (portStatus as any)?.rescue_orders !== undefined ? Number((portStatus as any).rescue_orders) : 0;
-        const rescueDDPct = (portStatus as any)?.rescue_dd !== undefined ? Number((portStatus as any).rescue_dd) : 0.00;
+        const rescueOrdersCount = primeData?.rescue_orders !== undefined 
+            ? Number(primeData.rescue_orders) 
+            : ((portStatus as any)?.rescue_orders !== undefined ? Number((portStatus as any).rescue_orders) : 0);
+        const rescueDDPct = primeData?.rescue_dd !== undefined 
+            ? Number(primeData.rescue_dd) 
+            : ((portStatus as any)?.rescue_dd !== undefined ? Number((portStatus as any).rescue_dd) : 0.00);
 
-        // Table E: Quarantine Check (QT)
-        const quarantinedList = ['EURJPY', 'GBPJPY'];
-        const quarantinedDetails = [
-            { sym: 'EURJPY', abbr: 'EJ', ddPct: 12.22 },
-            { sym: 'GBPJPY', abbr: 'GJ', ddPct: 19.93 }
-        ];
-        const quarantineSummary: string = 'QT: EJ 12.22% : GJ 19.93%';
-        const alertAction: string = (portStatus as any)?.alert_action || 'lock withdraws';
+        // Alert Action
+        const alertAction: string = primeData?.alert || (portStatus as any)?.alert_action || (quarantinedDetails.length > 0 ? 'lock withdraws' : 'system healthy');
 
         return {
             portMode,
@@ -936,6 +994,7 @@ export default function FarmClient({
             quarantinedDetails,
             quarantineSummary,
             alertAction,
+            settings,
             pairData
         };
     }, [stats, orders, licenseInfo, portStatus]);
@@ -1776,14 +1835,16 @@ export default function FarmClient({
                                                             className="opacity-80"
                                                         />
                                                         {(() => {
-                                                            // Mode DD has 3 zones: Normal (0-15%), Slow (15-28%), Freeze (28-35%+)
+                                                            // Mode DD has 3 zones dynamically driven by EA inputs: Normal (0 -> slowDD), Slow (slowDD -> freezeDD), Freeze (freezeDD -> freezeDD+10%+)
+                                                            const slowLimit = primeTelemetry.settings?.slowDD ?? 15;
+                                                            const freezeLimit = primeTelemetry.settings?.freezeDD ?? 28;
                                                             let angleDeg = -90;
-                                                            if (primeTelemetry.modeDDPct <= 15) {
-                                                                angleDeg = -90 + (Math.max(0, primeTelemetry.modeDDPct) / 15) * 60;
-                                                            } else if (primeTelemetry.modeDDPct <= 28) {
-                                                                angleDeg = -30 + ((primeTelemetry.modeDDPct - 15) / 13) * 60;
+                                                            if (primeTelemetry.modeDDPct <= slowLimit) {
+                                                                angleDeg = -90 + (Math.max(0, primeTelemetry.modeDDPct) / (slowLimit || 1)) * 60;
+                                                            } else if (primeTelemetry.modeDDPct <= freezeLimit) {
+                                                                angleDeg = -30 + ((primeTelemetry.modeDDPct - slowLimit) / Math.max(1, freezeLimit - slowLimit)) * 60;
                                                             } else {
-                                                                angleDeg = 30 + Math.min(1, (primeTelemetry.modeDDPct - 28) / 10) * 60;
+                                                                angleDeg = 30 + Math.min(1, (primeTelemetry.modeDDPct - freezeLimit) / 10) * 60;
                                                             }
                                                             return (
                                                                 <g transform={`rotate(${angleDeg}, 65, 60)`} className="transition-transform duration-700 ease-out">
@@ -1837,11 +1898,13 @@ export default function FarmClient({
                                                             strokeWidth="9"
                                                             strokeLinecap="round"
                                                             strokeDasharray="141.4"
-                                                            strokeDashoffset={141.4 * (1 - Math.min(1, Math.max(0, primeTelemetry.lockedPair.ddPct / 30)))}
+                                                            strokeDashoffset={141.4 * (1 - Math.min(1, Math.max(0, primeTelemetry.lockedPair.ddPct / Math.max(30, (primeTelemetry.settings?.quarantineIn ?? 18) * 1.5))))}
                                                             className="transition-all duration-700 ease-out"
                                                         />
                                                         {(() => {
-                                                            const p = Math.min(1, Math.max(0, primeTelemetry.lockedPair.ddPct / 30));
+                                                            const qIn = primeTelemetry.settings?.quarantineIn ?? 18;
+                                                            const maxScale = Math.max(30, qIn * 1.5);
+                                                            const p = Math.min(1, Math.max(0, primeTelemetry.lockedPair.ddPct / maxScale));
                                                             const angleDeg = -90 + p * 180;
                                                             return (
                                                                 <g transform={`rotate(${angleDeg}, 65, 60)`} className="transition-transform duration-700 ease-out">
@@ -1984,14 +2047,14 @@ export default function FarmClient({
                                                 {/* Threshold Meter Bar */}
                                                 <div className="space-y-1 mt-1">
                                                     <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-white/10 flex">
-                                                        <div className="h-full bg-emerald-500/70 border-r border-black/40" style={{ width: '42.8%' }} title="NORMAL: 0 - 15%" />
-                                                        <div className="h-full bg-amber-500/70 border-r border-black/40" style={{ width: '37.1%' }} title="SLOW: 15 - 28%" />
-                                                        <div className="h-full bg-red-500/70" style={{ width: '20.1%' }} title="FREEZE: 28%+" />
+                                                        <div className="h-full bg-emerald-500/70 border-r border-black/40" style={{ width: '42.8%' }} title={`NORMAL: 0 - ${primeTelemetry.settings?.slowDD ?? 15}%`} />
+                                                        <div className="h-full bg-amber-500/70 border-r border-black/40" style={{ width: '37.1%' }} title={`SLOW: ${primeTelemetry.settings?.slowDD ?? 15} - ${primeTelemetry.settings?.freezeDD ?? 28}%`} />
+                                                        <div className="h-full bg-red-500/70" style={{ width: '20.1%' }} title={`FREEZE: ${primeTelemetry.settings?.freezeDD ?? 28}%+`} />
                                                     </div>
                                                     <div className="flex justify-between text-[9px] font-mono text-white/40">
-                                                        <span className="text-emerald-400 font-semibold">Normal &le;15%</span>
-                                                        <span className="text-amber-400 font-semibold">Slow &le;28%</span>
-                                                        <span className="text-red-400 font-semibold">Freeze &gt;28%</span>
+                                                        <span className="text-emerald-400 font-semibold">Normal &le;{primeTelemetry.settings?.slowDD ?? 15}%</span>
+                                                        <span className="text-amber-400 font-semibold">Slow &le;{primeTelemetry.settings?.freezeDD ?? 28}%</span>
+                                                        <span className="text-red-400 font-semibold">Freeze &gt;{primeTelemetry.settings?.freezeDD ?? 28}%</span>
                                                     </div>
                                                 </div>
                                             </div>

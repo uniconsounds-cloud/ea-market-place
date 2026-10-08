@@ -69,30 +69,47 @@ export async function POST(req: Request) {
             const systemCode = snapshot?.identity?.system_code || payload.system_code || 'EasyM';
             const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
 
-            const { error: statusErr } = await supabase
+            const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
+
+            const statusPayload: any = {
+                port_number: portNumber,
+                balance,
+                equity,
+                margin_level: marginLevel,
+                floating_pnl: floatingPnl,
+                buy_count: buyCount,
+                sell_count: sellCount,
+                buy_pnl: buyPnl,
+                sell_pnl: sellPnl,
+                total_lots: totalLots,
+                today_pnl: todayPnl,
+                daily_max_drawdown: dailyMaxDrawdown,
+                today_closed_lots: todayClosedLots,
+                account_type: accountType,
+                asset_type: assetType,
+                system_code: systemCode,
+                ea_version: eaVersion,
+                is_online: true,
+                last_ping: nowIso,
+                updated_at: nowIso
+            };
+
+            if (primeData) {
+                statusPayload.prime_data = primeData;
+            }
+
+            let { error: statusErr } = await supabase
                 .from('farm_port_status')
-                .upsert({
-                    port_number: portNumber,
-                    balance,
-                    equity,
-                    margin_level: marginLevel,
-                    floating_pnl: floatingPnl,
-                    buy_count: buyCount,
-                    sell_count: sellCount,
-                    buy_pnl: buyPnl,
-                    sell_pnl: sellPnl,
-                    total_lots: totalLots,
-                    today_pnl: todayPnl,
-                    daily_max_drawdown: dailyMaxDrawdown,
-                    today_closed_lots: todayClosedLots,
-                    account_type: accountType,
-                    asset_type: assetType,
-                    system_code: systemCode,
-                    ea_version: eaVersion,
-                    is_online: true,
-                    last_ping: nowIso,
-                    updated_at: nowIso
-                }, { onConflict: 'port_number' });
+                .upsert(statusPayload, { onConflict: 'port_number' });
+
+            if (statusErr && primeData) {
+                console.warn('Initial farm_port_status upsert with prime_data failed, retrying without prime_data:', statusErr.message);
+                delete statusPayload.prime_data;
+                const retry = await supabase
+                    .from('farm_port_status')
+                    .upsert(statusPayload, { onConflict: 'port_number' });
+                statusErr = retry.error;
+            }
 
             if (statusErr) console.error('Error syncing farm_port_status:', statusErr);
         }

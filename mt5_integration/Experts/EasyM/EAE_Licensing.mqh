@@ -1,0 +1,900 @@
+//+------------------------------------------------------------------+
+//|                                                EAE_Licensing.mqh |
+//|                                    Copyright 2026, EAEZE Systems |
+//|                                             https://eaeze.com    |
+//|                                             update : 2026.05.30  |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2026, EAEZE Systems"
+#property link      "https://eaeze.com"
+#property version   "1.20"
+#property strict
+
+// --- Configuration Constants ---
+#ifndef EA_PRODUCT_ID
+   #define EA_PRODUCT_ID "EZM-MAX-V1"
+#endif
+
+// API Settings
+#define EAE_LICENSE_URL "https://eaeze.com/api/verify-license"
+#define EAE_LICENSE_REFRESH_INTERVAL 43200   // 12 hours
+#define EAE_LICENSE_GRACE_PERIOD     172800  // 48 hours
+#define EAE_RETRY_COOLDOWN           120     // 2 minutes
+
+// --- Anti-Tampering Double-Ulong Union ---
+union DoubleUlong {
+   double d_val;
+   ulong u_val;
+};
+
+// --- Calculate checksum hash (FNV-1a 64-bit) for F3 protection ---
+ulong CalculateF3Checksum(long account, string product_id, double status, datetime check_time)
+{
+   string salt = "EAEZE_SECRET_SALT_2026_KHUCHAI";
+   string data = IntegerToString(account) + "_" + product_id + "_" + DoubleToString(status, 2) + "_" + IntegerToString((long)check_time) + "_" + salt;
+   
+   ulong hash = 14695981039346656037ULL;
+   int len = StringLen(data);
+   for(int i = 0; i < len; i++) {
+      hash = hash ^ data[i];
+      hash = hash * 1099511628211ULL;
+   }
+   return hash;
+}
+
+// --- On-chart GUI Alert Display ---
+void ShowLicenseAlert(string message) {
+    string boxName = "EAEZE_Alert_BG";
+    string txtName = "EAEZE_Alert_TXT";
+
+    ObjectCreate(0, boxName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+    ObjectSetInteger(0, boxName, OBJPROP_XDISTANCE, 100);
+    ObjectSetInteger(0, boxName, OBJPROP_YDISTANCE, 100);
+    ObjectSetInteger(0, boxName, OBJPROP_XSIZE, 900);
+    ObjectSetInteger(0, boxName, OBJPROP_YSIZE, 90);
+    ObjectSetInteger(0, boxName, OBJPROP_BGCOLOR, clrDarkRed);
+    ObjectSetInteger(0, boxName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+
+    ObjectCreate(0, txtName, OBJ_LABEL, 0, 0, 0);
+    ObjectSetInteger(0, txtName, OBJPROP_XDISTANCE, 160);
+    ObjectSetInteger(0, txtName, OBJPROP_YDISTANCE, 130);
+    ObjectSetInteger(0, txtName, OBJPROP_COLOR, clrWhite);
+    ObjectSetString(0, txtName, OBJPROP_TEXT, "EAEZE: " + message);
+    ObjectSetInteger(0, txtName, OBJPROP_FONTSIZE, 11);
+    ObjectSetInteger(0, txtName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    
+    ChartRedraw(0);
+}
+
+void EaezeRemoveLicenseAlert() {
+    ObjectDelete(0, "EAEZE_Alert_BG");
+    ObjectDelete(0, "EAEZE_Alert_TXT");
+    ChartRedraw(0);
+}
+
+// --- Core License Verification ---
+bool EaezeCheckLicense(string product_id, string api_key = "KHUCHAI_SUPHAKORN", bool force_check = false) {
+    long current_account = AccountInfoInteger(ACCOUNT_LOGIN);
+    string account_no = IntegerToString(current_account);
+    
+    string time_var     = "EAEZE_T_" + account_no + "_" + product_id;
+    string status_var   = "EAEZE_S_" + account_no + "_" + product_id;
+    string attempt_var  = "EAEZE_A_" + account_no + "_" + product_id;
+    string checksum_var = "EAEZE_C_" + account_no + "_" + product_id;
+    
+    datetime now = TimeLocal();
+    
+    // 1. Verify Cached Status with Signature Checksum to prevent F3 tampering
+    if(!force_check && GlobalVariableCheck(status_var) && GlobalVariableCheck(time_var) && GlobalVariableCheck(checksum_var)) {
+        double cached_status = GlobalVariableGet(status_var);
+        datetime last_check = (datetime)GlobalVariableGet(time_var);
+        double cached_checksum = GlobalVariableGet(checksum_var);
+        
+        DoubleUlong check_union;
+        check_union.d_val = cached_checksum;
+        
+        ulong calculated = CalculateF3Checksum(current_account, product_id, cached_status, last_check);
+        if(check_union.u_val == calculated) {
+            if(cached_status == 1.0 && (now - last_check) < EAE_LICENSE_REFRESH_INTERVAL) {
+                Print("EAEZE: Valid cached license found & verified. Account: ", account_no);
+                EaezeRemoveLicenseAlert();
+                return true;
+            }
+        } else {
+            Print("EAEZE SECURITY WARNING: Cache tampering detected in Global Variables! (Account: ", account_no, ")");
+            ShowLicenseAlert("Security Warning: Cache Tampering Detected!");
+            return false;
+        }
+    }
+    
+    // 2. Prevent spamming the server if within retry cooldown
+    if(!force_check && GlobalVariableCheck(attempt_var)) {
+        datetime last_attempt = (datetime)GlobalVariableGet(attempt_var);
+        // Only throttle if within 10 seconds (instead of 120s) to allow easy retry on chart reload
+        if((now - last_attempt) < 10) {
+            if(GlobalVariableCheck(status_var) && GlobalVariableCheck(checksum_var)) {
+                double cached_status = GlobalVariableGet(status_var);
+                double cached_checksum = GlobalVariableGet(checksum_var);
+                datetime last_check = (datetime)GlobalVariableGet(time_var);
+                
+                DoubleUlong check_union;
+                check_union.d_val = cached_checksum;
+                ulong calculated = CalculateF3Checksum(current_account, product_id, cached_status, last_check);
+                
+                if(check_union.u_val == calculated && cached_status == 1.0 && (now - last_check) < EAE_LICENSE_GRACE_PERIOD) {
+                    return true;
+                }
+            }
+            Print("EAEZE: WebRequest rate-limited. Retrying in 10s.");
+            return false;
+        }
+    }
+    
+    GlobalVariableSet(attempt_var, (double)now);
+    
+    Print("EAEZE: Performing license verification WebRequest...");
+    
+    char data[];
+    char result[];
+    string result_headers;
+    
+    string balance_str = DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2);
+    string post_data   = "{\"account_number\":\"" + account_no + "\", \"product_id\":\"" + product_id + "\", \"balance\":" + balance_str + "}";
+    int len = StringToCharArray(post_data, data, 0, WHOLE_ARRAY, CP_UTF8);
+    if (len > 0) ArrayResize(data, len - 1);
+    
+    string headers = "Content-Type: application/json\r\n" + "x-api-key: " + api_key + "\r\n";
+    
+    ResetLastError();
+    // [2026-08-23] Increased timeout to 10,000ms (10s) to handle VPS latency & cloud cold starts
+    int res = WebRequest("POST", EAE_LICENSE_URL, headers, 10000, data, result, result_headers);
+    
+    if(res == -1) {
+        int last_error = GetLastError();
+        Print("EAEZE: Connection Error. Code: ", last_error);
+        
+        if(last_error == 4060 || last_error == 4014) {
+            Print("EAEZE ERROR: Please ensure 'https://eaeze.com' is added to Allow WebRequest in Tools > Options > Expert Advisors");
+            ShowLicenseAlert("Please add https://eaeze.com to MT5 WebRequest Options");
+            return false;
+        }
+        
+        // Grace period fallback
+        if(GlobalVariableCheck(status_var) && GlobalVariableCheck(checksum_var)) {
+            double cached_status = GlobalVariableGet(status_var);
+            double cached_checksum = GlobalVariableGet(checksum_var);
+            datetime last_check = (datetime)GlobalVariableGet(time_var);
+            
+            DoubleUlong check_union;
+            check_union.d_val = cached_checksum;
+            ulong calculated = CalculateF3Checksum(current_account, product_id, cached_status, last_check);
+            
+            if(check_union.u_val == calculated && cached_status == 1.0 && (now - last_check) < EAE_LICENSE_GRACE_PERIOD) {
+                Print("EAEZE: Server unreachable. Using cached license.");
+                EaezeRemoveLicenseAlert();
+                return true;
+            }
+        }
+        
+        ShowLicenseAlert("Connection Error: Server Unreachable");
+        return false;
+    }
+    
+    if(res == 200) {
+        string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+        
+        if(StringFind(response, "\"status\":\"active\"") >= 0) {
+            Print("EAEZE: License verified for account ", account_no, " | Balance: ", balance_str);
+            EaezeRemoveLicenseAlert();
+            
+            GlobalVariableSet(status_var, 1.0);
+            GlobalVariableSet(time_var, (double)now);
+            
+            DoubleUlong sig_union;
+            sig_union.u_val = CalculateF3Checksum(current_account, product_id, 1.0, now);
+            GlobalVariableSet(checksum_var, sig_union.d_val);
+            return true;
+        }
+        
+        double fail_status = 3.0; // expired/invalid
+        string fail_msg = "License Invalid or Expired for Account: " + account_no;
+        
+        if(StringFind(response, "\"status\":\"insufficient_balance\"") >= 0) {
+             fail_status = 2.0;
+             fail_msg = "Balance is too low for this EA. (Account: " + account_no + ")";
+        }
+        
+        Print("EAEZE License Failed: ", response);
+        ShowLicenseAlert(fail_msg);
+        
+        GlobalVariableSet(status_var, fail_status);
+        GlobalVariableSet(time_var, (double)now);
+        
+        DoubleUlong sig_union;
+        sig_union.u_val = CalculateF3Checksum(current_account, product_id, fail_status, now);
+        GlobalVariableSet(checksum_var, sig_union.d_val);
+        return false;
+    }
+
+    string error_msg = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+    Print("EAEZE: Server Error (", res, "): ", error_msg);
+    
+    if(GlobalVariableCheck(status_var) && GlobalVariableCheck(checksum_var)) {
+        double cached_status = GlobalVariableGet(status_var);
+        double cached_checksum = GlobalVariableGet(checksum_var);
+        datetime last_check = (datetime)GlobalVariableGet(time_var);
+        
+        DoubleUlong check_union;
+        check_union.d_val = cached_checksum;
+        ulong calculated = CalculateF3Checksum(current_account, product_id, cached_status, last_check);
+        
+        if(check_union.u_val == calculated && cached_status == 1.0 && (now - last_check) < EAE_LICENSE_GRACE_PERIOD) {
+            Print("EAEZE: Server returned error ", res, ". Using cached license.");
+            EaezeRemoveLicenseAlert();
+            return true;
+        }
+    }
+    
+    ShowLicenseAlert("Connection Error: " + IntegerToString(res));
+    return false;
+}
+
+// --- Periodic Check Call ---
+void EaezeCheckLicensePeriodic(string product_id, string api_key = "KHUCHAI_SUPHAKORN") {
+    long current_account = AccountInfoInteger(ACCOUNT_LOGIN);
+    string account_no = IntegerToString(current_account);
+    
+    string time_var     = "EAEZE_T_" + account_no + "_" + product_id;
+    string status_var   = "EAEZE_S_" + account_no + "_" + product_id;
+    string checksum_var = "EAEZE_C_" + account_no + "_" + product_id;
+    
+    datetime now = TimeLocal();
+    
+    if(GlobalVariableCheck(status_var) && GlobalVariableCheck(time_var) && GlobalVariableCheck(checksum_var)) {
+        double cached_status = GlobalVariableGet(status_var);
+        datetime last_check = (datetime)GlobalVariableGet(time_var);
+        double cached_checksum = GlobalVariableGet(checksum_var);
+        
+        DoubleUlong check_union;
+        check_union.d_val = cached_checksum;
+        ulong calculated = CalculateF3Checksum(current_account, product_id, cached_status, last_check);
+        
+        if(check_union.u_val != calculated) {
+            Print("EAEZE: Periodic signature check failed (tampered). Removing EA.");
+            ShowLicenseAlert("Security Warning: Cache Tampering Detected!");
+            ExpertRemove();
+            return;
+        }
+        
+        if(cached_status == 1.0 && (now - last_check) < EAE_LICENSE_REFRESH_INTERVAL) {
+            return;
+        }
+        
+        if(cached_status > 1.0) {
+            string alert_msg = "License Invalid or Expired";
+            if(cached_status == 2.0) alert_msg = "Balance is too low for this EA.";
+            Print("EAEZE: Periodic check failed (cached status: ", cached_status, "). Removing EA.");
+            ShowLicenseAlert(alert_msg + " (Account: " + account_no + ")");
+            ExpertRemove();
+            return;
+        }
+    }
+    
+    if (!EaezeCheckLicense(product_id, api_key, false)) {
+        Print("EAEZE: Periodic license verification failed. Removing EA.");
+        ExpertRemove();
+    }
+}
+
+// =====================================================================
+// --- OPTIONAL SYNC FUNCTIONS (Enabled via #define EAEZE_SYNC_ENABLED) ---
+// =====================================================================
+#ifdef EAEZE_SYNC_ENABLED
+
+// Single URL Whitelist: eaeze.com only (no Supabase URL required in MT5)
+#define EAE_SYNC_URL "https://eaeze.com/api/sync-dashboard"
+#define EAE_SYSTEM_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo"
+
+// Helper to scan positions
+void EaezeScanPositions(long magic_buy, long magic_sell, 
+                         int &buy_count, double &buy_lots, double &buy_pnl,
+                         int &sell_count, double &sell_lots, double &sell_pnl)
+{
+   buy_count = 0; buy_lots = 0.0; buy_pnl = 0.0;
+   sell_count = 0; sell_lots = 0.0; sell_pnl = 0.0;
+   
+   int total = PositionsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket > 0 && PositionSelectByTicket(ticket))
+      {
+         long type = PositionGetInteger(POSITION_TYPE);
+         double lots = PositionGetDouble(POSITION_VOLUME);
+         double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+         long magic = PositionGetInteger(POSITION_MAGIC);
+         
+         if(type == POSITION_TYPE_BUY)
+         {
+            if(magic_buy == magic_sell) {
+               if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
+            } else {
+               if(magic_buy != 0 && magic != magic_buy) continue;
+            }
+            buy_count++;
+            buy_lots += lots;
+            buy_pnl += pnl;
+         }
+         else if(type == POSITION_TYPE_SELL)
+         {
+            if(magic_buy == magic_sell) {
+               if(magic_sell != 0 && (magic < magic_sell || magic >= magic_sell + 100)) continue;
+            } else {
+               if(magic_sell != 0 && magic != magic_sell) continue;
+            }
+            sell_count++;
+            sell_lots += lots;
+            sell_pnl += pnl;
+         }
+      }
+   }
+}
+
+// Helper for drawdown
+double EaezeGetDailyMaxDrawdownPct()
+{
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
+   if(balance <= 0) return 0.0;
+   
+   double current_pnl = equity - balance;
+   double current_dd_pct = (current_pnl < 0 ? MathAbs(current_pnl) / balance * 100.0 : 0.0);
+   
+   string gv_max_dd = "EAE_MaxDDPct_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string gv_date   = "EAE_LastDateVal_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   
+   datetime today_start = (TimeCurrent() / 86400) * 86400;
+   
+   if(!GlobalVariableCheck(gv_date) || GlobalVariableGet(gv_date) != (double)today_start)
+   {
+      GlobalVariableSet(gv_max_dd, 0);
+      GlobalVariableSet(gv_date, (double)today_start);
+   }
+   
+   double max_dd = GlobalVariableGet(gv_max_dd);
+   if(current_dd_pct > max_dd) {
+      max_dd = current_dd_pct;
+      GlobalVariableSet(gv_max_dd, max_dd);
+   }
+   return max_dd;
+}
+
+// Helper for today's profit
+double EaezeScanTodayProfit(long magic_buy, long magic_sell, double &out_lots)
+{
+   MqlDateTime dt; TimeToStruct(TimeCurrent(), dt); dt.hour=0; dt.min=0; dt.sec=0;
+   datetime start = StructToTime(dt);
+   datetime end   = TimeCurrent();
+   double profit = 0.0;
+   out_lots = 0.0;
+   
+   if(HistorySelect(start, end))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket <= 0) continue;
+         
+         long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+         {
+            long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+            long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+            bool is_buy = (deal_type == DEAL_TYPE_SELL);
+            bool is_sell = (deal_type == DEAL_TYPE_BUY);
+            
+            // Match TodayClosedProfit() on EA chart: in multi-currency portfolio, include all closed deals today
+            if(magic_buy != magic_sell && magic_buy != 0) {
+               if(is_buy && magic != magic_buy) continue;
+               if(is_sell && magic_sell != 0 && magic != magic_sell) continue;
+            }
+            
+            profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+            profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+            profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+            out_lots += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+         }
+      }
+   }
+   return profit;
+}
+
+// --- Structure for Daily History summaries ---
+struct EaezeDailySummary
+{
+   datetime date;
+   long     account_login;
+   double   max_dd_pct;
+   double   total_profit;
+   double   total_lots;
+   int      buy_cycles;
+   int      sell_cycles;
+};
+
+// --- Helper to scan history daily summary ---
+bool EaezeScanHistoryDailySummary(datetime targetDay, long magic_buy, long magic_sell, EaezeDailySummary &out_sum)
+{
+   datetime start = (targetDay / 86400) * 86400;
+   datetime end   = start + 86399;
+   
+   ZeroMemory(out_sum);
+   out_sum.date          = start;
+   out_sum.account_login = AccountInfoInteger(ACCOUNT_LOGIN);
+   
+   if(!HistorySelect(start, end)) return false;
+   
+   int total = HistoryDealsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket <= 0) continue;
+      
+      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+      if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+      {
+         long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+         long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+         bool is_buy = (deal_type == DEAL_TYPE_SELL);
+         bool is_sell = (deal_type == DEAL_TYPE_BUY);
+         
+         // Match TodayClosedProfit(): in portfolio mode (magic_buy == magic_sell), include all closed deals
+         if(magic_buy != magic_sell && magic_buy != 0) {
+            if(is_buy && magic != magic_buy) continue;
+            if(is_sell && magic_sell != 0 && magic != magic_sell) continue;
+         }
+         
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+         out_sum.total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+         out_sum.total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+         
+         string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+         if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
+         {
+            if(magic_buy == magic_sell) {
+               if(magic >= magic_buy && magic < magic_buy + 100) {
+                  out_sum.buy_cycles++;
+               }
+            }
+            else {
+               if(magic == magic_buy) out_sum.buy_cycles++;
+               else if(magic == magic_sell) out_sum.sell_cycles++;
+            }
+         }
+      }
+   }
+   
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(balance <= 0) balance = 1.0;
+   string gv_max_dd = "EAE_MaxDDPct_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   out_sum.max_dd_pct = GlobalVariableCheck(gv_max_dd) ? GlobalVariableGet(gv_max_dd) : 0.0;
+   
+   return true;
+}
+
+// --- Push history batch to database ---
+bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_sell)
+{
+   if(days_to_sync <= 0) return false;
+   if(days_to_sync > 30) days_to_sync = 30;
+   
+   datetime now = TimeCurrent();
+   datetime today_start = (now / 86400) * 86400;
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   
+   EaezeDailySummary summaries[];
+   ArrayResize(summaries, days_to_sync);
+   for(int i = 0; i < days_to_sync; i++)
+   {
+      ZeroMemory(summaries[i]);
+      summaries[i].date          = today_start - (i * 86400);
+      summaries[i].account_login = login;
+      if(i == 0)
+      {
+         string gv_max_dd = "EAE_MaxDDPct_" + IntegerToString(login);
+         summaries[i].max_dd_pct = GlobalVariableCheck(gv_max_dd) ? GlobalVariableGet(gv_max_dd) : 0.0;
+      }
+   }
+   
+   datetime start_time = today_start - (days_to_sync * 86400);
+   if(HistorySelect(start_time, now))
+   {
+      int total = HistoryDealsTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket <= 0) continue;
+         
+         long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+         if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+         {
+            datetime deal_time = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
+            datetime deal_day_start = (deal_time / 86400) * 86400;
+            long diff_sec = today_start - deal_day_start;
+            if(diff_sec < 0) continue;
+            
+            int idx = (int)(diff_sec / 86400);
+            if(idx < 0 || idx >= days_to_sync) continue;
+            
+            long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+            long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+            bool is_buy = (deal_type == DEAL_TYPE_SELL);
+            bool is_sell = (deal_type == DEAL_TYPE_BUY);
+            
+            // Match TodayClosedProfit(): in portfolio mode (magic_buy == magic_sell), include all closed deals
+            if(magic_buy != magic_sell && magic_buy != 0) {
+               if(is_buy && magic != magic_buy) continue;
+               if(is_sell && magic_sell != 0 && magic != magic_sell) continue;
+            }
+            
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+            summaries[idx].total_profit += HistoryDealGetDouble(ticket, DEAL_SWAP);
+            summaries[idx].total_lots   += HistoryDealGetDouble(ticket, DEAL_VOLUME);
+         }
+      }
+   }
+   
+   string json_array = "[";
+   for(int i = 0; i < days_to_sync; i++)
+   {
+      if(i > 0) json_array += ",";
+      
+      string date_str = TimeToString(summaries[i].date, TIME_DATE);
+      StringReplace(date_str, ".", "-"); // Convert YYYY.MM.DD to YYYY-MM-DD
+      
+      json_array += "{";
+      json_array += "\"date\":\"" + date_str + "\",";
+      json_array += "\"profit\":" + DoubleToString(summaries[i].total_profit, 2) + ",";
+      json_array += "\"lots\":" + DoubleToString(summaries[i].total_lots, 2) + ",";
+      json_array += "\"max_dd\":" + DoubleToString(summaries[i].max_dd_pct, 2);
+      json_array += "}";
+   }
+   json_array += "]";
+   
+   string payload = "{";
+   payload += "\"p_port_number\":\"" + IntegerToString(login) + "\",";
+   payload += "\"p_history_array\":" + json_array + ",";
+   payload += "\"p_api_key\":\"LICENSE_AUTO\"";
+   payload += "}";
+
+   char data[]; char result[]; string result_headers;
+   StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, ArraySize(data) - 1);
+   
+   string url = "https://eaeze.com/api/sync-dashboard";
+   string headers = "Content-Type: application/json\r\n";
+                    
+   ResetLastError();
+   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   
+   if(res == 200) {
+      string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+      if(StringFind(response, "\"success\":false") < 0 && StringFind(response, "\"success\": false") < 0) {
+         Print("EAEZE History Sync: Successfully pushed ", days_to_sync, " days of history. Response: ", response);
+         return true;
+      }
+   }
+   Print("EAEZE History Sync: Failed to push batch history. Code: ", res);
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| [2026-08-20] Self-Healing Boot & Day-Change Rollover Sync        |
+//| Staggered execution prevents cloud server request spikes.        |
+//+------------------------------------------------------------------+
+void EaezeWebSyncCheckAndPushHistory(long magic_buy, long magic_sell)
+{
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   datetime now = TimeCurrent();
+   datetime current_day = (now / 86400) * 86400;
+
+   // Static trackers for rollover detection and staggered execution
+   static datetime last_synced_day = 0;
+   static datetime scheduled_sync_time = 0;
+   static bool boot_scheduled = false;
+
+   // 1. Initial Boot Check / Timeframe Refresh: Sync immediately in 2s
+   if(!boot_scheduled)
+   {
+      boot_scheduled = true;
+      scheduled_sync_time = now + 2;
+      Print("EAEZE History Sync: Boot/Refresh detected. Immediate 14-day history sync scheduled in 2s.");
+   }
+
+   // 2. Day-Change Rollover Detection: When server time crosses into new day
+   if(last_synced_day == 0)
+   {
+      string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
+      if(GlobalVariableCheck(gv_last_history))
+      {
+         datetime saved_time = (datetime)GlobalVariableGet(gv_last_history);
+         last_synced_day = (saved_time / 86400) * 86400;
+      }
+   }
+
+   if(current_day > last_synced_day && scheduled_sync_time <= now)
+   {
+      // Schedule new day sync with staggered jitter (0-300s) to avoid cloud spike at midnight
+      MathSrand((uint)GetTickCount() + (uint)login);
+      int day_delay = (int)(login % 180) + (MathRand() % 120);
+      scheduled_sync_time = current_day + day_delay;
+      last_synced_day = current_day;
+      Print("EAEZE History Sync: Day rollover detected. Next history sync scheduled in ", (scheduled_sync_time - now), "s.");
+   }
+
+   // 3. Check if scheduled time has arrived
+   if(scheduled_sync_time == 0 || now < scheduled_sync_time) return;
+
+   // Reset scheduled time so it executes once per trigger
+   scheduled_sync_time = 0;
+
+   // Calculate self-healing gap (default: last 14 days)
+   int days_to_sync = 14; // Sync past 14 days to wrap up yesterday & heal missing records
+   string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
+   if(GlobalVariableCheck(gv_last_history))
+   {
+      datetime last_sync = (datetime)GlobalVariableGet(gv_last_history);
+      int diff_sec = (int)(now - last_sync);
+      if(diff_sec > 0)
+      {
+         int gap_days = (diff_sec / 86400) + 1;
+         if(gap_days > days_to_sync) days_to_sync = gap_days;
+      }
+   }
+   if(days_to_sync > 30) days_to_sync = 30; // Cap at 30 days to protect network
+
+   Print("EAEZE History Sync: [2026-08-20] Executing auto history sync for last ", days_to_sync, " days...");
+   if(EaezeWebSyncPushHistoryBatch(days_to_sync, magic_buy, magic_sell))
+   {
+      GlobalVariableSet(gv_last_history, (double)now);
+      last_synced_day = current_day;
+      Print("EAEZE History Sync: [2026-08-20] Auto history sync completed successfully.");
+   }
+   else
+   {
+      Print("EAEZE History Sync: [2026-08-20] Auto history sync failed. Will retry in 60s.");
+      scheduled_sync_time = now + 60; // Retry in 60 seconds
+   }
+}
+
+// Helper to build an Order JSON list for the EAEZE Sync
+string EaezeBuildOrdersJson(long magic_buy = 0, long magic_sell = 0)
+{
+   string json = "[";
+   bool first = true;
+   int total = PositionsTotal();
+   
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket > 0 && PositionSelectByTicket(ticket))
+      {
+         long type = PositionGetInteger(POSITION_TYPE);
+         long magic = PositionGetInteger(POSITION_MAGIC);
+         
+         if(magic_buy == magic_sell) {
+            if(magic_buy != 0 && (magic < magic_buy || magic >= magic_buy + 100)) continue;
+         }
+         else {
+            if(type == POSITION_TYPE_BUY) {
+               if(magic_buy != 0 && magic != magic_buy) continue;
+            }
+            else if(type == POSITION_TYPE_SELL) {
+               if(magic_sell != 0 && magic != magic_sell) continue;
+            }
+         }
+         
+         if(!first) json += ",";
+         
+         string pos_type = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+         
+         json += "{";
+         json += "\"ticket_id\":" + IntegerToString(ticket) + ",";
+         json += "\"type\":\"" + pos_type + "\",";
+         json += "\"status\":\"OPEN\",";
+         json += "\"current_pnl\":" + DoubleToString(PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP), 2) + ",";
+         json += "\"raw_lot_size\":" + DoubleToString(PositionGetDouble(POSITION_VOLUME), 2);
+         json += "}";
+         
+         first = false;
+      }
+   }
+   
+   json += "]";
+   return json;
+}
+
+// Unified licensing check + smart sync
+void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_version, int sync_interval_sec, long magic_buy = 0, long magic_sell = 0, string extra_payload_json = "")
+{
+   // 1. Check license status first
+   EaezeCheckLicensePeriodic(product_id, "KHUCHAI_SUPHAKORN");
+   
+   // [Single WebRequest Architecture]:
+   // mini and Farm only verify license, no live farm UI streaming needed
+   if(product_id == "EZM-MIN-V1" || product_id == "EZM-FARM-V1") {
+      return;
+   }
+   
+   // --- [NEW] Self-Healing 30-Day Sync Check ---
+   EaezeWebSyncCheckAndPushHistory(magic_buy, magic_sell);
+   
+   // 2. Perform the WebRequest sync
+   static uint last_sync_ticks = 0;
+   static bool full_sync_mode = true;
+   static int active_sync_interval = 0;
+   static string license_tier = "free";
+   static bool is_trial = false;
+   
+   if(active_sync_interval <= 0) {
+      active_sync_interval = sync_interval_sec;
+   }
+   
+   uint now_ticks = GetTickCount();
+   
+   int current_interval = active_sync_interval;
+   if(!full_sync_mode) {
+      current_interval = 180; // Sleep mode: ping heartbeat every 3 minutes (180s) when no active viewer
+   }
+   
+   if(last_sync_ticks > 0 && (int)(now_ticks - last_sync_ticks) < current_interval * 1000) {
+      return;
+   }
+   
+   last_sync_ticks = now_ticks;
+   
+   // Gather data
+   int buy_count = 0, sell_count = 0;
+   double buy_lots = 0.0, buy_pnl = 0.0, sell_lots = 0.0, sell_pnl = 0.0;
+   EaezeScanPositions(magic_buy, magic_sell, buy_count, buy_lots, buy_pnl, sell_count, sell_lots, sell_pnl);
+   
+   double today_closed_lots = 0.0;
+   double today_profit = EaezeScanTodayProfit(magic_buy, magic_sell, today_closed_lots);
+   double max_dd_pct = EaezeGetDailyMaxDrawdownPct();
+   
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
+   double margin  = AccountInfoDouble(ACCOUNT_MARGIN_LEVEL);
+   string currency = AccountInfoString(ACCOUNT_CURRENCY);
+   
+   // Auto-detect asset family (product_family / asset_type) based on symbol
+   string chart_sym = _Symbol;
+   StringToUpper(chart_sym);
+   string prod_fam = "FOREX";
+   if(StringFind(chart_sym, "XAU") >= 0 || StringFind(chart_sym, "GOLD") >= 0 || StringFind(chart_sym, "XAG") >= 0 || StringFind(chart_sym, "SILVER") >= 0) {
+      prod_fam = "GOLD";
+   } else if(StringFind(chart_sym, "BTC") >= 0 || StringFind(chart_sym, "ETH") >= 0 || StringFind(chart_sym, "XRP") >= 0 || StringFind(chart_sym, "LTC") >= 0 || StringFind(chart_sym, "CRYPTO") >= 0) {
+      prod_fam = "CRYPTO";
+   }
+
+   // Build orders payload if full_sync_mode is active and NOT skip orders
+   bool skip_orders = (license_tier == "free" && !is_trial);
+   string orders_json = (full_sync_mode && !skip_orders ? EaezeBuildOrdersJson(magic_buy, magic_sell) : "[]");
+
+   // Build Simple Payload
+   string payload = "{ \"p_payload\": {";
+   payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+   payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
+   payload += "\"current_price\":" + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits) + ",";
+   payload += "\"ping_only\":" + (full_sync_mode ? "false" : "true") + ",";
+   payload += "\"today_profit\":" + DoubleToString(today_profit, 2) + ",";
+   payload += "\"today_closed_lots\":" + DoubleToString(today_closed_lots, 2) + ",";
+   payload += "\"daily_max_drawdown\":" + DoubleToString(max_dd_pct, 2) + ",";
+   
+   payload += "\"snapshot\":{";
+   payload += "\"account\":{\"balance\":" + DoubleToString(balance, 2) + ",\"equity\":" + DoubleToString(equity, 2) + ",\"margin_level\":" + DoubleToString(margin, 2) + ",\"currency\":\"" + currency + "\"},";
+   payload += "\"buy_state\":{\"open_count\":" + IntegerToString(buy_count) + ",\"open_lots\":" + DoubleToString(buy_lots, 2) + ",\"floating_pnl\":" + DoubleToString(buy_pnl, 2) + "},";
+   payload += "\"sell_state\":{\"open_count\":" + IntegerToString(sell_count) + ",\"open_lots\":" + DoubleToString(sell_lots, 2) + ",\"floating_pnl\":" + DoubleToString(sell_pnl, 2) + "},";
+   payload += "\"identity\":{\"product_family\":\"" + prod_fam + "\",\"system_code\":\"" + system_code + "\",\"ea_version\":\"" + ea_version + "\"}";
+   payload += "},";
+   
+   payload += "\"orders\":" + orders_json;
+   if(StringLen(extra_payload_json) > 0)
+   {
+      payload += ",\"prime_data\":" + extra_payload_json;
+   }
+   payload += "}, \"p_api_key\":\"LICENSE_AUTO\" }";
+   
+   char data[]; char result[]; string result_headers;
+   StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, ArraySize(data) - 1);
+   
+   string headers = "Content-Type: application/json\r\n" + 
+                    "apikey: " + EAE_SYSTEM_KEY + "\r\n" +
+                    "Authorization: Bearer " + EAE_SYSTEM_KEY + "\r\n";
+   
+   ResetLastError();
+   int res = WebRequest("POST", EAE_SYNC_URL, headers, 10000, data, result, result_headers);
+   
+   if(res == -1) {
+      int err = GetLastError();
+      // If WebRequest host is not listed (ERR_WEBREQUEST_CANNOT_CONNECT = 4060 or ERR_FUNCTION_NOT_ALLOWED = 4014), fail silently
+      if(err == 4060 || err == 4014) {
+         static bool printed_warning = false;
+         if(!printed_warning) {
+            Print("[EAE_SYSTEM WARNING] WebRequest is not whitelisted. Web Dashboard Sync is disabled. Please add 'https://eaeze.com' to MT5 WebRequest options if you wish to see the Web Dashboard.");
+            printed_warning = true;
+         }
+         return;
+      }
+      Print("EAEZE Dashboard Sync Error: ", err);
+      return;
+   }
+   
+   if(res == 200) {
+      string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+      
+      // Smart sleep/wake parsing
+      if(StringFind(response, "\"should_sync_full\":true") >= 0 || StringFind(response, "\"should_sync_full\": true") >= 0) {
+         if(!full_sync_mode) {
+            last_sync_ticks = 0; // Trigger sync immediately on next tick!
+         }
+         full_sync_mode = true;
+      } else {
+         full_sync_mode = false;
+      }
+      
+      // Dynamic sync interval parsing
+      int pos = StringFind(response, "\"sync_interval\":");
+      if(pos >= 0) {
+         int start = pos + StringLen("\"sync_interval\":");
+         int end = start;
+         while(end < StringLen(response) && response[end] >= '0' && response[end] <= '9') {
+            end++;
+         }
+         if(end > start) {
+            active_sync_interval = (int)StringToInteger(StringSubstr(response, start, end - start));
+         }
+      }
+
+      // License tier parsing
+      int tier_pos = StringFind(response, "\"license_tier\":");
+      if(tier_pos >= 0) {
+         int start = tier_pos + StringLen("\"license_tier\":");
+         int end = start;
+         while(end < StringLen(response) && response[end] != '"') {
+            end++;
+         }
+         if(end < StringLen(response)) {
+            end++;
+            start = end;
+            while(end < StringLen(response) && response[end] != '"') {
+               end++;
+            }
+            if(end > start) {
+               license_tier = StringSubstr(response, start, end - start);
+            }
+         }
+      }
+
+      // Is trial parsing
+      int trial_pos = StringFind(response, "\"is_trial\":");
+      if(trial_pos >= 0) {
+         int start = trial_pos + StringLen("\"is_trial\":");
+         int end = start;
+         while(end < StringLen(response) && response[end] != 't' && response[end] != 'f' && response[end] != 'T' && response[end] != 'F') {
+            end++;
+         }
+         start = end;
+         while(end < StringLen(response) && ((response[end] >= 'a' && response[end] <= 'z') || (response[end] >= 'A' && response[end] <= 'Z'))) {
+            end++;
+         }
+         if(end > start) {
+            string trial_val = StringSubstr(response, start, end - start);
+            is_trial = (trial_val == "true" || trial_val == "TRUE");
+         }
+      }
+   }
+}
+#endif
