@@ -147,10 +147,10 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                                         <div className="space-y-1.5 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="font-bold text-amber-300 text-sm sm:text-base">
-                                                    สิทธิพิเศษอัปเกรด EasyM PRIME สำหรับลูกค้าเดิม (ลด 50% ปีแรกเท่านั้น)
+                                                    สิทธิพิเศษอัปเกรด EasyM PRIME สำหรับลูกค้าเดิม (ลด 50% เฉพาะปีแรก)
                                                 </span>
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                                    First Year Only
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
+                                                    เฉพาะปีแรก
                                                 </span>
                                             </div>
                                             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">

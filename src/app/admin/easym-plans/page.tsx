@@ -1027,25 +1027,25 @@ export default function EasyMPlansPage() {
                                         <>
                                             {/* ส่วนบน (Upper Section: ราคาหลัก + คำอธิบายย่อย) */}
                                             <div className="space-y-1">
-                                                <div className="flex items-center justify-between h-8 sm:h-9">
-                                                    <div className="flex items-baseline gap-2">
+                                                <div className="flex items-center justify-between gap-1.5 h-8 sm:h-9">
+                                                    <div className="flex items-baseline gap-1.5 sm:gap-2 min-w-0">
                                                         {priceInfo.originalPrice && (
-                                                            <span className="text-xs text-slate-500 line-through font-mono">
+                                                            <span className="text-[11px] sm:text-xs text-slate-500 line-through font-mono shrink-0">
                                                                 ฿{priceInfo.originalPrice.toLocaleString()}
                                                             </span>
                                                         )}
-                                                        <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight leading-none">
+                                                        <span className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight leading-none">
                                                             {priceInfo.price === 0 ? '฿0' : `฿${priceInfo.price.toLocaleString()}`}
                                                         </span>
                                                         {priceInfo.price > 0 && (
-                                                            <span className="text-xs text-slate-400 font-medium">
+                                                            <span className="text-[11px] sm:text-xs text-slate-400 font-medium shrink-0">
                                                                 / ปี
                                                             </span>
                                                         )}
                                                     </div>
                                                     {isExistingCustomer && priceInfo.originalPrice && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black tracking-tight text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md shadow-sm">
-                                                            ⚡ ปีแรกเท่านั้น
+                                                        <span className="inline-flex items-center text-[10px] sm:text-[11px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md shadow-sm whitespace-nowrap shrink-0">
+                                                            เฉพาะปีแรก
                                                         </span>
                                                     )}
                                                 </div>
@@ -1236,10 +1236,10 @@ export default function EasyMPlansPage() {
                                 <div className="text-xs space-y-1 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-bold text-amber-300 text-sm">
-                                            ⚡ สิทธิพิเศษลูกค้าเดิม: รับส่วนลดอัปเกรด 50% (เฉพาะปีแรกเท่านั้น)
+                                            ⚡ สิทธิพิเศษลูกค้าเดิม: รับส่วนลดอัปเกรด 50% (เฉพาะปีแรก)
                                         </span>
-                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                            First Year Only
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                            เฉพาะปีแรก
                                         </span>
                                     </div>
                                     <p className="text-slate-300 leading-relaxed text-[11px] sm:text-xs">
@@ -1421,8 +1421,8 @@ export default function EasyMPlansPage() {
                                             สรุปราคาสุทธิ (Annual Total) • {isExistingCustomer ? 'สิทธิ์ลูกค้าเดิม' : 'ลูกค้าใหม่'}
                                         </span>
                                         {isExistingCustomer && detailPriceInfo?.originalPrice && (
-                                            <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded">
-                                                ⚡ ราคาเฉพาะปีแรก
+                                            <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                เฉพาะปีแรก
                                             </span>
                                         )}
                                     </div>
