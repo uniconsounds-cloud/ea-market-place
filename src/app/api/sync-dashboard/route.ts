@@ -71,6 +71,12 @@ export async function POST(req: Request) {
 
             const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
 
+            // Seamless dual-storage: Encode primeData into system_code as fallback
+            // so telemetry works immediately even before the prime_data DB column is added
+            const finalSystemCode = (primeData && typeof primeData === 'object')
+                ? `${systemCode}:::${JSON.stringify(primeData)}`
+                : systemCode;
+
             const statusPayload: any = {
                 port_number: portNumber,
                 balance,
@@ -87,7 +93,7 @@ export async function POST(req: Request) {
                 today_closed_lots: todayClosedLots,
                 account_type: accountType,
                 asset_type: assetType,
-                system_code: systemCode,
+                system_code: finalSystemCode,
                 ea_version: eaVersion,
                 is_online: true,
                 last_ping: nowIso,

@@ -124,7 +124,7 @@ export default function AdminFarmDiagnosticOverlay({
     } else if (isEAMismatch) {
         healthGrade = 'warning';
         healthTitle = 'ตรวจพบรัน EA ทองคำ (EA Mismatch)';
-        healthDescription = `พอร์ตนี้ขอสิทธิ์เป็น ${licenseInfo?.productName || 'EasyM'} (คู่เงิน Forex) แต่บน MT5 กำลังรัน EA ทองคำ (${portStatus?.asset_type || 'GOLD'} / ${portStatus?.system_code || 'EasyGold'}) หน้าฟาร์มจึงแสดงภาพเป็นฟาร์มทองคำตามข้อมูลจริงที่ MT5 ส่งมา`;
+        healthDescription = `พอร์ตนี้ขอสิทธิ์เป็น ${licenseInfo?.productName || 'EasyM'} (คู่เงิน Forex) แต่บน MT5 กำลังรัน EA ทองคำ (${portStatus?.asset_type || 'GOLD'} / ${portStatus?.system_code?.split(':::')[0] || 'EasyGold'}) หน้าฟาร์มจึงแสดงภาพเป็นฟาร์มทองคำตามข้อมูลจริงที่ MT5 ส่งมา`;
     } else if (!hasEnoughCapital) {
         healthGrade = 'warning';
         healthTitle = 'ทุนต่ำกว่าเกณฑ์ขั้นต่ำของบอท';
@@ -246,7 +246,7 @@ export default function AdminFarmDiagnosticOverlay({
                                 <span>เหตุผลที่หน้าฟาร์มแสดงผลเป็นทองคำ (EasyGold):</span>
                             </div>
                             <p className="text-muted-foreground text-[11px] leading-relaxed">
-                                พอร์ตนี้ในระบบขอใช้เป็น <strong className="text-amber-200">{licenseInfo?.productName}</strong> (คู่เงิน Forex) แต่บน MT5 ผู้ใช้ได้เปิดรันบอททองคำ <strong className="text-amber-200">({portStatus?.asset_type || 'GOLD'} - {portStatus?.system_code || 'EasyGold'} {portStatus?.ea_version})</strong>
+                                พอร์ตนี้ในระบบขอใช้เป็น <strong className="text-amber-200">{licenseInfo?.productName}</strong> (คู่เงิน Forex) แต่บน MT5 ผู้ใช้ได้เปิดรันบอททองคำ <strong className="text-amber-200">({portStatus?.asset_type || 'GOLD'} - {portStatus?.system_code?.split(':::')[0] || 'EasyGold'} {portStatus?.ea_version})</strong>
                             </p>
                             <p className="text-[10px] text-amber-400/90 pt-1 border-t border-amber-500/20">
                                 💡 ระบบหน้าฟาร์มจะแสดงภาพฟาร์มเป็นทองคำตามข้อมูลจริงที่ MT5 ส่งมา และแดชบอร์ด EasyM ได้แยกพอร์ตนี้ออกจากผลรวมกำไรคู่เงินเรียบร้อยแล้ว

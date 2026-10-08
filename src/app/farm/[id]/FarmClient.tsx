@@ -141,7 +141,9 @@ export default function FarmClient({
     // Determine product & asset types for default theme & behavior
     const prodKey = (licenseInfo?.productKey || '').toUpperCase();
     const prodName = (licenseInfo?.productName || '').toLowerCase();
-    const sysCode = (initialPortStatus?.system_code || portStatus?.system_code || '').toLowerCase();
+    const rawSysCode = initialPortStatus?.system_code || portStatus?.system_code || '';
+    const cleanSysCode = rawSysCode.split(':::')[0];
+    const sysCode = cleanSysCode.toLowerCase();
     const eaVer = (initialPortStatus?.ea_version || portStatus?.ea_version || '').toLowerCase();
     const rawAsset = portStatus?.asset_type || (prodName.includes('gold') || prodKey.includes('GOLD') || prodKey.includes('EZG') ? 'GOLD' : 'FOREX');
     const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
@@ -823,8 +825,16 @@ export default function FarmClient({
         const pairData: Record<string, { count: number; lot: number; pnl: number }> = {};
         PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
 
-        // Extract Realtime Prime Telemetry from MT5 EA Heartbeat (if available)
-        const primeData = (portStatus as any)?.prime_data;
+        // Extract Realtime Prime Telemetry from MT5 EA Heartbeat (supports native column or embedded fallback)
+        let primeData = (portStatus as any)?.prime_data;
+        if (!primeData && portStatus?.system_code && portStatus.system_code.includes(':::')) {
+            try {
+                const parts = portStatus.system_code.split(':::');
+                primeData = JSON.parse(parts.slice(1).join(':::'));
+            } catch (e) {
+                console.error('Failed to parse embedded prime_data from system_code:', e);
+            }
+        }
 
         // Dynamic Settings transmitted from MT5 EA (learns user's custom thresholds)
         const settings = {
@@ -1289,7 +1299,7 @@ export default function FarmClient({
                     }}
                     accountType={portStatus?.account_type || 'USC'}
                     assetType={assetType}
-                    systemCode={portStatus?.system_code}
+                    systemCode={portStatus?.system_code?.split(':::')[0]}
                     eaVersion={portStatus?.ea_version}
                     orders={orders}
                     recentlyClosed={recentlyClosed}
@@ -1352,7 +1362,7 @@ export default function FarmClient({
                     drawdownAmount={stats.drawdownAmount}
                     assetType={assetType}
                     isShaking={isShaking}
-                    systemCode={portStatus?.system_code}
+                    systemCode={portStatus?.system_code?.split(':::')[0]}
                     onClick={handleSecretToggle}
                 />
                 
