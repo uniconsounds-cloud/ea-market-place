@@ -236,9 +236,9 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 priceExisting: 4000,
                 originalPrice: 8000,
                 noteNew: 'ระบบ MAX + Standard Farm UI (เฉลี่ย ฿667/ด.)',
-                noteExisting: 'ส่วนลด 50% สำหรับลูกค้าเดิม (เฉลี่ย ฿333/ด.)',
+                noteExisting: 'ส่วนลด 50% เฉพาะปีแรกสำหรับลูกค้าเดิม (เฉลี่ย ฿333/ด.)',
                 trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
-                trialBadgeExisting: '⭐ สิทธิ์ต่ออายุราคาพิเศษเฉพาะคุณ',
+                trialBadgeExisting: '⭐ สิทธิ์ต่ออายุราคาพิเศษเฉพาะคุณ (ปีแรก)',
                 farmUi: '1u',
                 webControl: false,
                 ctaText: 'ทดลองใช้ฟรี 2 เดือน (Start Trial)'
@@ -249,9 +249,9 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 priceExisting: 6000,
                 originalPrice: 12000,
                 noteNew: 'รวม Cloud VPS + ทีมงานดูแล 24/5 (เฉลี่ย ฿1,000/ด.)',
-                noteExisting: 'ส่วนลดพิเศษ 50% สำหรับลูกค้าเดิม (เฉลี่ยเพียง ฿500/ด.)',
+                noteExisting: 'ส่วนลด 50% เฉพาะปีแรกสำหรับลูกค้าเดิม (เฉลี่ยเพียง ฿500/ด.)',
                 trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
-                trialBadgeExisting: '⭐ สิทธิ์ลูกค้าเดิมลด 50% ประหยัด ฿6,000',
+                trialBadgeExisting: '⭐ สิทธิ์ลูกค้าเดิมลด 50% (เฉพาะปีแรก) ประหยัด ฿6,000',
                 farmUi: '1u',
                 webControl: false,
                 ctaText: 'เลือกแพ็กเกจ MAX Managed'
@@ -309,9 +309,9 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 priceExisting: 5000,
                 originalPrice: 10000,
                 noteNew: 'ระบบเรือธงครบวงจร (เฉลี่ย ฿833/ด.)',
-                noteExisting: 'ส่วนลด 50% สำหรับลูกค้าเดิมทุกสินค้า (เฉลี่ย ฿417/ด.)',
+                noteExisting: 'ส่วนลด 50% เฉพาะปีแรกสำหรับลูกค้าเดิมทุกสินค้า (เฉลี่ย ฿417/ด.)',
                 trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
-                trialBadgeExisting: '⭐ สิทธิ์ลูกค้าเดิมลด 50% ประหยัด ฿5,000',
+                trialBadgeExisting: '⭐ สิทธิ์ลูกค้าเดิมลด 50% (เฉพาะปีแรก) ประหยัด ฿5,000',
                 farmUi: '2u',
                 webControl: true,
                 ctaText: 'ทดลองใช้ฟรี 2 เดือน (Start Trial)'
@@ -322,9 +322,9 @@ const EASYM_PRODUCTS: ProductConfig[] = [
                 priceExisting: 7000,
                 originalPrice: 14000,
                 noteNew: 'พรีเมียม Cloud VPS + จูนเนอร์ส่วนตัว + ดูแล 24/5 (เฉลี่ย ฿1,167/ด.)',
-                noteExisting: 'ส่วนลด 50% สำหรับลูกค้าเดิมทุกสินค้า (เฉลี่ย ฿583/ด.)',
+                noteExisting: 'ส่วนลด 50% เฉพาะปีแรกสำหรับลูกค้าเดิมทุกสินค้า (เฉลี่ย ฿583/ด.)',
                 trialBadgeNew: '🎁 ทดลอง Farm UI ฟรี 2 เดือน',
-                trialBadgeExisting: '⭐ Best Value: ลด 50% ประหยัด ฿7,000 สำหรับลูกค้าเดิม',
+                trialBadgeExisting: '⭐ Best Value: ลด 50% (เฉพาะปีแรก) ประหยัด ฿7,000',
                 farmUi: '2u',
                 webControl: true,
                 ctaText: 'เลือกแพ็กเกจ PRIME Managed'
@@ -505,7 +505,7 @@ export default function EasyMPlansPage() {
 ราคาแพ็กเกจ: ${priceLabel}
 โบรกเกอร์: ${detailBroker === 'ib' ? 'IB Partner (ฟรีไม่มีค่าธรรมเนียม)' : 'Own Broker Unlock (+฿4,000 / ปี)'}
 ยอดรวมทั้งสิ้น: ${isSpecial ? 'เงื่อนไขพิเศษ (รอการอนุมัติ)' : `฿${detailTotalAnnual.toLocaleString()} / ปี (เฉลี่ย ฿${detailMonthlyAvg.toLocaleString()} / เดือน)`}
-สิทธิ์พิเศษ: ${detailPriceInfo?.trialBadge || (isSpecial ? 'ต้องได้รับการอนุมัติจากแอดมิน' : 'ตามเงื่อนไขแพ็กเกจ')}`;
+สิทธิ์พิเศษ: ${detailPriceInfo?.trialBadge || (isSpecial ? 'ต้องได้รับการอนุมัติจากแอดมิน' : 'ตามเงื่อนไขแพ็กเกจ')}${isExistingCustomer && detailPriceInfo?.originalPrice ? '\nหมายเหตุ: สิทธิ์ราคาพิเศษอัปเกรดมีผลเฉพาะรอบบิลปีแรกเท่านั้น รอบต่ออายุปีถัดไปคิดราคามาตรฐาน' : ''}`;
 
         navigator.clipboard.writeText(text);
         setCopiedSummary(true);
@@ -776,7 +776,7 @@ export default function EasyMPlansPage() {
                         ระบบตรวจสอบสิทธิ์อัตโนมัติ: {
                             isExistingCustomer ? (
                                 <strong className="text-emerald-300 font-semibold">
-                                    ตรวจพบสถานะลูกค้าเดิม (ระบบปรับใช้ราคาพิเศษและส่วนลดอัปเกรดทันที)
+                                    ตรวจพบสถานะลูกค้าเดิม (รับสิทธิ์อัปเกรดลด 50% เฉพาะปีแรก • ปีถัดไปต่ออายุราคาปกติ)
                                 </strong>
                             ) : (
                                 <strong className="text-blue-300 font-semibold">
@@ -1027,18 +1027,25 @@ export default function EasyMPlansPage() {
                                         <>
                                             {/* ส่วนบน (Upper Section: ราคาหลัก + คำอธิบายย่อย) */}
                                             <div className="space-y-1">
-                                                <div className="flex items-baseline gap-2 h-8 sm:h-9">
-                                                    {priceInfo.originalPrice && (
-                                                        <span className="text-xs text-slate-500 line-through font-mono">
-                                                            ฿{priceInfo.originalPrice.toLocaleString()}
+                                                <div className="flex items-center justify-between h-8 sm:h-9">
+                                                    <div className="flex items-baseline gap-2">
+                                                        {priceInfo.originalPrice && (
+                                                            <span className="text-xs text-slate-500 line-through font-mono">
+                                                                ฿{priceInfo.originalPrice.toLocaleString()}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight leading-none">
+                                                            {priceInfo.price === 0 ? '฿0' : `฿${priceInfo.price.toLocaleString()}`}
                                                         </span>
-                                                    )}
-                                                    <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight leading-none">
-                                                        {priceInfo.price === 0 ? '฿0' : `฿${priceInfo.price.toLocaleString()}`}
-                                                    </span>
-                                                    {priceInfo.price > 0 && (
-                                                        <span className="text-xs text-slate-400 font-medium">
-                                                            / ปี
+                                                        {priceInfo.price > 0 && (
+                                                            <span className="text-xs text-slate-400 font-medium">
+                                                                / ปี
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {isExistingCustomer && priceInfo.originalPrice && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black tracking-tight text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md shadow-sm">
+                                                            ⚡ ปีแรกเท่านั้น
                                                         </span>
                                                     )}
                                                 </div>
@@ -1220,6 +1227,28 @@ export default function EasyMPlansPage() {
                             </div>
                         </div>
 
+                        {/* Upgrade Special Privilege Highlight Box for Existing Customers */}
+                        {isExistingCustomer && (detailProduct.id === 'easym-prime' || detailPriceInfo?.originalPrice) && (
+                            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                                <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                                    <Sparkles className="w-4 h-4" />
+                                </div>
+                                <div className="text-xs space-y-1 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-bold text-amber-300 text-sm">
+                                            ⚡ สิทธิพิเศษลูกค้าเดิม: รับส่วนลดอัปเกรด 50% (เฉพาะปีแรกเท่านั้น)
+                                        </span>
+                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                            First Year Only
+                                        </span>
+                                    </div>
+                                    <p className="text-slate-300 leading-relaxed text-[11px] sm:text-xs">
+                                        สิทธิ์ราคาพิเศษลด 50% สำหรับลูกค้าเดิมทุกสินค้า มีผลครอบคลุมเฉพาะรอบบิลการใช้งานในปีแรก (Year 1) เพื่อให้ลูกค้าได้สัมผัสระบบเรือธงตัวใหม่ในราคาพิเศษ สำหรับรอบการต่ออายุในปีถัดไปจะคิดในอัตรามาตรฐานของระบบ
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Modal Body: Interactive Configuration */}
                         <div className="space-y-4">
                             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
@@ -1387,9 +1416,16 @@ export default function EasyMPlansPage() {
                                 </div>
                             ) : (
                                 <div>
-                                    <span className="text-[11px] text-slate-400 block font-medium">
-                                        สรุปราคาสุทธิ (Annual Total) • {isExistingCustomer ? 'สิทธิ์ลูกค้าเดิม' : 'ลูกค้าใหม่'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-slate-400 block font-medium">
+                                            สรุปราคาสุทธิ (Annual Total) • {isExistingCustomer ? 'สิทธิ์ลูกค้าเดิม' : 'ลูกค้าใหม่'}
+                                        </span>
+                                        {isExistingCustomer && detailPriceInfo?.originalPrice && (
+                                            <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded">
+                                                ⚡ ราคาเฉพาะปีแรก
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex items-baseline gap-2">
                                         <span className="text-3xl font-black text-white font-mono">
                                             {detailTotalAnnual === 0 ? '฿0' : `฿${detailTotalAnnual.toLocaleString()}`}
@@ -1405,6 +1441,11 @@ export default function EasyMPlansPage() {
                                         <span className="text-[11px] text-purple-300 flex items-center gap-1 mt-0.5">
                                             <Sparkles className="w-3 h-3 text-amber-400" />
                                             {detailPriceInfo.trialBadge}
+                                        </span>
+                                    )}
+                                    {isExistingCustomer && detailPriceInfo?.originalPrice && (
+                                        <span className="text-[10px] text-amber-300/90 block mt-1">
+                                            *สิทธิ์ส่วนลดพิเศษเฉพาะรอบบิลปีแรกเท่านั้น รอบต่ออายุปีถัดไปคิดราคามาตรฐาน
                                         </span>
                                     )}
                                 </div>

@@ -2,8 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
-import { Button } from '@/components/ui/button';
-import { Check, ShieldCheck, Zap } from 'lucide-react';
+import { Check, ShieldCheck, Zap, Sparkles, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { ProductPurchaseSection } from '@/components/product-purchase-section';
 import { ProductIbBanner } from '@/components/product-ib-banner';
@@ -137,6 +136,40 @@ export default async function ProductPage(props: { params: Promise<{ id: string 
                                             </li>
                                         ))}
                                     </ul>
+                                </div>
+
+                                {/* Special Upgrade Privilege Callout for Existing Customers */}
+                                <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-transparent border border-amber-500/30">
+                                    <div className="flex items-start gap-3.5">
+                                        <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                                            <Sparkles className="w-5 h-5" />
+                                        </div>
+                                        <div className="space-y-1.5 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-bold text-amber-300 text-sm sm:text-base">
+                                                    สิทธิพิเศษอัปเกรด EasyM PRIME สำหรับลูกค้าเดิม (ลด 50% ปีแรกเท่านั้น)
+                                                </span>
+                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                                    First Year Only
+                                                </span>
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                                                ลูกค้าเดิมที่ถือ EA ทุกสินค้าในเครือ รับสิทธิ์อัปเกรดเป็น <strong className="text-purple-300">EasyM PRIME</strong> ระบบเรือธงในราคาลด 50% สำหรับการใช้งานปีแรก (แบบรันเองเหลือเพียง <strong className="text-foreground">฿5,000/ปี</strong> หรือแบบให้เรารันให้เหลือเพียง <strong className="text-foreground">฿7,000/ปี</strong>)
+                                            </p>
+                                            <p className="text-xs text-amber-300/90 font-medium">
+                                                *ข้อกำหนดสำคัญ: ราคาส่วนลดพิเศษ 50% นี้มีผลเฉพาะรอบบิลปีแรกเท่านั้น รอบการต่ออายุในปีถัดไปจะคิดในอัตรามาตรฐานของระบบ
+                                            </p>
+                                            <div className="pt-1.5">
+                                                <Link 
+                                                    href="/admin/easym-plans" 
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-purple-200 transition"
+                                                >
+                                                    <span>ดูแผนราคา EasyM & สิทธิ์อัปเกรด</span>
+                                                    <ArrowRight className="w-3.5 h-3.5" />
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <ProductPurchaseSection product={product} />
