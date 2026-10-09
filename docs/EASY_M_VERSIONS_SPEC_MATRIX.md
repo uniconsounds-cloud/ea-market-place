@@ -93,16 +93,23 @@
 
 ### 📌 Version 2.00-1009 / 1008 (9 ตุลาคม 2026)
 * **Risk Management & 2-Way Command Synchronization:**
-  * ปรับเกณฑ์โควตากักขังสูงสุด `InpMaxQuarantinedSymbols` เป็น **`3 คู่เงิน`** ให้สอดคล้องกับพอร์ต 20 คู่เงิน
-  * ยืนยันและล็อกเกณฑ์ความปลอดภัยมาตรฐานทั้งระบบ:
+  * **Event-Driven Adaptive Quarantine [QT]:**
+    * ปรับกลไกกักขังให้ตอบสนองทันทีเมื่อพอร์ตเข้าโหมด Freeze (`DD >= 28.0%`) โดยจะเลือกคู่ที่ติดลบสูงสุดที่แตะ Safety Floor (`DD >= 10.0%`) เข้าห้องขังเดี่ยวทันที พร้อม Failsafe ลากหลุดเดี่ยวที่ 25.0%
+    * ปลดปล่อยเมื่อ DD ลดลงอย่างน้อย 4.0% จากจุดเข้าขัง และต้องผ่านเกณฑ์ Safe Ceiling Floor (`DD <= 8.0%`) ขังได้สูงสุด 3 คู่เงิน
+  * **Hybrid Smart Rescue Grid Sniping [R1–R3]:**
+    * จุดเข้าไม้กู้ภัยยืดหยุ่นตามจุดเข้าขังจริง (`Entry DD + 8.0%` ขั้นต่ำ 18.0%)
+    * ติดตั้งฟิลเตอร์ `IsRescueExhaustionConfirmed()` สกัดกั้นอาการรับมีดร่วง (Anti-Falling Knife) ดักรอ Rejection Wick (>=35%), Reversal Candle หรือการพักตัวแบบ Range Contraction ก่อนยิงไม้กู้ภัย สูงสุด 3 ไม้
+  * **100% Symbol Freeze Coverage (ปิดจุดบอดคู่ที่ 5):**
+    * บล็อกการออกไม้กริดเพิ่มทันทีเมื่อคู่เงินใดก็ตามแตะ Freeze 8.0% ครอบคลุม 100% ทุกคู่ในพอร์ต
+  * **เกราะความปลอดภัยมาตรฐานครบวงจร:**
     * Portfolio DD: Slow 18% / Freeze 28% / Resume 12%
-    * Symbol Worst Throttle: Slow 5% / Freeze 8% / Resume 4% (Top 4 คู่)
-    * Quarantine Defense: เข้าขัง 18% / ปลดขัง 12% / ขังสูงสุด 3 คู่
-    * Rescue Grid Sniping: เริ่มกู้ภัย 25% / สูงสุด 3 ไม้ (R1-R3) / ห่าง 100 pips / ก้าว 45 pips / เป้า 15 cent ตัดไม้ดอย
+    * Symbol Worst Throttle: Slow 5% / Freeze 8% / Resume 4% (ตรวจสอบครบ 100% ทุกคู่)
+    * Quarantine Defense: ขังสูงสุด 3 คู่เงิน (Adaptive + Failsafe 25%)
+    * Rescue Grid Sniping: สูงสุด 3 ไม้ (R1-R3) / ห่าง 100 pips / ก้าว 45 pips / เป้า 15 cent ตัดไม้ดอย
     * Auto-Hedge Lock: 40% DD (Single Worst, Net Delta = 0)
     * Currency Cluster: ถือสกุลเงินซ้ำได้สูงสุด 3 คู่ (`InpMaxCurrencyCluster = 3`)
     * Relief Fund: ปันผล 40% จากคู่ที่ปิดกำไร / เพดาน 5% ของ Balance
-  * แยกเวอร์ชันชัดเจน: `v2.00-1008` (Stable Standalone ปิดระบบรีโมต) และ `v2.00-1009` (เปิด 2-Way Web Control)
+  * **แยกเวอร์ชันชัดเจน:** `v2.00-1008` (Stable Standalone ปิดระบบรีโมต) และ `v2.00-1009` (เปิด 2-Way Web Control)
 
 ### 📌 Version 2.00-1006 (6 ตุลาคม 2026)
 * **Cash Flow Optimization & Telemetry Web Sync Upgrade:**

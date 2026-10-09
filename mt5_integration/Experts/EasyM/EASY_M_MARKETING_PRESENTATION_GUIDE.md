@@ -53,39 +53,41 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 
 ---
 
-### 🎬 Slide 2: ฟีเจอร์ที่ 1 — Quarantine Defense [QT] (ระบบกักกันโรคทางการเงิน)
-* **หัวข้อ**: **Quarantine Defense [QT]: สกัดกั้นความเสี่ยง ป้องกันพอร์ตโอเวอร์เทรด**
-* **Key Message**: *"ตัดไฟแต่ต้นลม เมื่อคู่ใดผิดทางเกิน 18% DD ระบบสั่งหยุดออกไม้ทันที"*
+### 🎬 Slide 2: ฟีเจอร์ที่ 1 — Event-Driven Adaptive Quarantine [QT] (ระบบกักกันโรคแบบปรับตัวตามสถานการณ์)
+* **หัวข้อ**: **Event-Driven Adaptive Quarantine [QT]: สกัดกั้นความเสี่ยง ป้องกันพอร์ตโอเวอร์เทรด**
+* **Key Message**: *"ตัดไฟแต่ต้นลม ทันทีที่พอร์ตส่งสัญญาณอันตราย ระบบเข้าล็อกคู่ปัญหาเข้าห้องขังเดี่ยวทันที"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "จุดอ่อนของระบบ Grid ทั่วไปในตลาดคือเมื่อเจอกราฟวันเวย์ บอทจะออกไม้ถี่ขึ้นเรื่อยๆ จนกินมาร์จิ้นพอร์ตแตก แต่ใน EasyM Prime เรามีระบบ Quarantine หรือ 'หอผู้ป่วยแยกโรค' ทันทีที่คู่เงินใดติดลบแตะ 18% ระบบจะล็อกคู่นั้นให้อยู่ในสถานะ Quarantine ไม่ออกไม้กริดทั่วไปเพิ่มอีกเด็ดขาด โดยจำกัดการกักกันไว้สูงสุดไม่เกิน 3 คู่เงินพร้อมกัน (หากเกิน 3 คู่ระบบจะสั่ง Freeze เพื่อความปลอดภัยเชิงระบบ) และเมื่อคู่เงินฟื้นตัวกลับมา DD ต่ำกว่า 12% จะปลดปล่อยกลับมาเทรดปกติ ทำให้พอร์ตหลักยังคงปลอดภัยและมีมาร์จิ้นเหลือเฟือ"
+  "จุดอ่อนของระบบ Grid ทั่วไปในตลาดคือเมื่อเจอกราฟวันเวย์ บอทจะออกไม้ถี่ขึ้นเรื่อยๆ จนกินมาร์จิ้นพอร์ตแตก แต่ใน EasyM Prime เรามีระบบ Adaptive Quarantine หรือ 'หอผู้ป่วยแยกโรคอัจฉริยะ' ที่ทำงานแบบ Event-Driven ทันทีที่พอร์ตโดยรวมส่งสัญญาณเตือนเข้าสู่โหมด Freeze (DD แตะ 28%) ระบบจะคัดเลือกคู่เงินที่ติดลบหนักที่สุดที่แตะ Safety Floor (DD >= 10%) เข้ากักขังในห้องขังเดี่ยวทันที พร้อมเกราะ Emergency Failsafe ที่ 25% DD หากมีคู่ใดลากหลุดเดี่ยว โดยคู่ที่ติดขังจะหยุดถมไม้กริดปกติโดยเด็ดขาด และถูกแยก DD ออกจากการคำนวณโหมดพอร์ตชั่วคราว เพื่อให้คู่ที่เหลือยังสร้าง Cash Flow ได้ตามปกติ จำกัดโควตากักขังสูงสุด 3 คู่ และจะปลดปล่อยอย่างปลอดภัยเมื่อ DD คลายตัวลดลง 4% จากจุดเข้า พร้อมผ่านเกณฑ์ Safe Ceiling Floor ต่ำกว่า 8%"
 * **Bullet Points**:
-  - **Auto Lockdown**: ขังคู่เงินทันทีเมื่อ Drawdown แตะ 18.0%
-  - **Margin Preservation**: ห้ามเปิดไม้กริดปกติเพิ่ม ป้องกันปัญหาไม้บานปลาย
-  - **Quota Limiter**: จำกัดการกักกันสูงสุด 3 คู่พร้อมกัน ป้องกันการลุกลาม
-  - **Hysteresis Release**: ปลดปล่อยออกจากห้องขังเมื่อ DD ลดลงต่ำกว่า 12.0%
+  - **Event-Driven Trigger**: ขังคู่ปัญหาทันทีเมื่อพอร์ตเข้า Freeze (28.0% DD) โดยมี Safety Floor ที่ 10.0% DD
+  - **Emergency Failsafe**: ล็อกขังฉุกเฉินทันทีหากคู่ใดแตะ 25.0% DD แม้พอร์ตยังไม่แตะ Freeze
+  - **Margin Preservation**: ห้ามเปิดไม้กริดปกติเพิ่ม ตัดไฟแต่ต้นลมไม่ให้ลุกลาม
+  - **Quota Limiter**: จำกัดการกักกันสูงสุด 3 คู่พร้อมกัน ป้องกันวิกฤตเชิงระบบ
+  - **Safe Hysteresis Release**: ปลดปล่อยเมื่อ DD ลดลง 4% จากจุดเข้าขัง และต้องต่ำกว่าเพดานปลอดภัย 8.0%
   - **Active State Monitoring**: สัญลักษณ์ [QT] ปรากฏชัดเจนบนแผงแดชบอร์ด
 
 #### 🎨 AI Image Prompt (Slide 2):
 > **Prompt for Midjourney / DALL-E 3 / Flux**:
-> `A high-tech digital isolation vault in a futuristic data center, glowing amber and neon red protective forcefield shielding a specific node labeled "QUARANTINE 18% DD", separating it from the healthy green trading nodes, cybernetic security barrier, sleek isometric infographic design, glossy reflections, financial risk management concept, octane render 8k --ar 16:9 --v 6.0`
+> `A high-tech digital isolation vault in a futuristic data center, glowing amber and neon red protective forcefield shielding a specific node labeled "ADAPTIVE QUARANTINE", separating it from the healthy green trading nodes, cybernetic security barrier, sleek isometric infographic design, glossy reflections, financial risk management concept, octane render 8k --ar 16:9 --v 6.0`
 
 ---
 
-### 🎬 Slide 3: ฟีเจอร์ที่ 2 — Rescue Grid Sniping [R1-R3] & Continuous Lot
-* **หัวข้อ**: **Rescue Grid Sniping: 3 ไม้สไนเปอร์กู้ภัย คืนชีพไม้ติดหล่ม**
-* **Key Message**: *"ไม่ออกพร่ำเพรื่อ แต่ซุ่มยิงในจุดกลับตัวลึก ด้วยลอตที่คำนวณมาอย่างแม่นยำ"*
+### 🎬 Slide 3: ฟีเจอร์ที่ 2 — Hybrid Smart Rescue Grid Sniping [R1-R3] & Anti-Falling Knife
+* **หัวข้อ**: **Smart Rescue Grid Sniping: 3 ไม้สไนเปอร์กู้ภัย ไม่รับมีดร่วง คืนชีพไม้ติดหล่ม**
+* **Key Message**: *"ไม่ออกพร่ำเพรื่อ ไม่รับมีดที่กำลังร่วง แต่ดักซุ่มยิงในจุดที่กราฟหมดแรงชะลอตัวจริง"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "หลังจากคู่เงินถูกกักกันที่ 18% หากตลาดยังไหลต่อจนถึง 25% DD ระบบจะส่งหน่วยกู้ภัยพิเศษ Rescue Grid ออกมาเพียง 3 ไม้เท่านั้น (R1, R2, R3) จุดเด่นคือไม่ได้ออกทันที แต่ต้องรอระยะดึงกลับอย่างน้อย 100 pips และระยะก้าวไม้ถัดไป 45 pips และที่สำคัญที่สุด ขนาดลอตจะวิ่งต่อเนื่องตามขั้นบันได (Ladder Lot) เสมือนเป็นไม้อันดับถัดไปของชุดเดิม มีเป้ากำไรชุดกู้ภัย 15 cent เพื่อล็อกกำไรสดแล้วนำไปชำแหละตัดยอดดอยทิ้งทันที ทำให้จุดคุ้มทุน (Breakeven) ถูกดึงเข้ามาประชิดราคาปัจจุบันทันทีโดยไม่ต้องเสี่ยงเพิ่มไม้เกินจำเป็น"
+  "เมื่อคู่เงินถูกนำเข้าห้องขัง ระบบจะไม่รีบร้อนเปิดไม้แก้ในทันที แต่จะใช้กลยุทธ์ Hybrid Smart Rescue Sniping: ด่านแรกคือ Dynamic Adaptive Entry Gate โดยจะเริ่มเปิดโซนกู้ภัยเมื่อ DD ลากต่อจากจุดเข้าขังอีก 8% (เช่น เข้าขังที่ 12% โซนกู้ภัยจะเริ่มที่ 20%) และด่านสำคัญที่สุดคือ 'Price Action Exhaustion Gate' สกัดกั้นปัญหาการรับมีดร่วง (Anti-Falling Knife) อย่างสมบูรณ์แบบ หากกราฟยังทิ้งดิ่งเป็นน้ำตกหรือพุ่งทะลุรวดเร็ว ระบบจะสั่งรอจนกว่าโมเมนตัมจะชะลอตัว เกิดไส้เทียนปฏิเสธราคา (Rejection Wick >= 35%) หรือเกิดแท่งเทียนกลับตัว หรือเข้าสู่จุดพักตัว Sideway ชัดเจน จากนั้นจึงส่งสไนเปอร์ออกมายิงเพียง 3 ไม้ (R1, R2, R3) ลอตต่อเนื่อง Ladder Lot เป้า 15 cent เพื่อนำกำไรไปตัดตอนไม้ดอยสุดทิ้งทันที"
 * **Bullet Points**:
-  - **Sniper Trigger**: เปิดทำงานเมื่อ DD ลึกถึง 25.0% เท่านั้น
-  - **Deep Spacing**: ไม้แรกห่างจากไม้เดิมอย่างน้อย 100 pips ไม้ถัดไประยะ 45 pips
-  - **Continuous Ladder Lot**: ขนาดลอตต่อเนื่องจากไม้หลัก (เช่น ไม้ 16 -> กู้ภัยไม้ที่ 17, 18, 19)
-  - **Strict Limit**: ออกสูงสุดเพียง 3 ไม้ เพื่อความปลอดภัยขั้นสูงสุด
+  - **Adaptive Entry Gate**: ระยะเริ่มกู้ภัยยืดหยุ่นตามจุดเข้าขังจริง (`Entry DD + 8.0%` ขั้นต่ำ 18.0%)
+  - **Anti-Falling Knife Gate**: ดักรอ Price Action หมดแรง ไม่รับมีดที่กำลังร่วงเด็ดขาด
+  - **Exhaustion Confirmation**: ตรวจจับ Rejection Wick (>=35%), Reversal Candle หรือ Range Contraction
+  - **Continuous Ladder Lot**: ขนาดลอตคำนวณต่อเนื่องตามสัดส่วน ไม่เบิ้ลมั่วซั่ว
+  - **Strict 3-Order Limit**: ออกสูงสุดเพียง 3 ไม้ (R1, R2, R3) เพื่อความปลอดภัยสูงสุด
   - **Tactical Trim Target**: ตั้งเป้าเก็บกำไร 15 cent เพื่อนำไปตัดไม้ดอยสุดทิ้งทันที
 
 #### 🎨 AI Image Prompt (Slide 3):
 > **Prompt for Midjourney / DALL-E 3 / Flux**:
-> `A futuristic sniper targeting system projecting holographic crosshairs onto a fluctuating golden financial candlestick chart, 3 glowing laser-guided precision nodes labeled "R1, R2, R3" appearing at the market bottom pivot point (25% DD trigger), dynamic upward reversal momentum arrows, deep tech aesthetic, dark navy and neon cyan, crisp 3D visualization, cinematic lighting --ar 16:9 --v 6.0`
+> `A futuristic sniper targeting system projecting holographic crosshairs onto a fluctuating golden financial candlestick chart showing price exhaustion and long rejection wick, 3 glowing laser-guided precision nodes labeled "R1, R2, R3" appearing at the confirmed pivot rest point, dynamic upward reversal momentum arrows, deep tech aesthetic, dark navy and neon cyan, crisp 3D visualization, cinematic lighting --ar 16:9 --v 6.0`
 
 ---
 
