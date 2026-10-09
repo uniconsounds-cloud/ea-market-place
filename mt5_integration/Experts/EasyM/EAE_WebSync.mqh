@@ -274,7 +274,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
          current_interval = g_eae_active_sync_interval;
       }
       if(!g_eae_full_sync_mode) {
-         current_interval = 10; // Sleep mode: ping to check for active viewer every 10 seconds
+         current_interval = 180; // Standby / Sleep mode: ping heartbeat every 3 minutes (180s) when no active viewer
       }
       
       if(!force_now && (int)(now_ticks - g_eae_last_sync_ticks) < current_interval * 1000) {
@@ -380,7 +380,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    
    if(res != 200) {
       if(res == 1003) {
-         // Transient internet network timeout (MQL5 internal code 1003)
+         // Transient internet network timeout (MQL5 internal code 1003) - Auto-recovering
          g_eae_sync_status = "RETRYING";
          g_eae_sync_message = "Network Timeout (Auto-recovering)";
          return false;
@@ -423,12 +423,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
          g_eae_last_sync_ticks = 0; // Trigger instant full sync on the very next tick!
          g_eae_last_sync_hash = ""; // Clear hash to force a full update!
          g_eae_last_heartbeat_ticks = 0;  // Reset heartbeat timer!
-         Print("🟢 EAE WebSync: >> FARM VIEWER ACTIVE << (กำลังเปิดดูหน้าฟาร์ม - ซิงค์ข้อมูล Realtime ทุก 10 วิ)");
+         Print("🟢 EAE WebSync: >> FARM VIEWER ACTIVE << (กำลังเปิดดูหน้าฟาร์ม - ซิงค์ข้อมูลสดทุก 20 วินาที)");
       }
       g_eae_full_sync_mode = true;
    } else {
       if(g_eae_full_sync_mode) {
-         Print("💤 EAE WebSync: >> STANDBY MODE << (ปิดหน้าฟาร์มแล้ว - เข้าสู่โหมดประหยัดทรัพยากร ซิงค์ทุก 20 วิ)");
+         Print("💤 EAE WebSync: >> STANDBY MODE << (ปิดหน้าฟาร์มแล้ว - เข้าสู่โหมดประหยัดทรัพยากร ซิงค์ทุก 3 นาที)");
       }
       g_eae_full_sync_mode = false;
    }
