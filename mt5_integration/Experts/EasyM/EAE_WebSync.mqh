@@ -259,7 +259,7 @@ string EAE_CalculateDataHash(const EAE_RealtimeSnapshot &snap)
 //+------------------------------------------------------------------+
 //| Send a full modular snapshot to the web server                   |
 //+------------------------------------------------------------------+
-bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
+bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, string extra_payload_json = "")
 {
    datetime now = TimeCurrent();
    datetime today_start = (now / 86400) * 86400;
@@ -301,14 +301,19 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
    payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
    
    // Snapshot
+   string sys_code = snap.identity.system_code;
    payload += "\"snapshot\":{";
    payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
    payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
    payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
-   payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + snap.identity.system_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
+   payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + sys_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
    payload += "},";
    
    payload += "\"orders\":" + orders_json;
+   if(StringLen(extra_payload_json) > 0)
+   {
+      payload += ",\"prime_data\":" + extra_payload_json;
+   }
    payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
 
    // Hash Check for Throttling (only applies in full sync mode)
@@ -478,127 +483,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false)
        }
     }
    
-   // 5. Parse 2-Way Web Command & Control Config
-   EAE_ParseAndApplyWebConfig(response);
-   
+   // 5. Parse 2-Way Web Command & Control Config (Active in v2.00-1009+)
+#ifdef ENABLE_EM_WEB_CONTROL
+   WebControlParseAndApplyResponse(response);
+#endif
+
    return true;
-}
-
-//+------------------------------------------------------------------+
-//| Extract JSON string value by key                                 |
-//+------------------------------------------------------------------+
-string EAE_ExtractJsonString(const string json, const string key)
-{
-   int keyPos = StringFind(json, "\"" + key + "\":");
-   if(keyPos < 0) return "";
-   int start = keyPos + StringLen("\"" + key + "\":");
-   while(start < StringLen(json) && (json[start] == ' ' || json[start] == '\"')) start++;
-   int end = start;
-   while(end < StringLen(json) && json[end] != '\"' && json[end] != ',' && json[end] != '}') end++;
-   if(end > start)
-   {
-      string val = StringSubstr(json, start, end - start);
-      StringTrimLeft(val);
-      StringTrimRight(val);
-      return val;
-   }
-   return "";
-}
-
-//+------------------------------------------------------------------+
-//| Extract JSON boolean value by key                                |
-//+------------------------------------------------------------------+
-bool EAE_ExtractJsonBool(const string json, const string key, bool defaultVal = false)
-{
-   int keyPos = StringFind(json, "\"" + key + "\":");
-   if(keyPos < 0) return defaultVal;
-   int start = keyPos + StringLen("\"" + key + "\":");
-   while(start < StringLen(json) && json[start] == ' ') start++;
-   if(StringSubstr(json, start, 4) == "true" || StringSubstr(json, start, 4) == "TRUE") return true;
-   if(StringSubstr(json, start, 5) == "false" || StringSubstr(json, start, 5) == "FALSE") return false;
-   return defaultVal;
-}
-
-//+------------------------------------------------------------------+
-//| Parse 2-Way Web Command & Control Config from Server Response    |
-//+------------------------------------------------------------------+
-void EAE_ParseAndApplyWebConfig(const string response)
-{
-   int wcPos = StringFind(response, "\"web_config\"");
-   if(wcPos < 0) return;
-   
-   long login = AccountInfoInteger(ACCOUNT_LOGIN);
-   string subJson = StringSubstr(response, wcPos);
-   
-   // 1. Control Mode (\"web\" vs \"manual\")
-   string ctrlMode = EAE_ExtractJsonString(subJson, "control_mode");
-   if(ctrlMode != "")
-   {
-      double modeVal = (ctrlMode == "manual") ? 0.0 : 1.0;
-      GlobalVariableSet(StringFormat("EMP18_%I64d_CONTROL_MODE", login), modeVal);
-   }
-   
-   // 2. Port Mode (\"NORMAL\", \"SLOW\", \"FREEZE\")
-   string portMode = EAE_ExtractJsonString(subJson, "port_mode");
-   if(portMode != "")
-   {
-      double pmVal = 0.0;
-      if(portMode == "SLOW") pmVal = 1.0;
-      else if(portMode == "FREEZE") pmVal = 2.0;
-      GlobalVariableSet(StringFormat("EMP18_%I64d_PORT_MODE", login), pmVal);
-   }
-   
-   // 3. Pause New Orders
-   if(StringFind(subJson, "\"pause_new_orders\":") >= 0)
-   {
-      bool isPaused = EAE_ExtractJsonBool(subJson, "pause_new_orders", false);
-      GlobalVariableSet(StringFormat("EMP18_%I64d_PAUSE", login), isPaused ? 1.0 : 0.0);
-   }
-   
-   // 4. Symbols Configuration
-   int symPos = StringFind(subJson, "\"symbols\"");
-   if(symPos >= 0)
-   {
-      string symJson = StringSubstr(subJson, symPos);
-      
-      string knownSymbols[] = {
-         "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDJPY", "USDCHF",
-         "EURJPY", "GBPJPY", "USDCAD", "AUDNZD", "CADCHF", "NZDCAD",
-         "EURCAD", "GBPCAD", "EURAUD", "GBPAUD", "AUDJPY", "NZDJPY",
-         "EURNZD", "GBPNZD", "AUDCAD", "EURCHF", "GBPCHF"
-      };
-      
-      for(int s = 0; s < ArraySize(knownSymbols); s++)
-      {
-         string sym = knownSymbols[s];
-         int sKey = StringFind(symJson, "\"" + sym + "\":");
-         if(sKey >= 0)
-         {
-            int sEnd = StringFind(symJson, "}", sKey);
-            if(sEnd > sKey)
-            {
-               string block = StringSubstr(symJson, sKey, sEnd - sKey + 1);
-               
-               string gvEn = StringFormat("EMP18_%I64d_%s_EN", login, sym);
-               string gvQt = StringFormat("EMP18_%I64d_%s_QT", login, sym);
-
-               if(StringFind(block, "\"close_only\":true") >= 0 || StringFind(block, "\"close_only\": true") >= 0)
-                  GlobalVariableSet(gvEn, 0.0);
-               else if(StringFind(block, "\"enabled\":false") >= 0 || StringFind(block, "\"enabled\": false") >= 0)
-                  GlobalVariableSet(gvEn, 0.0);
-               else if(StringFind(block, "\"enabled\":true") >= 0 || StringFind(block, "\"enabled\": true") >= 0)
-                  GlobalVariableSet(gvEn, 1.0);
-
-               if(StringFind(block, "\"quarantined\":true") >= 0 || StringFind(block, "\"quarantined\": true") >= 0)
-                  GlobalVariableSet(gvQt, 1.0);
-               else if(StringFind(block, "\"quarantined\":false") >= 0 || StringFind(block, "\"quarantined\": false") >= 0)
-                  GlobalVariableSet(gvQt, 0.0);
-            }
-         }
-      }
-   }
-   
-   GlobalVariableSet(StringFormat("EMP18_%I64d_LAST_WEB_UPDATE", login), (double)TimeCurrent());
 }
 
 //+------------------------------------------------------------------+
