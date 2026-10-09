@@ -41,7 +41,7 @@
 | **ห้องขังเดี่ยว (Quarantine)** | ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (18% DD, ขังสูงสุด 3 คู่, ปลดขัง 12%)** |
 | **กองทุนตัดขาดทุน (Relief Fund)**| ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (Cross-Pair Vault 40%, Cap 5%)** |
 | **สไนเปอร์กู้ภัย (Rescue Grid)**| ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (25% DD, 3 ไม้สไนเปอร์ R1-R3)** |
-| **Currency Cluster Limit** | สูงสุด 2 คู่เงิน | สูงสุด 2 คู่เงิน | สูงสุด 2 คู่เงิน | ✅ **สูงสุด 3 คู่เงิน (เพิ่ม Cash Flow)** |
+| **Currency Cluster Limit** | สูงสุด 2 คู่เงิน | สูงสุด 2 คู่เงิน | สูงสุด 3 คู่เงิน (`InpMaxCurrencyCluster=3`) | ✅ **สูงสุด 3 คู่เงิน (เพิ่ม Cash Flow)** |
 | **3-Tier Portfolio DD** | 18% Slow / 28% Freeze | 18% Slow / 28% Freeze | 18% Slow / 28% Freeze | ✅ **18% Slow / 28% Freeze / 12% Resume** |
 
 ---
