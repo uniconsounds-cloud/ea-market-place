@@ -96,6 +96,7 @@ export async function POST(req: Request) {
                 asset_type: assetType,
                 system_code: finalSystemCode,
                 ea_version: eaVersion,
+                server_time: Number(payload.server_time || Math.floor(Date.now() / 1000)),
                 is_online: true,
                 last_ping: nowIso,
                 updated_at: nowIso
@@ -182,15 +183,37 @@ export async function POST(req: Request) {
             }
         }
 
-        // 7. Retrieve 2-Way Command & Web Control state for this port
+        // 7. Check if user is actively viewing this port on the web (within last 2 minutes)
+        let shouldSyncFull = false;
+        try {
+            const { data: viewCheck } = await supabase
+                .from('farm_port_status')
+                .select('last_viewed_at')
+                .eq('port_number', portNumber)
+                .maybeSingle();
+
+            if (viewCheck?.last_viewed_at) {
+                const lastViewedMs = new Date(viewCheck.last_viewed_at).getTime();
+                const diffMs = Date.now() - lastViewedMs;
+                // If viewed within last 2 minutes (120,000 ms), full sync is active
+                if (diffMs < 120000) {
+                    shouldSyncFull = true;
+                }
+            }
+        } catch (e) {
+            shouldSyncFull = true;
+        }
+
+        // 8. Retrieve 2-Way Command & Web Control state for this port
         const webConfig = getPortControl(portNumber);
 
         // Return response matching both MQL5 WebSync and Licensing expectation with 2-Way Web Config
         return NextResponse.json({
             status: 'success',
             success: true,
-            should_sync_full: true,
-            sync_interval: 20,
+            should_sync_full: shouldSyncFull,
+            viewer_active: shouldSyncFull,
+            sync_interval: shouldSyncFull ? 10 : 20,
             license_tier: 'pro',
             is_trial: false,
             timestamp: nowIso,

@@ -641,31 +641,34 @@ export default function DemoFarmClient({
         return () => clearInterval(interval);
     }, []);
 
-    // Ignore 0 profit momentarily caused by EA sync delays
+    // Day rollover & today's profit sync
     useEffect(() => {
         if (!portStatus) return;
         const currentPnl = Number(portStatus.today_pnl || 0);
+        const currentClosedLots = Number(portStatus.today_closed_lots || 0);
         
-        let serverDate = new Date();
-        if (portStatus.server_time) {
-            serverDate = new Date(Number(portStatus.server_time) * 1000);
-        }
+        // Derive trading day from market trading date (rolls over at 05:00 AM Bangkok)
+        const mDate = getMarketTradingDate(time || new Date());
+        const yyyy = mDate.getFullYear();
+        const mm = String(mDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(mDate.getDate()).padStart(2, '0');
+        const activeTradingDateStr = `${yyyy}-${mm}-${dd}`;
         
-        const dayStr = serverDate.toISOString().split('T')[0];
-        
-        if (lastDayRef.current !== dayStr) {
-            // New day or first load
-            lastDayRef.current = dayStr;
+        if (lastDayRef.current !== activeTradingDateStr) {
+            // New day or first load: sync with current today_pnl immediately
+            lastDayRef.current = activeTradingDateStr;
             setSmoothedTodayProfit(currentPnl);
         } else {
-            // Same day: if currentPnl drops to exactly 0 suddenly but it was positive, ignore it!
-            if (currentPnl === 0 && smoothedTodayProfit > 0) {
-                // momentary 0 drop, ignore
+            // Same day: if 0 trades closed today, today's PnL is definitely 0
+            if (currentClosedLots === 0 && currentPnl === 0) {
+                setSmoothedTodayProfit(0);
+            } else if (currentPnl === 0 && smoothedTodayProfit > 0 && currentClosedLots > 0) {
+                // momentary 0 drop during position reload on the same day with existing closed lots
             } else {
                 setSmoothedTodayProfit(currentPnl);
             }
         }
-    }, [portStatus?.today_pnl, portStatus?.server_time, smoothedTodayProfit]);
+    }, [portStatus?.today_pnl, portStatus?.today_closed_lots, time, smoothedTodayProfit]);
 
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 

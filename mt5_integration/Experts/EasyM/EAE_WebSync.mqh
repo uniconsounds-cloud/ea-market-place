@@ -360,7 +360,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    ResetLastError();
-   int res = WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
+   int res = WebRequest("POST", g_eae_api_url, headers, 10000, data, result, result_headers);
    if(res == -1) {
       int err = GetLastError();
       g_eae_sync_status = "ERR: CONN";
@@ -379,6 +379,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    }
    
    if(res != 200) {
+      if(res == 1003) {
+         // Transient internet network timeout (MQL5 internal code 1003)
+         g_eae_sync_status = "RETRYING";
+         g_eae_sync_message = "Network Timeout (Auto-recovering)";
+         return false;
+      }
       g_eae_sync_status = "ERR: " + IntegerToString(res);
       string err_resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
       g_eae_sync_message = "HTTP " + IntegerToString(res);
@@ -417,12 +423,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
          g_eae_last_sync_ticks = 0; // Trigger instant full sync on the very next tick!
          g_eae_last_sync_hash = ""; // Clear hash to force a full update!
          g_eae_last_heartbeat_ticks = 0;  // Reset heartbeat timer!
-         Print("EAE WebSync: >> WAKING UP << (Viewer active, initiating full sync...)");
+         Print("🟢 EAE WebSync: >> FARM VIEWER ACTIVE << (กำลังเปิดดูหน้าฟาร์ม - ซิงค์ข้อมูล Realtime ทุก 10 วิ)");
       }
       g_eae_full_sync_mode = true;
    } else {
       if(g_eae_full_sync_mode) {
-         Print("EAE WebSync: >> GOING TO SLEEP << (No active viewer, entering sleep mode...)");
+         Print("💤 EAE WebSync: >> STANDBY MODE << (ปิดหน้าฟาร์มแล้ว - เข้าสู่โหมดประหยัดทรัพยากร ซิงค์ทุก 20 วิ)");
       }
       g_eae_full_sync_mode = false;
    }
