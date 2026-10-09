@@ -8,8 +8,8 @@
 1. [ภาพรวมของตระกูล EasyM (Executive Summary)](#1-ภาพรวมของตระกูล-easym)
 2. [EasyM Prime (v1.18 0924) — สไลด์เจาะลึก 6 ฟีเจอร์ใหม่ + AI Prompts](#2-easym-prime-v118-0924--สไลด์พรีเซนต์-6-ฟีเจอร์ใหม่)
    - Slide 1: Cover Slide — The Evolution of Multi-Currency Grid
-   - Slide 2: Quarantine Defense [QT] — ระบบกักกันความเสี่ยง 10% DD
-   - Slide 3: Rescue Grid Sniping [R1-R3] & Continuous Lot — สไนเปอร์กู้ภัย 3 นัด
+   - Slide 2: Quarantine Defense [QT] — ระบบกักกันความเสี่ยง 18% DD (ขังสูงสุด 3 คู่, ปลดขัง 12%)
+   - Slide 3: Rescue Grid Sniping [R1-R3] & Continuous Lot — สไนเปอร์กู้ภัย 3 นัด (25% DD)
    - Slide 4: Dual-Exit Engine — รวบจบกำไรไว vs สไนเปอร์ตัดยอดดอย
    - Slide 5: Cross-Pair Profit Relief — พันธมิตรคู่เงินปันผล 40% ช่วยตัดไม้ดอย
    - Slide 6: Single-Worst 40% Circuit Breaker — ซูเปอร์เซฟล็อกพอร์ตฉุกเฉิน
@@ -55,18 +55,19 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 
 ### 🎬 Slide 2: ฟีเจอร์ที่ 1 — Quarantine Defense [QT] (ระบบกักกันโรคทางการเงิน)
 * **หัวข้อ**: **Quarantine Defense [QT]: สกัดกั้นความเสี่ยง ป้องกันพอร์ตโอเวอร์เทรด**
-* **Key Message**: *"ตัดไฟแต่ต้นลม เมื่อคู่ใดผิดทางเกิน 10% DD ระบบสั่งหยุดออกไม้ทันที"*
+* **Key Message**: *"ตัดไฟแต่ต้นลม เมื่อคู่ใดผิดทางเกิน 18% DD ระบบสั่งหยุดออกไม้ทันที"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "จุดอ่อนของระบบ Grid ทั่วไปในตลาดคือเมื่อเจอกราฟวันเวย์ บอทจะออกไม้ถี่ขึ้นเรื่อยๆ จนกินมาร์จิ้นพอร์ตแตก แต่ใน EasyM Prime เรามีระบบ Quarantine หรือ 'หอผู้ป่วยแยกโรค' ทันทีที่คู่เงินใดติดลบแตะ 10% ระบบจะล็อกคู่นั้นให้อยู่ในสถานะ Quarantine ไม่ออกไม้กริดทั่วไปเพิ่มอีกเด็ดขาด จำกัดไว้สูงสุดไม่เกิน 2 คู่พร้อมกัน ทำให้พอร์ตหลักยังคงปลอดภัยและมีมาร์จิ้นเหลือเฟือ"
+  "จุดอ่อนของระบบ Grid ทั่วไปในตลาดคือเมื่อเจอกราฟวันเวย์ บอทจะออกไม้ถี่ขึ้นเรื่อยๆ จนกินมาร์จิ้นพอร์ตแตก แต่ใน EasyM Prime เรามีระบบ Quarantine หรือ 'หอผู้ป่วยแยกโรค' ทันทีที่คู่เงินใดติดลบแตะ 18% ระบบจะล็อกคู่นั้นให้อยู่ในสถานะ Quarantine ไม่ออกไม้กริดทั่วไปเพิ่มอีกเด็ดขาด โดยจำกัดการกักกันไว้สูงสุดไม่เกิน 3 คู่เงินพร้อมกัน (หากเกิน 3 คู่ระบบจะสั่ง Freeze เพื่อความปลอดภัยเชิงระบบ) และเมื่อคู่เงินฟื้นตัวกลับมา DD ต่ำกว่า 12% จะปลดปล่อยกลับมาเทรดปกติ ทำให้พอร์ตหลักยังคงปลอดภัยและมีมาร์จิ้นเหลือเฟือ"
 * **Bullet Points**:
-  - **Auto Lockdown**: ขังคู่เงินทันทีเมื่อ Drawdown แตะ 10.0%
+  - **Auto Lockdown**: ขังคู่เงินทันทีเมื่อ Drawdown แตะ 18.0%
   - **Margin Preservation**: ห้ามเปิดไม้กริดปกติเพิ่ม ป้องกันปัญหาไม้บานปลาย
-  - **Quota Limiter**: จำกัดการกักกันสูงสุด 2 คู่พร้อมกัน ไม่ปล่อยให้ลุกลาม
+  - **Quota Limiter**: จำกัดการกักกันสูงสุด 3 คู่พร้อมกัน ป้องกันการลุกลาม
+  - **Hysteresis Release**: ปลดปล่อยออกจากห้องขังเมื่อ DD ลดลงต่ำกว่า 12.0%
   - **Active State Monitoring**: สัญลักษณ์ [QT] ปรากฏชัดเจนบนแผงแดชบอร์ด
 
 #### 🎨 AI Image Prompt (Slide 2):
 > **Prompt for Midjourney / DALL-E 3 / Flux**:
-> `A high-tech digital isolation vault in a futuristic data center, glowing amber and neon red protective forcefield shielding a specific node labeled "QUARANTINE 10% DD", separating it from the healthy green trading nodes, cybernetic security barrier, sleek isometric infographic design, glossy reflections, financial risk management concept, octane render 8k --ar 16:9 --v 6.0`
+> `A high-tech digital isolation vault in a futuristic data center, glowing amber and neon red protective forcefield shielding a specific node labeled "QUARANTINE 18% DD", separating it from the healthy green trading nodes, cybernetic security barrier, sleek isometric infographic design, glossy reflections, financial risk management concept, octane render 8k --ar 16:9 --v 6.0`
 
 ---
 
@@ -74,16 +75,17 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 * **หัวข้อ**: **Rescue Grid Sniping: 3 ไม้สไนเปอร์กู้ภัย คืนชีพไม้ติดหล่ม**
 * **Key Message**: *"ไม่ออกพร่ำเพรื่อ แต่ซุ่มยิงในจุดกลับตัวลึก ด้วยลอตที่คำนวณมาอย่างแม่นยำ"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "หลังจากคู่เงินถูกกักกันที่ 10% หากตลาดยังไหลต่อจนถึง 15% DD ระบบจะส่งหน่วยกู้ภัยพิเศษ Rescue Grid ออกมาเพียง 3 ไม้เท่านั้น (R1, R2, R3) จุดเด่นคือไม่ได้ออกทันที แต่ต้องรอระยะดึงกลับอย่างน้อย 100-150 pips และที่สำคัญที่สุด ขนาดลอตจะวิ่งต่อเนื่องตามขั้นบันได (Ladder Lot) เสมือนเป็นไม้อันดับถัดไปของชุดเดิม ทำให้จุดคุ้มทุน (Breakeven) ถูกดึงเข้ามาประชิดราคาปัจจุบันทันทีโดยไม่ต้องเสี่ยงเพิ่มไม้เกินจำเป็น"
+  "หลังจากคู่เงินถูกกักกันที่ 18% หากตลาดยังไหลต่อจนถึง 25% DD ระบบจะส่งหน่วยกู้ภัยพิเศษ Rescue Grid ออกมาเพียง 3 ไม้เท่านั้น (R1, R2, R3) จุดเด่นคือไม่ได้ออกทันที แต่ต้องรอระยะดึงกลับอย่างน้อย 100 pips และระยะก้าวไม้ถัดไป 45 pips และที่สำคัญที่สุด ขนาดลอตจะวิ่งต่อเนื่องตามขั้นบันได (Ladder Lot) เสมือนเป็นไม้อันดับถัดไปของชุดเดิม มีเป้ากำไรชุดกู้ภัย 15 cent เพื่อล็อกกำไรสดแล้วนำไปชำแหละตัดยอดดอยทิ้งทันที ทำให้จุดคุ้มทุน (Breakeven) ถูกดึงเข้ามาประชิดราคาปัจจุบันทันทีโดยไม่ต้องเสี่ยงเพิ่มไม้เกินจำเป็น"
 * **Bullet Points**:
-  - **Sniper Trigger**: เปิดทำงานเมื่อ DD ลึกถึง 15.0% เท่านั้น
+  - **Sniper Trigger**: เปิดทำงานเมื่อ DD ลึกถึง 25.0% เท่านั้น
   - **Deep Spacing**: ไม้แรกห่างจากไม้เดิมอย่างน้อย 100 pips ไม้ถัดไประยะ 45 pips
   - **Continuous Ladder Lot**: ขนาดลอตต่อเนื่องจากไม้หลัก (เช่น ไม้ 16 -> กู้ภัยไม้ที่ 17, 18, 19)
   - **Strict Limit**: ออกสูงสุดเพียง 3 ไม้ เพื่อความปลอดภัยขั้นสูงสุด
+  - **Tactical Trim Target**: ตั้งเป้าเก็บกำไร 15 cent เพื่อนำไปตัดไม้ดอยสุดทิ้งทันที
 
 #### 🎨 AI Image Prompt (Slide 3):
 > **Prompt for Midjourney / DALL-E 3 / Flux**:
-> `A futuristic sniper targeting system projecting holographic crosshairs onto a fluctuating golden financial candlestick chart, 3 glowing laser-guided precision nodes labeled "R1, R2, R3" appearing at the market bottom pivot point, dynamic upward reversal momentum arrows, deep tech aesthetic, dark navy and neon cyan, crisp 3D visualization, cinematic lighting --ar 16:9 --v 6.0`
+> `A futuristic sniper targeting system projecting holographic crosshairs onto a fluctuating golden financial candlestick chart, 3 glowing laser-guided precision nodes labeled "R1, R2, R3" appearing at the market bottom pivot point (25% DD trigger), dynamic upward reversal momentum arrows, deep tech aesthetic, dark navy and neon cyan, crisp 3D visualization, cinematic lighting --ar 16:9 --v 6.0`
 
 ---
 
@@ -167,10 +169,10 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 * **หัวข้อ**: **The Mathematics of Balance: ระบบ 10 คู่เงินสมดุล Correlation**
 * **Key Message**: *"ไม่ได้เทรดคู่เดียว แต่เทรดตะกร้าเงินที่หักล้างความเสี่ยงกันเองตามธรรมชาติ"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "EasyM Max ประสบความสำเร็จอย่างสูงเพราะใช้หลักการ Correlation Hedging เทรด 10 คู่เงินข้ามสกุล เช่น EURUSD, GBPUSD, AUDUSD, USDCHF, USDCAD ฯลฯ โดยมีระบบ **Currency Cluster Limiter** คอยควบคุมไม่ให้มีสกุลเงินใดสกุลเงินหนึ่ง (เช่น USD หรือ JPY) ถูกเปิดเทรดซ้ำกันเกิน 2 คู่ ทำให้แม้จะมีข่าวดอลลาร์แข็งค่าอย่างรุนแรง พอร์ตจะไม่ถูกลากไปทางเดียวทั้งหมด เพราะมีคู่เงินอื่นช่วยคานอำนาจไว้"
+  "EasyM Max ประสบความสำเร็จอย่างสูงเพราะใช้หลักการ Correlation Hedging เทรด 10 คู่เงินข้ามสกุล เช่น EURUSD, GBPUSD, AUDUSD, USDCHF, USDCAD ฯลฯ โดยมีระบบ **Currency Cluster Limiter** คอยควบคุมไม่ให้มีสกุลเงินใดสกุลเงินหนึ่ง (เช่น USD หรือ JPY) ถูกเปิดเทรดซ้ำกันเกินกำหนด (ใน Max กำหนดไว้ที่ 2 คู่ และใน Prime อัปเกรดเป็น 3 คู่เพื่อเพิ่มกระแสเงินสด Cash Flow ในพอร์ต 20 สัญลักษณ์) ทำให้แม้จะมีข่าวดอลลาร์แข็งค่าอย่างรุนแรง พอร์ตจะไม่ถูกลากไปทางเดียวทั้งหมด เพราะมีคู่เงินอื่นช่วยคานอำนาจไว้"
 * **Bullet Points**:
   - เทรด 10 คู่ความสัมพันธ์ รวม 20 สัญลักษณ์สกุลเงิน
-  - **Currency Cluster (Max 2)**: จำกัดการเปิดสกุลเงินซ้ำ ป้องกันโดนลากทางเดียว
+  - **Currency Cluster Limit**: จำกัดเปิดสกุลเงินซ้ำ (Max 3 ใน Prime / Max 2 ใน Max) ป้องกันลากทิศทางเดียว
   - กระจายความเสี่ยงข้ามทวีป: ยุโรป, อเมริกา, เอเชีย, ออสเตรเลีย
   - สร้างกระแสเงินสดต่อเนื่องตลอด 24 ชั่วโมงในวันทำการ
 
@@ -184,7 +186,7 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 * **หัวข้อ**: **3-Tier Portfolio Defense: ระบบป้องกันพอร์ต 3 ชั้นพร้อม Hysteresis**
 * **Key Message**: *"ชะลอตัวอัตโนมัติเมื่อเจอลมมรสุม และกลับมาเร่งเครื่องเมื่อฟ้าเปิด"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "หัวใจความนิ่งของ EasyM Max คือระบบจัดการ Drawdown รวมของทั้งพอร์ต 3 ระดับ:
+  "หัวใจความนิ่งของ EasyM คือระบบจัดการ Drawdown รวมของทั้งพอร์ต 3 ระดับ:
   - **Normal Mode (DD < 18%)**: ทำงานเต็มสูบ ออกออเดอร์ตามแผนปกติ
   - **Slow Mode (DD >= 18%)**: ตลาดเริ่มผันผวน บอทจะเพิ่มระยะห่างของไม้กริดเป็น 2 เท่าทันที เพื่อประหยัดกระสุน
   - **Freeze Mode (DD >= 28%)**: ลมพายุพัดแรง สั่งหยุดเปิดไม้แรกของคู่ใหม่ทั้งหมด เพื่อคุมขนาดพอร์ต
@@ -205,10 +207,14 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 * **หัวข้อ**: **Symbol Break & Worst Throttle: จัดระเบียบคู่เงินที่มีปัญหา**
 * **Key Message**: *"จับตาดู 4 อันดับคู่ที่ขาดทุนสูงสุด และลดสปีดลงทันที ไม่ปล่อยให้ลากพอร์ต"*
 * **เนื้อหาบรรยาย (Speaker Notes)**:
-  "นอกจากการดูพอร์ตในภาพรวม Max ยังมีเรดาร์ตรวจจับรายคู่เงิน โดยจัดอันดับคู่เงินที่มีผลขาดทุนสูงสุด 4 อันดับแรก (Top 4 Worst) หากคู่ใดติดลบเกินค่าที่กำหนด ระบบจะทำการ Throttle (เบรก) ขยายระยะไม้ออกไปเฉพาะคู่นั้น หรือหยุดออกไม้ชั่วคราว ทำให้คู่เงินที่มีปัญหาไม่สามารถดึงเงินในพอร์ตไปใช้จนหมดได้ ปล่อยให้คู่เงินที่กำลังทำกำไรทำงานได้อย่างสบายใจ"
+  "นอกจากการดูพอร์ตในภาพรวม Prime และ Max ยังมีเรดาร์ตรวจจับรายคู่เงิน โดยจัดอันดับคู่เงินที่มีผลขาดทุนสูงสุด 4 อันดับแรก (Top 4 Worst):
+  - **Slow รายคู่ (DD >= 5.0%)**: ชะลอความถี่ออกไม้ ให้เปิดได้ทุก 3 แท่งเทียน
+  - **Freeze รายคู่ (DD >= 8.0%)**: สั่งหยุดออกไม้เพิ่มของคู่นั้นทันที
+  - **Resume ปลดล็อก (DD <= 4.0%)**: ปลดกลับสู่สภาวะปกติเมื่อ DD ลดลงต่ำกว่า 4%
+  ทำให้คู่เงินที่มีปัญหาไม่สามารถดึงเงินในพอร์ตไปใช้จนหมดได้ ปล่อยให้คู่เงินที่กำลังทำกำไรทำงานได้อย่างสบายใจ"
 * **Bullet Points**:
-  - จัดอันดับ Real-time Dynamic Ranking ตรวจจับคู่ที่ Drawdown สูงสุด
-  - สั่งเบรกและชะลอการออกไม้เฉพาะคู่เงินที่ดื้อรั้น
+  - จัดอันดับ Real-time Dynamic Ranking ตรวจจับ 4 คู่ที่ Drawdown สูงสุด
+  - **Throttle 5% Slow / 8% Freeze / 4% Resume**: สั่งเบรกและชะลอการออกไม้เฉพาะคู่เงินที่ดื้อรั้น
   - ปกป้อง Equity ส่วนรวม ไม่ให้คู่ใดคู่หนึ่งขโมยมาร์จิ้นของพอร์ตไป
   - ระบบคลายตัวอัตโนมัติเมื่อกราฟเริ่มกลับเข้าสู่สภาวะปกติ
 
@@ -216,17 +222,17 @@ EasyM คือระบบเทรดอัตโนมัติ (Automated Al
 
 ## 4. ตารางเปรียบเทียบเชิงลึก: mini vs Max vs Prime
 
-| มิติการเปรียบเทียบ | 🥉 EasyM mini | 🥈 EasyM Max (v1.16) | 🥇 EasyM Prime (v1.18 0924) |
+| มิติการเปรียบเทียบ | 🥉 EasyM mini | 🥈 EasyM Max (v1.16) | 🥇 EasyM Prime (v2.00) |
 | :--- | :--- | :--- | :--- |
 | **ขนาดทุนแนะนำ (Cent)** | $500 (50,000 USC) | $1,000 (100,000 USC) | $1,000+ (100,000+ USC) |
 | **จำนวนคู่เงินที่เทรด** | 5 คู่เงิน (10 Symbols) | 10 คู่เงิน (20 Symbols) | 10 คู่เงิน (20 Symbols) |
-| **Correlation Hedging** | มี (ระดับพื้นฐาน) | มี (ระดับมาตรฐานสากล) | มี (ระดับสากล + Dynamic Cluster) |
-| **3-Tier DD Control** | มี (18% Slow / 28% Freeze) | มี (18% Slow / 28% Freeze) | มี (ทำงานควบคู่กับระบบกักกัน) |
-| **Quarantine [QT] (10% DD)** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (กักกันล็อกหยุดไม้ทันที)** |
-| **Rescue Grid [R1-R3]** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (3 ไม้สไนเปอร์ ลอตต่อเนื่อง)** |
-| **Dual-Exit Engine** | ปิดรวมทั้งชุดปกติ | ปิดรวมทั้งชุดปกติ | ✅ **มี (รวบยกชุด + สไนเปอร์ตัดยอดดอย)** |
-| **Cross-Pair Profit Relief** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (แบ่งกำไร 40% ช่วยตัดไม้ดอย)** |
-| **Single-Worst 40% Hedge** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (Hedge ล็อกความเสี่ยงคู่แย่สุด)** |
+| **Correlation Hedging** | มี (ระดับพื้นฐาน) | มี (ระดับมาตรฐานสากล) | มี (ระดับสากล + Cluster สูงสุด 3 คู่) |
+| **3-Tier DD Control** | มี (18% Slow / 28% Freeze / 12% Resume) | มี (18% Slow / 28% Freeze / 12% Resume) | มี (18% Slow / 28% Freeze / 12% Resume) |
+| **Quarantine [QT]** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (ขังเดี่ยวที่ 18% DD, ขังสูงสุด 3 คู่, ปลดขัง 12%)** |
+| **Rescue Grid [R1-R3]** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (3 ไม้สไนเปอร์ ทำงานที่ 25% DD)** |
+| **Dual-Exit Engine** | ปิดรวมทั้งชุดปกติ | ปิดรวมทั้งชุดปกติ | ✅ **มี (รวบยกชุด + สไนเปอร์ตัดยอดดอย 15¢)** |
+| **Cross-Pair Profit Relief** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (แบ่งกำไร 40% ช่วยตัดไม้ดอย, Cap 5%)** |
+| **Single-Worst 40% Hedge** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (Delta=0 Hedge ล็อกคู่แย่สุดตัวเดียว)** |
 | **21-Day Time Bailout** | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (ปรับเสมอตัว Breakeven อัตโนมัติ)** |
 | **ความเหมาะสมของนักลงทุน** | ผู้เริ่มต้น, ทุนประหยัด | พอร์ตมาตรฐาน, เน้นความนิ่ง | **นักลงทุนที่ต้องการระบบ Safe ขั้นสูงสุด** |
 

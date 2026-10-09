@@ -37,10 +37,12 @@
 | **Endpoint ซิงค์ฟาร์ม** | — | — | `/api/sync-dashboard` | `/api/sync-dashboard` |
 | **ระบบสั่งการ 2 ทาง (Remote)** | ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **Close-Only & Quarantine รายคู่** |
 | **Safe Liquidation Protocol** | ❌ ไม่มี (หยุดเมื่อหมดอายุ) | ❌ ไม่มี (หยุดเมื่อหมดอายุ) | ❌ ไม่มี (หยุดเมื่อหมดอายุ) | ✅ **ปิดรวบเคลียร์พอร์ต แล้วถอดตัวเอง** |
-| **เกราะป้องกัน Auto-Hedge** | ❌ ไม่มี | ❌ ไม่มี | มี (Hard Cap 15%) | มี (Delta=0 Neutralizer) |
-| **ห้องขังเดี่ยว (Quarantine)** | มี (Auto 10% DD) | มี (Auto 10% DD) | มี (Auto 10% DD) | มี (Auto + สั่ง Force ผ่านเว็บ) |
-| **กองทุนตัดขาดทุน (Relief Fund)**| ❌ ไม่มี | ❌ ไม่มี | มี (Slicing 40%) | มี (Cross-Pair Vault + ควบคุมได้) |
-| **สไนเปอร์กู้ภัย (Rescue Grid)**| ❌ ไม่มี | ❌ ไม่มี | มี (3 ไม้สไนเปอร์) | มี (R1/R2 Radar + สั่งงานได้) |
+| **เกราะป้องกัน Auto-Hedge** | ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (Single Worst 40% DD, Delta=0)** |
+| **ห้องขังเดี่ยว (Quarantine)** | ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (18% DD, ขังสูงสุด 3 คู่, ปลดขัง 12%)** |
+| **กองทุนตัดขาดทุน (Relief Fund)**| ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (Cross-Pair Vault 40%, Cap 5%)** |
+| **สไนเปอร์กู้ภัย (Rescue Grid)**| ❌ ไม่มี | ❌ ไม่มี | ❌ ไม่มี | ✅ **มี (25% DD, 3 ไม้สไนเปอร์ R1-R3)** |
+| **Currency Cluster Limit** | สูงสุด 2 คู่เงิน | สูงสุด 2 คู่เงิน | สูงสุด 2 คู่เงิน | ✅ **สูงสุด 3 คู่เงิน (เพิ่ม Cash Flow)** |
+| **3-Tier Portfolio DD** | 18% Slow / 28% Freeze | 18% Slow / 28% Freeze | 18% Slow / 28% Freeze | ✅ **18% Slow / 28% Freeze / 12% Resume** |
 
 ---
 
@@ -89,11 +91,24 @@
 
 ## 📝 บันทึกประวัติเวอร์ชัน (Changelog History)
 
+### 📌 Version 2.00-1009 / 1008 (9 ตุลาคม 2026)
+* **Risk Management & 2-Way Command Synchronization:**
+  * ปรับเกณฑ์โควตากักขังสูงสุด `InpMaxQuarantinedSymbols` เป็น **`3 คู่เงิน`** ให้สอดคล้องกับพอร์ต 20 คู่เงิน
+  * ยืนยันและล็อกเกณฑ์ความปลอดภัยมาตรฐานทั้งระบบ:
+    * Portfolio DD: Slow 18% / Freeze 28% / Resume 12%
+    * Symbol Worst Throttle: Slow 5% / Freeze 8% / Resume 4% (Top 4 คู่)
+    * Quarantine Defense: เข้าขัง 18% / ปลดขัง 12% / ขังสูงสุด 3 คู่
+    * Rescue Grid Sniping: เริ่มกู้ภัย 25% / สูงสุด 3 ไม้ (R1-R3) / ห่าง 100 pips / ก้าว 45 pips / เป้า 15 cent ตัดไม้ดอย
+    * Auto-Hedge Lock: 40% DD (Single Worst, Net Delta = 0)
+    * Currency Cluster: ถือสกุลเงินซ้ำได้สูงสุด 3 คู่ (`InpMaxCurrencyCluster = 3`)
+    * Relief Fund: ปันผล 40% จากคู่ที่ปิดกำไร / เพดาน 5% ของ Balance
+  * แยกเวอร์ชันชัดเจน: `v2.00-1008` (Stable Standalone ปิดระบบรีโมต) และ `v2.00-1009` (เปิด 2-Way Web Control)
+
 ### 📌 Version 2.00-1006 (6 ตุลาคม 2026)
 * **Cash Flow Optimization & Telemetry Web Sync Upgrade:**
   * ปรับค่าพารามิเตอร์คลัสเตอร์สกุลเงิน `InpMaxCurrencyCluster` จาก **`2` เป็น `3`**
     * **เหตุผล:** ในพอร์ต 20 คู่เงิน มีสกุลเงินร่วมกันหนาแน่น (เช่น USD มีถึง 7 คู่, NZD 6 คู่, JPY 5 คู่) การจำกัดไว้ที่ 2 คู่เดิมทำให้พอร์ตถูกตัดโอกาสสร้างกระแสเงินสดมากเกินไป (บล็อกคู่ USD อื่นๆ ถึง 5 คู่เมื่อถืออยู่แล้ว 2 คู่)
-    * การปรับเป็น 3 คู่ทำให้พอร์ตเก็บรอบกำไรสร้าง Cash Flow ได้ต่อเนื่องและเต็มประสิทธิภาพ ขณะที่ความเสี่ยงยังถูกควบคุมอย่างรัดกุมผ่านเกราะป้องกัน 5 ชั้นของ Prime (Quarantine 10% DD, Sniper Rescue R1/R2, กองทุน Relief Fund 40%, Portfolio Safety Slow/Freeze, และ Safe Liquidation Delta=0 Hedge)
+    * การปรับเป็น 3 คู่ทำให้พอร์ตเก็บรอบกำไรสร้าง Cash Flow ได้ต่อเนื่องและเต็มประสิทธิภาพ ขณะที่ความเสี่ยงยังถูกควบคุมอย่างรัดกุมผ่านเกราะป้องกัน 5 ชั้นของ Prime (Quarantine 18% DD ขังสูงสุด 3 คู่, Sniper Rescue R1-R3 25% DD, กองทุน Relief Fund 40%, Portfolio Safety Slow 18%/Freeze 28%, และ Safe Liquidation Delta=0 Hedge 40%)
   * **Full Telemetry Web Integration (`https://eaeze.com`):**
     * ปรับปรุงหน้าเว็บ `admin/easym-prime-farm` ให้ดึงค่า Real Telemetry จาก MT5 และคำนวณสถานะพอร์ตแบบ Dynamic 100%
     * ซิงค์ค่า Port Mode (`NORMAL`, `SLOW`, `FREEZE`), Drawdown Amount/Percent, Relief Fund Balance (40% ของกำไรวัน), Worst Pair และ Quarantine Pairs อัตโนมัติ

@@ -53,6 +53,9 @@
      * รองรับการคลิกปุ่มเปิด-ปิดคู่เงิน (เขียว = ทำงาน, แดง = ปิดรอบแล้วหยุด Close-Only) บนกราฟ MT5 โดยตรง พร้อมบันทึกสถานะลง GlobalVariables ป้องกันการรีเซ็ต
   4. **ความปลอดภัยสูง (Isolated Logic):**
      * ไม่มีการอ่านหรือรับคำสั่งจากภายนอกเข้ามาทับการตัดสินใจของ EA ป้องกันเหตุขัดข้องจากการเชื่อมต่ออินเทอร์เน็ต
+  5. **Quarantine Quota & Risk Control Synchronization:**
+     * ปรับโควตากักขังสูงสุด `InpMaxQuarantinedSymbols` จาก 2 เป็น **3 คู่เงิน** เพื่อให้สอดคล้องกับพอร์ต 20 คู่เงิน
+     * ล็อกเกณฑ์ความปลอดภัยมาตรฐาน: Portfolio DD (Slow 18% / Freeze 28% / Resume 12%), Worst Throttle (Slow 5% / Freeze 8% / Resume 4%), Quarantine (In 18% / Out 12% / Max 3 คู่), Rescue Grid (25% / 3 ไม้), Auto-Hedge (40% / Delta=0), และ Currency Cluster (3 คู่)
 
 ---
 
