@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { getPortControl } from '@/lib/farm-control/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -181,7 +182,10 @@ export async function POST(req: Request) {
             }
         }
 
-        // 7. Return response matching both MQL5 WebSync and Licensing expectation
+        // 7. Retrieve 2-Way Command & Web Control state for this port
+        const webConfig = getPortControl(portNumber);
+
+        // Return response matching both MQL5 WebSync and Licensing expectation with 2-Way Web Config
         return NextResponse.json({
             status: 'success',
             success: true,
@@ -189,7 +193,8 @@ export async function POST(req: Request) {
             sync_interval: 20,
             license_tier: 'pro',
             is_trial: false,
-            timestamp: nowIso
+            timestamp: nowIso,
+            web_config: webConfig
         });
 
     } catch (err: any) {

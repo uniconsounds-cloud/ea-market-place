@@ -220,15 +220,27 @@ export default function AdminPrimeFarmLabPage() {
 
         const fetchLiveData = async () => {
             try {
-                const [ordersRes, statusRes, historyRes] = await Promise.all([
+                const [ordersRes, statusRes, historyRes, controlRes] = await Promise.all([
                     supabase.from('farm_active_orders').select('*').eq('port_number', portNumber),
                     supabase.from('farm_port_status').select('*').eq('port_number', portNumber).maybeSingle(),
-                    supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }).limit(90)
+                    supabase.from('farm_daily_history').select('*').eq('port_number', portNumber).order('date', { ascending: false }).limit(90),
+                    fetch(`/api/farm/control?port=${portNumber}`).then(r => r.json()).catch(() => null)
                 ]);
 
                 if (ordersRes.data) setLiveOrders(ordersRes.data);
                 if (statusRes.data) setLivePortStatus(statusRes.data);
                 if (historyRes.data) setRawHistory(historyRes.data.reverse());
+
+                if (controlRes?.success && controlRes.control?.symbols) {
+                    const loadedOverrides: Record<string, { closeOnly?: boolean, quarantined?: boolean }> = {};
+                    for (const [s, cfg] of Object.entries(controlRes.control.symbols as Record<string, any>)) {
+                        loadedOverrides[s] = {
+                            closeOnly: Boolean(cfg.close_only || cfg.enabled === false),
+                            quarantined: Boolean(cfg.quarantined)
+                        };
+                    }
+                    setPairOverrides(loadedOverrides);
+                }
             } catch (err) {
                 console.error('Error loading live port:', err);
             }
@@ -589,29 +601,66 @@ export default function AdminPrimeFarmLabPage() {
         });
     }, [rawHistory, brokerDateStr]);
 
-    // Handlers for pair actions
-    const handleToggleCloseOnly = (sym: string) => {
+    // Handlers for pair actions (2-Way Web Command Dispatch)
+    const handleToggleCloseOnly = async (sym: string) => {
+        const nextVal = !pairOverrides[sym]?.closeOnly;
         setPairOverrides(prev => ({
             ...prev,
             [sym]: {
                 ...prev[sym],
-                closeOnly: !prev[sym]?.closeOnly
+                closeOnly: nextVal
             }
         }));
-        const nextVal = !pairOverrides[sym]?.closeOnly;
-        toast.info(`${sym}: สลับสถานะเป็น ${nextVal ? '⛔ CLOSE-ONLY (รอปิดรวบ ไม่เปิดใหม่)' : '✅ ACTIVE (เทรดปกติ)'}`);
+
+        try {
+            await fetch('/api/farm/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    port_number: portNumber,
+                    symbols: {
+                        [sym]: {
+                            enabled: !nextVal,
+                            close_only: nextVal
+                        }
+                    }
+                })
+            });
+            toast.info(`${sym}: สลับสถานะเป็น ${nextVal ? '⛔ CLOSE-ONLY (รอปิดรวบ ไม่เปิดใหม่)' : '✅ ACTIVE (เทรดปกติ)'} • ส่งคำสั่งไปยัง MT5 แล้ว`);
+        } catch (e) {
+            console.error('Error sending control command:', e);
+            toast.error(`เกิดข้อผิดพลาดในการส่งคำสั่ง ${sym}`);
+        }
     };
 
-    const handleToggleQuarantine = (sym: string) => {
+    const handleToggleQuarantine = async (sym: string) => {
+        const nextVal = !pairOverrides[sym]?.quarantined;
         setPairOverrides(prev => ({
             ...prev,
             [sym]: {
                 ...prev[sym],
-                quarantined: !prev[sym]?.quarantined
+                quarantined: nextVal
             }
         }));
-        const nextVal = !pairOverrides[sym]?.quarantined;
-        toast.warning(`${sym}: ${nextVal ? '🔒 สั่งขังคู่เงิน (FORCE QUARANTINE) หยุดถมไม้ทันที' : '🔓 ปลดปล่อยออกจากห้องขัง'}`);
+
+        try {
+            await fetch('/api/farm/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    port_number: portNumber,
+                    symbols: {
+                        [sym]: {
+                            quarantined: nextVal
+                        }
+                    }
+                })
+            });
+            toast.warning(`${sym}: ${nextVal ? '🔒 สั่งขังคู่เงิน (FORCE QUARANTINE) หยุดถมไม้ทันที' : '🔓 ปลดปล่อยออกจากห้องขัง'} • ส่งคำสั่งไปยัง MT5 แล้ว`);
+        } catch (e) {
+            console.error('Error sending quarantine command:', e);
+            toast.error(`เกิดข้อผิดพลาดในการส่งคำสั่ง ${sym}`);
+        }
     };
 
     if (loadingAuth) {
