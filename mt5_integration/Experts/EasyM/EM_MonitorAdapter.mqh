@@ -62,7 +62,11 @@ void EM_BuildIdentity(EAE_SystemIdentity &id, long magicBase)
    id.product_family = EAE_AutoDetectAssetType(_Symbol);
 
 #ifdef EA_VERSION_STR
-   id.ea_version     = EA_VERSION_STR;
+   #ifdef EA_BUILD_ID
+      id.ea_version     = EA_VERSION_STR + " [" + EA_BUILD_ID + "]";
+   #else
+      id.ea_version     = EA_VERSION_STR;
+   #endif
 #else
    #ifdef EA_VERSION
       id.ea_version  = EA_VERSION;
