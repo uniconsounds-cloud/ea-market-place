@@ -148,3 +148,43 @@
 .animate-weekend-prime-glow {
   animation: weekend-prime-glow-pulse 6s ease-in-out infinite !important;
 }
+
+/* Independent asynchronous bobbing / floating animations for Quarantined & Rescue trees */
+@keyframes float-quarantine-1 {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@keyframes float-quarantine-2 {
+  0%, 100% {
+    transform: translateY(-2px);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
+
+@keyframes float-quarantine-3 {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float-tree-1 {
+  animation: float-quarantine-1 4.2s ease-in-out infinite;
+}
+
+.animate-float-tree-2 {
+  animation: float-quarantine-2 5.5s ease-in-out 1.3s infinite;
+}
+
+.animate-float-tree-3 {
+  animation: float-quarantine-3 3.6s ease-in-out 2.4s infinite;
+}

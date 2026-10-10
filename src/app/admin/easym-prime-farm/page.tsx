@@ -1012,15 +1012,49 @@ export default function AdminPrimeFarmLabPage() {
 
                         {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (ATTACHED TO 3 MIDDLE PLOTS AT BOTTOM-LEFT) */}
                         {isClient && [
-                            { id: 'q_preview_1', c: 1, r: 5, src: '/farm/Tree_fence.png?v=2', alt: 'Quarantined Tree', label: 'Quarantine' },
-                            { id: 'q_preview_2', c: 2, r: 5, src: '/farm/Tree_aura.png?v=2',  alt: 'Rescue Active Tree', label: 'Rescue Grid' },
-                            { id: 'q_preview_3', c: 3, r: 5, src: '/farm/Tree_fence.png?v=2', alt: 'Quarantined Tree', label: 'Quarantine' },
+                            { 
+                                id: 'q_preview_1', 
+                                c: 1, 
+                                r: 5, 
+                                sym: 'EURJPY',
+                                ddPct: 14.20,
+                                isRescue: false,
+                                src: '/farm/Tree_fence.png?v=2', 
+                                alt: 'Quarantined Tree', 
+                                label: 'QUARANTINE',
+                                animClass: 'animate-float-tree-1'
+                            },
+                            { 
+                                id: 'q_preview_2', 
+                                c: 2, 
+                                r: 5, 
+                                sym: 'GBPJPY',
+                                ddPct: 16.80,
+                                isRescue: true,
+                                src: '/farm/Tree_aura.png?v=2',  
+                                alt: 'Rescue Active Tree', 
+                                label: 'RESCUE GRID',
+                                animClass: 'animate-float-tree-2'
+                            },
+                            { 
+                                id: 'q_preview_3', 
+                                c: 3, 
+                                r: 5, 
+                                sym: 'USDJPY',
+                                ddPct: 11.50,
+                                isRescue: false,
+                                src: '/farm/Tree_fence.png?v=2', 
+                                alt: 'Quarantined Tree', 
+                                label: 'QUARANTINE',
+                                animClass: 'animate-float-tree-3'
+                            },
                         ].map((qTree) => {
                             const tZIndex = (qTree.c + qTree.r) + 20;
+                            const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
                             return (
                                 <div
                                     key={qTree.id}
-                                    className="absolute transition-transform duration-300 hover:scale-105"
+                                    className={`absolute transition-transform duration-300 hover:scale-105 ${qTree.animClass}`}
                                     style={{
                                         left: `${(qTree.c - qTree.r) * TILE_W}px`,
                                         top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
@@ -1029,6 +1063,69 @@ export default function AdminPrimeFarmLabPage() {
                                         height: '280px'
                                     }}
                                 >
+                                    {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (Horizontal Mercury Thermometer DD Gauge) */}
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 z-40 w-44 sm:w-48 flex flex-col items-center pointer-events-auto select-none transition-all duration-300 hover:scale-105">
+                                        {/* Status Header Badge */}
+                                        <div className="flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/85 backdrop-blur-md border-t border-x border-white/20 shadow-lg text-[10px] font-mono font-bold">
+                                            <span className={`tracking-wider ${qTree.isRescue ? 'text-amber-400' : 'text-rose-400'}`}>
+                                                {qTree.sym}
+                                            </span>
+                                            <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
+                                                qTree.isRescue 
+                                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                            }`}>
+                                                {qTree.label}
+                                            </span>
+                                            <span className={`font-black ${qTree.isRescue ? 'text-amber-300' : 'text-rose-400'}`}>
+                                                -{qTree.ddPct.toFixed(1)}%
+                                            </span>
+                                        </div>
+
+                                        {/* Mercury Tube Assembly (หลอดแก้วและกระเปาะปรอท) */}
+                                        <div className="flex items-center w-full px-1.5 py-1 rounded-b-lg bg-black/90 backdrop-blur-md border-b border-x border-white/20 shadow-xl">
+                                            {/* Mercury Bulb (กระเปาะปรอทด้านซ้าย) */}
+                                            <div className={`relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                                                qTree.isRescue 
+                                                    ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
+                                                    : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
+                                            }`}>
+                                                {/* Specular glass reflection dot */}
+                                                <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                            </div>
+
+                                            {/* Horizontal Glass Stem Tube (หลอดแก้วลำต้น) */}
+                                            <div className="relative flex-1 h-2.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/25 overflow-hidden shadow-inner flex items-center">
+                                                {/* Measurement Calibration Ticks (ขีดสเกลปรอท) */}
+                                                <div className="absolute inset-0 flex justify-between px-1.5 pointer-events-none z-10 opacity-30">
+                                                    <div className="w-[1px] h-full bg-white"></div>
+                                                    <div className="w-[1px] h-full bg-white"></div>
+                                                    <div className="w-[1px] h-full bg-white"></div>
+                                                    <div className="w-[1px] h-full bg-white"></div>
+                                                </div>
+
+                                                {/* Glass Highlight Streak */}
+                                                <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/40 z-20 pointer-events-none"></div>
+
+                                                {/* Mercury Liquid Column Fill */}
+                                                <div 
+                                                    className={`h-full rounded-r-full transition-all duration-700 relative ${
+                                                        qTree.isRescue
+                                                            ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
+                                                            : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+                                                    }`}
+                                                    style={{
+                                                        width: `${fillWidth}%`
+                                                    }}
+                                                >
+                                                    {/* Glowing Leading Meniscus */}
+                                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/70 rounded-r-full"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Tree Graphic */}
                                     <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                         <Image
                                             src={qTree.src}
