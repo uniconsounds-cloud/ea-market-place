@@ -133,6 +133,8 @@ export default function AdminPrimeFarmLabPage() {
     const [pairOverrides, setPairOverrides] = useState<Record<string, { closeOnly?: boolean; quarantined?: boolean }>>({
         EURJPY: { closeOnly: true, quarantined: true }
     });
+    const [isDdExpanded, setIsDdExpanded] = useState(false);
+    const [selectedTreeModal, setSelectedTreeModal] = useState<any | null>(null);
 
     // Client, Time, and Responsive Scaling
     const [time, setTime] = useState<Date | null>(null);
@@ -425,6 +427,33 @@ export default function AdminPrimeFarmLabPage() {
             ]
         };
     }, [isSimMode, livePortStatus, liveOrders, simScenario, simPortMode]);
+
+    // Top 4 Worst Drawdown pairs for vertical dropdown
+    const top4WorstPairs = useMemo(() => {
+        const map = new Map<string, { sym: string; ddPct: number; isQuarantined: boolean; isRescue: boolean; status: string }>();
+
+        const defaults = [
+            { sym: 'EURJPY', ddPct: 14.20, isQuarantined: true, isRescue: false, status: 'QUARANTINE' },
+            { sym: 'GBPJPY', ddPct: 16.80, isQuarantined: true, isRescue: true, status: 'RESCUE' },
+            { sym: 'USDJPY', ddPct: 11.50, isQuarantined: true, isRescue: false, status: 'QUARANTINE' },
+            { sym: 'AUDJPY', ddPct: 8.40, isQuarantined: false, isRescue: false, status: 'FREEZE' },
+        ];
+        defaults.forEach(d => map.set(d.sym, d));
+
+        if (telemetry.worstPair?.symbol) {
+            map.set(telemetry.worstPair.symbol, {
+                sym: telemetry.worstPair.symbol,
+                ddPct: telemetry.worstPair.dd || 14.20,
+                isQuarantined: telemetry.quarantinePairs.includes(telemetry.worstPair.symbol),
+                isRescue: false,
+                status: 'WORST'
+            });
+        }
+
+        return Array.from(map.values())
+            .sort((a, b) => b.ddPct - a.ddPct)
+            .slice(0, 4);
+    }, [telemetry]);
 
     // ─── 25-Tree Plot Calculation (Matching Classic Algorithm) ───
     const plot = useMemo(() => {
@@ -961,29 +990,136 @@ export default function AdminPrimeFarmLabPage() {
                                         </div>
                                     )}
 
-                                    {/* 🔻 Floating Drawdown Badge on First Withered Tree */}
+                                    {/* 🔻 Floating Drawdown Badge on First Withered Tree with Mercury Tube & Unfolding Top 4 Pairs Dropdown */}
                                     {(() => {
                                         const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
                                         const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
                                         const hasDrawdown = telemetry.drawdownPercent > 0 || telemetry.floatingPnl < 0;
                                         if (i === targetIdx && hasDrawdown && isClient) {
                                             const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
+                                            const portDDPct = telemetry.drawdownPercent;
+                                            const portMercuryFill = Math.min(100, Math.max(10, (portDDPct / 40) * 100));
+                                            
                                             return (
                                                 <div 
-                                                    className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
+                                                    className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-auto"
                                                     style={{
                                                         transform: `translateX(-50%) scale(${badgeCounterScale})`,
                                                         transformOrigin: 'bottom center'
                                                     }}
                                                 >
-                                                    <div className="bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center">
-                                                        <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
-                                                            -{telemetry.drawdownPercent.toFixed(2)}%
+                                                    {/* Main DD Badge Container */}
+                                                    <div 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setIsDdExpanded(prev => !prev);
+                                                        }}
+                                                        className="bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 select-none"
+                                                        title="คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุด"
+                                                    >
+                                                        {/* Line 1: Main DD Number (คงตัวเลข DD หลักไว้) */}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                                -{portDDPct.toFixed(2)}%
+                                                            </span>
+                                                            <span className={`text-[9px] text-red-400/80 transition-transform duration-300 ${isDdExpanded ? 'rotate-180' : ''}`}>
+                                                                ▼
+                                                            </span>
                                                         </div>
-                                                        <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
-                                                            -{telemetry.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC
+
+                                                        {/* Line 2: ปรอทแนวนอนแบบเดียวกับต้นไม้ใหม่ แสดงแค่ปรอท ไม่ต้องมีตัวอักษรอะไร */}
+                                                        <div className="w-24 sm:w-28 flex items-center px-1 py-0.5 rounded-full bg-black/80 border border-red-500/30 mt-1 shadow-inner">
+                                                            {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
+                                                            <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]">
+                                                                <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                            </div>
+
+                                                            {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
+                                                            <div className="relative flex-1 h-1.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+                                                                <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                                <div 
+                                                                    className="h-full rounded-r-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)] transition-all duration-700 relative"
+                                                                    style={{ width: `${portMercuryFill}%` }}
+                                                                >
+                                                                    <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* 📜 อนิเมชั่นคลี่แถบปรอทลงในแนวตั้ง แสดง Top 4 Pairs DD เรียงจากมากไปน้อย */}
+                                                    {isDdExpanded && (
+                                                        <div 
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="mt-1.5 w-60 sm:w-64 bg-black/95 border border-red-500/80 rounded-xl p-2.5 shadow-[0_10px_35px_rgba(0,0,0,0.9),0_0_20px_rgba(239,68,68,0.4)] backdrop-blur-xl flex flex-col gap-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-auto select-none"
+                                                        >
+                                                            <div className="flex items-center justify-between pb-1 border-b border-red-500/30 text-[10px] font-mono font-bold text-red-300/80 uppercase tracking-wider">
+                                                                <span>🔥 Top 4 Drawdown Pairs</span>
+                                                                <span className="text-[9px] text-white/50">High ➔ Low</span>
+                                                            </div>
+
+                                                            <div className="flex flex-col gap-1.5">
+                                                                {top4WorstPairs.map((p, idx) => {
+                                                                    const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
+                                                                    return (
+                                                                        <div 
+                                                                            key={p.sym} 
+                                                                            className="flex flex-col gap-0.5 p-1 rounded-lg bg-white/5 border border-white/10 hover:border-red-500/50 transition-colors"
+                                                                        >
+                                                                            <div className="flex items-center justify-between text-[10px] font-mono">
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className="text-[9px] font-black px-1 rounded bg-red-950 text-red-400 border border-red-800">
+                                                                                        #{idx + 1}
+                                                                                    </span>
+                                                                                    <span className="font-bold text-white tracking-wide">
+                                                                                        {p.sym}
+                                                                                    </span>
+                                                                                    <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
+                                                                                        p.isRescue 
+                                                                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                                                                                            : p.isQuarantined 
+                                                                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
+                                                                                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                                                                    }`}>
+                                                                                        {p.status}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <span className="font-black text-rose-400">
+                                                                                    -{p.ddPct.toFixed(1)}%
+                                                                                </span>
+                                                                            </div>
+
+                                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน */}
+                                                                            <div className="flex items-center w-full px-1 py-0.5 rounded-full bg-black/80 border border-white/20">
+                                                                                <div className={`relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                                                                                    p.isRescue 
+                                                                                        ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
+                                                                                        : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_6px_rgba(244,63,94,0.9)]'
+                                                                                }`}>
+                                                                                    <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                                                </div>
+
+                                                                                <div className="relative flex-1 h-2 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+                                                                                    <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                                                    <div 
+                                                                                        className={`h-full rounded-r-full transition-all duration-700 relative ${
+                                                                                            p.isRescue
+                                                                                                ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+                                                                                                : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
+                                                                                        }`}
+                                                                                        style={{ width: `${fillWidth}%` }}
+                                                                                    >
+                                                                                        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
                                                 </div>
                                             );
@@ -1063,8 +1199,15 @@ export default function AdminPrimeFarmLabPage() {
                                         height: '280px'
                                     }}
                                 >
-                                    {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (Horizontal Mercury Thermometer DD Gauge) */}
-                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 z-40 w-44 sm:w-48 flex flex-col items-center pointer-events-auto select-none transition-all duration-300 hover:scale-105">
+                                    {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (คลิกเพื่อขยายให้เห็นชัดเจนขึ้น) */}
+                                    <div 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedTreeModal(qTree);
+                                        }}
+                                        className="absolute top-0 left-1/2 -translate-x-1/2 z-40 w-44 sm:w-48 flex flex-col items-center pointer-events-auto select-none transition-all duration-300 hover:scale-110 cursor-pointer group"
+                                        title="คลิกเพื่อขยายดูรายละเอียดปรอท"
+                                    >
                                         {/* Status Header Badge */}
                                         <div className="flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/85 backdrop-blur-md border-t border-x border-white/20 shadow-lg text-[10px] font-mono font-bold">
                                             <span className={`tracking-wider ${qTree.isRescue ? 'text-amber-400' : 'text-rose-400'}`}>
@@ -1525,6 +1668,152 @@ export default function AdminPrimeFarmLabPage() {
                 </div>
             )}
 
+            {/* 🌟 EXPANDED MERCURY THERMOMETER ZOOM MODAL (เมื่อคลิกที่ปรอทของต้นไม้) */}
+            {selectedTreeModal && (
+                <div 
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+                    onClick={() => setSelectedTreeModal(null)}
+                >
+                    <div 
+                        className="relative w-full max-w-md bg-gradient-to-b from-[#181111] via-[#0d0707] to-black border-2 border-red-500/60 rounded-2xl p-6 shadow-[0_0_50px_rgba(239,68,68,0.5)] flex flex-col gap-5 select-none"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header with Close Button */}
+                        <div className="flex items-center justify-between border-b border-red-500/30 pb-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl">🌡️</span>
+                                <div>
+                                    <h3 className="text-base font-black text-white font-mono tracking-wide">
+                                        QUARANTINE THERMOMETER
+                                    </h3>
+                                    <p className="text-[11px] text-red-300/70 font-mono">
+                                        EasyM Prime Live Drawdown Monitor
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedTreeModal(null)}
+                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors border border-white/20"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Tree Preview & Symbol Readout */}
+                        <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-xl p-3.5">
+                            <div className="relative w-20 h-20 flex-shrink-0">
+                                <Image
+                                    src={selectedTreeModal.src}
+                                    alt={selectedTreeModal.alt}
+                                    fill
+                                    className="object-contain drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]"
+                                    unoptimized
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-2xl font-black font-mono text-cyan-400 tracking-wider">
+                                        {selectedTreeModal.sym}
+                                    </span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded font-black tracking-wider ${
+                                        selectedTreeModal.isRescue 
+                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                    }`}>
+                                        {selectedTreeModal.label}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-white/70">
+                                    {selectedTreeModal.isRescue 
+                                        ? 'Sniper Rescue Grid กำลังทำงานเพื่อลดการติดลบ'
+                                        : 'ถูกกักขังเดี่ยวเพื่อป้องกันความเสี่ยงของพอร์ต'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* High-Res Enlarged Horizontal Mercury Thermometer Gauge */}
+                        <div className="flex flex-col gap-2 bg-black/60 border border-white/10 rounded-xl p-4 shadow-inner">
+                            <div className="flex justify-between items-baseline font-mono">
+                                <span className="text-xs text-white/60 font-bold uppercase tracking-wider">
+                                    Current Drawdown Level
+                                </span>
+                                <span className={`text-2xl font-black ${
+                                    selectedTreeModal.isRescue ? 'text-amber-400' : 'text-rose-500'
+                                }`}>
+                                    -{selectedTreeModal.ddPct.toFixed(2)}%
+                                </span>
+                            </div>
+
+                            {/* Big Mercury Tube Assembly */}
+                            <div className="flex items-center w-full px-2 py-1.5 rounded-full bg-black border border-white/25 shadow-2xl">
+                                {/* Big Mercury Bulb */}
+                                <div className={`relative w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center border-2 ${
+                                    selectedTreeModal.isRescue 
+                                        ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.9)]'
+                                        : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.9)]'
+                                }`}>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white/90 -mt-1 -ml-1"></div>
+                                </div>
+
+                                {/* Big Glass Stem */}
+                                <div className="relative flex-1 h-5 -ml-1 rounded-r-full bg-slate-950/90 border border-white/30 overflow-hidden shadow-inner flex items-center">
+                                    {/* Scale Ticks */}
+                                    <div className="absolute inset-0 flex justify-between px-3 pointer-events-none z-10 opacity-40">
+                                        <div className="w-[1.5px] h-full bg-white"></div>
+                                        <div className="w-[1.5px] h-full bg-white"></div>
+                                        <div className="w-[1.5px] h-full bg-white"></div>
+                                        <div className="w-[1.5px] h-full bg-white"></div>
+                                    </div>
+
+                                    {/* Glass Reflection Highlight */}
+                                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/50 z-20 pointer-events-none"></div>
+
+                                    {/* Liquid Column */}
+                                    <div 
+                                        className={`h-full rounded-r-full transition-all duration-700 relative ${
+                                            selectedTreeModal.isRescue
+                                                ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_15px_rgba(251,191,36,0.9)]'
+                                                : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_15px_rgba(244,63,94,0.9)]'
+                                        }`}
+                                        style={{
+                                            width: `${Math.min(100, Math.max(12, (selectedTreeModal.ddPct / 25) * 100))}%`
+                                        }}
+                                    >
+                                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-white/80 rounded-r-full"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Scale Indicators */}
+                            <div className="flex justify-between text-[10px] font-mono text-white/50 px-1 pt-1">
+                                <span>0%</span>
+                                <span>10% Floor</span>
+                                <span>14% Runaway</span>
+                                <span>25% Max</span>
+                            </div>
+                        </div>
+
+                        {/* Threshold info summary */}
+                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                            <div className="p-2.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
+                                <span className="text-[10px] text-white/50 uppercase">เกณฑ์เข้าห้องขัง</span>
+                                <span className="font-bold text-amber-300">DD &ge; 14% (หรือพอร์ต Slow 10%)</span>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-white/5 border border-white/10 flex flex-col">
+                                <span className="text-[10px] text-white/50 uppercase">เกณฑ์ปลดปล่อย</span>
+                                <span className="font-bold text-emerald-400">DD ลดลง 4% จากจุดเข้า</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setSelectedTreeModal(null)}
+                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold font-mono text-xs tracking-wider uppercase transition-all shadow-lg shadow-red-900/40"
+                        >
+                            ปิดหน้าต่าง (Close)
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
