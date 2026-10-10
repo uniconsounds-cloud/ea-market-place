@@ -232,3 +232,49 @@
 .animate-unfold-bar-4 {
   animation: unfold-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.54s both;
 }
+
+/* Outward disperse animation for Quarantine mercury bars (กระจายออกแบบเดิม) */
+@keyframes disperse-bar-left {
+  0% {
+    opacity: 0;
+    transform: translate(60px, 35px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes disperse-bar-center {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes disperse-bar-right {
+  0% {
+    opacity: 0;
+    transform: translate(-60px, -35px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.animate-disperse-bar-left {
+  animation: disperse-bar-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-disperse-bar-center {
+  animation: disperse-bar-center 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-disperse-bar-right {
+  animation: disperse-bar-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

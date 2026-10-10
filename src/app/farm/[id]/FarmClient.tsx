@@ -1896,13 +1896,6 @@ export default function FarmClient({
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                {/* Hint when enlarged: Click again to reveal bars */}
-                                                {isQuarantineEnlarged && (
-                                                    <span className="text-[9px] font-mono font-bold text-amber-300/90 mt-1.5 px-2 py-0.5 rounded-full bg-amber-950/60 border border-amber-600/40 animate-pulse">
-                                                        แตะอีกครั้งเพื่อคลี่หลอดปรอท ▼
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1933,15 +1926,15 @@ export default function FarmClient({
                                         </div>
                                     </div>
 
-                                    {/* 3 Individual Mercury Bars */}
-                                    {previewList.map((qTree, idx) => {
+                                    {/* 3 Individual Mercury Bars (กระจายออกทางซ้าย กลาง ขวา) */}
+                                    {previewList.map((qTree) => {
                                         const isTreeExpanded = expandedTreeId === qTree.id;
                                         const barZIndex = isTreeExpanded ? 99999 : 90;
                                         const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
                                         const isLeftmost = qTree.id === 'q_preview_1';
                                         const isRightmost = qTree.id === 'q_preview_3';
-                                        const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
-                                                            idx === 1 ? 'animate-unfold-bar-2' : 'animate-unfold-bar-3';
+                                        const disperseClass = isLeftmost ? 'animate-disperse-bar-left' :
+                                                              isRightmost ? 'animate-disperse-bar-right' : 'animate-disperse-bar-center';
 
                                         return (
                                             <div
@@ -1955,20 +1948,20 @@ export default function FarmClient({
                                                     height: '280px'
                                                 }}
                                             >
-                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ~2.6 เท่าแบบนิ่มนวล ไม่ล้นจอซ้าย) */}
+                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (กระจายออกแบบเดิม) */}
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setExpandedTreeId(prev => prev === qTree.id ? null : qTree.id);
                                                     }}
-                                                    className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${unfoldClass} ${
+                                                    className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
                                                         isTreeExpanded 
                                                             ? isLeftmost 
                                                                 ? 'left-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]' 
                                                                 : isRightmost
                                                                     ? 'right-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-right shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
                                                                     : 'left-1/2 -translate-x-1/2 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
-                                                            : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
+                                                            : `left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105 ${disperseClass}`
                                                     }`}
                                                     style={{
                                                         width: isTreeExpanded ? '180px' : undefined
