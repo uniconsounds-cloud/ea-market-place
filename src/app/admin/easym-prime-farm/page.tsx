@@ -134,6 +134,7 @@ export default function AdminPrimeFarmLabPage() {
         EURJPY: { closeOnly: true, quarantined: true }
     });
     const [isDdExpanded, setIsDdExpanded] = useState(false);
+    const [expandedTreeId, setExpandedTreeId] = useState<string | null>(null);
     const [selectedTreeModal, setSelectedTreeModal] = useState<any | null>(null);
 
     // Client, Time, and Responsive Scaling
@@ -1013,14 +1014,18 @@ export default function AdminPrimeFarmLabPage() {
                                                         transformOrigin: 'bottom center'
                                                     }}
                                                 >
-                                                    {/* Main DD Badge Container */}
+                                                    {/* Main DD Badge Container (Step 1: Expands width smoothly to match cards below) */}
                                                     <div 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setIsDdExpanded(prev => !prev);
                                                         }}
-                                                        className="bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 select-none"
-                                                        title="คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุด"
+                                                        className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2 text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                            isDdExpanded 
+                                                                ? 'w-64 sm:w-72 shadow-[0_0_25px_rgba(239,68,68,0.8)]' 
+                                                                : 'w-32 sm:w-36 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                                                        }`}
+                                                        title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุด"}
                                                     >
                                                         {/* Line 1: Main DD Number (คงตัวเลข DD หลักไว้) */}
                                                         <div className="flex items-center gap-1.5">
@@ -1032,8 +1037,10 @@ export default function AdminPrimeFarmLabPage() {
                                                             </span>
                                                         </div>
 
-                                                        {/* Line 2: ปรอทแนวนอนแบบเดียวกับต้นไม้ใหม่ แสดงแค่ปรอท ไม่ต้องมีตัวอักษรอะไร */}
-                                                        <div className="w-24 sm:w-28 flex items-center px-1 py-0.5 rounded-full bg-black/80 border border-red-500/30 mt-1 shadow-inner">
+                                                        {/* Line 2: ปรอทแนวนอนแบบเดียวกับต้นไม้ใหม่ ขยายตามความกว้างแถบ */}
+                                                        <div className={`transition-all duration-300 ease-out flex items-center px-1 py-0.5 rounded-full bg-black/80 border border-red-500/30 mt-1 shadow-inner ${
+                                                            isDdExpanded ? 'w-52 sm:w-60' : 'w-24 sm:w-28'
+                                                        }`}>
                                                             {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
                                                             <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]">
                                                                 <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
@@ -1052,76 +1059,72 @@ export default function AdminPrimeFarmLabPage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* 📜 อนิเมชั่นคลี่แถบปรอทลงในแนวตั้ง แสดง Top 4 Pairs DD เรียงจากมากไปน้อย */}
+                                                    {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว แยกแถบแต่ละตัวออกจากกัน เว้นระยะห่างนิดหน่อย */}
                                                     {isDdExpanded && (
                                                         <div 
                                                             onClick={(e) => e.stopPropagation()}
-                                                            className="mt-1.5 w-60 sm:w-64 bg-black/95 border border-red-500/80 rounded-xl p-2.5 shadow-[0_10px_35px_rgba(0,0,0,0.9),0_0_20px_rgba(239,68,68,0.4)] backdrop-blur-xl flex flex-col gap-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-auto select-none"
+                                                            className="mt-2 w-64 sm:w-72 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
                                                         >
-                                                            <div className="flex items-center justify-between pb-1 border-b border-red-500/30 text-[10px] font-mono font-bold text-red-300/80 uppercase tracking-wider">
-                                                                <span>🔥 Top 4 Drawdown Pairs</span>
-                                                                <span className="text-[9px] text-white/50">High ➔ Low</span>
-                                                            </div>
-
-                                                            <div className="flex flex-col gap-1.5">
-                                                                {top4WorstPairs.map((p, idx) => {
-                                                                    const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
-                                                                    return (
-                                                                        <div 
-                                                                            key={p.sym} 
-                                                                            className="flex flex-col gap-0.5 p-1 rounded-lg bg-white/5 border border-white/10 hover:border-red-500/50 transition-colors"
-                                                                        >
-                                                                            <div className="flex items-center justify-between text-[10px] font-mono">
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <span className="text-[9px] font-black px-1 rounded bg-red-950 text-red-400 border border-red-800">
-                                                                                        #{idx + 1}
-                                                                                    </span>
-                                                                                    <span className="font-bold text-white tracking-wide">
-                                                                                        {p.sym}
-                                                                                    </span>
-                                                                                    <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
-                                                                                        p.isRescue 
-                                                                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
-                                                                                            : p.isQuarantined 
-                                                                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
-                                                                                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                                                                                    }`}>
-                                                                                        {p.status}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <span className="font-black text-rose-400">
-                                                                                    -{p.ddPct.toFixed(1)}%
+                                                            {top4WorstPairs.map((p, idx) => {
+                                                                const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
+                                                                const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
+                                                                                    idx === 1 ? 'animate-unfold-bar-2' :
+                                                                                    idx === 2 ? 'animate-unfold-bar-3' : 'animate-unfold-bar-4';
+                                                                return (
+                                                                    <div 
+                                                                        key={p.sym} 
+                                                                        className={`w-full bg-[#0d0303]/95 border border-red-500/80 rounded-xl p-2 sm:p-2.5 shadow-[0_8px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(239,68,68,0.35)] backdrop-blur-xl flex flex-col gap-1 ${unfoldClass}`}
+                                                                    >
+                                                                        <div className="flex items-center justify-between text-[11px] font-mono">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-700">
+                                                                                    #{idx + 1}
+                                                                                </span>
+                                                                                <span className="font-bold text-white tracking-wide">
+                                                                                    {p.sym}
+                                                                                </span>
+                                                                                <span className={`text-[8px] px-1.5 py-0.2 rounded font-semibold ${
+                                                                                    p.isRescue 
+                                                                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                                                                                        : p.isQuarantined 
+                                                                                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
+                                                                                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                                                                }`}>
+                                                                                    {p.status}
                                                                                 </span>
                                                                             </div>
+                                                                            <span className="font-black text-rose-400 text-xs">
+                                                                                -{p.ddPct.toFixed(1)}%
+                                                                            </span>
+                                                                        </div>
 
-                                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน */}
-                                                                            <div className="flex items-center w-full px-1 py-0.5 rounded-full bg-black/80 border border-white/20">
-                                                                                <div className={`relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
-                                                                                    p.isRescue 
-                                                                                        ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
-                                                                                        : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_6px_rgba(244,63,94,0.9)]'
-                                                                                }`}>
-                                                                                    <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
-                                                                                </div>
+                                                                        {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน */}
+                                                                        <div className="flex items-center w-full px-1 py-0.5 rounded-full bg-black/90 border border-white/20 shadow-inner">
+                                                                            <div className={`relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                                                                                p.isRescue 
+                                                                                    ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
+                                                                                    : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_6px_rgba(244,63,94,0.9)]'
+                                                                            }`}>
+                                                                                <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                                            </div>
 
-                                                                                <div className="relative flex-1 h-2 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
-                                                                                    <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
-                                                                                    <div 
-                                                                                        className={`h-full rounded-r-full transition-all duration-700 relative ${
-                                                                                            p.isRescue
-                                                                                                ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
-                                                                                                : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
-                                                                                        }`}
-                                                                                        style={{ width: `${fillWidth}%` }}
-                                                                                    >
-                                                                                        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
-                                                                                    </div>
+                                                                            <div className="relative flex-1 h-2 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+                                                                                <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                                                <div 
+                                                                                    className={`h-full rounded-r-full transition-all duration-700 relative ${
+                                                                                        p.isRescue
+                                                                                            ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+                                                                                            : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
+                                                                                    }`}
+                                                                                    style={{ width: `${fillWidth}%` }}
+                                                                                >
+                                                                                    <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
 
@@ -1191,12 +1194,13 @@ export default function AdminPrimeFarmLabPage() {
                                 animClass: ''
                             },
                         ].map((qTree) => {
-                            const tZIndex = (qTree.c + qTree.r) + 20;
+                            const isTreeExpanded = expandedTreeId === qTree.id;
+                            const tZIndex = isTreeExpanded ? 99999 : ((qTree.c + qTree.r) + 20);
                             const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
                             return (
                                 <div
                                     key={qTree.id}
-                                    className="absolute transition-transform duration-300 hover:scale-105"
+                                    className="absolute"
                                     style={{
                                         left: `${(qTree.c - qTree.r) * TILE_W}px`,
                                         top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
@@ -1205,17 +1209,26 @@ export default function AdminPrimeFarmLabPage() {
                                         height: '280px'
                                     }}
                                 >
-                                    {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (คลิกเพื่อขยายให้เห็นชัดเจนขึ้น) */}
+                                    {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ~2.8 เท่าแบบนิ่มนวลตรงจุด ไม่เปิด popup เต็มจอ) */}
                                     <div 
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setSelectedTreeModal(qTree);
+                                            setExpandedTreeId(prev => prev === qTree.id ? null : qTree.id);
                                         }}
-                                        className="absolute top-0 left-1/2 -translate-x-1/2 z-40 w-44 sm:w-48 flex flex-col items-center pointer-events-auto select-none transition-all duration-300 hover:scale-110 cursor-pointer group"
-                                        title="คลิกเพื่อขยายดูรายละเอียดปรอท"
+                                        className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out origin-bottom ${
+                                            isTreeExpanded 
+                                                ? 'z-[99999] scale-[2.8] sm:scale-[2.4] -translate-y-8 shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]' 
+                                                : 'z-40 w-44 sm:w-48 hover:scale-105'
+                                        }`}
+                                        style={{
+                                            width: isTreeExpanded ? '180px' : undefined
+                                        }}
+                                        title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                     >
                                         {/* Status Header Badge */}
-                                        <div className="flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/85 backdrop-blur-md border-t border-x border-white/20 shadow-lg text-[10px] font-mono font-bold">
+                                        <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/90 backdrop-blur-md border-t border-x shadow-lg text-[10px] font-mono font-bold transition-colors ${
+                                            isTreeExpanded ? 'border-amber-400/80 bg-black/95' : 'border-white/20'
+                                        }`}>
                                             <span className={`tracking-wider ${qTree.isRescue ? 'text-amber-400' : 'text-rose-400'}`}>
                                                 {qTree.sym}
                                             </span>
@@ -1232,14 +1245,15 @@ export default function AdminPrimeFarmLabPage() {
                                         </div>
 
                                         {/* Mercury Tube Assembly (หลอดแก้วและกระเปาะปรอท) */}
-                                        <div className="flex items-center w-full px-1.5 py-1 rounded-b-lg bg-black/90 backdrop-blur-md border-b border-x border-white/20 shadow-xl">
+                                        <div className={`flex items-center w-full px-1.5 py-1 rounded-b-lg bg-black/95 backdrop-blur-md border-b border-x shadow-xl transition-colors ${
+                                            isTreeExpanded ? 'border-amber-400/80' : 'border-white/20'
+                                        }`}>
                                             {/* Mercury Bulb (กระเปาะปรอทด้านซ้าย) */}
                                             <div className={`relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
                                                 qTree.isRescue 
                                                     ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
                                                     : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
                                             }`}>
-                                                {/* Specular glass reflection dot */}
                                                 <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                             </div>
 
@@ -1267,15 +1281,26 @@ export default function AdminPrimeFarmLabPage() {
                                                         width: `${fillWidth}%`
                                                     }}
                                                 >
-                                                    {/* Glowing Leading Meniscus */}
                                                     <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/70 rounded-r-full"></div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Tree Graphic */}
+                                    {/* Base Farm Tile (100% full scale so the 3 ground plots stay perfectly attached with 0 gaps) */}
                                     <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                        <Image
+                                            src="/farm/farm_tile.png"
+                                            alt="Plot"
+                                            fill
+                                            className="object-contain"
+                                            unoptimized
+                                            priority
+                                        />
+                                    </div>
+
+                                    {/* Tree Graphic (Scale down 6% so it's not overly prominent, anchored to ground) */}
+                                    <div className="absolute inset-0 scale-[0.94] origin-bottom" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                         <Image
                                             src={qTree.src}
                                             alt={qTree.alt}

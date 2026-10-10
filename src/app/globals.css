@@ -189,16 +189,46 @@
   animation: float-quarantine-3 3.6s ease-in-out 2.4s infinite;
 }
 
-/* Gentle slow floating animation for the entire main farm island */
+/* Buoyant upward floating animation for the entire main farm island */
 @keyframes float-farm {
   0%, 100% {
     transform: translateY(0px);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-22px);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
   }
 }
 
 .animate-float-farm {
-  animation: float-farm 6.5s ease-in-out infinite;
+  animation: float-farm 6s ease-in-out infinite;
+}
+
+/* Cascading vertical unfold animation for Top 4 DD bars */
+@keyframes unfold-bar {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scaleY(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+.animate-unfold-bar-1 {
+  animation: unfold-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+.animate-unfold-bar-2 {
+  animation: unfold-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+}
+
+.animate-unfold-bar-3 {
+  animation: unfold-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.41s both;
+}
+
+.animate-unfold-bar-4 {
+  animation: unfold-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.54s both;
 }
