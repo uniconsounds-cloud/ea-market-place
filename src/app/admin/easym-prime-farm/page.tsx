@@ -134,6 +134,7 @@ export default function AdminPrimeFarmLabPage() {
         EURJPY: { closeOnly: true, quarantined: true }
     });
     const [isDdExpanded, setIsDdExpanded] = useState(false);
+    const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
     const [expandedTreeId, setExpandedTreeId] = useState<string | null>(null);
     const [selectedTreeModal, setSelectedTreeModal] = useState<any | null>(null);
 
@@ -1045,40 +1046,48 @@ export default function AdminPrimeFarmLabPage() {
                                             transformOrigin: 'bottom center'
                                         }}
                                     >
-                                        {/* Main DD Badge Container (Step 1: Expands width smoothly to match cards below) */}
+                                        {/* Main DD Badge Container (Step 1: Expands width & height proportionally, enlarges number) */}
                                         <div 
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setIsDdExpanded(prev => !prev);
                                             }}
-                                            className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2 text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                            className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
                                                 isDdExpanded 
-                                                    ? 'w-64 sm:w-72 shadow-[0_0_25px_rgba(239,68,68,0.8)]' 
-                                                    : 'w-32 sm:w-36 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                                                    ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)]' 
+                                                    : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)]'
                                             }`}
                                             title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุด"}
                                         >
-                                            {/* Line 1: Main DD Number (คงตัวเลข DD หลักไว้) */}
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                            {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                    isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
+                                                }`}>
                                                     -{portDDPct.toFixed(2)}%
                                                 </span>
-                                                <span className={`text-[9px] text-red-400/80 transition-transform duration-300 ${isDdExpanded ? 'rotate-180' : ''}`}>
+                                                <span className={`text-red-400/80 transition-all duration-300 ${
+                                                    isDdExpanded ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
+                                                }`}>
                                                     ▼
                                                 </span>
                                             </div>
 
-                                            {/* Line 2: ปรอทแนวนอนแบบเดียวกับต้นไม้ใหม่ ขยายตามความกว้างแถบ */}
-                                            <div className={`transition-all duration-300 ease-out flex items-center px-1 py-0.5 rounded-full bg-black/80 border border-red-500/30 mt-1 shadow-inner ${
-                                                isDdExpanded ? 'w-52 sm:w-60' : 'w-24 sm:w-28'
+                                            {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง */}
+                                            <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-red-500/30 shadow-inner ${
+                                                isDdExpanded ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
                                             }`}>
                                                 {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
-                                                <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]">
+                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)] transition-all duration-300 ${
+                                                    isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
+                                                }`}>
                                                     <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                 </div>
 
                                                 {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
-                                                <div className="relative flex-1 h-1.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+                                                <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                    isDdExpanded ? 'h-2 sm:h-2.5' : 'h-1.5'
+                                                }`}>
                                                     <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                     <div 
                                                         className="h-full rounded-r-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)] transition-all duration-700 relative"
@@ -1230,135 +1239,229 @@ export default function AdminPrimeFarmLabPage() {
                             );
                         })}
 
-                        {/* 🌡️ 3 PREVIEW MERCURY BARS OVERLAY (SEPARATE FLOATING LAYER, NEVER BRINGS TREES TO FRONT) */}
-                        {isClient && [
-                            { 
-                                id: 'q_preview_1', 
-                                c: 1, 
-                                r: 5, 
-                                sym: 'EURJPY',
-                                ddPct: 14.20,
-                                isRescue: false,
-                                label: 'QUARANTINE',
-                            },
-                            { 
-                                id: 'q_preview_2', 
-                                c: 2, 
-                                r: 5, 
-                                sym: 'GBPJPY',
-                                ddPct: 16.80,
-                                isRescue: true,
-                                label: 'RESCUE GRID',
-                            },
-                            { 
-                                id: 'q_preview_3', 
-                                c: 3, 
-                                r: 5, 
-                                sym: 'USDJPY',
-                                ddPct: 11.50,
-                                isRescue: false,
-                                label: 'QUARANTINE',
-                            },
-                        ].map((qTree) => {
-                            const isTreeExpanded = expandedTreeId === qTree.id;
-                            const barZIndex = isTreeExpanded ? 99999 : 90;
-                            const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
-                            const isLeftmost = qTree.id === 'q_preview_1';
-                            const isRightmost = qTree.id === 'q_preview_3';
+                        {/* 🌡️ QUARANTINE FLOATING OVERLAY: COMBINED DD BADGE OR EXPANDED INDIVIDUAL MERCURY BARS */}
+                        {isClient && (() => {
+                            const previewList = [
+                                { 
+                                    id: 'q_preview_1', 
+                                    c: 1, 
+                                    r: 5, 
+                                    sym: 'EURJPY',
+                                    ddPct: 14.20,
+                                    isRescue: false,
+                                    label: 'QUARANTINE',
+                                },
+                                { 
+                                    id: 'q_preview_2', 
+                                    c: 2, 
+                                    r: 5, 
+                                    sym: 'GBPJPY',
+                                    ddPct: 16.80,
+                                    isRescue: true,
+                                    label: 'RESCUE GRID',
+                                },
+                                { 
+                                    id: 'q_preview_3', 
+                                    c: 3, 
+                                    r: 5, 
+                                    sym: 'USDJPY',
+                                    ddPct: 11.50,
+                                    isRescue: false,
+                                    label: 'QUARANTINE',
+                                },
+                            ];
+                            const totalQuarantineDD = previewList.reduce((acc, t) => acc + t.ddPct, 0);
+                            const quarantineMercuryFill = Math.min(100, Math.max(12, (totalQuarantineDD / 50) * 100));
 
-                            return (
-                                <div
-                                    key={`bar_${qTree.id}`}
-                                    className="absolute pointer-events-none"
-                                    style={{
-                                        left: `${(qTree.c - qTree.r) * TILE_W}px`,
-                                        top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
-                                        zIndex: barZIndex,
-                                        width: '280px',
-                                        height: '280px'
-                                    }}
-                                >
-                                    {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ~2.5 เท่าแบบนิ่มนวล ไม่ล้นจอซ้าย) */}
-                                    <div 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setExpandedTreeId(prev => prev === qTree.id ? null : qTree.id);
-                                        }}
-                                        className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
-                                            isTreeExpanded 
-                                                ? isLeftmost 
-                                                    ? 'left-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]' 
-                                                    : isRightmost
-                                                        ? 'right-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-right shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
-                                                        : 'left-1/2 -translate-x-1/2 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
-                                                : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
-                                        }`}
+                            if (!isQuarantineExpanded) {
+                                return (
+                                    <div
+                                        key="quarantine_combined_badge"
+                                        className="absolute pointer-events-none"
                                         style={{
-                                            width: isTreeExpanded ? '180px' : undefined
+                                            left: `${(2 - 5) * TILE_W}px`,
+                                            top: `${(2 + 5) * TILE_H_OFFSET}px`,
+                                            zIndex: 90,
+                                            width: '280px',
+                                            height: '280px'
                                         }}
-                                        title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                     >
-                                        {/* Status Header Badge */}
-                                        <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/90 backdrop-blur-md border-t border-x shadow-lg text-[10px] font-mono font-bold transition-colors ${
-                                            isTreeExpanded ? 'border-amber-400/80 bg-black/95' : 'border-white/20'
-                                        }`}>
-                                            <span className={`tracking-wider ${qTree.isRescue ? 'text-amber-400' : 'text-rose-400'}`}>
-                                                {qTree.sym}
-                                            </span>
-                                            <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
-                                                qTree.isRescue 
-                                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
-                                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                            }`}>
-                                                {qTree.label}
-                                            </span>
-                                            <span className={`font-black ${qTree.isRescue ? 'text-amber-300' : 'text-rose-400'}`}>
-                                                -{qTree.ddPct.toFixed(1)}%
-                                            </span>
-                                        </div>
-
-                                        {/* Mercury Tube Assembly */}
-                                        <div className={`flex items-center w-full px-1.5 py-1 rounded-b-lg bg-black/95 backdrop-blur-md border-b border-x shadow-xl transition-colors ${
-                                            isTreeExpanded ? 'border-amber-400/80' : 'border-white/20'
-                                        }`}>
-                                            {/* Mercury Bulb */}
-                                            <div className={`relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
-                                                qTree.isRescue 
-                                                    ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
-                                                    : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
-                                            }`}>
-                                                <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
-                                            </div>
-
-                                            {/* Horizontal Glass Stem Tube */}
-                                            <div className="relative flex-1 h-2.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/25 overflow-hidden shadow-inner flex items-center">
-                                                <div className="absolute inset-0 flex justify-between px-1.5 pointer-events-none z-10 opacity-30">
-                                                    <div className="w-[1px] h-full bg-white"></div>
-                                                    <div className="w-[1px] h-full bg-white"></div>
-                                                    <div className="w-[1px] h-full bg-white"></div>
-                                                    <div className="w-[1px] h-full bg-white"></div>
+                                        <div 
+                                            className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto select-none"
+                                        >
+                                            <div 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsQuarantineExpanded(true);
+                                                }}
+                                                className="bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2 text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none w-32 sm:w-36 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-fade-in"
+                                                title="คลิกเพื่อคลี่ดูหลอดปรอทของแต่ละคู่เงินที่ถูกขัง"
+                                            >
+                                                {/* Line 1: Main DD Number */}
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                        -{totalQuarantineDD.toFixed(2)}%
+                                                    </span>
+                                                    <span className="text-[9px] text-red-400/80">
+                                                        ▼
+                                                    </span>
                                                 </div>
 
-                                                <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/40 z-20 pointer-events-none"></div>
-
-                                                <div 
-                                                    className={`h-full rounded-r-full transition-all duration-700 relative ${
-                                                        qTree.isRescue
-                                                            ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-                                                            : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-                                                    }`}
-                                                    style={{
-                                                        width: `${fillWidth}%`
-                                                    }}
-                                                >
-                                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/70 rounded-r-full"></div>
+                                                {/* Line 2: ปรอทแนวนอนแบบเดียวกับของฟาร์ม */}
+                                                <div className="transition-all duration-300 ease-out flex items-center px-1 py-0.5 rounded-full bg-black/80 border border-red-500/30 mt-1 shadow-inner w-24 sm:w-28">
+                                                    <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]">
+                                                        <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                    </div>
+                                                    <div className="relative flex-1 h-1.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+                                                        <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                        <div 
+                                                            className="h-full rounded-r-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)] transition-all duration-700 relative"
+                                                            style={{ width: `${quarantineMercuryFill}%` }}
+                                                        >
+                                                            <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+                                );
+                            }
+
+                            return (
+                                <div key="quarantine_expanded_bars">
+                                    {/* Collapse Button floating above Tree 2 */}
+                                    <div
+                                        className="absolute pointer-events-none"
+                                        style={{
+                                            left: `${(2 - 5) * TILE_W}px`,
+                                            top: `${(2 + 5) * TILE_H_OFFSET}px`,
+                                            zIndex: 99998,
+                                            width: '280px',
+                                            height: '280px'
+                                        }}
+                                    >
+                                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 pointer-events-auto">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsQuarantineExpanded(false);
+                                                    setExpandedTreeId(null);
+                                                }}
+                                                className="text-[9px] font-mono font-bold text-red-300 hover:text-white bg-[#1a0505]/90 hover:bg-[#270808] px-2 py-0.5 rounded-full border border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.5)] backdrop-blur-md transition-all flex items-center gap-1 active:scale-95 whitespace-nowrap"
+                                                title="คลิกเพื่อรวบกลับเป็นกล่อง DD รวม"
+                                            >
+                                                ▲ รวบเก็บ DD รวม
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 3 Individual Mercury Bars */}
+                                    {previewList.map((qTree, idx) => {
+                                        const isTreeExpanded = expandedTreeId === qTree.id;
+                                        const barZIndex = isTreeExpanded ? 99999 : 90;
+                                        const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
+                                        const isLeftmost = qTree.id === 'q_preview_1';
+                                        const isRightmost = qTree.id === 'q_preview_3';
+                                        const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
+                                                            idx === 1 ? 'animate-unfold-bar-2' : 'animate-unfold-bar-3';
+
+                                        return (
+                                            <div
+                                                key={`bar_${qTree.id}`}
+                                                className="absolute pointer-events-none"
+                                                style={{
+                                                    left: `${(qTree.c - qTree.r) * TILE_W}px`,
+                                                    top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
+                                                    zIndex: barZIndex,
+                                                    width: '280px',
+                                                    height: '280px'
+                                                }}
+                                            >
+                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ~2.5 เท่าแบบนิ่มนวล ไม่ล้นจอซ้าย) */}
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setExpandedTreeId(prev => prev === qTree.id ? null : qTree.id);
+                                                    }}
+                                                    className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${unfoldClass} ${
+                                                        isTreeExpanded 
+                                                            ? isLeftmost 
+                                                                ? 'left-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]' 
+                                                                : isRightmost
+                                                                    ? 'right-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-right shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
+                                                                    : 'left-1/2 -translate-x-1/2 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
+                                                            : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
+                                                    }`}
+                                                    style={{
+                                                        width: isTreeExpanded ? '180px' : undefined
+                                                    }}
+                                                    title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
+                                                >
+                                                    {/* Status Header Badge */}
+                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/90 backdrop-blur-md border-t border-x shadow-lg text-[10px] font-mono font-bold transition-colors ${
+                                                        isTreeExpanded ? 'border-amber-400/80 bg-black/95' : 'border-white/20'
+                                                    }`}>
+                                                        <span className={`tracking-wider ${qTree.isRescue ? 'text-amber-400' : 'text-rose-400'}`}>
+                                                            {qTree.sym}
+                                                        </span>
+                                                        <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
+                                                            qTree.isRescue 
+                                                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                                                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                                        }`}>
+                                                            {qTree.label}
+                                                        </span>
+                                                        <span className={`font-black ${qTree.isRescue ? 'text-amber-300' : 'text-rose-400'}`}>
+                                                            -{qTree.ddPct.toFixed(1)}%
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Mercury Tube Assembly */}
+                                                    <div className={`flex items-center w-full px-1.5 py-1 rounded-b-lg bg-black/95 backdrop-blur-md border-b border-x shadow-xl transition-colors ${
+                                                        isTreeExpanded ? 'border-amber-400/80' : 'border-white/20'
+                                                    }`}>
+                                                        {/* Mercury Bulb */}
+                                                        <div className={`relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                                                            qTree.isRescue 
+                                                                ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
+                                                                : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
+                                                        }`}>
+                                                            <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                        </div>
+
+                                                        {/* Horizontal Glass Stem Tube */}
+                                                        <div className="relative flex-1 h-2.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/25 overflow-hidden shadow-inner flex items-center">
+                                                            <div className="absolute inset-0 flex justify-between px-1.5 pointer-events-none z-10 opacity-30">
+                                                                <div className="w-[1px] h-full bg-white"></div>
+                                                                <div className="w-[1px] h-full bg-white"></div>
+                                                                <div className="w-[1px] h-full bg-white"></div>
+                                                                <div className="w-[1px] h-full bg-white"></div>
+                                                            </div>
+
+                                                            <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/40 z-20 pointer-events-none"></div>
+
+                                                            <div 
+                                                                className={`h-full rounded-r-full transition-all duration-700 relative ${
+                                                                    qTree.isRescue
+                                                                        ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
+                                                                        : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+                                                                }`}
+                                                                style={{
+                                                                    width: `${fillWidth}%`
+                                                                }}
+                                                            >
+                                                                <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/70 rounded-r-full"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             );
-                        })}
+                        })()}
                     </div>
                 </div>
 
