@@ -196,21 +196,19 @@ export default function FarmClient({
     const [isDdExpanded, setIsDdExpanded] = useState(false);
     const [isQuarantineEnlarged, setIsQuarantineEnlarged] = useState(false);
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
-    const quarantineTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    const handleOpenQuarantine = (e: React.MouseEvent) => {
+    const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (isQuarantineEnlarged || isQuarantineExpanded) return;
-        setIsQuarantineEnlarged(true);
-        if (quarantineTimeoutRef.current) clearTimeout(quarantineTimeoutRef.current);
-        quarantineTimeoutRef.current = setTimeout(() => {
+        if (!isQuarantineEnlarged) {
+            // คลิกครั้งที่ 1: ขยายกล่อง DD ออกแล้วค้างไว้ ไม่ต่อเนื่องอัตโนมัติ
+            setIsQuarantineEnlarged(true);
+        } else {
+            // คลิกครั้งที่ 2: แสดงหลอดปรอทของแต่ละคู่เงิน
             setIsQuarantineExpanded(true);
-        }, 450);
+        }
     };
 
     const handleCloseQuarantine = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (quarantineTimeoutRef.current) clearTimeout(quarantineTimeoutRef.current);
         setIsQuarantineExpanded(false);
         setIsQuarantineEnlarged(false);
         setExpandedTreeId(null);
@@ -1843,13 +1841,13 @@ export default function FarmClient({
                                             className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto select-none"
                                         >
                                             <div 
-                                                onClick={handleOpenQuarantine}
+                                                onClick={handleQuarantineBoxClick}
                                                 className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
                                                     isQuarantineEnlarged
                                                         ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)] scale-100'
                                                         : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-fade-in'
                                                 }`}
-                                                title="คลิกเพื่อคลี่ดูหลอดปรอทของแต่ละคู่เงินที่ถูกขัง"
+                                                title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อแสดงหลอดปรอทของแต่ละต้นไม้" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
                                                 {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
                                                 <div className="flex items-center gap-2">
@@ -1858,9 +1856,18 @@ export default function FarmClient({
                                                     }`}>
                                                         -{totalQuarantineDD.toFixed(2)}%
                                                     </span>
-                                                    <span className={`text-red-400/80 transition-all duration-300 ${
-                                                        isQuarantineEnlarged ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
-                                                    }`}>
+                                                    <span 
+                                                        onClick={(e) => {
+                                                            if (isQuarantineEnlarged) {
+                                                                e.stopPropagation();
+                                                                setIsQuarantineEnlarged(false);
+                                                            }
+                                                        }}
+                                                        className={`text-red-400/80 transition-all duration-300 ${
+                                                            isQuarantineEnlarged ? 'rotate-180 text-xs sm:text-sm hover:scale-125' : 'text-[9px]'
+                                                        }`}
+                                                        title={isQuarantineEnlarged ? "คลิกเพื่อย่อกลับ" : undefined}
+                                                    >
                                                         ▼
                                                     </span>
                                                 </div>
@@ -1889,6 +1896,13 @@ export default function FarmClient({
                                                         </div>
                                                     </div>
                                                 </div>
+
+                                                {/* Hint when enlarged: Click again to reveal bars */}
+                                                {isQuarantineEnlarged && (
+                                                    <span className="text-[9px] font-mono font-bold text-amber-300/90 mt-1.5 px-2 py-0.5 rounded-full bg-amber-950/60 border border-amber-600/40 animate-pulse">
+                                                        แตะอีกครั้งเพื่อคลี่หลอดปรอท ▼
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1897,7 +1911,7 @@ export default function FarmClient({
 
                             return (
                                 <div key="quarantine_expanded_bars">
-                                    {/* 🔘 ปุ่มวงกลมมีกากบาท (X) ลอยตัวอยู่บนปรอททั้งสามเยื้องขวา ไม่ซ้อนทับปรอท */}
+                                    {/* 🔘 ปุ่มวงกลมมีกากบาท (X) ขยายใหญ่ขึ้น 3 เท่า ลอยตัวอยู่บนปรอททั้งสามเยื้องขวา ไม่ซ้อนทับปรอท */}
                                     <div
                                         className="absolute pointer-events-none"
                                         style={{
@@ -1908,13 +1922,13 @@ export default function FarmClient({
                                             height: '280px'
                                         }}
                                     >
-                                        <div className="absolute -top-7 sm:-top-8 left-1/2 translate-x-20 sm:translate-x-24 pointer-events-auto animate-fade-in">
+                                        <div className="absolute -top-20 sm:-top-24 left-1/2 translate-x-14 sm:translate-x-18 pointer-events-auto animate-fade-in">
                                             <button
                                                 onClick={handleCloseQuarantine}
-                                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#1a0505]/95 hover:bg-[#380b0b] border border-red-500/80 hover:border-red-400 text-red-200 hover:text-white flex items-center justify-center shadow-[0_0_12px_rgba(239,68,68,0.7)] backdrop-blur-md transition-all active:scale-90 select-none cursor-pointer group"
+                                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#1a0505]/95 hover:bg-[#380b0b] border-2 border-red-500/90 hover:border-red-400 text-red-200 hover:text-white flex items-center justify-center shadow-[0_0_25px_rgba(239,68,68,0.85)] backdrop-blur-md transition-all active:scale-95 select-none cursor-pointer group"
                                                 title="คลิกเพื่อรวบเก็บ DD รวม"
                                             >
-                                                <X className="w-4 h-4 stroke-[2.5] group-hover:scale-110 transition-transform" />
+                                                <X className="w-8 h-8 sm:w-10 sm:h-10 stroke-[2.5] group-hover:scale-110 transition-transform" />
                                             </button>
                                         </div>
                                     </div>
