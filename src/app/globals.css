@@ -278,3 +278,34 @@
 .animate-disperse-bar-right {
   animation: disperse-bar-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Horizontal disperse animation for Orb 1 sub-orbs (คลี่กระจายออกมาทางซ้ายเรียงกัน) */
+@keyframes orb-disperse-left {
+  0% {
+    opacity: 0;
+    transform: translateX(45px) scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes orb-disperse-mid {
+  0% {
+    opacity: 0;
+    transform: translateX(22px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-orb-disperse-left {
+  animation: orb-disperse-left 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-orb-disperse-mid {
+  animation: orb-disperse-mid 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

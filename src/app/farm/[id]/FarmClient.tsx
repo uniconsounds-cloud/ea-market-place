@@ -95,6 +95,113 @@ const PRIME_20_PAIRS = [
     'GBPAUD', 'AUDJPY', 'NZDJPY', 'EURNZD', 'GBPNZD'
 ];
 
+// 🔮 Glowing Crystal DD Dial Orb Component (ทรงลูกแก้วคริสตัลเรืองแสงพร้อมหน้าปัด DD Real-time)
+const GlowingDdOrb = ({
+    type,
+    value,
+    onClick,
+    className,
+    showPing,
+    title
+}: {
+    type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE';
+    value: number;
+    onClick?: () => void;
+    className?: string;
+    showPing?: boolean;
+    title?: string;
+}) => {
+    const config = {
+        TOTAL: {
+            container: 'border-rose-400/80 bg-gradient-to-b from-[#2e0915]/95 via-[#1d050d]/95 to-[#0a0204]/95 shadow-[0_0_20px_rgba(244,63,94,0.6),inset_0_0_12px_rgba(244,63,94,0.35)] hover:shadow-[0_0_35px_rgba(244,63,94,0.9)]',
+            stroke: '#f43f5e',
+            glow: 'rgba(244,63,94,0.7)',
+            label: 'TOTAL',
+            labelColor: 'text-rose-300/90',
+            valColor: 'text-rose-400',
+            pingBg: 'bg-rose-400',
+            pingDot: 'bg-rose-500',
+            tooltip: `DD รวมของพอร์ต: -${value.toFixed(2)}%`
+        },
+        ACTIVE: {
+            container: 'border-emerald-400/80 bg-gradient-to-b from-[#06241a]/95 via-[#031710]/95 to-[#010906]/95 shadow-[0_0_20px_rgba(16,185,129,0.55),inset_0_0_12px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.85)]',
+            stroke: '#10b981',
+            glow: 'rgba(16,185,129,0.7)',
+            label: 'ACTIVE',
+            labelColor: 'text-emerald-300/90',
+            valColor: 'text-emerald-400',
+            pingBg: 'bg-emerald-400',
+            pingDot: 'bg-emerald-500',
+            tooltip: `DD ฟาร์มปัจจุบัน: -${value.toFixed(2)}%`
+        },
+        QUARANTINE: {
+            container: 'border-amber-400/80 bg-gradient-to-b from-[#2a1705]/95 via-[#1a0e03]/95 to-[#0b0501]/95 shadow-[0_0_20px_rgba(245,158,11,0.55),inset_0_0_12px_rgba(245,158,11,0.3)] hover:shadow-[0_0_35px_rgba(245,158,11,0.85)]',
+            stroke: '#f59e0b',
+            glow: 'rgba(245,158,11,0.7)',
+            label: 'QUAR',
+            labelColor: 'text-amber-300/90',
+            valColor: 'text-amber-400',
+            pingBg: 'bg-amber-400',
+            pingDot: 'bg-amber-500',
+            tooltip: `DD คู่ที่ถูกขัง: -${value.toFixed(2)}%`
+        }
+    }[type];
+
+    const circumference = 122.52;
+    const fillPct = Math.min(100, Math.max(10, (value / 50) * 100));
+    const strokeDashoffset = circumference - (circumference * fillPct) / 100;
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`group relative flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-full border-2 transition-all duration-300 backdrop-blur-md cursor-pointer hover:scale-110 active:scale-95 select-none ${config.container} ${className || ''}`}
+            title={title || config.tooltip}
+        >
+            {/* 🔮 3D Crystal Specular Highlights */}
+            <span className="absolute top-0.5 sm:top-1 left-2 sm:left-2.5 right-2 sm:right-2.5 h-2.5 sm:h-3 rounded-full bg-gradient-to-b from-white/40 via-white/10 to-transparent pointer-events-none z-20" />
+            <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.22),transparent_65%)] pointer-events-none z-10" />
+            <span className="absolute bottom-0.5 left-2.5 right-2.5 h-1 rounded-full bg-white/15 blur-[0.5px] pointer-events-none z-20" />
+
+            {/* 🧭 Dial Circular Gauge SVG */}
+            <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none z-10" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="19.5" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+                <circle
+                    cx="24"
+                    cy="24"
+                    r="19.5"
+                    fill="none"
+                    stroke={config.stroke}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    style={{ filter: `drop-shadow(0 0 3px ${config.glow})` }}
+                    className="transition-all duration-700 ease-out"
+                />
+            </svg>
+
+            {/* 🔢 Center Dial Gauge Value & Label */}
+            <div className="relative z-20 flex flex-col items-center justify-center leading-none text-center">
+                <span className={`text-[6.5px] sm:text-[7.5px] font-black tracking-wider uppercase mb-0.5 ${config.labelColor}`}>
+                    {config.label}
+                </span>
+                <span className={`font-mono font-black text-[9.5px] sm:text-xs tracking-tight drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] ${config.valColor}`}>
+                    -{value.toFixed(1)}%
+                </span>
+            </div>
+
+            {/* 🚨 Pulse Ping Indicator */}
+            {showPing && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 sm:h-3 sm:w-3 pointer-events-none z-30">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${config.pingBg}`} />
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 ${config.pingDot}`} />
+                </span>
+            )}
+        </button>
+    );
+};
+
 export default function FarmClient({ 
     portNumber, 
     initialOrders, 
@@ -196,6 +303,8 @@ export default function FarmClient({
     const [isDdExpanded, setIsDdExpanded] = useState(false);
     const [isQuarantineEnlarged, setIsQuarantineEnlarged] = useState(false);
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
+    const [isDdOrbExpanded, setIsDdOrbExpanded] = useState(false);
+
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!isQuarantineEnlarged) {
@@ -1082,6 +1191,68 @@ export default function FarmClient({
             .slice(0, 4);
     }, [primeTelemetry]);
 
+    // 🛡️ 3 Quarantined & Rescued Trees Dataset
+    const quarantinePreviewList = useMemo(() => [
+        { 
+            id: 'q_preview_1', 
+            c: 1, 
+            r: 5, 
+            sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.sym || 'EURJPY') : 'EURJPY',
+            ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.ddPct ?? 14.20) : 14.20,
+            isRescue: false,
+            src: '/farm/Tree_fence.png?v=2', 
+            alt: 'Quarantined Tree', 
+            label: 'QUARANTINE',
+        },
+        { 
+            id: 'q_preview_2', 
+            c: 2, 
+            r: 5, 
+            sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.sym || 'GBPJPY') : 'GBPJPY',
+            ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.ddPct ?? 16.80) : 16.80,
+            isRescue: true,
+            src: '/farm/Tree_aura.png?v=2',  
+            alt: 'Rescue Active Tree', 
+            label: 'RESCUE GRID',
+        },
+        { 
+            id: 'q_preview_3', 
+            c: 3, 
+            r: 5, 
+            sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.sym || 'USDJPY') : 'USDJPY',
+            ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.ddPct ?? 11.50) : 11.50,
+            isRescue: false,
+            src: '/farm/Tree_fence.png?v=2', 
+            alt: 'Quarantined Tree', 
+            label: 'QUARANTINE',
+        },
+    ], [primeTelemetry]);
+
+    const totalQuarantineDD = useMemo(() => {
+        return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
+    }, [quarantinePreviewList]);
+
+    // Definitions of DD at each location:
+    // 1. Top Orb (ลูกแก้วบนสุด) = DD รวมของพอร์ต (Total Port DD)
+    // 2. Badge above Farm (กรอบ DD เหนือฟาร์ม) = DD ของฟาร์มที่ทำงานอยู่ปัจจุบันโดยหัก DD ที่ถูกกักขังออกแล้ว (Active Farm DD = Total Port DD - Quarantine Total DD)
+    // 3. Badge on Quarantined Trees (บนต้นไม้ที่ถูกขัง) = DD ของคู่เงินที่ถูกขังทั้งหมด (Quarantine Total DD)
+    const rawPortDD = primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent;
+    const activeFarmDDPct = useMemo(() => {
+        if (portNumber === '97053088' || isPrime) {
+            return rawPortDD >= totalQuarantineDD + 5 
+                ? Number((rawPortDD - totalQuarantineDD).toFixed(2)) 
+                : (rawPortDD > 0 ? Number(rawPortDD.toFixed(2)) : 14.20);
+        }
+        return rawPortDD;
+    }, [rawPortDD, totalQuarantineDD, portNumber, isPrime]);
+
+    const totalPortDDPct = useMemo(() => {
+        if (portNumber === '97053088' || isPrime) {
+            return Number((activeFarmDDPct + totalQuarantineDD).toFixed(2));
+        }
+        return rawPortDD;
+    }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, portNumber, isPrime]);
+
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => pairControls[p]?.enabled !== false).length;
     }, [pairControls]);
@@ -1576,7 +1747,7 @@ export default function FarmClient({
                             const badgeLeft = (targetC - targetR) * TILE_W;
                             const badgeTop = (targetC + targetR) * TILE_H_OFFSET;
                             const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
-                            const portDDPct = primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent;
+                            const portDDPct = activeFarmDDPct;
                             const portMercuryFill = Math.min(100, Math.max(10, (portDDPct / 40) * 100));
 
                             return (
@@ -1727,41 +1898,7 @@ export default function FarmClient({
                         </div> {/* 🌾 End of animate-float-farm */}
 
                         {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (TREES ONLY, PERMANENT ISOMETRIC Z-INDEX, NO FAINT PLOT) */}
-                        {isClient && portNumber === '97053088' && [
-                            { 
-                                id: 'q_preview_1', 
-                                c: 1, 
-                                r: 5, 
-                                sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.sym || 'EURJPY') : 'EURJPY',
-                                ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.ddPct ?? 14.20) : 14.20,
-                                isRescue: false,
-                                src: '/farm/Tree_fence.png?v=2', 
-                                alt: 'Quarantined Tree', 
-                                label: 'QUARANTINE',
-                            },
-                            { 
-                                id: 'q_preview_2', 
-                                c: 2, 
-                                r: 5, 
-                                sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.sym || 'GBPJPY') : 'GBPJPY',
-                                ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.ddPct ?? 16.80) : 16.80,
-                                isRescue: true,
-                                src: '/farm/Tree_aura.png?v=2',  
-                                alt: 'Rescue Active Tree', 
-                                label: 'RESCUE GRID',
-                            },
-                            { 
-                                id: 'q_preview_3', 
-                                c: 3, 
-                                r: 5, 
-                                sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.sym || 'USDJPY') : 'USDJPY',
-                                ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.ddPct ?? 11.50) : 11.50,
-                                isRescue: false,
-                                src: '/farm/Tree_fence.png?v=2', 
-                                alt: 'Quarantined Tree', 
-                                label: 'QUARANTINE',
-                            },
-                        ].map((qTree) => {
+                        {isClient && portNumber === '97053088' && quarantinePreviewList.map((qTree) => {
                             const tZIndex = (qTree.c + qTree.r) + 20;
                             return (
                                 <div
@@ -1792,36 +1929,7 @@ export default function FarmClient({
 
                         {/* 🌡️ QUARANTINE FLOATING OVERLAY: COMBINED DD BADGE OR EXPANDED INDIVIDUAL MERCURY BARS */}
                         {isClient && portNumber === '97053088' && (() => {
-                            const previewList = [
-                                { 
-                                    id: 'q_preview_1', 
-                                    c: 1, 
-                                    r: 5, 
-                                    sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.sym || 'EURJPY') : 'EURJPY',
-                                    ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.ddPct ?? 14.20) : 14.20,
-                                    isRescue: false,
-                                    label: 'QUARANTINE',
-                                },
-                                { 
-                                    id: 'q_preview_2', 
-                                    c: 2, 
-                                    r: 5, 
-                                    sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.sym || 'GBPJPY') : 'GBPJPY',
-                                    ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.ddPct ?? 16.80) : 16.80,
-                                    isRescue: true,
-                                    label: 'RESCUE GRID',
-                                },
-                                { 
-                                    id: 'q_preview_3', 
-                                    c: 3, 
-                                    r: 5, 
-                                    sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.sym || 'USDJPY') : 'USDJPY',
-                                    ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.ddPct ?? 11.50) : 11.50,
-                                    isRescue: false,
-                                    label: 'QUARANTINE',
-                                },
-                            ];
-                            const totalQuarantineDD = previewList.reduce((acc, t) => acc + t.ddPct, 0);
+                            const previewList = quarantinePreviewList;
                             const quarantineMercuryFill = Math.min(100, Math.max(12, (totalQuarantineDD / 50) * 100));
 
                             if (!isQuarantineExpanded) {
@@ -2140,19 +2248,40 @@ export default function FarmClient({
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {isPrime && (
                 <>
-                    <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto">
-                        {/* Orb 1: Emerald/Green Glow */}
-                        <button
-                            onClick={() => setPrimeActiveOrb(1)}
-                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_35px_rgba(16,185,129,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title="Prime menu 1"
-                        >
-                            <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 group-hover:animate-pulse transition-transform" />
-                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                            </span>
-                        </button>
+                    <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto items-end">
+                        {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 ลูก) */}
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            {isDdOrbExpanded && (
+                                <>
+                                    {/* 1. Leftmost Orb: Quarantine Total DD (คู่เงินที่ถูกขังทั้งหมด) */}
+                                    <div className="animate-orb-disperse-left">
+                                        <GlowingDdOrb
+                                            type="QUARANTINE"
+                                            value={totalQuarantineDD}
+                                            title={`🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}%`}
+                                        />
+                                    </div>
+
+                                    {/* 2. Middle Orb: Active Farm DD (ฟาร์มที่ทำงานปัจจุบัน) */}
+                                    <div className="animate-orb-disperse-mid">
+                                        <GlowingDdOrb
+                                            type="ACTIVE"
+                                            value={activeFarmDDPct}
+                                            title={`🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}%`}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* 3. Rightmost Orb: Original Orb 1 (Total Port DD รวมของพอร์ต) */}
+                            <GlowingDdOrb
+                                type="TOTAL"
+                                value={totalPortDDPct}
+                                showPing
+                                onClick={() => setIsDdOrbExpanded(prev => !prev)}
+                                title={isDdOrbExpanded ? "คลิกเพื่อพับเก็บลูกแก้วย่อย" : `📊 DD รวมของพอร์ต: -${totalPortDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดู DD ฟาร์ม / DD ถูกขัง)`}
+                            />
+                        </div>
 
                         {/* Orb 2: Cyan/Blue Glow */}
                         <button
