@@ -194,7 +194,28 @@ export default function FarmClient({
     const [previewTimeLeft, setPreviewTimeLeft] = useState(0);
     const [secondsSinceLastUpdate, setSecondsSinceLastUpdate] = useState<number>(0);
     const [isDdExpanded, setIsDdExpanded] = useState(false);
+    const [isQuarantineEnlarged, setIsQuarantineEnlarged] = useState(false);
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
+    const quarantineTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const handleOpenQuarantine = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isQuarantineEnlarged || isQuarantineExpanded) return;
+        setIsQuarantineEnlarged(true);
+        if (quarantineTimeoutRef.current) clearTimeout(quarantineTimeoutRef.current);
+        quarantineTimeoutRef.current = setTimeout(() => {
+            setIsQuarantineExpanded(true);
+        }, 450);
+    };
+
+    const handleCloseQuarantine = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (quarantineTimeoutRef.current) clearTimeout(quarantineTimeoutRef.current);
+        setIsQuarantineExpanded(false);
+        setIsQuarantineEnlarged(false);
+        setExpandedTreeId(null);
+    };
+
     const [expandedTreeId, setExpandedTreeId] = useState<string | null>(null);
     const [selectedTreeModal, setSelectedTreeModal] = useState<any | null>(null);
 
@@ -1822,29 +1843,43 @@ export default function FarmClient({
                                             className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto select-none"
                                         >
                                             <div 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setIsQuarantineExpanded(true);
-                                                }}
-                                                className="bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2 text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none w-32 sm:w-36 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-fade-in"
+                                                onClick={handleOpenQuarantine}
+                                                className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                    isQuarantineEnlarged
+                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)] scale-100'
+                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-fade-in'
+                                                }`}
                                                 title="คลิกเพื่อคลี่ดูหลอดปรอทของแต่ละคู่เงินที่ถูกขัง"
                                             >
-                                                {/* Line 1: Main DD Number */}
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
+                                                    }`}>
                                                         -{totalQuarantineDD.toFixed(2)}%
                                                     </span>
-                                                    <span className="text-[9px] text-red-400/80">
+                                                    <span className={`text-red-400/80 transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
+                                                    }`}>
                                                         ▼
                                                     </span>
                                                 </div>
 
-                                                {/* Line 2: ปรอทแนวนอนแบบเดียวกับของฟาร์ม */}
-                                                <div className="transition-all duration-300 ease-out flex items-center px-1 py-0.5 rounded-full bg-black/80 border border-red-500/30 mt-1 shadow-inner w-24 sm:w-28">
-                                                    <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]">
+                                                {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง */}
+                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-red-500/30 shadow-inner ${
+                                                    isQuarantineEnlarged ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
+                                                }`}>
+                                                    {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
+                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)] transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
+                                                    }`}>
                                                         <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                     </div>
-                                                    <div className="relative flex-1 h-1.5 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+
+                                                    {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
+                                                    <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'h-2 sm:h-2.5' : 'h-1.5'
+                                                    }`}>
                                                         <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                         <div 
                                                             className="h-full rounded-r-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)] transition-all duration-700 relative"
@@ -1862,7 +1897,7 @@ export default function FarmClient({
 
                             return (
                                 <div key="quarantine_expanded_bars">
-                                    {/* Collapse Button floating above Tree 2 */}
+                                    {/* 🔘 ปุ่มวงกลมมีกากบาท (X) ลอยตัวอยู่บนปรอททั้งสามเยื้องขวา ไม่ซ้อนทับปรอท */}
                                     <div
                                         className="absolute pointer-events-none"
                                         style={{
@@ -1873,17 +1908,13 @@ export default function FarmClient({
                                             height: '280px'
                                         }}
                                     >
-                                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 pointer-events-auto">
+                                        <div className="absolute -top-7 sm:-top-8 left-1/2 translate-x-20 sm:translate-x-24 pointer-events-auto animate-fade-in">
                                             <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setIsQuarantineExpanded(false);
-                                                    setExpandedTreeId(null);
-                                                }}
-                                                className="text-[9px] font-mono font-bold text-red-300 hover:text-white bg-[#1a0505]/90 hover:bg-[#270808] px-2 py-0.5 rounded-full border border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.5)] backdrop-blur-md transition-all flex items-center gap-1 active:scale-95 whitespace-nowrap"
-                                                title="คลิกเพื่อรวบกลับเป็นกล่อง DD รวม"
+                                                onClick={handleCloseQuarantine}
+                                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#1a0505]/95 hover:bg-[#380b0b] border border-red-500/80 hover:border-red-400 text-red-200 hover:text-white flex items-center justify-center shadow-[0_0_12px_rgba(239,68,68,0.7)] backdrop-blur-md transition-all active:scale-90 select-none cursor-pointer group"
+                                                title="คลิกเพื่อรวบเก็บ DD รวม"
                                             >
-                                                ▲ รวบเก็บ DD รวม
+                                                <X className="w-4 h-4 stroke-[2.5] group-hover:scale-110 transition-transform" />
                                             </button>
                                         </div>
                                     </div>
