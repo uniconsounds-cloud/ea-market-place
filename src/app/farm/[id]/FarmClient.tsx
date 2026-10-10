@@ -1534,9 +1534,9 @@ export default function FarmClient({
 
                         {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (FOR USER PORT 97053088 - ATTACHED TO 3 MIDDLE PLOTS AT BOTTOM-LEFT) */}
                         {isClient && portNumber === '97053088' && [
-                            { id: 'q_preview_1', c: 1, r: 5, src: '/farm/Tree_fence.png', alt: 'Quarantined Tree', label: 'Quarantined' },
-                            { id: 'q_preview_2', c: 2, r: 5, src: '/farm/Tree_aura.png',  alt: 'Rescue Active Tree', label: 'Rescue Grid' },
-                            { id: 'q_preview_3', c: 3, r: 5, src: '/farm/Tree_fence.png', alt: 'Quarantined Tree', label: 'Quarantine' },
+                            { id: 'q_preview_1', c: 1, r: 5, src: '/farm/Tree_fence.png?v=2', alt: 'Quarantined Tree', label: 'Quarantined' },
+                            { id: 'q_preview_2', c: 2, r: 5, src: '/farm/Tree_aura.png?v=2',  alt: 'Rescue Active Tree', label: 'Rescue Grid' },
+                            { id: 'q_preview_3', c: 3, r: 5, src: '/farm/Tree_fence.png?v=2', alt: 'Quarantined Tree', label: 'Quarantine' },
                         ].map((qTree) => {
                             const tZIndex = (qTree.c + qTree.r) + 20;
                             return (
