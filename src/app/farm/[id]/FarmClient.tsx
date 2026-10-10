@@ -1531,6 +1531,39 @@ export default function FarmClient({
                                 </div>
                             );
                         })}
+
+                        {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (FOR USER PORT 97053088 - ATTACHED TO 3 MIDDLE PLOTS AT BOTTOM-LEFT) */}
+                        {isClient && portNumber === '97053088' && [
+                            { id: 'q_preview_1', c: 1, r: 5, src: '/farm/Tree_fence.png', alt: 'Quarantined Tree', label: 'Quarantined' },
+                            { id: 'q_preview_2', c: 2, r: 5, src: '/farm/Tree_aura.png',  alt: 'Rescue Active Tree', label: 'Rescue Grid' },
+                            { id: 'q_preview_3', c: 3, r: 5, src: '/farm/Tree_fence.png', alt: 'Quarantined Tree', label: 'Quarantine' },
+                        ].map((qTree) => {
+                            const tZIndex = (qTree.c + qTree.r) + 20;
+                            return (
+                                <div
+                                    key={qTree.id}
+                                    className="absolute transition-transform duration-300 hover:scale-105"
+                                    style={{
+                                        left: `${(qTree.c - qTree.r) * TILE_W}px`,
+                                        top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
+                                        zIndex: tZIndex,
+                                        width: '280px',
+                                        height: '280px'
+                                    }}
+                                >
+                                    <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                        <Image
+                                            src={qTree.src}
+                                            alt={qTree.alt}
+                                            fill
+                                            className="object-contain object-bottom drop-shadow-2xl"
+                                            unoptimized
+                                            priority
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
