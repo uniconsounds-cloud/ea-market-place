@@ -111,14 +111,17 @@ const PRIME_20_PAIRS = [
 type PortMode = 'NORMAL' | 'SLOW' | 'FREEZE';
 type ActiveModal = 'DEFENSE' | 'MATRIX' | 'VAULT' | 'RADAR' | null;
 
-// 🔮 Glowing Crystal DD Dial Orb Component (ทรงลูกแก้วคริสตัลเรืองแสงพร้อมหน้าปัด DD Real-time)
+// 🔮 Glowing Crystal DD Dial Orb Component (ทรงลูกแก้วคริสตัลเรืองแสงพร้อมสเกลหน้าปัดและเข็มตาชั่ง Real-time)
 const GlowingDdOrb = ({
     type,
     value,
     onClick,
     className,
     showPing,
-    title
+    title,
+    isHighlighted,
+    onMouseEnter,
+    onMouseLeave
 }: {
     type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE';
     value: number;
@@ -126,12 +129,16 @@ const GlowingDdOrb = ({
     className?: string;
     showPing?: boolean;
     title?: string;
+    isHighlighted?: boolean;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
 }) => {
     const config = {
         TOTAL: {
             container: 'border-rose-400/80 bg-gradient-to-b from-[#2e0915]/95 via-[#1d050d]/95 to-[#0a0204]/95 shadow-[0_0_20px_rgba(244,63,94,0.6),inset_0_0_12px_rgba(244,63,94,0.35)] hover:shadow-[0_0_35px_rgba(244,63,94,0.9)]',
             stroke: '#f43f5e',
             glow: 'rgba(244,63,94,0.7)',
+            needleColor: '#fda4af',
             label: 'TOTAL',
             labelColor: 'text-rose-300/90',
             valColor: 'text-rose-400',
@@ -143,6 +150,7 @@ const GlowingDdOrb = ({
             container: 'border-emerald-400/80 bg-gradient-to-b from-[#06241a]/95 via-[#031710]/95 to-[#010906]/95 shadow-[0_0_20px_rgba(16,185,129,0.55),inset_0_0_12px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.85)]',
             stroke: '#10b981',
             glow: 'rgba(16,185,129,0.7)',
+            needleColor: '#6ee7b7',
             label: 'ACTIVE',
             labelColor: 'text-emerald-300/90',
             valColor: 'text-emerald-400',
@@ -154,6 +162,7 @@ const GlowingDdOrb = ({
             container: 'border-amber-400/80 bg-gradient-to-b from-[#2a1705]/95 via-[#1a0e03]/95 to-[#0b0501]/95 shadow-[0_0_20px_rgba(245,158,11,0.55),inset_0_0_12px_rgba(245,158,11,0.3)] hover:shadow-[0_0_35px_rgba(245,158,11,0.85)]',
             stroke: '#f59e0b',
             glow: 'rgba(245,158,11,0.7)',
+            needleColor: '#fde68a',
             label: 'QUAR',
             labelColor: 'text-amber-300/90',
             valColor: 'text-amber-400',
@@ -163,15 +172,28 @@ const GlowingDdOrb = ({
         }
     }[type];
 
-    const circumference = 122.52;
-    const fillPct = Math.min(100, Math.max(12, (value / 50) * 100));
-    const strokeDashoffset = circumference - (circumference * fillPct) / 100;
+    // Scale calculation: 270-degree speedometer / weighing scale arc (starts at 135° to 405°)
+    const r = 20;
+    const circumference = 2 * Math.PI * r; // 125.66
+    const arcTotalLength = circumference * (270 / 360); // 94.25
+    const fillPct = Math.min(100, Math.max(5, (value / 50) * 100));
+    const activeSweepLength = arcTotalLength * (fillPct / 100);
+
+    // Indicator needle tip angle at current value (เลื่อนหมุนตามสเกลเหมือนเข็มตาชั่ง)
+    const needleAngleDeg = 135 + (fillPct / 100) * 270;
+    const needleRad = (needleAngleDeg * Math.PI) / 180;
+    const tipX = 24 + r * Math.cos(needleRad);
+    const tipY = 24 + r * Math.sin(needleRad);
+    const needleBaseX = 24 + (r - 4.5) * Math.cos(needleRad);
+    const needleBaseY = 24 + (r - 4.5) * Math.sin(needleRad);
 
     return (
         <button
             type="button"
             onClick={onClick}
-            className={`group relative flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-full border-2 transition-all duration-300 backdrop-blur-md cursor-pointer hover:scale-110 active:scale-95 select-none ${config.container} ${className || ''}`}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+            className={`group relative flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-full border-2 transition-all duration-300 backdrop-blur-md cursor-pointer hover:scale-110 active:scale-95 select-none ${config.container} ${isHighlighted ? 'ring-2 ring-white shadow-[0_0_35px_rgba(255,255,255,0.8)] scale-110' : ''} ${className || ''}`}
             title={title || config.tooltip}
         >
             {/* 🔮 3D Crystal Specular Highlights */}
@@ -179,30 +201,64 @@ const GlowingDdOrb = ({
             <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.22),transparent_65%)] pointer-events-none z-10" />
             <span className="absolute bottom-0.5 left-2.5 right-2.5 h-1 rounded-full bg-white/15 blur-[0.5px] pointer-events-none z-20" />
 
-            {/* 🧭 Dial Circular Gauge SVG */}
-            <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none z-10" viewBox="0 0 48 48">
-                <circle cx="24" cy="24" r="19.5" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+            {/* 🧭 Calibrated Scale Meter & Needle (สเกลขีดรอบวงและเข็มบอกค่าตาชั่ง) */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 48 48">
+                {/* 1. Background Graduation Ticks (ขีดสเกลหน้าปัดตาชั่ง) */}
                 <circle
                     cx="24"
                     cy="24"
-                    r="19.5"
+                    r={r}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.2)"
+                    strokeWidth="2.2"
+                    strokeDasharray="1.2 3.5"
+                    strokeDashoffset="0"
+                    transform="rotate(135 24 24)"
+                />
+
+                {/* 2. Active Scale Progress Sweep Arc (วงสเกลยาวขึ้นตามค่าที่ระบุ) */}
+                <circle
+                    cx="24"
+                    cy="24"
+                    r={r}
                     fill="none"
                     stroke={config.stroke}
-                    strokeWidth="2.5"
+                    strokeWidth="2.4"
                     strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
+                    strokeDasharray={`${activeSweepLength} ${circumference}`}
+                    transform="rotate(135 24 24)"
                     style={{ filter: `drop-shadow(0 0 3px ${config.glow})` }}
+                    className="transition-all duration-700 ease-out"
+                />
+
+                {/* 3. Scale Needle / Indicator Point (เข็มชี้สเกลตาชั่ง) */}
+                <line
+                    x1={needleBaseX}
+                    y1={needleBaseY}
+                    x2={tipX}
+                    y2={tipY}
+                    stroke="#ffffff"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    style={{ filter: `drop-shadow(0 0 2px ${config.needleColor})` }}
+                    className="transition-all duration-700 ease-out"
+                />
+                <circle
+                    cx={tipX}
+                    cy={tipY}
+                    r="1.4"
+                    fill="#ffffff"
+                    style={{ filter: `drop-shadow(0 0 3px ${config.stroke})` }}
                     className="transition-all duration-700 ease-out"
                 />
             </svg>
 
-            {/* 🔢 Center Dial Gauge Value & Label */}
-            <div className="relative z-20 flex flex-col items-center justify-center leading-none text-center">
-                <span className={`text-[6.5px] sm:text-[7.5px] font-black tracking-wider uppercase mb-0.5 ${config.labelColor}`}>
+            {/* 🔢 Center Dial Gauge Value & Label (ย่อขนาดเล็กลงพอเหมาะ ไม่ทับสเกล) */}
+            <div className="relative z-20 flex flex-col items-center justify-center leading-none text-center pointer-events-none">
+                <span className={`text-[5px] sm:text-[6px] font-black tracking-widest uppercase mb-0.5 ${config.labelColor}`}>
                     {config.label}
                 </span>
-                <span className={`font-mono font-black text-[9.5px] sm:text-xs tracking-tight drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] ${config.valColor}`}>
+                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${config.valColor}`}>
                     -{value.toFixed(1)}%
                 </span>
             </div>
@@ -244,6 +300,7 @@ export default function AdminPrimeFarmLabPage() {
     const [isQuarantineEnlarged, setIsQuarantineEnlarged] = useState(false);
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
     const [isDdOrbExpanded, setIsDdOrbExpanded] = useState(false);
+    const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | null>(null);
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!isQuarantineEnlarged) {
@@ -1236,12 +1293,24 @@ export default function AdminPrimeFarmLabPage() {
                                                 setIsDdExpanded(prev => !prev);
                                             }}
                                             className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                highlightTarget === 'FARM'
+                                                    ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
+                                                    : ''
+                                            } ${
                                                 isDdExpanded 
                                                     ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)]' 
                                                     : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)]'
                                             }`}
                                             title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุด"}
                                         >
+                                            {/* Mini Subtitle Tag linking to Active Farm */}
+                                            <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-emerald-400 uppercase">
+                                                    ACTIVE FARM
+                                                </span>
+                                            </div>
+
                                             {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
                                             <div className="flex items-center gap-2">
                                                 <span className={`font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
@@ -1412,12 +1481,24 @@ export default function AdminPrimeFarmLabPage() {
                                             <div 
                                                 onClick={handleQuarantineBoxClick}
                                                 className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                    highlightTarget === 'QUARANTINE'
+                                                        ? 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110'
+                                                        : ''
+                                                } ${
                                                     isQuarantineEnlarged
                                                         ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)] scale-100'
                                                         : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-fade-in'
                                                 }`}
                                                 title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อแสดงหลอดปรอทของแต่ละต้นไม้" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
+                                                {/* Mini Subtitle Tag linking to Quarantined Pairs */}
+                                                <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                                    <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-amber-400 uppercase">
+                                                        QUARANTINE
+                                                    </span>
+                                                </div>
+
                                                 {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
                                                 <div className="flex items-center gap-2">
                                                     <span className={`font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
@@ -1618,7 +1699,10 @@ export default function AdminPrimeFarmLabPage() {
                                     <GlowingDdOrb
                                         type="QUARANTINE"
                                         value={totalQuarantineDD}
-                                        title={`🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}%`}
+                                        isHighlighted={highlightTarget === 'QUARANTINE'}
+                                        onMouseEnter={() => setHighlightTarget('QUARANTINE')}
+                                        onMouseLeave={() => setHighlightTarget(null)}
+                                        title={`🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}% (เชื่อมโยงกับกล่องต้นไม้ที่ขัง)`}
                                     />
                                 </div>
 
@@ -1627,7 +1711,10 @@ export default function AdminPrimeFarmLabPage() {
                                     <GlowingDdOrb
                                         type="ACTIVE"
                                         value={activeFarmDDPct}
-                                        title={`🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}%`}
+                                        isHighlighted={highlightTarget === 'FARM'}
+                                        onMouseEnter={() => setHighlightTarget('FARM')}
+                                        onMouseLeave={() => setHighlightTarget(null)}
+                                        title={`🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}% (เชื่อมโยงกับกล่อง DD เหนือฟาร์ม)`}
                                     />
                                 </div>
                             </>
