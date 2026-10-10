@@ -932,11 +932,16 @@ export default function AdminPrimeFarmLabPage() {
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
                 >
                     <div className="absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px]">
+                        {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY) */}
+                        <div className="animate-float-farm">
                         {Array.from({ length: 25 }).map((_, i) => {
                             const c = i % 5;
                             const r = Math.floor(i / 5);
                             const tZIndex = (c + r) + 20;
                             const tree = plot.trees[i];
+                            const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
+                            const targetBadgeIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
+                            const tileZIndex = (isDdExpanded && i === targetBadgeIdx) ? 99999 : tZIndex;
 
                             return (
                                 <div
@@ -945,7 +950,7 @@ export default function AdminPrimeFarmLabPage() {
                                     style={{
                                         left: `${(c - r) * TILE_W}px`,
                                         top: `${(c + r) * TILE_H_OFFSET}px`,
-                                        zIndex: tZIndex,
+                                        zIndex: tileZIndex,
                                         width: '280px',
                                         height: '280px'
                                     }}
@@ -1145,8 +1150,9 @@ export default function AdminPrimeFarmLabPage() {
                                 </div>
                             );
                         })}
+                        </div> {/* 🌾 End of animate-float-farm */}
 
-                        {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (ATTACHED TO 3 MIDDLE PLOTS AT BOTTOM-LEFT) */}
+                        {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (COMPLETELY STATIC / FIXED IN PLACE) */}
                         {isClient && [
                             { 
                                 id: 'q_preview_1', 
@@ -1158,7 +1164,7 @@ export default function AdminPrimeFarmLabPage() {
                                 src: '/farm/Tree_fence.png?v=2', 
                                 alt: 'Quarantined Tree', 
                                 label: 'QUARANTINE',
-                                animClass: 'animate-float-tree-1'
+                                animClass: ''
                             },
                             { 
                                 id: 'q_preview_2', 
@@ -1170,7 +1176,7 @@ export default function AdminPrimeFarmLabPage() {
                                 src: '/farm/Tree_aura.png?v=2',  
                                 alt: 'Rescue Active Tree', 
                                 label: 'RESCUE GRID',
-                                animClass: 'animate-float-tree-2'
+                                animClass: ''
                             },
                             { 
                                 id: 'q_preview_3', 
@@ -1182,7 +1188,7 @@ export default function AdminPrimeFarmLabPage() {
                                 src: '/farm/Tree_fence.png?v=2', 
                                 alt: 'Quarantined Tree', 
                                 label: 'QUARANTINE',
-                                animClass: 'animate-float-tree-3'
+                                animClass: ''
                             },
                         ].map((qTree) => {
                             const tZIndex = (qTree.c + qTree.r) + 20;
@@ -1190,7 +1196,7 @@ export default function AdminPrimeFarmLabPage() {
                             return (
                                 <div
                                     key={qTree.id}
-                                    className={`absolute transition-transform duration-300 hover:scale-105 ${qTree.animClass}`}
+                                    className="absolute transition-transform duration-300 hover:scale-105"
                                     style={{
                                         left: `${(qTree.c - qTree.r) * TILE_W}px`,
                                         top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,

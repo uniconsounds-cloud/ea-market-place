@@ -188,3 +188,17 @@
 .animate-float-tree-3 {
   animation: float-quarantine-3 3.6s ease-in-out 2.4s infinite;
 }
+
+/* Gentle slow floating animation for the entire main farm island */
+@keyframes float-farm {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float-farm {
+  animation: float-farm 6.5s ease-in-out infinite;
+}
