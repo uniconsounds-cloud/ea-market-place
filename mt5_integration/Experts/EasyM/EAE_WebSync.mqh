@@ -423,12 +423,12 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
          g_eae_last_sync_ticks = 0; // Trigger instant full sync on the very next tick!
          g_eae_last_sync_hash = ""; // Clear hash to force a full update!
          g_eae_last_heartbeat_ticks = 0;  // Reset heartbeat timer!
-         Print("🟢 EAE WebSync: >> FARM VIEWER ACTIVE << (กำลังเปิดดูหน้าฟาร์ม - ซิงค์ข้อมูลสดทุก 20 วินาที)");
+         Print("🟢 EAE WebSync: >> FARM VIEWER ACTIVE << (Farm viewer online - Syncing live data every 20s)");
       }
       g_eae_full_sync_mode = true;
    } else {
       if(g_eae_full_sync_mode) {
-         Print("💤 EAE WebSync: >> STANDBY MODE << (ปิดหน้าฟาร์มแล้ว - เข้าสู่โหมดประหยัดทรัพยากร ซิงค์ทุก 3 นาที)");
+         Print("💤 EAE WebSync: >> STANDBY MODE << (Farm viewer closed - Low resource mode, Syncing every 3m)");
       }
       g_eae_full_sync_mode = false;
    }
