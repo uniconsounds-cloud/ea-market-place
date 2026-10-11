@@ -1400,7 +1400,7 @@ export default function AdminPrimeFarmLabPage() {
                                                             : ''
                                                     } ${
                                                         isDdExpanded 
-                                                            ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
+                                                            ? 'w-72 sm:w-80 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
                                                             : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.55)]'
                                                     }`}
                                                     title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุดในโหมด Active"}
@@ -1429,7 +1429,7 @@ export default function AdminPrimeFarmLabPage() {
 
                                                     {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
                                                     <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
-                                                        isDdExpanded ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
+                                                        isDdExpanded ? 'w-56 sm:w-64 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
                                                     }`}>
                                                         {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
                                                         <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${activeTheme.bulbBorder} ${activeTheme.bulbBg} transition-all duration-300 ${
@@ -1455,11 +1455,11 @@ export default function AdminPrimeFarmLabPage() {
                                             );
                                         })()}
 
-                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs: SLOW 5% เหลืองส้ม, FREEZE 8% แดง) */}
+                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs: สัดส่วนและขนาดตัวอักษรเหมือนของกักขัง ไม่มี #1,2,3,4) */}
                                         {isDdExpanded && (
                                             <div 
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="mt-2 w-64 sm:w-72 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
+                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
                                             >
                                                 {top4WorstPairs.map((p, idx) => {
                                                     const isPairExpanded = expandedActivePair === p.sym;
@@ -1475,57 +1475,62 @@ export default function AdminPrimeFarmLabPage() {
                                                                 e.stopPropagation();
                                                                 setExpandedActivePair(prev => prev === p.sym ? null : p.sym);
                                                             }}
-                                                            className={`w-full bg-[#02130d]/95 border rounded-xl transition-all duration-300 cursor-pointer select-none ${
+                                                            className={`w-full bg-[#02140d]/95 border-2 rounded-xl sm:rounded-2xl transition-all duration-300 cursor-pointer select-none backdrop-blur-xl flex flex-col gap-1.5 sm:gap-2 ${
                                                                 isPairExpanded 
-                                                                    ? 'scale-[1.06] sm:scale-[1.08] p-3 sm:p-3.5 shadow-[0_15px_35px_rgba(0,0,0,0.95),0_0_25px_rgba(16,185,129,0.55)] border-emerald-400 ring-2 ring-emerald-400/50 z-50' 
-                                                                    : 'border-emerald-500/80 p-2 sm:p-2.5 hover:scale-[1.02] shadow-[0_8px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)]'
-                                                            } backdrop-blur-xl flex flex-col gap-1.5 ${unfoldClass}`}
+                                                                    ? 'scale-[1.10] sm:scale-[1.14] px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-[0_20px_45px_rgba(0,0,0,0.95),0_0_25px_rgba(16,185,129,0.7)] border-emerald-300 ring-2 ring-emerald-400/80 z-50 my-1' 
+                                                                    : 'border-emerald-500/80 px-3 py-2 sm:px-3.5 sm:py-2.5 hover:scale-[1.02] shadow-[0_10px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)]'
+                                                            } ${unfoldClass}`}
                                                             title={isPairExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายดูรายละเอียดปรอท"}
                                                         >
+                                                            {/* Top Row: Symbol, Status Badge, DD % (ไม่มีตัวเลขลำดับ #1,2,3,4) */}
                                                             <div className="flex items-center justify-between font-mono">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className={`font-black rounded bg-emerald-950 text-emerald-300 border border-emerald-700 transition-all ${
-                                                                        isPairExpanded ? 'text-[11px] px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'
-                                                                    }`}>
-                                                                        #{idx + 1}
-                                                                    </span>
-                                                                    <span className={`font-bold text-white tracking-wide transition-all ${
-                                                                        isPairExpanded ? 'text-sm sm:text-base' : 'text-[11px]'
-                                                                    }`}>
-                                                                        {p.sym}
-                                                                    </span>
-                                                                    <span className={`rounded font-semibold border transition-all ${pTheme.badgeBg} ${
-                                                                        isPairExpanded ? 'text-[10px] px-2 py-0.5' : 'text-[8px] px-1.5 py-0.2'
-                                                                    }`}>
-                                                                        {pTheme.status}
-                                                                    </span>
-                                                                </div>
-                                                                <span className={`font-black ${pTheme.textColor} transition-all ${
-                                                                    isPairExpanded ? 'text-sm sm:text-base' : 'text-xs'
+                                                                <span className={`font-black tracking-wider transition-all ${pTheme.textColor} ${
+                                                                    isPairExpanded ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
+                                                                }`}>
+                                                                    {p.sym}
+                                                                </span>
+                                                                <span className={`rounded-md font-bold uppercase tracking-wider border transition-all ${pTheme.badgeBg} ${
+                                                                    isPairExpanded ? 'text-[11px] sm:text-xs px-2.5 py-0.5' : 'text-[10px] sm:text-[11px] px-2 py-0.5'
+                                                                }`}>
+                                                                    {pTheme.status}
+                                                                </span>
+                                                                <span className={`font-black font-mono transition-all ${pTheme.textColor} ${
+                                                                    isPairExpanded ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
                                                                 }`}>
                                                                     -{p.ddPct.toFixed(1)}%
                                                                 </span>
                                                             </div>
 
-                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน Active (ขยายใหญ่ขึ้นเมื่อคลิก) */}
-                                                            <div className={`flex items-center w-full rounded-full bg-black/90 border border-white/20 shadow-inner transition-all duration-300 ${
-                                                                isPairExpanded ? 'px-1.5 py-1' : 'px-1 py-0.5'
-                                                            }`}>
-                                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${pTheme.bulbBorder} ${pTheme.bulbBg} transition-all duration-300 ${
-                                                                    isPairExpanded ? 'w-3.5 h-3.5 sm:w-4 sm:h-4 shadow-[0_0_10px_rgba(16,185,129,0.9)]' : 'w-2.5 h-2.5'
+                                                            {/* Bottom Row: หลอดปรอทสัดส่วนเหมือนชุดของกักขัง (Bulb ทรงกลม + Glass Tube สเกล 4 ขีด) */}
+                                                            <div className="flex items-center w-full">
+                                                                {/* Mercury Bulb (กระเปาะปรอททรงกลมพร้อมจุดสะท้อนแสง) */}
+                                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border-2 ${pTheme.bulbBorder} ${pTheme.bulbBg} transition-all duration-300 z-10 ${
+                                                                    isPairExpanded ? 'w-5 h-5 sm:w-6 sm:h-6 shadow-[0_0_12px_rgba(16,185,129,0.95)]' : 'w-4 h-4 sm:w-4.5 sm:h-4.5'
                                                                 }`}>
-                                                                    <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5 pointer-events-none"></div>
                                                                 </div>
 
-                                                                <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
-                                                                    isPairExpanded ? 'h-3 sm:h-3.5' : 'h-2'
+                                                                {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอนพร้อมขีดสเกล 4 เส้น) */}
+                                                                <div className={`relative flex-1 -ml-1 rounded-r-full bg-slate-950/90 border border-white/25 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                                    isPairExpanded ? 'h-3.5 sm:h-4' : 'h-3 sm:h-3.5'
                                                                 }`}>
-                                                                    <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                                    {/* Graduation tick marks (ขีดสเกล 4 ขีด) */}
+                                                                    <div className="absolute inset-0 flex justify-between px-2 pointer-events-none z-10 opacity-30">
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                    </div>
+
+                                                                    {/* Specular top reflection line (เส้นสะท้อนแสงด้านบน) */}
+                                                                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/40 z-20 pointer-events-none"></div>
+
+                                                                    {/* Mercury Fill Bar */}
                                                                     <div 
                                                                         className={`h-full rounded-r-full ${pTheme.fillGradient} transition-all duration-700 relative`}
                                                                         style={{ width: `${fillWidth}%` }}
                                                                     >
-                                                                        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                                        <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/80 rounded-r-full shadow-[0_0_4px_white]"></div>
                                                                     </div>
                                                                 </div>
                                                             </div>
