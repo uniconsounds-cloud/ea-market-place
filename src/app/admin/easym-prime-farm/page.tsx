@@ -361,6 +361,12 @@ export default function AdminPrimeFarmLabPage() {
     const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | null>(null);
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+        // ปรับการคลิกที่กรอบแสดง DD รวมของ quarantine ให้คลิกแล้วขยายใหญ่ขึ้นเหมือนเดิม แต่ไม่มีผลกับโดม เมื่อคลิกอีกครั้งก็หดลงเหมือนเดิม
+        setIsQuarantineEnlarged(prev => !prev);
+    };
+
+    const handleGreenhouseDomeClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
         // เมื่อคลิกที่โดมแก้ว ให้กระจายแปลงต้นไม้พร้อมแสดงปรอทแยกต้นได้ทันที
         setIsQuarantineExpanded(true);
         setIsQuarantineEnlarged(false);
@@ -1509,7 +1515,7 @@ export default function AdminPrimeFarmLabPage() {
                         {isClient && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
                             <div
                                 key="quarantine_greenhouse_dome"
-                                onClick={handleQuarantineBoxClick}
+                                onClick={handleGreenhouseDomeClick}
                                 className="absolute cursor-pointer transition-all duration-300 group select-none"
                                 style={{
                                     left: `${(1 - 5) * TILE_W}px`,
@@ -1602,8 +1608,12 @@ export default function AdminPrimeFarmLabPage() {
                                                     highlightTarget === 'QUARANTINE'
                                                         ? 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110'
                                                         : ''
-                                                } w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.55)] animate-fade-in`}
-                                                title="คลิกเพื่อคลี่ดูแปลงต้นไม้และหลอดปรอทแยกต้น"
+                                                } ${
+                                                    isQuarantineEnlarged
+                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(245,158,11,0.85)] scale-100'
+                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.55)] animate-fade-in'
+                                                }`}
+                                                title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อย่อกลับ" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
                                                 {/* Mini Subtitle Tag linking to Quarantined Pairs */}
                                                 <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
@@ -1615,23 +1625,33 @@ export default function AdminPrimeFarmLabPage() {
 
                                                 {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`font-mono font-black ${quarTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 text-[17px] sm:text-xl`}>
+                                                    <span className={`font-mono font-black ${quarTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
+                                                    }`}>
                                                         -{totalQuarantineDD.toFixed(2)}%
                                                     </span>
-                                                    <span className={`${quarTheme.arrowColor} text-[9px]`}>
+                                                    <span className={`${quarTheme.arrowColor} transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
+                                                    }`}>
                                                         ▼
                                                     </span>
                                                 </div>
 
-                                                {/* Line 2: ปรอทแนวนอน (สีปรอทเปลี่ยนตามระดับ DD) */}
-                                                <div className="transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner w-24 sm:w-28 px-1 py-0.5 mt-1">
+                                                {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
+                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner ${
+                                                    isQuarantineEnlarged ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
+                                                }`}>
                                                     {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
-                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${quarTheme.bulbBorder} ${quarTheme.bulbBg} w-2.5 h-2.5`}>
+                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${quarTheme.bulbBorder} ${quarTheme.bulbBg} transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
+                                                    }`}>
                                                         <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                     </div>
 
                                                     {/* Horizontal Glass Stem Tube */}
-                                                    <div className="relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center h-1.5">
+                                                    <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                        isQuarantineEnlarged ? 'h-2 sm:h-2.5' : 'h-1.5'
+                                                    }`}>
                                                         <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                         <div 
                                                             className={`h-full rounded-r-full ${quarTheme.fillGradient} transition-all duration-700 relative`}
@@ -1676,8 +1696,6 @@ export default function AdminPrimeFarmLabPage() {
                                         const isTreeExpanded = expandedTreeId === qTree.id;
                                         const barZIndex = isTreeExpanded ? 99999 : 90;
                                         const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
-                                        const isLeftmost = idx === 0;
-                                        const isRightmost = idx === previewList.length - 1;
 
                                         return (
                                             <div
@@ -1692,7 +1710,7 @@ export default function AdminPrimeFarmLabPage() {
                                                     animationDelay: `${qTree.delayMs || idx * 150}ms`
                                                 }}
                                             >
-                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (กระจายออกแบบเดิม) */}
+                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ขยายออกทางขวาไม่ล้นจอทางซ้าย) */}
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1700,15 +1718,11 @@ export default function AdminPrimeFarmLabPage() {
                                                     }}
                                                     className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
                                                         isTreeExpanded 
-                                                            ? isLeftmost 
-                                                                ? 'left-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
-                                                                : isRightmost
-                                                                    ? 'right-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-right shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]'
-                                                                    : 'left-1/2 -translate-x-1/2 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]'
+                                                            ? 'left-1/2 -translate-x-12 scale-[2.0] sm:scale-[1.8] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
                                                             : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
                                                     }`}
                                                     style={{
-                                                        width: isTreeExpanded ? '180px' : undefined
+                                                        width: isTreeExpanded ? '170px' : undefined
                                                     }}
                                                     title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                                 >
