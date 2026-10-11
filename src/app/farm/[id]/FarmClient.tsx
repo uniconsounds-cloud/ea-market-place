@@ -1242,20 +1242,43 @@ export default function FarmClient({
             status: topQuarantined ? (topQuarantined.isHedged ? 'HEDGE' : 'QT') : 'NORMAL'
         };
 
-        let worstPair = {
-            sym: 'NZDJPY',
-            ddPct: 10.3,
-            status: 'F'
+        let worstItems: Array<{ sym: string; lossPct: number; flag: string; flagLabel: string }> = [];
+
+        // 1. Live Parse Table D worst items transmitted directly from MT5 EA Dashboard (e.g. "NZDUSD 0.9- | EURAUD 0.1- | NZDJPY 10.3F")
+        if (primeData?.worst && primeData.worst !== '-' && typeof primeData.worst === 'string') {
+            const tokens = primeData.worst.split('|').map((t: string) => t.trim()).filter(Boolean);
+            tokens.forEach((tok: string) => {
+                const match = tok.match(/([A-Z0-9]+)\s+([\d\.]+)([FS\-]?)/i);
+                if (match) {
+                    const sym = match[1].toUpperCase();
+                    const lossPct = parseFloat(match[2]);
+                    const flag = match[3] || '-';
+                    const flagLabel = flag === 'F' ? 'FREEZE' : flag === 'S' ? 'SLOW' : 'ปกติ';
+                    worstItems.push({ sym, lossPct, flag, flagLabel });
+                }
+            });
+        }
+
+        if (worstItems.length === 0 && !primeData) {
+            worstItems = [
+                { sym: 'NZDUSD', lossPct: 1.0, flag: '-', flagLabel: 'ปกติ' },
+                { sym: 'NZDJPY', lossPct: 10.3, flag: 'F', flagLabel: 'FREEZE' }
+            ];
+        }
+
+        let worstPair = worstItems.length > 0 ? {
+            sym: worstItems[0].sym,
+            ddPct: worstItems[0].lossPct,
+            status: worstItems[0].flag
+        } : {
+            sym: '-',
+            ddPct: 0.0,
+            status: '-'
         };
 
         let worstSummary = primeData?.worst && primeData.worst !== '-' 
             ? primeData.worst 
-            : ((portStatus as any)?.worst_summary || 'NZDUSD 1.0- | NZDJPY 10.3F');
-            
-        let worstItems = [
-            { sym: 'NZDUSD', lossPct: 1.0, flag: '-', flagLabel: 'ปกติ' },
-            { sym: 'NZDJPY', lossPct: 10.3, flag: 'F', flagLabel: 'FREEZE' }
-        ];
+            : ((portStatus as any)?.worst_summary || (worstItems.length > 0 ? worstItems.map(w => `${w.sym} ${w.lossPct}${w.flag}`).join(' | ') : '-'));
 
         if (orders && orders.length > 0) {
             let hasAnySymbol = false;
@@ -1426,12 +1449,12 @@ export default function FarmClient({
     // Top 4 Worst Drawdown pairs for vertical dropdown under Active Farm DD
     // EXCLUDES all quarantined pairs, exactly matching Table D on the EA dashboard!
     const top4WorstPairs = useMemo(() => {
-        const quarantinedSyms = new Set(primeTelemetry?.quarantinedList || ['EURJPY', 'GBPJPY', 'USDJPY']);
+        const quarantinedSyms = new Set(primeTelemetry?.quarantinedList || []);
         const map = new Map<string, { sym: string; ddPct: number; isQuarantined: boolean; isRescue: boolean; status: string }>();
 
         // 1. Add from primeTelemetry.worstItems (Table D active pairs) excluding quarantined pairs
         primeTelemetry?.worstItems?.forEach(w => {
-            if (!quarantinedSyms.has(w.sym) && !map.has(w.sym)) {
+            if (!quarantinedSyms.has(w.sym) && !map.has(w.sym) && w.lossPct > 0) {
                 map.set(w.sym, {
                     sym: w.sym,
                     ddPct: w.lossPct,
@@ -1446,31 +1469,37 @@ export default function FarmClient({
         if (primeTelemetry?.pairData) {
             const bal = stats.balance > 0 ? stats.balance : 100000;
             Object.entries(primeTelemetry.pairData).forEach(([sym, data]) => {
-                if (!quarantinedSyms.has(sym) && data.pnl < 0 && !map.has(sym)) {
-                    const lossPct = Number(((Math.abs(data.pnl) / bal) * 100).toFixed(1));
-                    map.set(sym, {
-                        sym,
-                        ddPct: lossPct,
-                        isQuarantined: false,
-                        isRescue: false,
-                        status: lossPct >= 8.0 ? 'FREEZE' : lossPct >= 5.0 ? 'SLOW' : 'ACTIVE'
-                    });
+                if (!quarantinedSyms.has(sym) && (data.pnl < 0 || data.ddPct > 0) && !map.has(sym)) {
+                    const lossPct = data.ddPct > 0 
+                        ? data.ddPct 
+                        : Number(((Math.abs(data.pnl) / bal) * 100).toFixed(1));
+                    if (lossPct > 0) {
+                        map.set(sym, {
+                            sym,
+                            ddPct: lossPct,
+                            isQuarantined: false,
+                            isRescue: false,
+                            status: lossPct >= 8.0 ? 'FREEZE' : lossPct >= 5.0 ? 'SLOW' : 'ACTIVE'
+                        });
+                    }
                 }
             });
         }
 
-        // 3. Fallback active pairs (Table D style) if no active drawdown orders yet
-        const activeFallbacks = [
-            { sym: 'NZDJPY', ddPct: 10.30, isQuarantined: false, isRescue: false, status: 'FREEZE' },
-            { sym: 'AUDJPY', ddPct: 8.40, isQuarantined: false, isRescue: false, status: 'FREEZE' },
-            { sym: 'CADJPY', ddPct: 5.40, isQuarantined: false, isRescue: false, status: 'SLOW' },
-            { sym: 'NZDUSD', ddPct: 1.20, isQuarantined: false, isRescue: false, status: 'ACTIVE' },
-        ];
-        activeFallbacks.forEach(fb => {
-            if (!quarantinedSyms.has(fb.sym) && !map.has(fb.sym)) {
-                map.set(fb.sym, fb);
-            }
-        });
+        // 3. Fallback active pairs ONLY if completely no telemetry exists
+        if (map.size === 0 && !primeTelemetry) {
+            const activeFallbacks = [
+                { sym: 'NZDJPY', ddPct: 10.30, isQuarantined: false, isRescue: false, status: 'FREEZE' },
+                { sym: 'AUDJPY', ddPct: 8.40, isQuarantined: false, isRescue: false, status: 'FREEZE' },
+                { sym: 'CADJPY', ddPct: 5.40, isQuarantined: false, isRescue: false, status: 'SLOW' },
+                { sym: 'NZDUSD', ddPct: 1.20, isQuarantined: false, isRescue: false, status: 'ACTIVE' },
+            ];
+            activeFallbacks.forEach(fb => {
+                if (!quarantinedSyms.has(fb.sym) && !map.has(fb.sym)) {
+                    map.set(fb.sym, fb);
+                }
+            });
+        }
 
         return Array.from(map.values())
             .sort((a, b) => b.ddPct - a.ddPct)
@@ -1580,13 +1609,16 @@ export default function FarmClient({
     // 3. Badge on Quarantined Trees (บนต้นไม้ที่ถูกขัง) = DD ของคู่เงินที่ถูกขังทั้งหมด (Quarantine Total DD)
     const rawPortDD = primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent;
     const activeFarmDDPct = useMemo(() => {
+        if (primeTelemetry?.modeDDPct !== undefined && primeTelemetry.modeDDPct >= 0) {
+            return Number(primeTelemetry.modeDDPct.toFixed(2));
+        }
         if (portNumber === '97053088' || isPrime) {
-            return rawPortDD >= totalQuarantineDD + 5 
+            return rawPortDD >= totalQuarantineDD 
                 ? Number((rawPortDD - totalQuarantineDD).toFixed(2)) 
-                : (rawPortDD > 0 ? Number(rawPortDD.toFixed(2)) : 14.20);
+                : Number(rawPortDD.toFixed(2));
         }
         return rawPortDD;
-    }, [rawPortDD, totalQuarantineDD, portNumber, isPrime]);
+    }, [primeTelemetry, rawPortDD, totalQuarantineDD, portNumber, isPrime]);
 
     const totalPortDDPct = useMemo(() => {
         if (portNumber === '97053088' || isPrime) {

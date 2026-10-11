@@ -45,6 +45,8 @@ export async function POST(req: Request) {
         }
 
         const nowIso = new Date().toISOString();
+        const systemCode = snapshot?.identity?.system_code || payload.system_code || 'EasyM';
+        const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
 
         // 3. Process Status Sync (From Snapshot or direct stats)
         if (snapshot || type === 'STATS_SYNC' || payload.balance !== undefined) {
@@ -67,10 +69,7 @@ export async function POST(req: Request) {
 
             const accountType = (snapshot?.account?.currency === 'USC' || payload.account_type === 'USC') ? 'USC' : 'USD';
             const assetType = snapshot?.identity?.product_family || payload.asset_type || 'FOREX';
-            const systemCode = snapshot?.identity?.system_code || payload.system_code || 'EasyM';
             const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
-
-            const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
 
             // Seamless dual-storage: Encode primeData into system_code as fallback
             // so telemetry works immediately even before the prime_data DB column is added
@@ -185,24 +184,27 @@ export async function POST(req: Request) {
         }
 
         // 7. Check if user is actively viewing this port on the web (within last 2 minutes)
-        let shouldSyncFull = false;
-        try {
-            const { data: viewCheck } = await supabase
-                .from('farm_port_status')
-                .select('last_viewed_at')
-                .eq('port_number', portNumber)
-                .maybeSingle();
+        // EasyM Prime or ports with active telemetry always receive should_sync_full: true for full real-time metrics
+        let shouldSyncFull = Boolean(primeData) || systemCode.toLowerCase().includes('prime') || portNumber === '97053088';
+        if (!shouldSyncFull) {
+            try {
+                const { data: viewCheck } = await supabase
+                    .from('farm_port_status')
+                    .select('last_viewed_at')
+                    .eq('port_number', portNumber)
+                    .maybeSingle();
 
-            if (viewCheck?.last_viewed_at) {
-                const lastViewedMs = new Date(viewCheck.last_viewed_at).getTime();
-                const diffMs = Date.now() - lastViewedMs;
-                // If viewed within last 2 minutes (120,000 ms), full sync is active
-                if (diffMs < 120000) {
-                    shouldSyncFull = true;
+                if (viewCheck?.last_viewed_at) {
+                    const lastViewedMs = new Date(viewCheck.last_viewed_at).getTime();
+                    const diffMs = Date.now() - lastViewedMs;
+                    // If viewed within last 2 minutes (120,000 ms), full sync is active
+                    if (diffMs < 120000) {
+                        shouldSyncFull = true;
+                    }
                 }
+            } catch (e) {
+                shouldSyncFull = true;
             }
-        } catch (e) {
-            shouldSyncFull = true;
         }
 
         // 8. Retrieve 2-Way Command & Web Control state for this port
