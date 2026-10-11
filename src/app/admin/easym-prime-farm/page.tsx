@@ -614,38 +614,47 @@ export default function AdminPrimeFarmLabPage() {
         };
     }, [isSimMode, livePortStatus, liveOrders, simScenario, simPortMode]);
 
-    // Top 4 Worst Drawdown pairs for vertical dropdown
+    // Top 4 Worst Drawdown pairs for vertical dropdown under Active Farm DD
+    // EXCLUDES all quarantined pairs, exactly matching Table D on the EA dashboard!
     const top4WorstPairs = useMemo(() => {
+        const quarantinedSyms = new Set(telemetry.quarantinePairs || ['EURJPY', 'GBPJPY', 'USDJPY']);
         const map = new Map<string, { sym: string; ddPct: number; isQuarantined: boolean; isRescue: boolean; status: string }>();
 
-        const defaults = [
-            { sym: 'EURJPY', ddPct: 14.20, isQuarantined: true, isRescue: false, status: 'QUARANTINE' },
-            { sym: 'GBPJPY', ddPct: 16.80, isQuarantined: true, isRescue: true, status: 'RESCUE' },
-            { sym: 'USDJPY', ddPct: 11.50, isQuarantined: true, isRescue: false, status: 'QUARANTINE' },
-            { sym: 'AUDJPY', ddPct: 8.40, isQuarantined: false, isRescue: false, status: 'FREEZE' },
-        ];
-        defaults.forEach(d => map.set(d.sym, d));
-
-        if (telemetry.worstPair?.symbol) {
+        // 1. Add active worst pairs (Table D style)
+        if (telemetry.worstPair?.symbol && !quarantinedSyms.has(telemetry.worstPair.symbol)) {
             map.set(telemetry.worstPair.symbol, {
                 sym: telemetry.worstPair.symbol,
-                ddPct: telemetry.worstPair.dd || 14.20,
-                isQuarantined: telemetry.quarantinePairs.includes(telemetry.worstPair.symbol),
+                ddPct: telemetry.worstPair.dd || 10.30,
+                isQuarantined: false,
                 isRescue: false,
-                status: 'WORST'
+                status: 'FREEZE'
             });
         }
+
+        // 2. Fallback active pairs (Table D style)
+        const activeFallbacks = [
+            { sym: 'NZDJPY', ddPct: 10.30, isQuarantined: false, isRescue: false, status: 'FREEZE' },
+            { sym: 'AUDJPY', ddPct: 8.40, isQuarantined: false, isRescue: false, status: 'FREEZE' },
+            { sym: 'CADJPY', ddPct: 4.20, isQuarantined: false, isRescue: false, status: 'SLOW' },
+            { sym: 'NZDUSD', ddPct: 1.00, isQuarantined: false, isRescue: false, status: 'ACTIVE' },
+        ];
+        activeFallbacks.forEach(fb => {
+            if (!quarantinedSyms.has(fb.sym) && !map.has(fb.sym)) {
+                map.set(fb.sym, fb);
+            }
+        });
 
         return Array.from(map.values())
             .sort((a, b) => b.ddPct - a.ddPct)
             .slice(0, 4);
     }, [telemetry]);
 
-    // 🛡️ 3 Quarantined & Rescued Trees Dataset (Adjacent without middle gap)
+    // 🛡️ 3 Quarantined & Rescued Trees Dataset
+    // Anchored at Plot 2 (c: 1.0, r: 5) where the dome sits, and unfolding sequentially to the right
     const quarantinePreviewList = useMemo(() => [
         { 
             id: 'q_preview_1', 
-            c: 1.2, 
+            c: 1.0, 
             r: 5, 
             sym: 'EURJPY',
             ddPct: 14.20,
@@ -653,10 +662,11 @@ export default function AdminPrimeFarmLabPage() {
             src: '/farm/Tree_fence.png?v=2', 
             alt: 'Quarantined Tree', 
             label: 'QUARANTINE',
+            delayMs: 0
         },
         { 
             id: 'q_preview_2', 
-            c: 2.0, 
+            c: 1.8, 
             r: 5, 
             sym: 'GBPJPY',
             ddPct: 16.80,
@@ -664,10 +674,11 @@ export default function AdminPrimeFarmLabPage() {
             src: '/farm/Tree_aura.png?v=2',  
             alt: 'Rescue Active Tree', 
             label: 'RESCUE GRID',
+            delayMs: 150
         },
         { 
             id: 'q_preview_3', 
-            c: 2.8, 
+            c: 2.6, 
             r: 5, 
             sym: 'USDJPY',
             ddPct: 11.50,
@@ -675,6 +686,7 @@ export default function AdminPrimeFarmLabPage() {
             src: '/farm/Tree_fence.png?v=2', 
             alt: 'Quarantined Tree', 
             label: 'QUARANTINE',
+            delayMs: 300
         },
     ], []);
 
@@ -1174,14 +1186,14 @@ export default function AdminPrimeFarmLabPage() {
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
                 >
                     <div className="absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px]">
-                        {/* 🌑 SPOTLIGHT FOCUS BACKDROP WHEN QUARANTINE IS ACTIVE */}
+                        {/* 🌑 GENTLE SPOTLIGHT FOCUS BACKDROP WHEN QUARANTINE IS ACTIVE */}
                         <div 
                             onClick={(e) => {
                                 if (isQuarantineExpanded || isQuarantineEnlarged) {
                                     handleCloseQuarantine(e);
                                 }
                             }}
-                            className={`absolute inset-[-1500px] bg-black/45 backdrop-blur-[1px] transition-all duration-500 z-[19] ${
+                            className={`absolute inset-[-1500px] bg-black/15 transition-all duration-500 z-[19] ${
                                 (isQuarantineExpanded || isQuarantineEnlarged) 
                                     ? 'opacity-100 pointer-events-auto cursor-pointer' 
                                     : 'opacity-0 pointer-events-none'
@@ -1189,11 +1201,11 @@ export default function AdminPrimeFarmLabPage() {
                             title="คลิกพื้นที่ว่างเพื่อกลับสู่มุมมองฟาร์มปกติ"
                         />
 
-                        {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, DIMMED WHEN QUARANTINE IS FOCUSED) */}
-                        <div className={`animate-float-farm transition-all duration-700 ease-out ${
+                        {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, SUBTLY RECEDING WHEN QUARANTINE IS FOCUSED) */}
+                        <div className={`animate-float-farm transition-all duration-500 ease-out ${
                             (isQuarantineExpanded || isQuarantineEnlarged)
-                                ? 'opacity-25 blur-[1.5px] brightness-75 scale-[0.98]'
-                                : 'opacity-100 blur-0 brightness-100 scale-100'
+                                ? 'opacity-70 brightness-95 scale-[0.99]'
+                                : 'opacity-100 brightness-100 scale-100'
                         }`}>
                         {Array.from({ length: 25 }).map((_, i) => {
                             const c = i % 5;
@@ -1311,16 +1323,16 @@ export default function AdminPrimeFarmLabPage() {
                                                 e.stopPropagation();
                                                 setIsDdExpanded(prev => !prev);
                                             }}
-                                            className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                            className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
                                                 highlightTarget === 'FARM'
                                                     ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
                                                     : ''
                                             } ${
                                                 isDdExpanded 
-                                                    ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)]' 
-                                                    : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                                                    ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
+                                                    : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.55)]'
                                             }`}
-                                            title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุด"}
+                                            title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุดในโหมด Active"}
                                         >
                                             {/* Mini Subtitle Tag linking to Active Farm */}
                                             <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
@@ -1332,12 +1344,12 @@ export default function AdminPrimeFarmLabPage() {
 
                                             {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
                                             <div className="flex items-center gap-2">
-                                                <span className={`font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                <span className={`font-mono font-black text-emerald-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
                                                     isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
                                                 }`}>
                                                     -{portDDPct.toFixed(2)}%
                                                 </span>
-                                                <span className={`text-red-400/80 transition-all duration-300 ${
+                                                <span className={`text-emerald-400/80 transition-all duration-300 ${
                                                     isDdExpanded ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
                                                 }`}>
                                                     ▼
@@ -1345,11 +1357,11 @@ export default function AdminPrimeFarmLabPage() {
                                             </div>
 
                                             {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง */}
-                                            <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-red-500/30 shadow-inner ${
+                                            <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
                                                 isDdExpanded ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
                                             }`}>
                                                 {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
-                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)] transition-all duration-300 ${
+                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-emerald-300 bg-gradient-to-br from-emerald-400 via-teal-600 to-emerald-800 shadow-[0_0_6px_rgba(16,185,129,0.9)] transition-all duration-300 ${
                                                     isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
                                                 }`}>
                                                     <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
@@ -1361,7 +1373,7 @@ export default function AdminPrimeFarmLabPage() {
                                                 }`}>
                                                     <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                     <div 
-                                                        className="h-full rounded-r-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)] transition-all duration-700 relative"
+                                                        className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_6px_rgba(16,185,129,0.8)] transition-all duration-700 relative"
                                                         style={{ width: `${portMercuryFill}%` }}
                                                     >
                                                         <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
@@ -1370,7 +1382,7 @@ export default function AdminPrimeFarmLabPage() {
                                             </div>
                                         </div>
 
-                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว แยกแถบแต่ละตัวออกจากกัน เว้นระยะห่างนิดหน่อย */}
+                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs ONLY - Excludes Quarantined Pairs) */}
                                         {isDdExpanded && (
                                             <div 
                                                 onClick={(e) => e.stopPropagation()}
@@ -1384,49 +1396,35 @@ export default function AdminPrimeFarmLabPage() {
                                                     return (
                                                         <div 
                                                             key={p.sym} 
-                                                            className={`w-full bg-[#0d0303]/95 border border-red-500/80 rounded-xl p-2 sm:p-2.5 shadow-[0_8px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(239,68,68,0.35)] backdrop-blur-xl flex flex-col gap-1 ${unfoldClass}`}
+                                                            className={`w-full bg-[#02130d]/95 border border-emerald-500/80 rounded-xl p-2 sm:p-2.5 shadow-[0_8px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)] backdrop-blur-xl flex flex-col gap-1 ${unfoldClass}`}
                                                         >
                                                             <div className="flex items-center justify-between text-[11px] font-mono">
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-700">
+                                                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700">
                                                                         #{idx + 1}
                                                                     </span>
                                                                     <span className="font-bold text-white tracking-wide">
                                                                         {p.sym}
                                                                     </span>
-                                                                    <span className={`text-[8px] px-1.5 py-0.2 rounded font-semibold ${
-                                                                        p.isRescue 
-                                                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
-                                                                            : p.isQuarantined 
-                                                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
-                                                                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                                                                    }`}>
+                                                                    <span className="text-[8px] px-1.5 py-0.2 rounded font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-600">
                                                                         {p.status}
                                                                     </span>
                                                                 </div>
-                                                                <span className="font-black text-rose-400 text-xs">
+                                                                <span className="font-black text-emerald-400 text-xs">
                                                                     -{p.ddPct.toFixed(1)}%
                                                                 </span>
                                                             </div>
 
-                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน */}
+                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน Active */}
                                                             <div className="flex items-center w-full px-1 py-0.5 rounded-full bg-black/90 border border-white/20 shadow-inner">
-                                                                <div className={`relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
-                                                                    p.isRescue 
-                                                                        ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.9)]'
-                                                                        : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_6px_rgba(244,63,94,0.9)]'
-                                                                }`}>
+                                                                <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-emerald-300 bg-gradient-to-br from-emerald-400 via-teal-600 to-emerald-800 shadow-[0_0_6px_rgba(16,185,129,0.9)]">
                                                                     <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                                 </div>
 
                                                                 <div className="relative flex-1 h-2 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
                                                                     <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                                     <div 
-                                                                        className={`h-full rounded-r-full transition-all duration-700 relative ${
-                                                                            p.isRescue
-                                                                                ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
-                                                                                : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
-                                                                        }`}
+                                                                        className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_6px_rgba(16,185,129,0.8)] transition-all duration-700 relative"
                                                                         style={{ width: `${fillWidth}%` }}
                                                                     >
                                                                         <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
@@ -1439,32 +1437,32 @@ export default function AdminPrimeFarmLabPage() {
                                             </div>
                                         )}
 
-                                        <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
+                                        <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-emerald-500 via-emerald-500/60 to-transparent"></div>
                                     </div>
                                 </div>
                             );
                         })()}
                         </div> {/* 🌾 End of animate-float-farm */}
 
-                        {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกฟื้นฟูหลังเดียวก่อนคลิกขยาย เพื่อไม่ให้เกะกะสายตา) */}
+                        {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกที่แปลงที่ 2: c: 1.0, r: 5 ก่อนคลิกขยาย) */}
                         {isClient && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
                             <div
                                 key="quarantine_greenhouse_dome"
                                 onClick={handleQuarantineBoxClick}
                                 className="absolute cursor-pointer transition-all duration-300 group select-none"
                                 style={{
-                                    left: `${(2 - 5) * TILE_W}px`,
-                                    top: `${(2 + 5) * TILE_H_OFFSET}px`,
-                                    zIndex: (2 + 5) + 20,
+                                    left: `${(1 - 5) * TILE_W}px`,
+                                    top: `${(1 + 5) * TILE_H_OFFSET}px`,
+                                    zIndex: (1 + 5) + 20,
                                     width: '280px',
                                     height: '280px'
                                 }}
                                 title="โรงเรือนกระจกฟื้นฟูพืช (แตะเพื่อขยายดูคู่เงินที่ถูกกักขัง)"
                             >
-                                {/* Subtle breathing magical aura under the dome */}
+                                {/* Subtle breathing magical amber aura under the dome */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-48 h-48 rounded-full bg-emerald-500/15 group-hover:bg-emerald-400/25 blur-2xl animate-pulse transition-all"></div>
-                                    <div className="w-36 h-36 rounded-full bg-amber-400/15 group-hover:bg-amber-300/25 blur-xl animate-pulse delay-700 transition-all"></div>
+                                    <div className="w-40 h-40 rounded-full bg-amber-500/15 group-hover:bg-amber-400/25 blur-2xl animate-pulse transition-all"></div>
+                                    <div className="w-28 h-28 rounded-full bg-orange-400/15 group-hover:bg-orange-300/25 blur-xl animate-pulse delay-700 transition-all"></div>
                                 </div>
 
                                 {/* Greenhouse Dome Graphic: Compact & clean scale with subtle hover feedback */}
@@ -1484,8 +1482,8 @@ export default function AdminPrimeFarmLabPage() {
                             </div>
                         )}
 
-                        {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (กระจายแสดงเฉพาะเมื่อคลิกขยาย isQuarantineExpanded เท่านั้น) */}
-                        {isClient && isQuarantineExpanded && quarantinePreviewList.map((qTree) => {
+                        {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (คลี่ออกมาจากจุดที่โดมอยู่ เรียงเป็นลำดับ 1 -> 2 -> 3 และชิดกัน) */}
+                        {isClient && isQuarantineExpanded && quarantinePreviewList.map((qTree, idx) => {
                             const tZIndex = Math.round(qTree.c + qTree.r) + 20;
                             return (
                                 <div
@@ -1496,7 +1494,8 @@ export default function AdminPrimeFarmLabPage() {
                                         top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
                                         zIndex: tZIndex,
                                         width: '280px',
-                                        height: '280px'
+                                        height: '280px',
+                                        animationDelay: `${qTree.delayMs || idx * 150}ms`
                                     }}
                                 >
                                     {/* Tree Graphic: Compact scale (scale-[0.75]) to sit close and not overwhelm the farm */}
@@ -1525,8 +1524,8 @@ export default function AdminPrimeFarmLabPage() {
                                         key="quarantine_combined_badge"
                                         className="absolute pointer-events-none"
                                         style={{
-                                            left: `${(2 - 5) * TILE_W}px`,
-                                            top: `${(2 + 5) * TILE_H_OFFSET}px`,
+                                            left: `${(1 - 5) * TILE_W}px`,
+                                            top: `${(1 + 5) * TILE_H_OFFSET}px`,
                                             zIndex: 90,
                                             width: '280px',
                                             height: '280px'
@@ -1537,14 +1536,14 @@ export default function AdminPrimeFarmLabPage() {
                                         >
                                             <div 
                                                 onClick={handleQuarantineBoxClick}
-                                                className={`bg-[#1a0505]/95 hover:bg-[#270808]/95 border sm:border-2 border-red-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                className={`bg-[#1c1204]/95 hover:bg-[#2a1b06]/95 border sm:border-2 border-amber-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
                                                     highlightTarget === 'QUARANTINE'
                                                         ? 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110'
                                                         : ''
                                                 } ${
                                                     isQuarantineEnlarged
-                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(239,68,68,0.85)] scale-100'
-                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-fade-in'
+                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(245,158,11,0.85)] scale-100'
+                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.55)] animate-fade-in'
                                                 }`}
                                                 title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อแสดงหลอดปรอทของแต่ละต้นไม้" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
@@ -1556,9 +1555,9 @@ export default function AdminPrimeFarmLabPage() {
                                                     </span>
                                                 </div>
 
-                                                {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
+                                                {/* Line 1: Main DD Number (สี Amber สอดคล้องกับลูกแก้ว QUARANTINE) */}
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                    <span className={`font-mono font-black text-amber-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
                                                         isQuarantineEnlarged ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
                                                     }`}>
                                                         -{totalQuarantineDD.toFixed(2)}%
@@ -1570,7 +1569,7 @@ export default function AdminPrimeFarmLabPage() {
                                                                 setIsQuarantineEnlarged(false);
                                                             }
                                                         }}
-                                                        className={`text-red-400/80 transition-all duration-300 ${
+                                                        className={`text-amber-400/80 transition-all duration-300 ${
                                                             isQuarantineEnlarged ? 'rotate-180 text-xs sm:text-sm hover:scale-125' : 'text-[9px]'
                                                         }`}
                                                         title={isQuarantineEnlarged ? "คลิกเพื่อย่อกลับ" : undefined}
@@ -1579,24 +1578,24 @@ export default function AdminPrimeFarmLabPage() {
                                                     </span>
                                                 </div>
 
-                                                {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง */}
-                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-red-500/30 shadow-inner ${
+                                                {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สี Amber) */}
+                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner ${
                                                     isQuarantineEnlarged ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
                                                 }`}>
-                                                    {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
-                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-rose-300 bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)] transition-all duration-300 ${
+                                                    {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงสี Amber) */}
+                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-amber-300 bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_6px_rgba(245,158,11,0.9)] transition-all duration-300 ${
                                                         isQuarantineEnlarged ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
                                                     }`}>
                                                         <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                     </div>
 
-                                                    {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
+                                                    {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอนสี Amber) */}
                                                     <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
                                                         isQuarantineEnlarged ? 'h-2 sm:h-2.5' : 'h-1.5'
                                                     }`}>
                                                         <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                         <div 
-                                                            className="h-full rounded-r-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)] transition-all duration-700 relative"
+                                                            className="h-full rounded-r-full bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 shadow-[0_0_6px_rgba(245,158,11,0.8)] transition-all duration-700 relative"
                                                             style={{ width: `${quarantineMercuryFill}%` }}
                                                         >
                                                             <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
@@ -1611,21 +1610,21 @@ export default function AdminPrimeFarmLabPage() {
 
                             return (
                                 <div key="quarantine_expanded_bars">
-                                    {/* 🔘 ปุ่มวงกลมมีกากบาท (X) ขยายใหญ่ขึ้น 3 เท่า ลอยตัวอยู่บนปรอททั้งสามเยื้องขวา ไม่ซ้อนทับปรอท */}
+                                    {/* 🔘 ปุ่มวงกลมมีกากบาท (X) ขยายใหญ่ ลอยตัวอยู่บนปรอทเยื้องขวา ไม่ซ้อนทับปรอท */}
                                     <div
                                         className="absolute pointer-events-none"
                                         style={{
-                                            left: `${(2 - 5) * TILE_W}px`,
-                                            top: `${(2 + 5) * TILE_H_OFFSET}px`,
+                                            left: `${(1.8 - 5) * TILE_W}px`,
+                                            top: `${(1.8 + 5) * TILE_H_OFFSET}px`,
                                             zIndex: 99998,
                                             width: '280px',
                                             height: '280px'
                                         }}
                                     >
-                                        <div className="absolute -top-20 sm:-top-24 left-1/2 translate-x-14 sm:translate-x-18 pointer-events-auto animate-fade-in">
+                                        <div className="absolute -top-20 sm:-top-24 left-1/2 translate-x-12 sm:translate-x-16 pointer-events-auto animate-fade-in">
                                             <button
                                                 onClick={handleCloseQuarantine}
-                                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#1a0505]/95 hover:bg-[#380b0b] border-2 border-red-500/90 hover:border-red-400 text-red-200 hover:text-white flex items-center justify-center shadow-[0_0_25px_rgba(239,68,68,0.85)] backdrop-blur-md transition-all active:scale-95 select-none cursor-pointer group"
+                                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#1c1204]/95 hover:bg-[#332007] border-2 border-amber-500/90 hover:border-amber-400 text-amber-200 hover:text-white flex items-center justify-center shadow-[0_0_25px_rgba(245,158,11,0.85)] backdrop-blur-md transition-all active:scale-95 select-none cursor-pointer group"
                                                 title="คลิกเพื่อรวบเก็บ DD รวม"
                                             >
                                                 <X className="w-8 h-8 sm:w-10 sm:h-10 stroke-[2.5] group-hover:scale-110 transition-transform" />
@@ -1633,26 +1632,25 @@ export default function AdminPrimeFarmLabPage() {
                                         </div>
                                     </div>
 
-                                    {/* 3 Individual Mercury Bars (กระจายออกทางซ้าย กลาง ขวา) */}
-                                    {previewList.map((qTree) => {
+                                    {/* Individual Mercury Bars (คลี่ออกตามลำดับจากซ้ายไปขวา) */}
+                                    {previewList.map((qTree, idx) => {
                                         const isTreeExpanded = expandedTreeId === qTree.id;
                                         const barZIndex = isTreeExpanded ? 99999 : 90;
                                         const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
-                                        const isLeftmost = qTree.id === 'q_preview_1';
-                                        const isRightmost = qTree.id === 'q_preview_3';
-                                        const disperseClass = isLeftmost ? 'animate-disperse-bar-left' :
-                                                              isRightmost ? 'animate-disperse-bar-right' : 'animate-disperse-bar-center';
+                                        const isLeftmost = idx === 0;
+                                        const isRightmost = idx === previewList.length - 1;
 
                                         return (
                                             <div
                                                 key={`bar_${qTree.id}`}
-                                                className="absolute pointer-events-none"
+                                                className="absolute pointer-events-none animate-fade-in"
                                                 style={{
                                                     left: `${(qTree.c - qTree.r) * TILE_W}px`,
                                                     top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
                                                     zIndex: barZIndex,
                                                     width: '280px',
-                                                    height: '280px'
+                                                    height: '280px',
+                                                    animationDelay: `${qTree.delayMs || idx * 150}ms`
                                                 }}
                                             >
                                                 {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (กระจายออกแบบเดิม) */}
@@ -1664,11 +1662,11 @@ export default function AdminPrimeFarmLabPage() {
                                                     className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
                                                         isTreeExpanded 
                                                             ? isLeftmost 
-                                                                ? 'left-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]' 
+                                                                ? 'left-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
                                                                 : isRightmost
-                                                                    ? 'right-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-right shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
-                                                                    : 'left-1/2 -translate-x-1/2 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(244,63,94,0.6)]'
-                                                            : `left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105 ${disperseClass}`
+                                                                    ? 'right-8 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom-right shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]'
+                                                                    : 'left-1/2 -translate-x-1/2 scale-[2.5] sm:scale-[2.2] -translate-y-8 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]'
+                                                            : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
                                                     }`}
                                                     style={{
                                                         width: isTreeExpanded ? '180px' : undefined
@@ -1676,34 +1674,26 @@ export default function AdminPrimeFarmLabPage() {
                                                     title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                                 >
                                                     {/* Status Header Badge */}
-                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-black/90 backdrop-blur-md border-t border-x shadow-lg text-[10px] font-mono font-bold transition-colors ${
-                                                        isTreeExpanded ? 'border-amber-400/80 bg-black/95' : 'border-white/20'
-                                                    }`}>
-                                                        <span className={`tracking-wider ${qTree.isRescue ? 'text-amber-400' : 'text-rose-400'}`}>
+                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-[#160e03]/95 backdrop-blur-md border-t border-x border-amber-500/70 shadow-lg text-[10px] font-mono font-bold transition-colors`}>
+                                                        <span className="tracking-wider text-amber-300">
                                                             {qTree.sym}
                                                         </span>
                                                         <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
                                                             qTree.isRescue 
-                                                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
-                                                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                                                ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50' 
+                                                                : 'bg-orange-500/25 text-orange-300 border border-orange-500/50'
                                                         }`}>
                                                             {qTree.label}
                                                         </span>
-                                                        <span className={`font-black ${qTree.isRescue ? 'text-amber-300' : 'text-rose-400'}`}>
+                                                        <span className="font-black text-amber-400">
                                                             -{qTree.ddPct.toFixed(1)}%
                                                         </span>
                                                     </div>
 
                                                     {/* Mercury Tube Assembly */}
-                                                    <div className={`flex items-center w-full px-1.5 py-1 rounded-b-lg bg-black/95 backdrop-blur-md border-b border-x shadow-xl transition-colors ${
-                                                        isTreeExpanded ? 'border-amber-400/80' : 'border-white/20'
-                                                    }`}>
+                                                    <div className="flex items-center w-full px-1.5 py-1 rounded-b-lg bg-[#0e0802]/95 backdrop-blur-md border-b border-x border-amber-500/70 shadow-xl transition-colors">
                                                         {/* Mercury Bulb */}
-                                                        <div className={`relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
-                                                            qTree.isRescue 
-                                                                ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
-                                                                : 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 border-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
-                                                        }`}>
+                                                        <div className="relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border border-amber-300 bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_8px_rgba(245,158,11,0.9)]">
                                                             <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                         </div>
 
@@ -1721,7 +1711,7 @@ export default function AdminPrimeFarmLabPage() {
                                                             <div 
                                                                 className={`h-full rounded-r-full transition-all duration-700 relative ${
                                                                     qTree.isRescue
-                                                                        ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
+                                                                        ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
                                                                         : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
                                                                 }`}
                                                                 style={{
