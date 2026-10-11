@@ -93,13 +93,16 @@ const TREE_SLOTS = Array.from({ length: 15 }).map((_, i) => ({
     z: i
 }));
 
-// 20 Currency Pairs for EasyM Prime
-const PRIME_20_PAIRS = [
-    'EURUSD', 'GBPUSD', 'AUDUSD', 'NZDUSD', 'USDJPY',
-    'USDCHF', 'EURJPY', 'GBPJPY', 'USDCAD', 'AUDNZD',
-    'CADCHF', 'NZDCAD', 'EURCAD', 'GBPCAD', 'EURAUD',
-    'GBPAUD', 'AUDJPY', 'NZDJPY', 'EURNZD', 'GBPNZD'
+// 20 Currency Pairs for EasyM Prime (จัดกลุ่มตรงตาม 2 คอลัมน์บนแดชบอร์ด MT5)
+const PRIME_LEFT_PAIRS = [
+    'EURUSD', 'AUDUSD', 'USDJPY', 'EURJPY', 'USDCAD',
+    'CADCHF', 'EURCAD', 'EURAUD', 'AUDJPY', 'EURNZD'
 ];
+const PRIME_RIGHT_PAIRS = [
+    'GBPUSD', 'NZDUSD', 'USDCHF', 'GBPJPY', 'AUDNZD',
+    'NZDCAD', 'GBPCAD', 'GBPAUD', 'NZDJPY', 'GBPNZD'
+];
+const PRIME_20_PAIRS = [...PRIME_LEFT_PAIRS, ...PRIME_RIGHT_PAIRS];
 
 // 🎨 Helper คำนวณธีมสีตามระดับ DD (ต่ำกว่า 18% = เขียว, 18% - 28% = เหลืองส้ม, เกิน 28% = แดง)
 const getDDLevelTheme = (ddPct: number) => {
@@ -1056,39 +1059,101 @@ export default function FarmClient({
         }
     }, [portNumber]);
 
-    const handleTogglePair = (pair: string) => {
-        setPairControls(prev => {
-            const current = prev[pair]?.enabled !== false;
-            const updated = {
-                ...prev,
-                [pair]: { enabled: !current }
-            };
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updated));
-            }
-            toast(
-                !current 
-                    ? `🟢 ${pair}: สลับเป็น ACTIVE (เปิดรับออเดอร์ใหม่)` 
-                    : `⛔ ${pair}: สลับเป็น CLOSE-ONLY (รอปิดรวบ)`,
-                { duration: 2500 }
-            );
-            return updated;
+    // Confirmation state for pair commands (กดยืนยันก่อนส่งคำสั่งไปที่อีเอ)
+    const [pendingPairAction, setPendingPairAction] = useState<{
+        type: 'SINGLE' | 'ALL_ACTIVE' | 'ALL_CLOSE_ONLY';
+        pair?: string;
+        targetEnabled?: boolean;
+    } | null>(null);
+    const [isDispatchingCommand, setIsDispatchingCommand] = useState(false);
+
+    const requestTogglePair = (pair: string, currentEnabled: boolean) => {
+        setPendingPairAction({
+            type: 'SINGLE',
+            pair,
+            targetEnabled: !currentEnabled
         });
     };
 
-    const handleSetAllPairs = (enableAll: boolean) => {
-        const updated: Record<string, { enabled: boolean }> = {};
-        PRIME_20_PAIRS.forEach(p => { updated[p] = { enabled: enableAll }; });
-        setPairControls(updated);
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updated));
+    const requestSetAllPairs = (enableAll: boolean) => {
+        setPendingPairAction({
+            type: enableAll ? 'ALL_ACTIVE' : 'ALL_CLOSE_ONLY',
+            targetEnabled: enableAll
+        });
+    };
+
+    const handleConfirmAction = async () => {
+        if (!pendingPairAction) return;
+        setIsDispatchingCommand(true);
+        try {
+            if (pendingPairAction.type === 'SINGLE' && pendingPairAction.pair) {
+                const pair = pendingPairAction.pair;
+                const target = Boolean(pendingPairAction.targetEnabled);
+
+                // Update backend via /api/farm/control
+                await fetch('/api/farm/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        port_number: portNumber,
+                        symbols: {
+                            [pair]: { enabled: target, close_only: !target }
+                        }
+                    })
+                }).catch(err => console.warn('Control API error:', err));
+
+                setPairControls(prev => {
+                    const updated = { ...prev, [pair]: { enabled: target } };
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updated));
+                    }
+                    return updated;
+                });
+
+                toast.success(
+                    target 
+                        ? `🟢 ส่งคำสั่งเปิด [${pair}: ACTIVE] ไปยัง EA สำเร็จแล้ว` 
+                        : `⛔ ส่งคำสั่งปิด [${pair}: CLOSE-ONLY] ไปยัง EA สำเร็จแล้ว`,
+                    { duration: 3000 }
+                );
+            } else if (pendingPairAction.type === 'ALL_ACTIVE' || pendingPairAction.type === 'ALL_CLOSE_ONLY') {
+                const target = pendingPairAction.targetEnabled ?? true;
+                const symbolsPayload: Record<string, { enabled: boolean; close_only: boolean }> = {};
+                const updatedState: Record<string, { enabled: boolean }> = {};
+
+                PRIME_20_PAIRS.forEach(p => {
+                    symbolsPayload[p] = { enabled: target, close_only: !target };
+                    updatedState[p] = { enabled: target };
+                });
+
+                await fetch('/api/farm/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        port_number: portNumber,
+                        symbols: symbolsPayload
+                    })
+                }).catch(err => console.warn('Control API error:', err));
+
+                setPairControls(updatedState);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updatedState));
+                }
+
+                toast.success(
+                    target 
+                        ? `🟢 ส่งคำสั่งเปิดทุกคู่เงิน (20 Pairs ACTIVE) ไปยัง EA เรียบร้อยแล้ว` 
+                        : `⛔ ส่งคำสั่งปิดทุกคู่เงิน (20 Pairs CLOSE-ONLY) ไปยัง EA เรียบร้อยแล้ว`,
+                    { duration: 3500 }
+                );
+            }
+        } catch (err: any) {
+            console.error('Dispatch command failed:', err);
+            toast.error('เกิดข้อผิดพลาดในการส่งคำสั่ง: ' + (err.message || 'Network Error'));
+        } finally {
+            setIsDispatchingCommand(false);
+            setPendingPairAction(null);
         }
-        toast(
-            enableAll 
-                ? '🟢 สั่งเปิดทำงาน (ACTIVE) ครบทั้ง 20 คู่เงินแล้ว' 
-                : '⛔ สั่งตั้งเป็น (CLOSE-ONLY) ครบทั้ง 20 คู่เงินแล้ว',
-            { duration: 3000 }
-        );
     };
 
     // 🛡️ Prime Tactical Telemetry (Table D & Table E Computed Metrics)
@@ -1112,9 +1177,21 @@ export default function FarmClient({
             : (primeData?.total_dd !== undefined ? Number(primeData.total_dd) : stats.drawdownPercent);
         const ddPct = liveTotalDD;
 
-        // Group active orders per pair
-        const pairData: Record<string, { count: number; lot: number; pnl: number }> = {};
-        PRIME_20_PAIRS.forEach(p => { pairData[p] = { count: 0, lot: 0, pnl: 0 }; });
+        // Group active orders per pair (Enriched for Table & MT5 Cockpit)
+        const pairData: Record<string, {
+            count: number;
+            lot: number;
+            pnl: number;
+            buyCount: number;
+            sellCount: number;
+            buyLot: number;
+            sellLot: number;
+            side: 'B' | 'S' | '-';
+            ddPct: number;
+        }> = {};
+        PRIME_20_PAIRS.forEach(p => { 
+            pairData[p] = { count: 0, lot: 0, pnl: 0, buyCount: 0, sellCount: 0, buyLot: 0, sellLot: 0, side: '-', ddPct: 0 }; 
+        });
 
         // Dynamic Settings transmitted from MT5 EA (learns user's custom thresholds)
         const settings = {
@@ -1186,10 +1263,41 @@ export default function FarmClient({
                 const sym = (o.symbol || o.pair || '').toUpperCase().replace(/[^A-Z]/g, '');
                 if (sym && pairData[sym]) {
                     hasAnySymbol = true;
+                    const orderLot = (Number(o.raw_lot_size) || 0) / 100;
+                    const orderPnl = Number(o.current_pnl) || 0;
+                    const isBuy = o.type === 'BUY' || o.type === 0 || o.type === '0' || o.order_type === 'BUY';
+
                     pairData[sym].count += 1;
-                    pairData[sym].lot += (Number(o.raw_lot_size) || 0) / 100;
-                    pairData[sym].pnl += Number(o.current_pnl) || 0;
+                    pairData[sym].lot += orderLot;
+                    pairData[sym].pnl += orderPnl;
+
+                    if (isBuy) {
+                        pairData[sym].buyCount += 1;
+                        pairData[sym].buyLot += orderLot;
+                    } else {
+                        pairData[sym].sellCount += 1;
+                        pairData[sym].sellLot += orderLot;
+                    }
                 }
+            });
+
+            // Finalize side & ddPct for each pair
+            PRIME_20_PAIRS.forEach(p => {
+                const d = pairData[p];
+                if (d.buyCount > 0 && d.sellCount === 0) {
+                    d.side = 'B';
+                } else if (d.sellCount > 0 && d.buyCount === 0) {
+                    d.side = 'S';
+                } else if (d.buyLot > d.sellLot) {
+                    d.side = 'B';
+                } else if (d.sellLot > d.buyLot) {
+                    d.side = 'S';
+                } else if (d.count > 0) {
+                    d.side = 'B';
+                } else {
+                    d.side = '-';
+                }
+                d.ddPct = d.pnl < 0 ? Number(((Math.abs(d.pnl) / bal) * 100).toFixed(2)) : 0;
             });
 
             if (hasAnySymbol) {
@@ -2613,9 +2721,13 @@ export default function FarmClient({
                             onClick={() => setPrimeActiveOrb(null)}
                         >
                             <div 
-                                className={`relative w-[90vw] sm:w-[70vw] max-w-xl max-h-[70vh] sm:max-h-[72vh] flex flex-col rounded-3xl p-3.5 sm:p-5 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
+                                className={`relative ${
+                                    primeActiveOrb === 2 
+                                        ? 'w-[96vw] sm:w-[95vw] lg:w-[92vw] max-w-6xl max-h-[88vh] sm:max-h-[90vh]' 
+                                        : 'w-[90vw] sm:w-[70vw] max-w-xl max-h-[70vh] sm:max-h-[72vh]'
+                                } flex flex-col rounded-3xl p-3.5 sm:p-5 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
                                     primeActiveOrb === 1 ? 'bg-[#061512]/90 border-emerald-500/60 shadow-[0_0_50px_rgba(16,185,129,0.35)]' :
-                                    primeActiveOrb === 2 ? 'bg-[#06121a]/90 border-cyan-500/60 shadow-[0_0_50px_rgba(6,182,212,0.35)]' :
+                                    primeActiveOrb === 2 ? 'bg-[#06121a]/95 border-cyan-500/60 shadow-[0_0_50px_rgba(6,182,212,0.35)]' :
                                     primeActiveOrb === 3 ? 'bg-[#12081d]/90 border-purple-500/60 shadow-[0_0_50px_rgba(168,85,247,0.35)]' :
                                     'bg-[#1a0f06]/90 border-amber-500/60 shadow-[0_0_50px_rgba(245,158,11,0.35)]'
                                 }`}
@@ -3162,14 +3274,15 @@ export default function FarmClient({
                                     </div>
                                 )}
 
-                                {/* 🎛️ ORB 2: 20-PAIR COCKPIT MATRIX */}
+                                {/* 🎛️ ORB 2: 20-PAIR COCKPIT MATRIX (MT5 EA DASHBOARD MIRROR) */}
                                 {primeActiveOrb === 2 && (
-                                    <div className="overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 pr-1 no-scrollbar flex-1 flex flex-col">
+                                    <div className="overflow-y-auto py-2.5 sm:py-3 space-y-3 pr-1 no-scrollbar flex-1 flex flex-col">
                                         {/* Quick Actions & Pair Status Summary */}
-                                        <div className="flex flex-wrap items-center justify-between gap-2 bg-black/40 border border-cyan-500/30 rounded-2xl p-3 sm:p-4 backdrop-blur-md shrink-0">
-                                            <div className="flex items-center gap-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-black/60 border border-cyan-500/30 rounded-2xl p-2.5 sm:p-3.5 backdrop-blur-md shrink-0">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
                                                 <div className="text-xs font-mono">
-                                                    <span className="text-white/50">STATUS: </span>
+                                                    <span className="text-white/50">COCKPIT STATUS: </span>
                                                     <span className="text-emerald-400 font-black font-mono">{activeCount} ACTIVE</span>
                                                     <span className="text-white/30 mx-1.5">|</span>
                                                     <span className="text-amber-400 font-black font-mono">{closeOnlyCount} CLOSE-ONLY</span>
@@ -3178,70 +3291,273 @@ export default function FarmClient({
 
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => handleSetAllPairs(true)}
-                                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold transition-all cursor-pointer"
+                                                    onClick={() => requestSetAllPairs(true)}
+                                                    className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] sm:text-xs font-mono font-bold transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
                                                 >
-                                                    SET ALL ACTIVE
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    <span>SET ALL ACTIVE</span>
                                                 </button>
                                                 <button
-                                                    onClick={() => handleSetAllPairs(false)}
-                                                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold transition-all cursor-pointer"
+                                                    onClick={() => requestSetAllPairs(false)}
+                                                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] sm:text-xs font-mono font-bold transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
                                                 >
-                                                    SET ALL CLOSE-ONLY
+                                                    <Power className="w-3.5 h-3.5" />
+                                                    <span>SET ALL CLOSE-ONLY</span>
                                                 </button>
                                             </div>
                                         </div>
 
-                                        {/* 20 PAIRS GRID */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
-                                            {PRIME_20_PAIRS.map((pair) => {
-                                                const isEnabled = pairControls[pair]?.enabled !== false;
-                                                const data = primeTelemetry.pairData[pair] || { count: 0, lot: 0, pnl: 0 };
-                                                const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
+                                        {/* 20 PAIRS TWO-COLUMN MT5 REPLICA TABLE */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 overflow-y-auto max-h-[58vh] sm:max-h-[62vh] pr-1 no-scrollbar">
+                                            {/* Left Column (10 Pairs) */}
+                                            <div className="bg-black/50 border border-cyan-500/25 rounded-2xl overflow-hidden backdrop-blur-md flex flex-col">
+                                                <div className="px-3 py-2 bg-cyan-950/30 border-b border-cyan-500/20 flex items-center justify-between">
+                                                    <span className="text-[11px] font-mono font-black text-cyan-300 tracking-wider">PRIMARY CLUSTER (1 - 10)</span>
+                                                    <span className="text-[10px] font-mono text-white/40">EUR • USD • AUD • CAD</span>
+                                                </div>
+                                                <div className="overflow-x-auto no-scrollbar flex-1">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="border-b border-white/10 text-[10px] font-mono text-white/50 bg-black/40">
+                                                                <th className="py-2 px-2.5">SYM</th>
+                                                                <th className="py-2 px-1 text-center">DIR</th>
+                                                                <th className="py-2 px-2">ORDERS</th>
+                                                                <th className="py-2 px-2">P/L</th>
+                                                                <th className="py-2 px-2 text-right">LOT</th>
+                                                                <th className="py-2 px-2 text-right">DD%</th>
+                                                                <th className="py-2 px-2 text-center">COMMAND</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {PRIME_LEFT_PAIRS.map(pair => {
+                                                                const isEnabled = pairControls[pair]?.enabled !== false;
+                                                                const data = primeTelemetry.pairData[pair] || {
+                                                                    count: 0, lot: 0, pnl: 0, buyCount: 0, sellCount: 0, buyLot: 0, sellLot: 0, side: '-', ddPct: 0
+                                                                };
+                                                                const maxTicks = 8;
+                                                                const filledTicks = Math.min(maxTicks, data.count);
+                                                                const pnlVal = data.pnl;
+                                                                const pnlFormatted = pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal < 0 ? pnlVal.toFixed(2) : '0.00';
+                                                                const pnlColor = pnlVal > 0 ? 'text-emerald-400' : pnlVal < 0 ? 'text-rose-400' : 'text-white/40';
+                                                                const ddVal = data.ddPct;
+                                                                const ddColor = ddVal >= 8 ? 'text-rose-400 font-bold' : ddVal >= 4 ? 'text-amber-400 font-bold' : ddVal > 0 ? 'text-emerald-400' : 'text-white/40';
 
-                                                return (
-                                                    <div
-                                                        key={pair}
-                                                        onClick={() => handleTogglePair(pair)}
-                                                        className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                                                            !isEnabled
-                                                                ? 'bg-amber-950/25 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] hover:border-amber-400'
-                                                                : isQuarantined
-                                                                ? 'bg-rose-950/25 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.15)] hover:border-rose-400'
-                                                                : 'bg-black/40 border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-950/20'
-                                                        }`}
-                                                    >
-                                                        {/* Pair header & Switch */}
-                                                        <div className="flex items-center justify-between mb-1.5">
-                                                            <span className="font-mono font-black text-sm text-white tracking-wider">
-                                                                {pair}
-                                                            </span>
-                                                            <div className={`w-3 h-3 rounded-full border flex items-center justify-center transition-all ${
-                                                                isEnabled 
-                                                                    ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]' 
-                                                                    : 'bg-amber-500 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
-                                                            }`}>
-                                                                <div className="w-1 h-1 rounded-full bg-black" />
-                                                            </div>
-                                                        </div>
+                                                                return (
+                                                                    <tr key={pair} className="border-b border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+                                                                        <td className="py-1.5 px-2.5 font-mono font-black text-xs text-white tracking-wider whitespace-nowrap">
+                                                                            <span className="px-1.5 py-0.5 rounded bg-slate-900/90 border border-white/15 inline-block text-[11px]">
+                                                                                {pair}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="py-1.5 px-1 text-center whitespace-nowrap">
+                                                                            {data.side === 'B' ? (
+                                                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono font-black text-[10px] bg-cyan-500/25 border border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                                                                                    B
+                                                                                </span>
+                                                                            ) : data.side === 'S' ? (
+                                                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono font-black text-[10px] bg-amber-500/25 border border-amber-400 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.4)]">
+                                                                                    S
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono text-[10px] bg-white/5 border border-white/10 text-white/30">
+                                                                                    -
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <div className="flex items-center gap-0.5 w-11 sm:w-12 h-3 bg-black/60 rounded px-1 border border-white/10">
+                                                                                    {Array.from({ length: maxTicks }).map((_, i) => (
+                                                                                        <div 
+                                                                                            key={i} 
+                                                                                            className={`flex-1 h-2 rounded-[1px] transition-all ${
+                                                                                                i < filledTicks 
+                                                                                                    ? (i >= 5 ? 'bg-rose-500 shadow-[0_0_3px_rgba(244,63,94,0.8)]' : i >= 3 ? 'bg-amber-400 shadow-[0_0_3px_rgba(245,158,11,0.8)]' : 'bg-emerald-400 shadow-[0_0_3px_rgba(16,185,129,0.8)]')
+                                                                                                    : 'bg-white/10'
+                                                                                            }`} 
+                                                                                        />
+                                                                                    ))}
+                                                                                </div>
+                                                                                <span className="font-mono text-xs font-bold text-white/90 w-3 text-right">
+                                                                                    {data.count}
+                                                                                </span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <div className="relative w-10 sm:w-12 h-2.5 bg-black/70 rounded-full border border-white/10 overflow-hidden shrink-0">
+                                                                                    <div className="absolute top-0 bottom-0 left-1/2 w-[1.5px] -translate-x-1/2 bg-white/40 z-10" />
+                                                                                    {pnlVal > 0 ? (
+                                                                                        <div 
+                                                                                            className="absolute top-0 bottom-0 left-1/2 bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_4px_rgba(16,185,129,0.8)]"
+                                                                                            style={{ width: `${Math.min(50, (pnlVal / 50) * 50)}%` }}
+                                                                                        />
+                                                                                    ) : pnlVal < 0 ? (
+                                                                                        <div 
+                                                                                            className="absolute top-0 bottom-0 right-1/2 bg-gradient-to-l from-rose-500 to-amber-500 shadow-[0_0_4px_rgba(244,63,94,0.8)]"
+                                                                                            style={{ width: `${Math.min(50, (Math.abs(pnlVal) / 50) * 50)}%` }}
+                                                                                        />
+                                                                                    ) : null}
+                                                                                </div>
+                                                                                <span className={`font-mono text-[11px] font-bold text-right min-w-[45px] ${pnlColor}`}>
+                                                                                    {pnlFormatted}
+                                                                                </span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 font-mono text-[11px] text-cyan-200/90 text-right whitespace-nowrap">
+                                                                            {data.lot > 0 ? data.lot.toFixed(2) : '0.00'}
+                                                                        </td>
+                                                                        <td className={`py-1.5 px-2 font-mono text-[11px] text-right whitespace-nowrap ${ddColor}`}>
+                                                                            {data.ddPct > 0 ? `${data.ddPct.toFixed(2)}%` : '0.00%'}
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 text-center whitespace-nowrap">
+                                                                            <button
+                                                                                onClick={() => requestTogglePair(pair, isEnabled)}
+                                                                                className={`px-2.5 py-1 rounded-lg font-mono text-[10px] font-black tracking-wide border transition-all duration-200 cursor-pointer shadow-sm active:scale-95 ${
+                                                                                    isEnabled
+                                                                                        ? 'bg-emerald-500/20 hover:bg-emerald-500/35 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                                                                                        : 'bg-amber-500/20 hover:bg-amber-500/35 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                                                                                }`}
+                                                                            >
+                                                                                {isEnabled ? '🟢 ACTIVE' : '⛔ CLOSE'}
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
 
-                                                        {/* Order & Lot metrics */}
-                                                        <div className="text-[10px] font-mono text-white/50 flex justify-between mb-2">
-                                                            <span>{data.count > 0 ? `${data.count} ไม้` : '0 ไม้'}</span>
-                                                            <span>{data.lot > 0 ? `${data.lot.toFixed(2)}L` : '-'}</span>
-                                                        </div>
+                                            {/* Right Column (10 Pairs) */}
+                                            <div className="bg-black/50 border border-cyan-500/25 rounded-2xl overflow-hidden backdrop-blur-md flex flex-col">
+                                                <div className="px-3 py-2 bg-cyan-950/30 border-b border-cyan-500/20 flex items-center justify-between">
+                                                    <span className="text-[11px] font-mono font-black text-cyan-300 tracking-wider">SECONDARY CLUSTER (11 - 20)</span>
+                                                    <span className="text-[10px] font-mono text-white/40">GBP • NZD • CHF • JPY</span>
+                                                </div>
+                                                <div className="overflow-x-auto no-scrollbar flex-1">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="border-b border-white/10 text-[10px] font-mono text-white/50 bg-black/40">
+                                                                <th className="py-2 px-2.5">SYM</th>
+                                                                <th className="py-2 px-1 text-center">DIR</th>
+                                                                <th className="py-2 px-2">ORDERS</th>
+                                                                <th className="py-2 px-2">P/L</th>
+                                                                <th className="py-2 px-2 text-right">LOT</th>
+                                                                <th className="py-2 px-2 text-right">DD%</th>
+                                                                <th className="py-2 px-2 text-center">COMMAND</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {PRIME_RIGHT_PAIRS.map(pair => {
+                                                                const isEnabled = pairControls[pair]?.enabled !== false;
+                                                                const data = primeTelemetry.pairData[pair] || {
+                                                                    count: 0, lot: 0, pnl: 0, buyCount: 0, sellCount: 0, buyLot: 0, sellLot: 0, side: '-', ddPct: 0
+                                                                };
+                                                                const maxTicks = 8;
+                                                                const filledTicks = Math.min(maxTicks, data.count);
+                                                                const pnlVal = data.pnl;
+                                                                const pnlFormatted = pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal < 0 ? pnlVal.toFixed(2) : '0.00';
+                                                                const pnlColor = pnlVal > 0 ? 'text-emerald-400' : pnlVal < 0 ? 'text-rose-400' : 'text-white/40';
+                                                                const ddVal = data.ddPct;
+                                                                const ddColor = ddVal >= 8 ? 'text-rose-400 font-bold' : ddVal >= 4 ? 'text-amber-400 font-bold' : ddVal > 0 ? 'text-emerald-400' : 'text-white/40';
 
-                                                        {/* Action status button */}
-                                                        <div className={`w-full py-1 rounded-lg text-center font-mono text-[10px] font-bold border transition-colors ${
-                                                            isEnabled
-                                                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                                                                : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                                                        }`}>
-                                                            {isEnabled ? '🟢 ACTIVE' : '⛔ CLOSE-ONLY'}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                                return (
+                                                                    <tr key={pair} className="border-b border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+                                                                        <td className="py-1.5 px-2.5 font-mono font-black text-xs text-white tracking-wider whitespace-nowrap">
+                                                                            <span className="px-1.5 py-0.5 rounded bg-slate-900/90 border border-white/15 inline-block text-[11px]">
+                                                                                {pair}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="py-1.5 px-1 text-center whitespace-nowrap">
+                                                                            {data.side === 'B' ? (
+                                                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono font-black text-[10px] bg-cyan-500/25 border border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                                                                                    B
+                                                                                </span>
+                                                                            ) : data.side === 'S' ? (
+                                                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono font-black text-[10px] bg-amber-500/25 border border-amber-400 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.4)]">
+                                                                                    S
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono text-[10px] bg-white/5 border border-white/10 text-white/30">
+                                                                                    -
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <div className="flex items-center gap-0.5 w-11 sm:w-12 h-3 bg-black/60 rounded px-1 border border-white/10">
+                                                                                    {Array.from({ length: maxTicks }).map((_, i) => (
+                                                                                        <div 
+                                                                                            key={i} 
+                                                                                            className={`flex-1 h-2 rounded-[1px] transition-all ${
+                                                                                                i < filledTicks 
+                                                                                                    ? (i >= 5 ? 'bg-rose-500 shadow-[0_0_3px_rgba(244,63,94,0.8)]' : i >= 3 ? 'bg-amber-400 shadow-[0_0_3px_rgba(245,158,11,0.8)]' : 'bg-emerald-400 shadow-[0_0_3px_rgba(16,185,129,0.8)]')
+                                                                                                    : 'bg-white/10'
+                                                                                            }`} 
+                                                                                        />
+                                                                                    ))}
+                                                                                </div>
+                                                                                <span className="font-mono text-xs font-bold text-white/90 w-3 text-right">
+                                                                                    {data.count}
+                                                                                </span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <div className="relative w-10 sm:w-12 h-2.5 bg-black/70 rounded-full border border-white/10 overflow-hidden shrink-0">
+                                                                                    <div className="absolute top-0 bottom-0 left-1/2 w-[1.5px] -translate-x-1/2 bg-white/40 z-10" />
+                                                                                    {pnlVal > 0 ? (
+                                                                                        <div 
+                                                                                            className="absolute top-0 bottom-0 left-1/2 bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_4px_rgba(16,185,129,0.8)]"
+                                                                                            style={{ width: `${Math.min(50, (pnlVal / 50) * 50)}%` }}
+                                                                                        />
+                                                                                    ) : pnlVal < 0 ? (
+                                                                                        <div 
+                                                                                            className="absolute top-0 bottom-0 right-1/2 bg-gradient-to-l from-rose-500 to-amber-500 shadow-[0_0_4px_rgba(244,63,94,0.8)]"
+                                                                                            style={{ width: `${Math.min(50, (Math.abs(pnlVal) / 50) * 50)}%` }}
+                                                                                        />
+                                                                                    ) : null}
+                                                                                </div>
+                                                                                <span className={`font-mono text-[11px] font-bold text-right min-w-[45px] ${pnlColor}`}>
+                                                                                    {pnlFormatted}
+                                                                                </span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 font-mono text-[11px] text-cyan-200/90 text-right whitespace-nowrap">
+                                                                            {data.lot > 0 ? data.lot.toFixed(2) : '0.00'}
+                                                                        </td>
+                                                                        <td className={`py-1.5 px-2 font-mono text-[11px] text-right whitespace-nowrap ${ddColor}`}>
+                                                                            {data.ddPct > 0 ? `${data.ddPct.toFixed(2)}%` : '0.00%'}
+                                                                        </td>
+                                                                        <td className="py-1.5 px-2 text-center whitespace-nowrap">
+                                                                            <button
+                                                                                onClick={() => requestTogglePair(pair, isEnabled)}
+                                                                                className={`px-2.5 py-1 rounded-lg font-mono text-[10px] font-black tracking-wide border transition-all duration-200 cursor-pointer shadow-sm active:scale-95 ${
+                                                                                    isEnabled
+                                                                                        ? 'bg-emerald-500/20 hover:bg-emerald-500/35 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                                                                                        : 'bg-amber-500/20 hover:bg-amber-500/35 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                                                                                }`}
+                                                                            >
+                                                                                {isEnabled ? '🟢 ACTIVE' : '⛔ CLOSE'}
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Cockpit Safety Guard Note */}
+                                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/30 text-[10px] sm:text-[11px] font-mono text-cyan-200/80 shrink-0">
+                                            <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
+                                            <span>
+                                                <strong className="text-cyan-300">ความปลอดภัยของระบบ:</strong> สั่งการได้เฉพาะเปิดรับออเดอร์ใหม่ (ACTIVE) หรือปิดรับออเดอร์ใหม่ให้เคลียร์ไม้เดิม (CLOSE-ONLY) เท่านั้น • ปิดการสั่งกักขังเพื่อไม่ให้กระทบกลไกคำนวณและเสถียรภาพพอร์ตของ EA
+                                            </span>
                                         </div>
                                     </div>
                                 )}
@@ -3264,6 +3580,99 @@ export default function FarmClient({
                                         </p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🛡️ Pair Command Confirmation Dialog (กดยืนยันก่อนส่งคำสั่งไปที่อีเอ) */}
+                    {pendingPairAction && (
+                        <div 
+                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in"
+                            onClick={() => !isDispatchingCommand && setPendingPairAction(null)}
+                        >
+                            <div 
+                                className="bg-[#08131d] border-2 border-cyan-500/50 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-[0_0_60px_rgba(6,182,212,0.35)] animate-scale-up"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+                                        <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm sm:text-base font-mono font-black text-white tracking-wide">
+                                            {pendingPairAction.type === 'SINGLE' 
+                                                ? `ยืนยันส่งคำสั่ง [${pendingPairAction.pair}]`
+                                                : 'ยืนยันส่งคำสั่งทุกคู่เงิน (ALL 20 PAIRS)'
+                                            }
+                                        </h3>
+                                        <p className="text-[11px] text-white/50 font-sans">
+                                            ยืนยันคำสั่งควบคุมการทำงานก่อนส่งไปยัง EA MT5
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Content Details */}
+                                <div className="py-4 space-y-3 font-mono text-xs">
+                                    <div className="p-3 rounded-2xl bg-black/50 border border-white/10 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white/50">เป้าหมายคำสั่ง:</span>
+                                            <span className="font-black text-white px-2 py-0.5 rounded bg-white/10">
+                                                {pendingPairAction.pair || '20 PAIRS'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white/50">สถานะที่ต้องการเปลี่ยน:</span>
+                                            <span className={`font-black px-2.5 py-0.5 rounded-full border text-xs ${
+                                                pendingPairAction.targetEnabled
+                                                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                                                    : 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                            }`}>
+                                                {pendingPairAction.targetEnabled ? '🟢 ACTIVE (เปิดรับออเดอร์ใหม่)' : '⛔ CLOSE-ONLY (ปิดรับออเดอร์ใหม่)'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-[11px] font-sans text-white/70 leading-relaxed bg-cyan-950/20 border border-cyan-500/20 p-3 rounded-2xl">
+                                        {pendingPairAction.targetEnabled ? (
+                                            <span>
+                                                เมื่อกดยืนยัน อีเอ EasyM Prime จะ<strong>เปิดรับสัญญาณการเข้าออเดอร์ใหม่</strong>สำหรับคู่นี้ตามเงื่อนไขกลยุทธ์
+                                            </span>
+                                        ) : (
+                                            <span>
+                                                เมื่อกดยืนยัน อีเอ EasyM Prime จะ<strong>หยุดเปิดออเดอร์ใหม่</strong>สำหรับคู่นี้ โดยจะยังคงบริหารจัดการและปิดรวบกำไรไม้ที่ค้างอยู่เดิมให้จนจบ
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2.5 pt-2">
+                                    <button
+                                        disabled={isDispatchingCommand}
+                                        onClick={() => setPendingPairAction(null)}
+                                        className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                        ยกเลิก (Cancel)
+                                    </button>
+                                    <button
+                                        disabled={isDispatchingCommand}
+                                        onClick={handleConfirmAction}
+                                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-mono text-xs font-black shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isDispatchingCommand ? (
+                                            <>
+                                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                <span>กำลังส่งคำสั่ง...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                <span>ยืนยันส่งคำสั่ง EA</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
