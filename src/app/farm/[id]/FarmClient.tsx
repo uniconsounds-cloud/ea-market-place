@@ -1248,42 +1248,89 @@ export default function FarmClient({
             .slice(0, 4);
     }, [primeTelemetry]);
 
-    // 🛡️ 3 Quarantined & Rescued Trees Dataset
-    const quarantinePreviewList = useMemo(() => [
-        { 
-            id: 'q_preview_1', 
-            c: 1, 
-            r: 5, 
-            sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.sym || 'EURJPY') : 'EURJPY',
-            ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[0]?.ddPct ?? 14.20) : 14.20,
-            isRescue: false,
-            src: '/farm/Tree_fence.png?v=2', 
-            alt: 'Quarantined Tree', 
-            label: 'QUARANTINE',
-        },
-        { 
-            id: 'q_preview_2', 
-            c: 2, 
-            r: 5, 
-            sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.sym || 'GBPJPY') : 'GBPJPY',
-            ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[1]?.ddPct ?? 16.80) : 16.80,
-            isRescue: true,
-            src: '/farm/Tree_aura.png?v=2',  
-            alt: 'Rescue Active Tree', 
-            label: 'RESCUE GRID',
-        },
-        { 
-            id: 'q_preview_3', 
-            c: 3, 
-            r: 5, 
-            sym: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.sym || 'USDJPY') : 'USDJPY',
-            ddPct: primeTelemetry ? (primeTelemetry.quarantinedDetails[2]?.ddPct ?? 11.50) : 11.50,
-            isRescue: false,
-            src: '/farm/Tree_fence.png?v=2', 
-            alt: 'Quarantined Tree', 
-            label: 'QUARANTINE',
-        },
-    ], [primeTelemetry]);
+    // 🛡️ Quarantined & Rescued Trees Dataset (Dynamic: 0, 1, 2, or 3 trees)
+    const quarantinePreviewList = useMemo(() => {
+        const details = primeTelemetry?.quarantinedDetails || [];
+        // If no quarantined pairs exist, return empty array (plot stays empty/natural soil)
+        if (details.length === 0) return [];
+
+        if (details.length === 1) {
+            return [{
+                id: 'q_preview_center',
+                c: 2,
+                r: 5,
+                sym: details[0].sym,
+                ddPct: details[0].ddPct,
+                isRescue: details[0].isHedged,
+                src: details[0].isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                alt: details[0].isHedged ? 'Rescue Active Tree' : 'Quarantined Tree',
+                label: details[0].isHedged ? 'RESCUE GRID' : 'QUARANTINE',
+            }];
+        }
+
+        if (details.length === 2) {
+            return [
+                {
+                    id: 'q_preview_1',
+                    c: 1,
+                    r: 5,
+                    sym: details[0].sym,
+                    ddPct: details[0].ddPct,
+                    isRescue: details[0].isHedged,
+                    src: details[0].isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                    alt: 'Quarantined Tree',
+                    label: details[0].isHedged ? 'RESCUE GRID' : 'QUARANTINE',
+                },
+                {
+                    id: 'q_preview_2',
+                    c: 3,
+                    r: 5,
+                    sym: details[1].sym,
+                    ddPct: details[1].ddPct,
+                    isRescue: details[1].isHedged,
+                    src: details[1].isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                    alt: 'Rescue Active Tree',
+                    label: details[1].isHedged ? 'RESCUE GRID' : 'QUARANTINE',
+                }
+            ];
+        }
+
+        return [
+            { 
+                id: 'q_preview_1', 
+                c: 1, 
+                r: 5, 
+                sym: details[0]?.sym || 'EURJPY',
+                ddPct: details[0]?.ddPct ?? 14.20,
+                isRescue: Boolean(details[0]?.isHedged),
+                src: details[0]?.isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2', 
+                alt: 'Quarantined Tree', 
+                label: details[0]?.isHedged ? 'RESCUE GRID' : 'QUARANTINE',
+            },
+            { 
+                id: 'q_preview_2', 
+                c: 2, 
+                r: 5, 
+                sym: details[1]?.sym || 'GBPJPY',
+                ddPct: details[1]?.ddPct ?? 16.80,
+                isRescue: true,
+                src: '/farm/Tree_aura.png?v=2',  
+                alt: 'Rescue Active Tree', 
+                label: 'RESCUE GRID',
+            },
+            { 
+                id: 'q_preview_3', 
+                c: 3, 
+                r: 5, 
+                sym: details[2]?.sym || 'USDJPY',
+                ddPct: details[2]?.ddPct ?? 11.50,
+                isRescue: Boolean(details[2]?.isHedged),
+                src: details[2]?.isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2', 
+                alt: 'Quarantined Tree', 
+                label: details[2]?.isHedged ? 'RESCUE GRID' : 'QUARANTINE',
+            },
+        ];
+    }, [primeTelemetry]);
 
     const totalQuarantineDD = useMemo(() => {
         return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
@@ -1966,13 +2013,51 @@ export default function FarmClient({
                         })()}
                         </div> {/* 🌾 End of animate-float-farm */}
 
-                        {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (TREES ONLY, PERMANENT ISOMETRIC Z-INDEX, NO FAINT PLOT) */}
-                        {isClient && portNumber === '97053088' && quarantinePreviewList.map((qTree) => {
+                        {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกฟื้นฟูหลังเดียวก่อนคลิกขยาย เพื่อไม่ให้เกะกะสายตา) */}
+                        {isClient && (portNumber === '97053088' || isPrime) && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
+                            <div
+                                key="quarantine_greenhouse_dome"
+                                onClick={handleQuarantineBoxClick}
+                                className="absolute cursor-pointer transition-all duration-300 group select-none"
+                                style={{
+                                    left: `${(2 - 5) * TILE_W}px`,
+                                    top: `${(2 + 5) * TILE_H_OFFSET}px`,
+                                    zIndex: (2 + 5) + 20,
+                                    width: '280px',
+                                    height: '280px'
+                                }}
+                                title="โรงเรือนกระจกฟื้นฟูพืช (แตะเพื่อขยายดูคู่เงินที่ถูกกักขัง)"
+                            >
+                                {/* Subtle breathing magical aura under the dome */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-48 h-48 rounded-full bg-emerald-500/15 group-hover:bg-emerald-400/25 blur-2xl animate-pulse transition-all"></div>
+                                    <div className="w-36 h-36 rounded-full bg-amber-400/15 group-hover:bg-amber-300/25 blur-xl animate-pulse delay-700 transition-all"></div>
+                                </div>
+
+                                {/* Greenhouse Dome Graphic with subtle hover feedback */}
+                                <div 
+                                    className="absolute inset-0 scale-[0.94] origin-bottom transition-transform duration-300 group-hover:scale-[0.98] drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)]" 
+                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                >
+                                    <Image
+                                        src="/farm/Greenhouse_dome.png"
+                                        alt="Quarantine Greenhouse Dome"
+                                        fill
+                                        className="object-contain object-bottom"
+                                        unoptimized
+                                        priority
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (กระจายแสดงเฉพาะเมื่อคลิกขยาย isQuarantineExpanded เท่านั้น) */}
+                        {isClient && (portNumber === '97053088' || isPrime) && isQuarantineExpanded && quarantinePreviewList.map((qTree) => {
                             const tZIndex = (qTree.c + qTree.r) + 20;
                             return (
                                 <div
                                     key={`tree_${qTree.id}`}
-                                    className="absolute pointer-events-none"
+                                    className="absolute pointer-events-none animate-fade-in"
                                     style={{
                                         left: `${(qTree.c - qTree.r) * TILE_W}px`,
                                         top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
@@ -1997,7 +2082,7 @@ export default function FarmClient({
                         })}
 
                         {/* 🌡️ QUARANTINE FLOATING OVERLAY: COMBINED DD BADGE OR EXPANDED INDIVIDUAL MERCURY BARS */}
-                        {isClient && portNumber === '97053088' && (() => {
+                        {isClient && (portNumber === '97053088' || isPrime) && quarantinePreviewList.length > 0 && (() => {
                             const previewList = quarantinePreviewList;
                             const quarantineMercuryFill = Math.min(100, Math.max(12, (totalQuarantineDD / 50) * 100));
 

@@ -1427,13 +1427,51 @@ export default function AdminPrimeFarmLabPage() {
                         })()}
                         </div> {/* 🌾 End of animate-float-farm */}
 
-                        {/* 🛡️ 3 NEW QUARANTINE & RESCUE PREVIEW TREES (TREES ONLY, PERMANENT ISOMETRIC Z-INDEX, NO FAINT PLOT) */}
-                        {isClient && quarantinePreviewList.map((qTree) => {
+                        {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกฟื้นฟูหลังเดียวก่อนคลิกขยาย เพื่อไม่ให้เกะกะสายตา) */}
+                        {isClient && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
+                            <div
+                                key="quarantine_greenhouse_dome"
+                                onClick={handleQuarantineBoxClick}
+                                className="absolute cursor-pointer transition-all duration-300 group select-none"
+                                style={{
+                                    left: `${(2 - 5) * TILE_W}px`,
+                                    top: `${(2 + 5) * TILE_H_OFFSET}px`,
+                                    zIndex: (2 + 5) + 20,
+                                    width: '280px',
+                                    height: '280px'
+                                }}
+                                title="โรงเรือนกระจกฟื้นฟูพืช (แตะเพื่อขยายดูคู่เงินที่ถูกกักขัง)"
+                            >
+                                {/* Subtle breathing magical aura under the dome */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-48 h-48 rounded-full bg-emerald-500/15 group-hover:bg-emerald-400/25 blur-2xl animate-pulse transition-all"></div>
+                                    <div className="w-36 h-36 rounded-full bg-amber-400/15 group-hover:bg-amber-300/25 blur-xl animate-pulse delay-700 transition-all"></div>
+                                </div>
+
+                                {/* Greenhouse Dome Graphic with subtle hover feedback */}
+                                <div 
+                                    className="absolute inset-0 scale-[0.94] origin-bottom transition-transform duration-300 group-hover:scale-[0.98] drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)]" 
+                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                >
+                                    <Image
+                                        src="/farm/Greenhouse_dome.png"
+                                        alt="Quarantine Greenhouse Dome"
+                                        fill
+                                        className="object-contain object-bottom"
+                                        unoptimized
+                                        priority
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (กระจายแสดงเฉพาะเมื่อคลิกขยาย isQuarantineExpanded เท่านั้น) */}
+                        {isClient && isQuarantineExpanded && quarantinePreviewList.map((qTree) => {
                             const tZIndex = (qTree.c + qTree.r) + 20;
                             return (
                                 <div
                                     key={`tree_${qTree.id}`}
-                                    className="absolute pointer-events-none"
+                                    className="absolute pointer-events-none animate-fade-in"
                                     style={{
                                         left: `${(qTree.c - qTree.r) * TILE_W}px`,
                                         top: `${(qTree.c + qTree.r) * TILE_H_OFFSET}px`,
@@ -1458,7 +1496,7 @@ export default function AdminPrimeFarmLabPage() {
                         })}
 
                         {/* 🌡️ QUARANTINE FLOATING OVERLAY: COMBINED DD BADGE OR EXPANDED INDIVIDUAL MERCURY BARS */}
-                        {isClient && (() => {
+                        {isClient && quarantinePreviewList.length > 0 && (() => {
                             const previewList = quarantinePreviewList;
                             const quarantineMercuryFill = Math.min(100, Math.max(12, (totalQuarantineDD / 50) * 100));
 
