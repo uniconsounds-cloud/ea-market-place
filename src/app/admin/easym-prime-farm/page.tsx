@@ -641,11 +641,11 @@ export default function AdminPrimeFarmLabPage() {
             .slice(0, 4);
     }, [telemetry]);
 
-    // 🛡️ 3 Quarantined & Rescued Trees Dataset
+    // 🛡️ 3 Quarantined & Rescued Trees Dataset (Adjacent without middle gap)
     const quarantinePreviewList = useMemo(() => [
         { 
             id: 'q_preview_1', 
-            c: 1, 
+            c: 1.2, 
             r: 5, 
             sym: 'EURJPY',
             ddPct: 14.20,
@@ -656,7 +656,7 @@ export default function AdminPrimeFarmLabPage() {
         },
         { 
             id: 'q_preview_2', 
-            c: 2, 
+            c: 2.0, 
             r: 5, 
             sym: 'GBPJPY',
             ddPct: 16.80,
@@ -667,7 +667,7 @@ export default function AdminPrimeFarmLabPage() {
         },
         { 
             id: 'q_preview_3', 
-            c: 3, 
+            c: 2.8, 
             r: 5, 
             sym: 'USDJPY',
             ddPct: 11.50,
@@ -1174,8 +1174,27 @@ export default function AdminPrimeFarmLabPage() {
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
                 >
                     <div className="absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px]">
-                        {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY) */}
-                        <div className="animate-float-farm">
+                        {/* 🌑 SPOTLIGHT FOCUS BACKDROP WHEN QUARANTINE IS ACTIVE */}
+                        <div 
+                            onClick={(e) => {
+                                if (isQuarantineExpanded || isQuarantineEnlarged) {
+                                    handleCloseQuarantine(e);
+                                }
+                            }}
+                            className={`absolute inset-[-1500px] bg-black/45 backdrop-blur-[1px] transition-all duration-500 z-[19] ${
+                                (isQuarantineExpanded || isQuarantineEnlarged) 
+                                    ? 'opacity-100 pointer-events-auto cursor-pointer' 
+                                    : 'opacity-0 pointer-events-none'
+                            }`} 
+                            title="คลิกพื้นที่ว่างเพื่อกลับสู่มุมมองฟาร์มปกติ"
+                        />
+
+                        {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, DIMMED WHEN QUARANTINE IS FOCUSED) */}
+                        <div className={`animate-float-farm transition-all duration-700 ease-out ${
+                            (isQuarantineExpanded || isQuarantineEnlarged)
+                                ? 'opacity-25 blur-[1.5px] brightness-75 scale-[0.98]'
+                                : 'opacity-100 blur-0 brightness-100 scale-100'
+                        }`}>
                         {Array.from({ length: 25 }).map((_, i) => {
                             const c = i % 5;
                             const r = Math.floor(i / 5);
@@ -1448,9 +1467,9 @@ export default function AdminPrimeFarmLabPage() {
                                     <div className="w-36 h-36 rounded-full bg-amber-400/15 group-hover:bg-amber-300/25 blur-xl animate-pulse delay-700 transition-all"></div>
                                 </div>
 
-                                {/* Greenhouse Dome Graphic with subtle hover feedback */}
+                                {/* Greenhouse Dome Graphic: Compact & clean scale with subtle hover feedback */}
                                 <div 
-                                    className="absolute inset-0 scale-[0.94] origin-bottom transition-transform duration-300 group-hover:scale-[0.98] drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)]" 
+                                    className="absolute inset-0 scale-[0.78] origin-bottom transition-transform duration-300 group-hover:scale-[0.82] drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)]" 
                                     style={{ marginTop: `${TREE_Y_OFFSET}px` }}
                                 >
                                     <Image
@@ -1467,7 +1486,7 @@ export default function AdminPrimeFarmLabPage() {
 
                         {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (กระจายแสดงเฉพาะเมื่อคลิกขยาย isQuarantineExpanded เท่านั้น) */}
                         {isClient && isQuarantineExpanded && quarantinePreviewList.map((qTree) => {
-                            const tZIndex = (qTree.c + qTree.r) + 20;
+                            const tZIndex = Math.round(qTree.c + qTree.r) + 20;
                             return (
                                 <div
                                     key={`tree_${qTree.id}`}
@@ -1480,8 +1499,8 @@ export default function AdminPrimeFarmLabPage() {
                                         height: '280px'
                                     }}
                                 >
-                                    {/* Tree Graphic (Scale down 6% so it's not overly prominent, anchored to ground) */}
-                                    <div className="absolute inset-0 scale-[0.94] origin-bottom" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                    {/* Tree Graphic: Compact scale (scale-[0.75]) to sit close and not overwhelm the farm */}
+                                    <div className="absolute inset-0 scale-[0.75] origin-bottom transition-all duration-300" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                         <Image
                                             src={qTree.src}
                                             alt={qTree.alt}
