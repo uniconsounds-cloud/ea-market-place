@@ -81,15 +81,21 @@ function getMarketTradingDate(date: Date = new Date()): Date {
     const dayOfWeek = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
 
     if (dayOfWeek === 5) {
+        // Friday after 17:00 NY: Friday trading week has concluded. Next active session is Monday.
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 3);
+        }
         return d;
     } else if (dayOfWeek === 6) {
-        d.setDate(d.getDate() - 1);
+        // Saturday: weekend, market closed. Next active trading session is Monday.
+        d.setDate(d.getDate() + 2);
         return d;
     } else if (dayOfWeek === 0) {
+        // Sunday: before 17:00 NY is weekend (next session is Monday), after 17:00 NY is Monday
         if (hour >= 17) {
             d.setDate(d.getDate() + 1);
         } else {
-            d.setDate(d.getDate() - 2);
+            d.setDate(d.getDate() + 1);
         }
         return d;
     } else {
@@ -359,6 +365,7 @@ export default function AdminPrimeFarmLabPage() {
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
     const [isDdOrbExpanded, setIsDdOrbExpanded] = useState(false);
     const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | null>(null);
+    const [expandedActivePair, setExpandedActivePair] = useState<string | null>(null);
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         // ปรับการคลิกที่กรอบแสดง DD รวมของ quarantine ให้คลิกแล้วขยายใหญ่ขึ้นเหมือนเดิม แต่ไม่มีผลกับโดม เมื่อคลิกอีกครั้งก็หดลงเหมือนเดิม
@@ -1455,6 +1462,7 @@ export default function AdminPrimeFarmLabPage() {
                                                 className="mt-2 w-64 sm:w-72 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
                                             >
                                                 {top4WorstPairs.map((p, idx) => {
+                                                    const isPairExpanded = expandedActivePair === p.sym;
                                                     const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
                                                     const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
                                                                         idx === 1 ? 'animate-unfold-bar-2' :
@@ -1462,33 +1470,56 @@ export default function AdminPrimeFarmLabPage() {
                                                     const pTheme = getActivePairTheme(p.ddPct);
                                                     return (
                                                         <div 
-                                                            key={p.sym} 
-                                                            className={`w-full bg-[#02130d]/95 border border-emerald-500/80 rounded-xl p-2 sm:p-2.5 shadow-[0_8px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)] backdrop-blur-xl flex flex-col gap-1 ${unfoldClass}`}
+                                                            key={p.sym}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setExpandedActivePair(prev => prev === p.sym ? null : p.sym);
+                                                            }}
+                                                            className={`w-full bg-[#02130d]/95 border rounded-xl transition-all duration-300 cursor-pointer select-none ${
+                                                                isPairExpanded 
+                                                                    ? 'scale-[1.06] sm:scale-[1.08] p-3 sm:p-3.5 shadow-[0_15px_35px_rgba(0,0,0,0.95),0_0_25px_rgba(16,185,129,0.55)] border-emerald-400 ring-2 ring-emerald-400/50 z-50' 
+                                                                    : 'border-emerald-500/80 p-2 sm:p-2.5 hover:scale-[1.02] shadow-[0_8px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)]'
+                                                            } backdrop-blur-xl flex flex-col gap-1.5 ${unfoldClass}`}
+                                                            title={isPairExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายดูรายละเอียดปรอท"}
                                                         >
-                                                            <div className="flex items-center justify-between text-[11px] font-mono">
+                                                            <div className="flex items-center justify-between font-mono">
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700">
+                                                                    <span className={`font-black rounded bg-emerald-950 text-emerald-300 border border-emerald-700 transition-all ${
+                                                                        isPairExpanded ? 'text-[11px] px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'
+                                                                    }`}>
                                                                         #{idx + 1}
                                                                     </span>
-                                                                    <span className="font-bold text-white tracking-wide">
+                                                                    <span className={`font-bold text-white tracking-wide transition-all ${
+                                                                        isPairExpanded ? 'text-sm sm:text-base' : 'text-[11px]'
+                                                                    }`}>
                                                                         {p.sym}
                                                                     </span>
-                                                                    <span className={`text-[8px] px-1.5 py-0.2 rounded font-semibold border ${pTheme.badgeBg}`}>
+                                                                    <span className={`rounded font-semibold border transition-all ${pTheme.badgeBg} ${
+                                                                        isPairExpanded ? 'text-[10px] px-2 py-0.5' : 'text-[8px] px-1.5 py-0.2'
+                                                                    }`}>
                                                                         {pTheme.status}
                                                                     </span>
                                                                 </div>
-                                                                <span className={`font-black ${pTheme.textColor} text-xs`}>
+                                                                <span className={`font-black ${pTheme.textColor} transition-all ${
+                                                                    isPairExpanded ? 'text-sm sm:text-base' : 'text-xs'
+                                                                }`}>
                                                                     -{p.ddPct.toFixed(1)}%
                                                                 </span>
                                                             </div>
 
-                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน Active (สีตามโหมด SLOW 5% ส้ม, FREEZE 8% แดง) */}
-                                                            <div className="flex items-center w-full px-1 py-0.5 rounded-full bg-black/90 border border-white/20 shadow-inner">
-                                                                <div className={`relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border ${pTheme.bulbBorder} ${pTheme.bulbBg}`}>
+                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน Active (ขยายใหญ่ขึ้นเมื่อคลิก) */}
+                                                            <div className={`flex items-center w-full rounded-full bg-black/90 border border-white/20 shadow-inner transition-all duration-300 ${
+                                                                isPairExpanded ? 'px-1.5 py-1' : 'px-1 py-0.5'
+                                                            }`}>
+                                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${pTheme.bulbBorder} ${pTheme.bulbBg} transition-all duration-300 ${
+                                                                    isPairExpanded ? 'w-3.5 h-3.5 sm:w-4 sm:h-4 shadow-[0_0_10px_rgba(16,185,129,0.9)]' : 'w-2.5 h-2.5'
+                                                                }`}>
                                                                     <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                                 </div>
 
-                                                                <div className="relative flex-1 h-2 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
+                                                                <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                                    isPairExpanded ? 'h-3 sm:h-3.5' : 'h-2'
+                                                                }`}>
                                                                     <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                                     <div 
                                                                         className={`h-full rounded-r-full ${pTheme.fillGradient} transition-all duration-700 relative`}
