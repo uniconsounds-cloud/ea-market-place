@@ -99,6 +99,7 @@ string EAE_BuildOrdersJson(long magicB = 0, long magicS = 0)
          
          json += "{";
          json += "\"ticket_id\":" + IntegerToString(ticket) + ",";
+         json += "\"symbol\":\"" + PositionGetString(POSITION_SYMBOL) + "\",";
          json += "\"type\":\"" + pos_type + "\",";
          json += "\"status\":\"OPEN\",";
          json += "\"current_pnl\":" + DoubleToString(PositionGetDouble(POSITION_PROFIT), 2) + ",";

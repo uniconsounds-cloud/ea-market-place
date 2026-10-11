@@ -127,6 +127,7 @@ export async function POST(req: Request) {
             const upsertData = orders.map((o: any) => ({
                 ticket_id: o.ticket_id,
                 port_number: portNumber,
+                symbol: o.symbol || o.pair || '',
                 type: o.type || 'BUY',
                 status: o.status || 'OPEN',
                 current_pnl: o.current_pnl || 0,
