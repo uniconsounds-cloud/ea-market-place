@@ -111,6 +111,73 @@ const PRIME_20_PAIRS = [
 type PortMode = 'NORMAL' | 'SLOW' | 'FREEZE';
 type ActiveModal = 'DEFENSE' | 'MATRIX' | 'VAULT' | 'RADAR' | null;
 
+// 🎨 Helper คำนวณธีมสีตามระดับ DD (ต่ำกว่า 18% = เขียว, 18% - 28% = เหลืองส้ม, เกิน 28% = แดง)
+const getDDLevelTheme = (ddPct: number) => {
+    if (ddPct > 28) {
+        return {
+            textColor: 'text-rose-400',
+            arrowColor: 'text-rose-400/80',
+            bulbBorder: 'border-rose-300',
+            bulbBg: 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]',
+            fillGradient: 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]',
+            gaugeColor: '#f43f5e',
+            needleColor: '#fda4af'
+        };
+    }
+    if (ddPct >= 18) {
+        return {
+            textColor: 'text-amber-400',
+            arrowColor: 'text-amber-400/80',
+            bulbBorder: 'border-amber-300',
+            bulbBg: 'bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_6px_rgba(245,158,11,0.9)]',
+            fillGradient: 'bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 shadow-[0_0_6px_rgba(245,158,11,0.8)]',
+            gaugeColor: '#f59e0b',
+            needleColor: '#fde68a'
+        };
+    }
+    return {
+        textColor: 'text-emerald-400',
+        arrowColor: 'text-emerald-400/80',
+        bulbBorder: 'border-emerald-300',
+        bulbBg: 'bg-gradient-to-br from-emerald-400 via-teal-600 to-emerald-800 shadow-[0_0_6px_rgba(16,185,129,0.9)]',
+        fillGradient: 'bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_6px_rgba(16,185,129,0.8)]',
+        gaugeColor: '#10b981',
+        needleColor: '#6ee7b7'
+    };
+};
+
+// 🎨 Helper คำนวณสีของคู่เงินกลุ่ม Active (ต่ำกว่า 5% = Active เขียว, 5% - 8% = Slow เหลืองส้ม, เกิน 8% = Freeze แดง)
+const getActivePairTheme = (ddPct: number) => {
+    if (ddPct >= 8.0) {
+        return {
+            status: 'FREEZE',
+            badgeBg: 'bg-rose-950/80 text-rose-300 border-rose-600',
+            textColor: 'text-rose-400',
+            bulbBorder: 'border-rose-300',
+            bulbBg: 'bg-gradient-to-br from-rose-400 via-red-600 to-rose-800 shadow-[0_0_6px_rgba(244,63,94,0.9)]',
+            fillGradient: 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
+        };
+    }
+    if (ddPct >= 5.0) {
+        return {
+            status: 'SLOW',
+            badgeBg: 'bg-amber-950/80 text-amber-300 border-amber-600',
+            textColor: 'text-amber-400',
+            bulbBorder: 'border-amber-300',
+            bulbBg: 'bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_6px_rgba(245,158,11,0.9)]',
+            fillGradient: 'bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 shadow-[0_0_6px_rgba(245,158,11,0.8)]'
+        };
+    }
+    return {
+        status: 'ACTIVE',
+        badgeBg: 'bg-emerald-950/80 text-emerald-300 border-emerald-600',
+        textColor: 'text-emerald-400',
+        bulbBorder: 'border-emerald-300',
+        bulbBg: 'bg-gradient-to-br from-emerald-400 via-teal-600 to-emerald-800 shadow-[0_0_6px_rgba(16,185,129,0.9)]',
+        fillGradient: 'bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_6px_rgba(16,185,129,0.8)]'
+    };
+};
+
 // 🔮 Glowing Crystal DD Dial Orb Component (ทรงลูกแก้วคริสตัลเรืองแสงพร้อมสเกลหน้าปัดและเข็มตาชั่ง Real-time)
 const GlowingDdOrb = ({
     type,
@@ -133,39 +200,30 @@ const GlowingDdOrb = ({
     onMouseEnter?: () => void;
     onMouseLeave?: () => void;
 }) => {
+    // ระดับสีของค่า DD (ต่ำกว่า 18% เขียว, 18-28% เหลืองส้ม, เกิน 28% แดง)
+    const levelTheme = getDDLevelTheme(value);
+
     const config = {
         TOTAL: {
             container: 'border-rose-400/80 bg-gradient-to-b from-[#2e0915]/95 via-[#1d050d]/95 to-[#0a0204]/95 shadow-[0_0_20px_rgba(244,63,94,0.6),inset_0_0_12px_rgba(244,63,94,0.35)] hover:shadow-[0_0_35px_rgba(244,63,94,0.9)]',
-            stroke: '#f43f5e',
-            glow: 'rgba(244,63,94,0.7)',
-            needleColor: '#fda4af',
             label: 'TOTAL',
             labelColor: 'text-rose-300/90',
-            valColor: 'text-rose-400',
             pingBg: 'bg-rose-400',
             pingDot: 'bg-rose-500',
             tooltip: `DD รวมของพอร์ต: -${value.toFixed(2)}%`
         },
         ACTIVE: {
             container: 'border-emerald-400/80 bg-gradient-to-b from-[#06241a]/95 via-[#031710]/95 to-[#010906]/95 shadow-[0_0_20px_rgba(16,185,129,0.55),inset_0_0_12px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.85)]',
-            stroke: '#10b981',
-            glow: 'rgba(16,185,129,0.7)',
-            needleColor: '#6ee7b7',
             label: 'ACTIVE',
             labelColor: 'text-emerald-300/90',
-            valColor: 'text-emerald-400',
             pingBg: 'bg-emerald-400',
             pingDot: 'bg-emerald-500',
             tooltip: `DD ฟาร์มปัจจุบัน: -${value.toFixed(2)}%`
         },
         QUARANTINE: {
             container: 'border-amber-400/80 bg-gradient-to-b from-[#2a1705]/95 via-[#1a0e03]/95 to-[#0b0501]/95 shadow-[0_0_20px_rgba(245,158,11,0.55),inset_0_0_12px_rgba(245,158,11,0.3)] hover:shadow-[0_0_35px_rgba(245,158,11,0.85)]',
-            stroke: '#f59e0b',
-            glow: 'rgba(245,158,11,0.7)',
-            needleColor: '#fde68a',
             label: 'QUAR',
             labelColor: 'text-amber-300/90',
-            valColor: 'text-amber-400',
             pingBg: 'bg-amber-400',
             pingDot: 'bg-amber-500',
             tooltip: `DD คู่ที่ถูกขัง: -${value.toFixed(2)}%`
@@ -216,18 +274,18 @@ const GlowingDdOrb = ({
                     transform="rotate(135 24 24)"
                 />
 
-                {/* 2. Active Scale Progress Sweep Arc (วงสเกลยาวขึ้นตามค่าที่ระบุ) */}
+                {/* 2. Active Scale Progress Sweep Arc (วงสเกลยาวขึ้นตามค่าที่ระบุ - สีเปลี่ยนตามระดับ DD) */}
                 <circle
                     cx="24"
                     cy="24"
                     r={r}
                     fill="none"
-                    stroke={config.stroke}
+                    stroke={levelTheme.gaugeColor}
                     strokeWidth="2.4"
                     strokeLinecap="round"
                     strokeDasharray={`${activeSweepLength} ${circumference}`}
                     transform="rotate(135 24 24)"
-                    style={{ filter: `drop-shadow(0 0 3px ${config.glow})` }}
+                    style={{ filter: `drop-shadow(0 0 3px ${levelTheme.gaugeColor})` }}
                     className="transition-all duration-700 ease-out"
                 />
 
@@ -240,7 +298,7 @@ const GlowingDdOrb = ({
                     stroke="#ffffff"
                     strokeWidth="1.8"
                     strokeLinecap="round"
-                    style={{ filter: `drop-shadow(0 0 2px ${config.needleColor})` }}
+                    style={{ filter: `drop-shadow(0 0 2px ${levelTheme.needleColor})` }}
                     className="transition-all duration-700 ease-out"
                 />
                 <circle
@@ -248,17 +306,17 @@ const GlowingDdOrb = ({
                     cy={tipY}
                     r="1.4"
                     fill="#ffffff"
-                    style={{ filter: `drop-shadow(0 0 3px ${config.stroke})` }}
+                    style={{ filter: `drop-shadow(0 0 3px ${levelTheme.gaugeColor})` }}
                     className="transition-all duration-700 ease-out"
                 />
             </svg>
 
-            {/* 🔢 Center Dial Gauge Value & Label (ย่อขนาดเล็กลงพอเหมาะ ไม่ทับสเกล) */}
+            {/* 🔢 Center Dial Gauge Value & Label (ย่อขนาดเล็กลงพอเหมาะ ไม่ทับสเกล - สีตัวเลขเปลี่ยนตามระดับ DD) */}
             <div className="relative z-20 flex flex-col items-center justify-center leading-none text-center pointer-events-none">
                 <span className={`text-[5px] sm:text-[6px] font-black tracking-widest uppercase mb-0.5 ${config.labelColor}`}>
                     {config.label}
                 </span>
-                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${config.valColor}`}>
+                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${levelTheme.textColor}`}>
                     -{value.toFixed(1)}%
                 </span>
             </div>
@@ -303,13 +361,9 @@ export default function AdminPrimeFarmLabPage() {
     const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | null>(null);
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!isQuarantineEnlarged) {
-            // คลิกครั้งที่ 1: ขยายกล่อง DD ออกแล้วค้างไว้ ไม่ต่อเนื่องอัตโนมัติ
-            setIsQuarantineEnlarged(true);
-        } else {
-            // คลิกครั้งที่ 2: แสดงหลอดปรอทของแต่ละคู่เงิน
-            setIsQuarantineExpanded(true);
-        }
+        // เมื่อคลิกที่โดมแก้ว ให้กระจายแปลงต้นไม้พร้อมแสดงปรอทแยกต้นได้ทันที
+        setIsQuarantineExpanded(true);
+        setIsQuarantineEnlarged(false);
     };
 
     const handleCloseQuarantine = (e: React.MouseEvent) => {
@@ -622,12 +676,13 @@ export default function AdminPrimeFarmLabPage() {
 
         // 1. Add active worst pairs (Table D style)
         if (telemetry.worstPair?.symbol && !quarantinedSyms.has(telemetry.worstPair.symbol)) {
+            const worstDd = telemetry.worstPair.dd || 10.30;
             map.set(telemetry.worstPair.symbol, {
                 sym: telemetry.worstPair.symbol,
-                ddPct: telemetry.worstPair.dd || 10.30,
+                ddPct: worstDd,
                 isQuarantined: false,
                 isRescue: false,
-                status: 'FREEZE'
+                status: worstDd >= 8.0 ? 'FREEZE' : worstDd >= 5.0 ? 'SLOW' : 'ACTIVE'
             });
         }
 
@@ -635,8 +690,8 @@ export default function AdminPrimeFarmLabPage() {
         const activeFallbacks = [
             { sym: 'NZDJPY', ddPct: 10.30, isQuarantined: false, isRescue: false, status: 'FREEZE' },
             { sym: 'AUDJPY', ddPct: 8.40, isQuarantined: false, isRescue: false, status: 'FREEZE' },
-            { sym: 'CADJPY', ddPct: 4.20, isQuarantined: false, isRescue: false, status: 'SLOW' },
-            { sym: 'NZDUSD', ddPct: 1.00, isQuarantined: false, isRescue: false, status: 'ACTIVE' },
+            { sym: 'CADJPY', ddPct: 5.40, isQuarantined: false, isRescue: false, status: 'SLOW' },
+            { sym: 'NZDUSD', ddPct: 1.20, isQuarantined: false, isRescue: false, status: 'ACTIVE' },
         ];
         activeFallbacks.forEach(fb => {
             if (!quarantinedSyms.has(fb.sym) && !map.has(fb.sym)) {
@@ -1318,71 +1373,76 @@ export default function AdminPrimeFarmLabPage() {
                                         }}
                                     >
                                         {/* Main DD Badge Container (Step 1: Expands width & height proportionally, enlarges number) */}
-                                        <div 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsDdExpanded(prev => !prev);
-                                            }}
-                                            className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
-                                                highlightTarget === 'FARM'
-                                                    ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
-                                                    : ''
-                                            } ${
-                                                isDdExpanded 
-                                                    ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
-                                                    : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.55)]'
-                                            }`}
-                                            title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุดในโหมด Active"}
-                                        >
-                                            {/* Mini Subtitle Tag linking to Active Farm */}
-                                            <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                                <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-emerald-400 uppercase">
-                                                    ACTIVE FARM
-                                                </span>
-                                            </div>
+                                        {(() => {
+                                            const activeTheme = getDDLevelTheme(portDDPct);
+                                            return (
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsDdExpanded(prev => !prev);
+                                                    }}
+                                                    className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                        highlightTarget === 'FARM'
+                                                            ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
+                                                            : ''
+                                                    } ${
+                                                        isDdExpanded 
+                                                            ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
+                                                            : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.55)]'
+                                                    }`}
+                                                    title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุดในโหมด Active"}
+                                                >
+                                                    {/* Mini Subtitle Tag linking to Active Farm */}
+                                                    <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                        <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-emerald-400 uppercase">
+                                                            ACTIVE FARM
+                                                        </span>
+                                                    </div>
 
-                                            {/* Line 1: Main DD Number (ขยายขนาดตัวเลขให้ใหญ่ขึ้นได้สัดส่วนเมื่อคลิก) */}
-                                            <div className="flex items-center gap-2">
-                                                <span className={`font-mono font-black text-emerald-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
-                                                    isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
-                                                }`}>
-                                                    -{portDDPct.toFixed(2)}%
-                                                </span>
-                                                <span className={`text-emerald-400/80 transition-all duration-300 ${
-                                                    isDdExpanded ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
-                                                }`}>
-                                                    ▼
-                                                </span>
-                                            </div>
+                                                    {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`font-mono font-black ${activeTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                            isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
+                                                        }`}>
+                                                            -{portDDPct.toFixed(2)}%
+                                                        </span>
+                                                        <span className={`${activeTheme.arrowColor} transition-all duration-300 ${
+                                                            isDdExpanded ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
+                                                        }`}>
+                                                            ▼
+                                                        </span>
+                                                    </div>
 
-                                            {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง */}
-                                            <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
-                                                isDdExpanded ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
-                                            }`}>
-                                                {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสง) */}
-                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-emerald-300 bg-gradient-to-br from-emerald-400 via-teal-600 to-emerald-800 shadow-[0_0_6px_rgba(16,185,129,0.9)] transition-all duration-300 ${
-                                                    isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
-                                                }`}>
-                                                    <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
-                                                </div>
+                                                    {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
+                                                    <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
+                                                        isDdExpanded ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
+                                                    }`}>
+                                                        {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
+                                                        <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${activeTheme.bulbBorder} ${activeTheme.bulbBg} transition-all duration-300 ${
+                                                            isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
+                                                        }`}>
+                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                        </div>
 
-                                                {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
-                                                <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
-                                                    isDdExpanded ? 'h-2 sm:h-2.5' : 'h-1.5'
-                                                }`}>
-                                                    <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
-                                                    <div 
-                                                        className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_6px_rgba(16,185,129,0.8)] transition-all duration-700 relative"
-                                                        style={{ width: `${portMercuryFill}%` }}
-                                                    >
-                                                        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                        {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
+                                                        <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                            isDdExpanded ? 'h-2 sm:h-2.5' : 'h-1.5'
+                                                        }`}>
+                                                            <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                            <div 
+                                                                className={`h-full rounded-r-full ${activeTheme.fillGradient} transition-all duration-700 relative`}
+                                                                style={{ width: `${portMercuryFill}%` }}
+                                                            >
+                                                                <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
 
-                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs ONLY - Excludes Quarantined Pairs) */}
+                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs: SLOW 5% เหลืองส้ม, FREEZE 8% แดง) */}
                                         {isDdExpanded && (
                                             <div 
                                                 onClick={(e) => e.stopPropagation()}
@@ -1393,6 +1453,7 @@ export default function AdminPrimeFarmLabPage() {
                                                     const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
                                                                         idx === 1 ? 'animate-unfold-bar-2' :
                                                                         idx === 2 ? 'animate-unfold-bar-3' : 'animate-unfold-bar-4';
+                                                    const pTheme = getActivePairTheme(p.ddPct);
                                                     return (
                                                         <div 
                                                             key={p.sym} 
@@ -1406,25 +1467,25 @@ export default function AdminPrimeFarmLabPage() {
                                                                     <span className="font-bold text-white tracking-wide">
                                                                         {p.sym}
                                                                     </span>
-                                                                    <span className="text-[8px] px-1.5 py-0.2 rounded font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-600">
-                                                                        {p.status}
+                                                                    <span className={`text-[8px] px-1.5 py-0.2 rounded font-semibold border ${pTheme.badgeBg}`}>
+                                                                        {pTheme.status}
                                                                     </span>
                                                                 </div>
-                                                                <span className="font-black text-emerald-400 text-xs">
+                                                                <span className={`font-black ${pTheme.textColor} text-xs`}>
                                                                     -{p.ddPct.toFixed(1)}%
                                                                 </span>
                                                             </div>
 
-                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน Active */}
+                                                            {/* หลอดปรอทแนวนอนของแต่ละคู่เงิน Active (สีตามโหมด SLOW 5% ส้ม, FREEZE 8% แดง) */}
                                                             <div className="flex items-center w-full px-1 py-0.5 rounded-full bg-black/90 border border-white/20 shadow-inner">
-                                                                <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border border-emerald-300 bg-gradient-to-br from-emerald-400 via-teal-600 to-emerald-800 shadow-[0_0_6px_rgba(16,185,129,0.9)]">
+                                                                <div className={`relative w-2.5 h-2.5 rounded-full flex-shrink-0 flex items-center justify-center border ${pTheme.bulbBorder} ${pTheme.bulbBg}`}>
                                                                     <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                                 </div>
 
                                                                 <div className="relative flex-1 h-2 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center">
                                                                     <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                                     <div 
-                                                                        className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_6px_rgba(16,185,129,0.8)] transition-all duration-700 relative"
+                                                                        className={`h-full rounded-r-full ${pTheme.fillGradient} transition-all duration-700 relative`}
                                                                         style={{ width: `${fillWidth}%` }}
                                                                     >
                                                                         <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
@@ -1517,6 +1578,7 @@ export default function AdminPrimeFarmLabPage() {
                         {isClient && quarantinePreviewList.length > 0 && (() => {
                             const previewList = quarantinePreviewList;
                             const quarantineMercuryFill = Math.min(100, Math.max(12, (totalQuarantineDD / 50) * 100));
+                            const quarTheme = getDDLevelTheme(totalQuarantineDD);
 
                             if (!isQuarantineExpanded) {
                                 return (
@@ -1540,12 +1602,8 @@ export default function AdminPrimeFarmLabPage() {
                                                     highlightTarget === 'QUARANTINE'
                                                         ? 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110'
                                                         : ''
-                                                } ${
-                                                    isQuarantineEnlarged
-                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(245,158,11,0.85)] scale-100'
-                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.55)] animate-fade-in'
-                                                }`}
-                                                title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อแสดงหลอดปรอทของแต่ละต้นไม้" : "คลิกเพื่อขยายดูรายละเอียด"}
+                                                } w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.55)] animate-fade-in`}
+                                                title="คลิกเพื่อคลี่ดูแปลงต้นไม้และหลอดปรอทแยกต้น"
                                             >
                                                 {/* Mini Subtitle Tag linking to Quarantined Pairs */}
                                                 <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
@@ -1555,47 +1613,28 @@ export default function AdminPrimeFarmLabPage() {
                                                     </span>
                                                 </div>
 
-                                                {/* Line 1: Main DD Number (สี Amber สอดคล้องกับลูกแก้ว QUARANTINE) */}
+                                                {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`font-mono font-black text-amber-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
-                                                        isQuarantineEnlarged ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
-                                                    }`}>
+                                                    <span className={`font-mono font-black ${quarTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 text-[17px] sm:text-xl`}>
                                                         -{totalQuarantineDD.toFixed(2)}%
                                                     </span>
-                                                    <span 
-                                                        onClick={(e) => {
-                                                            if (isQuarantineEnlarged) {
-                                                                e.stopPropagation();
-                                                                setIsQuarantineEnlarged(false);
-                                                            }
-                                                        }}
-                                                        className={`text-amber-400/80 transition-all duration-300 ${
-                                                            isQuarantineEnlarged ? 'rotate-180 text-xs sm:text-sm hover:scale-125' : 'text-[9px]'
-                                                        }`}
-                                                        title={isQuarantineEnlarged ? "คลิกเพื่อย่อกลับ" : undefined}
-                                                    >
+                                                    <span className={`${quarTheme.arrowColor} text-[9px]`}>
                                                         ▼
                                                     </span>
                                                 </div>
 
-                                                {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สี Amber) */}
-                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner ${
-                                                    isQuarantineEnlarged ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
-                                                }`}>
-                                                    {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงสี Amber) */}
-                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border border-amber-300 bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_6px_rgba(245,158,11,0.9)] transition-all duration-300 ${
-                                                        isQuarantineEnlarged ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
-                                                    }`}>
+                                                {/* Line 2: ปรอทแนวนอน (สีปรอทเปลี่ยนตามระดับ DD) */}
+                                                <div className="transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner w-24 sm:w-28 px-1 py-0.5 mt-1">
+                                                    {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
+                                                    <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${quarTheme.bulbBorder} ${quarTheme.bulbBg} w-2.5 h-2.5`}>
                                                         <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                     </div>
 
-                                                    {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอนสี Amber) */}
-                                                    <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
-                                                        isQuarantineEnlarged ? 'h-2 sm:h-2.5' : 'h-1.5'
-                                                    }`}>
+                                                    {/* Horizontal Glass Stem Tube */}
+                                                    <div className="relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center h-1.5">
                                                         <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
                                                         <div 
-                                                            className="h-full rounded-r-full bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 shadow-[0_0_6px_rgba(245,158,11,0.8)] transition-all duration-700 relative"
+                                                            className={`h-full rounded-r-full ${quarTheme.fillGradient} transition-all duration-700 relative`}
                                                             style={{ width: `${quarantineMercuryFill}%` }}
                                                         >
                                                             <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
