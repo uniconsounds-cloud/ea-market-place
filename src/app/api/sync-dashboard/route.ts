@@ -48,6 +48,9 @@ export async function POST(req: Request) {
         const systemCode = snapshot?.identity?.system_code || payload.system_code || 'EasyM';
         const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
 
+        let lastViewedAt: string | null = null;
+        let checkedViewStatus = false;
+
         // 3. Process Status Sync (From Snapshot or direct stats)
         if (snapshot || type === 'STATS_SYNC' || payload.balance !== undefined) {
             const balance = Number(snapshot?.account?.balance ?? payload.balance ?? 0);
@@ -105,24 +108,34 @@ export async function POST(req: Request) {
                 statusPayload.prime_data = primeData;
             }
 
-            let { error: statusErr } = await supabase
+            let { data: upsertedRow, error: statusErr } = await supabase
                 .from('farm_port_status')
-                .upsert(statusPayload, { onConflict: 'port_number' });
+                .upsert(statusPayload, { onConflict: 'port_number' })
+                .select('last_viewed_at')
+                .maybeSingle();
 
             if (statusErr && primeData) {
                 console.warn('Initial farm_port_status upsert with prime_data failed, retrying without prime_data:', statusErr.message);
                 delete statusPayload.prime_data;
                 const retry = await supabase
                     .from('farm_port_status')
-                    .upsert(statusPayload, { onConflict: 'port_number' });
+                    .upsert(statusPayload, { onConflict: 'port_number' })
+                    .select('last_viewed_at')
+                    .maybeSingle();
                 statusErr = retry.error;
+                upsertedRow = retry.data;
             }
 
-            if (statusErr) console.error('Error syncing farm_port_status:', statusErr);
+            if (!statusErr) {
+                checkedViewStatus = true;
+                lastViewedAt = upsertedRow?.last_viewed_at || null;
+            } else {
+                console.error('Error syncing farm_port_status:', statusErr);
+            }
         }
 
         // 4. Process Active Orders (Farm UI Data)
-        if (orders && Array.isArray(orders)) {
+        if (orders && Array.isArray(orders) && orders.length > 0) {
             const upsertData = orders.map((o: any) => ({
                 ticket_id: o.ticket_id,
                 port_number: portNumber,
@@ -184,40 +197,43 @@ export async function POST(req: Request) {
         }
 
         // 7. Check if user is actively viewing this port on the web (within last 2 minutes)
-        // EasyM Prime or ports with active telemetry always receive should_sync_full: true for full real-time metrics
-        let shouldSyncFull = Boolean(primeData) || systemCode.toLowerCase().includes('prime') || portNumber === '97053088';
-        if (!shouldSyncFull) {
+        let isViewerActive = false;
+        if (!checkedViewStatus) {
             try {
                 const { data: viewCheck } = await supabase
                     .from('farm_port_status')
                     .select('last_viewed_at')
                     .eq('port_number', portNumber)
                     .maybeSingle();
-
-                if (viewCheck?.last_viewed_at) {
-                    const lastViewedMs = new Date(viewCheck.last_viewed_at).getTime();
-                    const diffMs = Date.now() - lastViewedMs;
-                    // If viewed within last 2 minutes (120,000 ms), full sync is active
-                    if (diffMs < 120000) {
-                        shouldSyncFull = true;
-                    }
-                }
+                lastViewedAt = viewCheck?.last_viewed_at || null;
             } catch (e) {
-                shouldSyncFull = true;
+                // Ignore query error and default to sleep mode
+            }
+        }
+
+        if (lastViewedAt) {
+            const lastViewedMs = new Date(lastViewedAt).getTime();
+            const diffMs = Date.now() - lastViewedMs;
+            // If viewed within last 2 minutes (120,000 ms), live 20s sync is active
+            if (diffMs >= 0 && diffMs < 120000) {
+                isViewerActive = true;
             }
         }
 
         // 8. Retrieve 2-Way Command & Web Control state for this port
         const webConfig = getPortControl(portNumber);
 
-        // Return response matching both MQL5 WebSync and Licensing expectation with 2-Way Web Config
+        // Return response:
+        // Note: should_sync_full is kept true so deployed EAs with EAE_WebSync.mqh
+        // respect sync_interval (180s when idle, 20s when viewed) and keep hash-throttling active,
+        // while license_tier ('free' when idle, 'pro' when viewed) skips uploading order arrays when idle.
         return NextResponse.json({
             status: 'success',
             success: true,
-            should_sync_full: shouldSyncFull,
-            viewer_active: shouldSyncFull,
-            sync_interval: shouldSyncFull ? 10 : 20,
-            license_tier: 'pro',
+            should_sync_full: true,
+            viewer_active: isViewerActive,
+            sync_interval: isViewerActive ? 20 : 180,
+            license_tier: isViewerActive ? 'pro' : 'free',
             is_trial: false,
             timestamp: nowIso,
             web_config: webConfig

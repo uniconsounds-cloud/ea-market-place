@@ -518,8 +518,15 @@ export default function AdminPrimeFarmLabPage() {
             })
             .subscribe();
 
+        // Signal to the server that we are actively viewing this port
+        supabase.rpc('ping_farm_view', { p_port_number: portNumber });
+        const pingInterval = setInterval(() => {
+            supabase.rpc('ping_farm_view', { p_port_number: portNumber });
+        }, 30000);
+
         return () => {
             supabase.removeChannel(channel);
+            clearInterval(pingInterval);
         };
     }, [loadingAuth]);
 
