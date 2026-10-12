@@ -157,3 +157,32 @@
 รหัสประจำรุ่นย่อย (Build ID เช่น `B261009.1`) สำหรับผู้ดูแลระบบเพื่อตรวจเช็กและระบุเวอร์ชันทางเทคนิค บันทึกไว้ที่:
 📄 `mt5_integration/Experts/EasyM/EA_TECHNICAL_BUILD_REGISTRY.md`
 
+---
+
+## 8. 🚨 กฎเหล็กการสร้าง Build ใหม่ทุกครั้งที่มีการแก้ไข (Mandatory Build Increment Rule - ห้ามแก้ไขทับ Build เดิมเด็ดขาด!)
+
+> **⚠️ บันทึกเตือนใจ AI & นักพัฒนา (Strict Protocol):**
+> **ทุกครั้งที่มีการแก้ไขปรับปรุงโค้ด EA ไม่ว่าจะเป็นจุดเล็กหรือใหญ่ ห้ามแก้ไขทับใน Build เดิมเด็ดขาด! จะต้องสร้างเป็น Build ใหม่เสมอทุกครั้ง!**
+
+### ขั้นตอนปฏิบัติมาตรฐานเมื่อมีการแก้ไขโค้ด EA (Standard Operating Procedure):
+1. **ทบทวนเอกสารอ้างอิงก่อนเริ่มงาน (Pre-flight Review):**
+   * ตรวจสอบไฟล์ `SYSTEM_ARCHITECTURE_RULES.md` และ `EA_TECHNICAL_BUILD_REGISTRY.md` ก่อนลงมือ เพื่อตรวจดูเลข Build ล่าสุดที่ใช้งานอยู่
+2. **ขยับเลข Revision หรือวันใหม่ (Increment Build ID):**
+   * หากแก้ไขในวันเดียวกัน ให้เพิ่มเลข Revision เช่น จาก `B261011_2` $\rightarrow$ เป็น **`B261011_3`**
+   * หากแก้ไขวันใหม่ ให้ขึ้นวันใหม่ เช่น **`B261012_1`**
+3. **สร้างไฟล์ชื่อใหม่เสมอ:**
+   * สร้างไฟล์ `.mq5` ใหม่ตามชื่อ Build เช่น `EasyM_Prime_v200_B261011_3.mq5`
+4. **อัปเดต Metadata ในหัวไฟล์ให้ตรงกัน 100%:**
+   * `#define EA_BUILD_ID          "B261011.3"`
+   * `#define EA_VERSION_STR       "v2.00-1011"` (หรือเลขเดือนวันที่แก้ไข)
+   * `#define EA_DASH_TITLE        "=== EasyM Prime v2.00 [B261011.3] ==="`
+5. **คอมไพล์ผ่าน MetaEditor64 ได้ไฟล์ `.ex5` ชื่อใหม่:**
+   * คอมไพล์ให้ได้ `EasyM_Prime_v200_B261011_3.ex5`
+6. **คัดลอกไฟล์ไปยังโฟลเดอร์ปลายทางครบทั้ง 3 จุด:**
+   * โฟลเดอร์ MT5 Wine: `.../MQL5/Experts/EasyM/`
+   * โฟลเดอร์ Git Repo: `ea-market-place/mt5_integration/Experts/EasyM/`
+   * โฟลเดอร์ Release: `Finishing EAeze Products/`
+7. **บันทึกลงตาราง `EA_TECHNICAL_BUILD_REGISTRY.md` ทันที:**
+   * เพิ่มแถวใหม่ในตารางประวัติ พร้อมระบุสิ่งที่แก้ไขอย่างชัดเจน
+
+
