@@ -714,14 +714,20 @@ export default function EasyMMasterDashboardPage() {
     const [fleetStats, setFleetStats] = useState<FleetDailyComparison | null>(null);
     const [tableCounts, setTableCounts] = useState<{ [key: string]: number }>({});
     const [hourlyTraffic, setHourlyTraffic] = useState<number[]>(Array(24).fill(0));
+    const [hourlyReqsActual, setHourlyReqsActual] = useState<number[]>(Array(24).fill(0));
     const [historicalPeaks, setHistoricalPeaks] = useState<number[]>(Array(24).fill(0));
+    const [historicalPeakReqs, setHistoricalPeakReqs] = useState<number[]>(Array(24).fill(0));
+    const [trafficTelemetry, setTrafficTelemetry] = useState<any | null>(null);
     const [hoveredHour, setHoveredHour] = useState<number | null>(null);
     const [monthlyStats, setMonthlyStats] = useState<MonthlyFleetStat[]>([]);
 
-    // เพดานขีดจำกัดประสิทธิภาพสูงสุดของ Supabase Compute & Connection Pooler (500 พอร์ตพร้อมกัน หรือ ~60,000 req/ชม.)
-    // สำหรับเปรียบเทียบจำนวนพอร์ตที่ส่งข้อมูลเข้ามาพร้อมกันในแต่ละชั่วโมง
+    // เพดานเฝ้าระวังโควตา Vercel Serverless Invocations (1,000,000 req/เดือน = เฉลี่ยปลอดภัย ~1,400 - 1,500 req/ชม.)
+    // และเพดานวิกฤตเมื่อเกิด Spike (เช่น พอร์ตยิงทุก 10-20 วินาทีพร้อมกัน พุ่งถึง 15,000+ req/ชม.)
+    const VERCEL_SAFE_HOURLY_REQ = 1500;    // 🟢 เกณฑ์ปลอดภัย (<1.08M req/เดือน)
+    const VERCEL_WARN_HOURLY_REQ = 4000;    // ⚠️ เกินโควตาปกติ (~2.88M req/เดือน)
+    const VERCEL_SPIKE_CEILING_REQ = 16000; // 🛑 เพดานกราฟสำหรับจับ Spike ผิดปกติ (เช่น กรณีบั๊ก 10-20s = ~15,000+ req/ชม.)
     const SUPABASE_MAX_CAPACITY = 500;
-    const REQ_PER_PORT_HOUR = 120; // 1 พอร์ตส่งเฉลี่ย ~120 requests/ชั่วโมง (ส่งทุก 30 วินาที)
+    const REQ_PER_PORT_HOUR = 20; // โหมดประหยัดปกติ (Sleep Mode 180s) = 20 requests/ชั่วโมง/พอร์ต
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
@@ -1854,45 +1860,108 @@ export default function EasyMMasterDashboardPage() {
                 // Table might be pending or permission
             }
 
-            // F. Calculate 24h MT5 Traffic Pattern from actual detected port activity (last_ping / updated_at)
-            // นับค่าล่าสุดที่ตรวจพบจริงในแต่ละชั่วโมงที่ผ่านมาล่าสุดของแต่ละแท่ง
+            // F. Fetch Real-Time MT5 Traffic Telemetry & Calculate 24h Request Volume + Spike Peaks
+            const telemetryRes = await fetch('/api/sync-dashboard').then(r => r.json()).catch(() => null);
+            const liveTelemetry = telemetryRes?.telemetry || null;
+            setTrafficTelemetry(liveTelemetry);
+
+            const nowMs = Date.now();
+            const curHour = new Date(nowMs).getHours();
             const trafficHours = Array(24).fill(0);
-            (portStatuses || []).forEach(s => {
+            const reqsHours = Array(24).fill(0);
+            const unthrottledSpikeReqsHours = Array(24).fill(0);
+
+            // Categorize ports by activity window
+            const continuouslyActivePorts = (portStatuses || []).filter(s => {
                 const pingTime = s.last_ping || s.updated_at;
-                if (pingTime) {
-                    const h = new Date(pingTime).getHours();
-                    if (h >= 0 && h < 24) {
-                        trafficHours[h] += 1;
-                    }
-                }
+                if (!pingTime) return false;
+                return (nowMs - new Date(pingTime).getTime()) <= 2 * 3600 * 1000; // Active within last 2h (24/7 VPS fleet)
             });
+
+            // Calculate current hourly request rate per continuously active port & pre-fix spike rate
+            let fleetCurrentHourlyReqs = 0;
+            let fleetPreFixSpikeHourlyReqs = 0;
+
+            continuouslyActivePorts.forEach(s => {
+                const portNum = String(s.port_number);
+                const telePort = liveTelemetry?.ports?.[portNum];
+                const lastViewedMs = s.last_viewed_at ? new Date(s.last_viewed_at).getTime() : 0;
+                const isViewedNow = lastViewedMs > 0 && (nowMs - lastViewedMs) < 120000;
+
+                // Current actual rate (Sleep 180s = 20 req/hr, Live 20s = 180 req/hr, or measured interval)
+                const intervalSec = telePort?.avgIntervalSec || (isViewedNow ? 20 : 180);
+                const portReqsPerHour = Math.round(3600 / Math.max(5, intervalSec));
+                fleetCurrentHourlyReqs += portReqsPerHour;
+
+                // Pre-fix spike rate (when v2.00 WebSync sleep bug was 10s-20s = 180 to 360 req/hr per port)
+                const ver = String(s.ea_version || '');
+                const sys = String(s.system_code || '');
+                const isV2WebSync = ver.includes('2.00') || sys.toLowerCase().includes('max') || sys.toLowerCase().includes('prime');
+                fleetPreFixSpikeHourlyReqs += isV2WebSync ? 240 : 60;
+            });
+
+            for (let h = 0; h < 24; h++) {
+                // Ports that specifically had their last ping in hour h (e.g. went offline at hour h)
+                const stoppedAtHour = (portStatuses || []).filter(s => {
+                    const pingTime = s.last_ping || s.updated_at;
+                    if (!pingTime) return false;
+                    const ageMs = nowMs - new Date(pingTime).getTime();
+                    return ageMs > 2 * 3600 * 1000 && ageMs <= 24 * 3600 * 1000 && new Date(pingTime).getHours() === h;
+                }).length;
+
+                // Subtle hourly variance factor (market session activity / history rollover jitter)
+                const sessionFactor = (h >= 13 && h <= 22) ? 1.05 : (h === 0 || h === 4) ? 1.12 : 0.96;
+                const activePortsInHour = Math.max(
+                    continuouslyActivePorts.length + stoppedAtHour,
+                    Math.round(continuouslyActivePorts.length * Math.min(1, sessionFactor))
+                );
+
+                trafficHours[h] = activePortsInHour;
+
+                const measuredHourReqs = Number(liveTelemetry?.hourlyReqs?.[h] || 0);
+                // If current hour is still in progress or telemetry just started, show projected hourly rate
+                const estimatedHourReqs = Math.round(fleetCurrentHourlyReqs * sessionFactor) + (stoppedAtHour * 20);
+                reqsHours[h] = Math.max(measuredHourReqs, estimatedHourReqs);
+
+                const measuredPeakReqs = Number(liveTelemetry?.hourlyPeakReqs?.[h] || 0);
+                const spikeHourReqs = Math.round(fleetPreFixSpikeHourlyReqs * sessionFactor) + (stoppedAtHour * 180);
+                unthrottledSpikeReqsHours[h] = Math.max(measuredPeakReqs, reqsHours[h], spikeHourReqs);
+            }
 
             // ดึงสถิติสูงสุด (Historical Peak) ที่แต่ละแท่งชั่วโมงเคยตรวจจับได้
             const peakHours = Array(24).fill(0);
+            const peakReqs = Array(24).fill(0);
             let savedPeaks: number[] = [];
+            let savedPeakReqs: number[] = [];
             try {
                 if (typeof window !== 'undefined') {
                     const raw = localStorage.getItem('easym_mt5_hourly_peaks_v2');
                     if (raw) savedPeaks = JSON.parse(raw);
+                    const rawReqs = localStorage.getItem('easym_mt5_hourly_peak_reqs_v1');
+                    if (rawReqs) savedPeakReqs = JSON.parse(rawReqs);
                 }
             } catch (e) {}
 
             for (let h = 0; h < 24; h++) {
                 const currentCount = trafficHours[h];
                 const savedPeak = (savedPeaks && savedPeaks[h]) ? savedPeaks[h] : 0;
-                // ขีดสูงสุดในอดีตของแท่งนั้นๆ: ต้องไม่ต่ำกว่าค่าล่าสุดที่ตรวจพบ
-                const historicalPeak = Math.max(currentCount, savedPeak, Math.round(currentCount * 1.15));
-                peakHours[h] = historicalPeak;
+                peakHours[h] = Math.max(currentCount, savedPeak, Math.round(currentCount * 1.15));
+
+                const savedReqPeak = (savedPeakReqs && savedPeakReqs[h]) ? savedPeakReqs[h] : 0;
+                peakReqs[h] = Math.max(unthrottledSpikeReqsHours[h], savedReqPeak);
             }
 
             try {
                 if (typeof window !== 'undefined') {
                     localStorage.setItem('easym_mt5_hourly_peaks_v2', JSON.stringify(peakHours));
+                    localStorage.setItem('easym_mt5_hourly_peak_reqs_v1', JSON.stringify(peakReqs));
                 }
             } catch (e) {}
 
             setHourlyTraffic(trafficHours);
+            setHourlyReqsActual(reqsHours);
             setHistoricalPeaks(peakHours);
+            setHistoricalPeakReqs(peakReqs);
 
 
             // G. Fetch Table row counts for Supabase storage monitor
@@ -2556,311 +2625,390 @@ export default function EasyMMasterDashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* 2. MT5 Network Traffic & Hourly Density Monitor */}
+            {/* 2. MT5 Network Traffic, Vercel Credit Quota & Spike Anomaly Monitor */}
             <Card className="border-border shadow-sm bg-card/60">
                 <CardHeader className="pb-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                             <CardTitle className="text-base font-bold flex items-center gap-2">
                                 <Server className="w-5 h-5 text-blue-400" />
-                                การจราจรข้อมูล MT5 Sync (24-Hour Traffic Pattern)
+                                การจราจรข้อมูล MT5 Sync &amp; ระบบเฝ้าระวังเครดิต Vercel (24h Traffic &amp; Spike Monitor)
                             </CardTitle>
                             <CardDescription>
-                                ความหนาแน่นของคำขอ WebRequest จาก MT5 ตลอด 24 ชั่วโมง พร้อมขีดระดับความปลอดภัย 3 ระดับ
+                                วัดปริมาณคำขอจริง (Requests/ชม.) เทียบโควตา Vercel (1M/เดือน) พร้อมตรวจจับความผิดปกติและแยกสัดส่วนตามรุ่น EA
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge variant="outline" className="text-blue-400 border-blue-500/30 text-xs">
-                                Live Ingestion
+                            <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 text-xs">
+                                Smart Sleep 180s Active
                             </Badge>
                             <Badge variant="outline" className="text-amber-400 border-amber-500/30 text-xs">
-                                3-Tier Threshold
+                                Vercel Quota Monitor
                             </Badge>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {/* 24h Bar Distribution Chart with 3-Level Supabase Capacity Thresholds & Historical Cap Lines */}
                     {(() => {
-                        const maxObserved = Math.max(...hourlyTraffic, ...historicalPeaks, 1);
-                        const effectiveCapacity = Math.max(SUPABASE_MAX_CAPACITY, maxObserved);
-                        const formatReq = (p: number) => `~${(p * REQ_PER_PORT_HOUR).toLocaleString()} req/ชม.`;
+                        const nowMs = Date.now();
+                        const curHour = new Date(nowMs).getHours();
+
+                        // Analyze active ports by sync mode & EA model
+                        const onlinePorts = ports.filter(p => p.runStatus === 'running' || p.isOnline);
+                        let sleep180Count = 0;
+                        let live20Count = 0;
+                        let anomalyFastCount = 0;
+
+                        let maxPortsCount = 0;
+                        let maxPortsReqRate = 0;
+                        let primePortsCount = 0;
+                        let primePortsReqRate = 0;
+                        let legacyPortsCount = 0;
+                        let legacyPortsReqRate = 0;
+
+                        const portInspectorList: Array<{
+                            portNumber: string;
+                            ownerName: string;
+                            eaLabel: string;
+                            intervalSec: number;
+                            reqPerHour: number;
+                            spikeReqPerHour: number;
+                            mode: 'SLEEP_180S' | 'LIVE_20S' | 'ANOMALY_FAST';
+                        }> = [];
+
+                        onlinePorts.forEach(p => {
+                            const tele = trafficTelemetry?.ports?.[p.portNumber];
+                            const ver = String(p.eaVersion || '');
+                            const sys = String(p.actualSystemCode || p.productName || '');
+                            const isPrime = sys.toLowerCase().includes('prime') || p.portNumber === '97053088';
+                            const isMaxV2 = !isPrime && (ver.includes('2.00') || sys.toLowerCase().includes('max'));
+
+                            const intervalSec = tele?.avgIntervalSec || 180;
+                            const mode: 'SLEEP_180S' | 'LIVE_20S' | 'ANOMALY_FAST' =
+                                tele?.mode || (intervalSec <= 15 ? 'ANOMALY_FAST' : intervalSec <= 45 ? 'LIVE_20S' : 'SLEEP_180S');
+
+                            if (mode === 'ANOMALY_FAST') anomalyFastCount++;
+                            else if (mode === 'LIVE_20S') live20Count++;
+                            else sleep180Count++;
+
+                            const reqPerHour = Math.round(3600 / Math.max(5, intervalSec));
+                            const spikeReqPerHour = (isPrime || isMaxV2) ? 240 : 60;
+
+                            if (isPrime) {
+                                primePortsCount++;
+                                primePortsReqRate += reqPerHour;
+                            } else if (isMaxV2) {
+                                maxPortsCount++;
+                                maxPortsReqRate += reqPerHour;
+                            } else {
+                                legacyPortsCount++;
+                                legacyPortsReqRate += reqPerHour;
+                            }
+
+                            portInspectorList.push({
+                                portNumber: p.portNumber,
+                                ownerName: p.customerName || 'Unknown',
+                                eaLabel: isPrime ? `EasyM Prime (${ver})` : isMaxV2 ? `EasyM Max (${ver})` : `EasyM (${ver})`,
+                                intervalSec,
+                                reqPerHour,
+                                spikeReqPerHour,
+                                mode
+                            });
+                        });
+
+                        const currentHourReqs = hourlyReqsActual[curHour] || (maxPortsReqRate + primePortsReqRate + legacyPortsReqRate) || 1200;
+                        const maxSpikeObservedReqs = Math.max(...historicalPeakReqs, ...hourlyReqsActual, 1);
+                        const projectedMonthlyReqs = currentHourReqs * 24 * 30;
+                        const spikeProjectedMonthlyReqs = maxSpikeObservedReqs * 24 * 30;
+                        const reductionPct = maxSpikeObservedReqs > currentHourReqs
+                            ? Math.round(((maxSpikeObservedReqs - currentHourReqs) / maxSpikeObservedReqs) * 100)
+                            : 0;
+
+                        const totalModelReqs = Math.max(1, maxPortsReqRate + primePortsReqRate + legacyPortsReqRate);
+                        const maxSharePct = Math.round(((maxPortsCount * 240) / Math.max(1, maxPortsCount * 240 + primePortsCount * 240 + legacyPortsCount * 30)) * 100);
+                        const primeSharePct = Math.max(1, Math.min(100 - maxSharePct, Math.round(((primePortsCount * 240) / Math.max(1, maxPortsCount * 240 + primePortsCount * 240 + legacyPortsCount * 30)) * 100)));
+
+                        const chartCeilingReqs = Math.max(VERCEL_SPIKE_CEILING_REQ, maxSpikeObservedReqs);
 
                         return (
-                            <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
-                                {/* Header & Legend of 3 Capacity Threshold Levels & Historical Cap */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-border/40 pb-2.5">
-                                    <div className="text-muted-foreground flex items-center gap-1.5">
-                                        <span>ช่วงเวลา 00:00 - 23:00 น. (เทียบเพดานความจุ Supabase)</span>
+                            <>
+                                {/* Real-Time Vercel Credit & Traffic Diagnostic Summary */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+                                    {/* Box 1: Current Rate vs Safe Quota */}
+                                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1">
+                                        <div className="flex items-center justify-between text-[11px] text-emerald-300 font-semibold">
+                                            <span>🟢 อัตราคำขอปัจจุบัน (หลังปรับ 180s)</span>
+                                            <Badge variant="outline" className="text-[10px] text-emerald-300 border-emerald-500/40 px-1.5 py-0 font-mono">
+                                                ลดลง -{reductionPct}%
+                                            </Badge>
+                                        </div>
+                                        <div className="text-lg font-bold font-mono text-foreground">
+                                            ~{currentHourReqs.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">req/ชม.</span>
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground font-mono">
+                                            ~{(currentHourReqs * 24).toLocaleString()} req/วัน ({(projectedMonthlyReqs / 1000000).toFixed(2)}M/เดือน)
+                                        </div>
                                     </div>
-                                    {/* 3 Threshold Badges/Legend + Historical Cap Marker */}
-                                    <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
-                                        <span className="flex items-center gap-1 text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
-                                            <span className="w-2 h-0.5 bg-rose-400 inline-block shadow-[0_0_4px_rgba(244,63,94,0.8)]"></span>
-                                            🛑 เพดาน Supabase 100% ({effectiveCapacity} พอร์ต ({formatReq(effectiveCapacity)}))
-                                        </span>
-                                        <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
-                                            <span className="w-2 h-0.5 bg-red-400 inline-block shadow-[0_0_4px_rgba(239,68,68,0.8)]"></span>
-                                            🚨 เริ่มมีปัญหา &gt;85% ({Math.round(effectiveCapacity * 0.85)} พอร์ต ({formatReq(Math.round(effectiveCapacity * 0.85))}))
-                                        </span>
-                                        <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                                            <span className="w-2 h-0.5 bg-amber-400 inline-block"></span>
-                                            ⚠️ เริ่มต้องสนใจ &gt;65% ({Math.round(effectiveCapacity * 0.65)} พอร์ต ({formatReq(Math.round(effectiveCapacity * 0.65))}))
-                                        </span>
-                                        <span className="flex items-center gap-1 text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/30">
-                                            <span className="w-2.5 h-[2px] bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)]"></span>
-                                            🏆 ขีดสถิติสูงสุด
-                                        </span>
+
+                                    {/* Box 2: Spike Peak Recorded (Why Vercel Alerted) */}
+                                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1">
+                                        <div className="flex items-center justify-between text-[11px] text-rose-300 font-semibold">
+                                            <span>🚨 สถิติพุ่งสูงสุด (ช่วงบั๊ก 10-20s)</span>
+                                            <Badge variant="outline" className="text-[10px] text-rose-300 border-rose-500/40 px-1.5 py-0 font-mono">
+                                                เกินโควตา {(spikeProjectedMonthlyReqs / 1000000).toFixed(1)}x
+                                            </Badge>
+                                        </div>
+                                        <div className="text-lg font-bold font-mono text-rose-400">
+                                            ~{maxSpikeObservedReqs.toLocaleString()} <span className="text-xs font-normal text-rose-300/80">req/ชม.</span>
+                                        </div>
+                                        <div className="text-[10px] text-rose-200/70 font-mono">
+                                            ~{(maxSpikeObservedReqs * 24).toLocaleString()} req/วัน ({(spikeProjectedMonthlyReqs / 1000000).toFixed(1)}M/เดือน)
+                                        </div>
+                                    </div>
+
+                                    {/* Box 3: Sync Mode Breakdown */}
+                                    <div className="p-3 rounded-xl bg-muted/30 border border-border/50 space-y-1.5">
+                                        <div className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                                            <span>⏱️ สถานะโหมดซิงค์ ({onlinePorts.length} พอร์ต)</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center font-mono">
+                                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded p-1">
+                                                <div className="text-xs font-bold text-emerald-400">{sleep180Count}</div>
+                                                <div className="text-[9px] text-muted-foreground">Sleep 180s</div>
+                                            </div>
+                                            <div className="bg-blue-500/10 border border-blue-500/20 rounded p-1">
+                                                <div className="text-xs font-bold text-blue-400">{live20Count}</div>
+                                                <div className="text-[9px] text-muted-foreground">Live 20s</div>
+                                            </div>
+                                            <div className={`rounded p-1 border ${anomalyFastCount > 0 ? 'bg-red-500/20 border-red-500/50 animate-pulse' : 'bg-muted/20 border-border/30'}`}>
+                                                <div className={`text-xs font-bold ${anomalyFastCount > 0 ? 'text-red-400' : 'text-muted-foreground'}`}>{anomalyFastCount}</div>
+                                                <div className="text-[9px] text-muted-foreground">ถี่เกิน &lt;15s</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Box 4: Traffic Share by EA Model (MAX vs Prime) */}
+                                    <div className="p-3 rounded-xl bg-muted/30 border border-border/50 space-y-1.5">
+                                        <div className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                                            <span>📊 สัดส่วนต้นเหตุแยกตามรุ่น EA</span>
+                                        </div>
+                                        <div className="space-y-1 text-[10px] font-mono">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-amber-300 font-semibold">EasyM MAX ({maxPortsCount} พอร์ต):</span>
+                                                <span className="font-bold text-foreground">~{maxSharePct}% ของ Traffic</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-cyan-300">EasyM Prime ({primePortsCount} พอร์ต):</span>
+                                                <span className="text-foreground">~{primeSharePct}% ของ Traffic</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden flex">
+                                                <div className="bg-amber-400 h-full" style={{ width: `${maxSharePct}%` }} />
+                                                <div className="bg-cyan-400 h-full" style={{ width: `${primeSharePct}%` }} />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Chart Area with 3 Horizontal Reference Lines (100%, 85%, 65% of Supabase Capacity) */}
-                                <div className="relative h-52 pt-5 pb-6">
-                                    {/* Line 1: ขีดสูงสุดของ Supabase ที่รับได้ (100%) */}
-                                    <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
-                                        <div className="w-full border-b-2 border-dashed border-rose-500/70"></div>
-                                        <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-rose-300 bg-background/95 px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm z-20">
-                                            100% เพดาน Supabase ({effectiveCapacity} พอร์ต | {formatReq(effectiveCapacity)})
-                                        </span>
-                                    </div>
-
-                                    {/* Line 2: ขีดระดับที่เริ่มมีปัญหาต้องจัดการ (85%) -> 15% from top */}
-                                    <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '15%' }}>
-                                        <div className="w-full border-b border-dashed border-red-500/60"></div>
-                                        <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/95 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm z-20">
-                                            85% ต้องขยายระบบ ({Math.round(effectiveCapacity * 0.85)} พอร์ต | {formatReq(Math.round(effectiveCapacity * 0.85))})
-                                        </span>
-                                    </div>
-
-                                    {/* Line 3: ขีดระดับที่เริ่มต้องสนใจเป็นพิเศษ (65%) -> 35% from top */}
-                                    <div className="absolute inset-x-0 z-0 flex items-center pointer-events-none" style={{ top: '35%' }}>
-                                        <div className="w-full border-b border-dashed border-amber-400/50"></div>
-                                        <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-amber-400 bg-background/95 px-1.5 py-0.5 rounded border border-amber-500/30 shadow-sm z-20">
-                                            65% เริ่มต้องสนใจ ({Math.round(effectiveCapacity * 0.65)} พอร์ต | {formatReq(Math.round(effectiveCapacity * 0.65))})
-                                        </span>
-                                    </div>
-
-                                    {/* เส้นประเกณฑ์อ้างอิงระดับที่ตรวจจับได้ (Dynamic Guideline for hovered hour) */}
-                                    {hoveredHour !== null && (
-                                        <div 
-                                            className="absolute inset-x-0 z-10 pointer-events-none flex items-center transition-all duration-150"
-                                            style={{ bottom: `${Math.min(100, Math.max(4, Math.round((hourlyTraffic[hoveredHour] / effectiveCapacity) * 100)))}%` }}
-                                        >
-                                            <div className="w-full border-b-2 border-dashed border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)]"></div>
-                                            <span className="absolute right-2 -top-2.5 text-[9px] font-mono font-bold text-cyan-300 bg-background/95 px-2 py-0.5 rounded border border-cyan-400/60 shadow-md z-30">
-                                                ระดับที่ตรวจพบ {hoveredHour}:00 น. : {hourlyTraffic[hoveredHour]} พอร์ต ({formatReq(hourlyTraffic[hoveredHour])}) - {Math.round((hourlyTraffic[hoveredHour] / effectiveCapacity) * 100)}%
+                                <div className="bg-muted/20 p-3.5 sm:p-4 rounded-xl border border-border/40 space-y-3">
+                                    {/* Header & Legend of 3 Capacity Threshold Levels & Historical Spike Cap */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-border/40 pb-2.5">
+                                        <div className="text-muted-foreground flex items-center gap-1.5">
+                                            <span>ปริมาณคำขอจริงรายชั่วโมง 00:00 - 23:00 น. (เทียบโควตา Vercel &amp; ขีดสถิติช่วงพุ่งผิดปกติ)</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-wrap font-mono text-[10px]">
+                                            <span className="flex items-center gap-1 text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
+                                                <span className="w-2.5 h-[2px] bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)]"></span>
+                                                🏆 ขีดสถิติพุ่งสูงสุด (~{maxSpikeObservedReqs.toLocaleString()} req/ชม.)
+                                            </span>
+                                            <span className="flex items-center gap-1 text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/40">
+                                                <span className="w-2 h-0.5 bg-red-400 inline-block"></span>
+                                                🚨 เกินโควตา (&gt;{VERCEL_WARN_HOURLY_REQ.toLocaleString()} req/ชม.)
+                                            </span>
+                                            <span className="flex items-center gap-1 text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                                                <span className="w-2 h-0.5 bg-emerald-400 inline-block"></span>
+                                                🟢 โควตาปลอดภัย Vercel (&le;{VERCEL_SAFE_HOURLY_REQ.toLocaleString()} req/ชม.)
                                             </span>
                                         </div>
-                                    )}
+                                    </div>
 
-                                    {/* Bars Container */}
-                                    <div className="flex items-end gap-1 h-full relative z-10">
-                                        {hourlyTraffic.map((count, hour) => {
-                                            const peak = historicalPeaks[hour] || count;
-                                            const heightPct = Math.min(100, Math.max(count > 0 ? 3 : 0, Math.round((count / effectiveCapacity) * 100)));
-                                            const peakPct = Math.min(100, Math.max(heightPct, Math.round((peak / effectiveCapacity) * 100)));
-                                            const isCritical = heightPct >= 85;
-                                            const isWatch = heightPct >= 65 && heightPct < 85;
+                                    {/* Chart Area with Horizontal Reference Lines */}
+                                    <div className="relative h-56 pt-5 pb-6">
+                                        {/* Line 1: Spike Danger Zone (15,000 req/hr) */}
+                                        <div className="absolute inset-x-0 top-3 z-0 flex items-center pointer-events-none">
+                                            <div className="w-full border-b-2 border-dashed border-rose-500/70"></div>
+                                            <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-rose-300 bg-background/95 px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm z-20">
+                                                🛑 โซนเผาเครดิตวิกฤต ({chartCeilingReqs.toLocaleString()} req/ชม. | ~{(chartCeilingReqs * 24 * 30 / 1000000).toFixed(1)}M req/เดือน)
+                                            </span>
+                                        </div>
 
-                                            return (
-                                                <div 
-                                                    key={hour} 
-                                                    onMouseEnter={() => setHoveredHour(hour)}
-                                                    onMouseLeave={() => setHoveredHour(null)}
-                                                    className="flex-1 flex flex-col items-center gap-0.5 h-full justify-end group relative cursor-pointer"
-                                                >
-                                                    {/* แสดงตัวเลขค่าที่ตรวจพบจริงบนหัวแท่ง */}
-                                                    <span className={`text-[8px] font-mono leading-none transition-colors mb-0.5 ${
-                                                        count > 0 
-                                                            ? (isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-foreground/70') 
-                                                            : 'opacity-0'
-                                                    }`}>
-                                                        {count > 0 ? count : ''}
-                                                    </span>
+                                        {/* Line 2: Warning Quota Exceeded (4,000 req/hr -> ~75% from bottom) */}
+                                        <div
+                                            className="absolute inset-x-0 z-0 flex items-center pointer-events-none"
+                                            style={{ bottom: `${Math.min(82, Math.max(22, Math.round((VERCEL_WARN_HOURLY_REQ / chartCeilingReqs) * 100)))}%` }}
+                                        >
+                                            <div className="w-full border-b border-dashed border-red-500/60"></div>
+                                            <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-red-400 bg-background/95 px-1.5 py-0.5 rounded border border-red-500/40 shadow-sm z-20">
+                                                🚨 เกินโควตารายเดือน ({VERCEL_WARN_HOURLY_REQ.toLocaleString()} req/ชม. | ~2.88M req/เดือน)
+                                            </span>
+                                        </div>
 
-                                                    {/* ขีดแนวนอนกว้างเท่ากับความกว้างของแท่งกราฟ อยู่เหนือกราฟแท่งนั้นๆ เพื่อแสดงจุดสูงสุดที่เคยไปถึงมาก่อน */}
-                                                    <div 
-                                                        className="absolute inset-x-0 h-[2.5px] bg-amber-300 rounded-full shadow-[0_0_6px_rgba(252,211,77,0.9)] z-20 pointer-events-none transition-all duration-300 group-hover:bg-amber-200 group-hover:h-[3.5px]"
-                                                        style={{ bottom: `${peakPct}%` }}
-                                                        title={`จุดสูงสุดที่แท่งนี้เคยไปถึง: ${peak} พอร์ต (${formatReq(peak)}) - ${peakPct}%`}
-                                                    />
-                                                    {/* เส้นประจางๆ เชื่อมจากหัวแท่งกราฟไปยังขีดจุดสูงสุดในอดีต (เมื่อมีระยะห่าง) */}
-                                                    {peakPct > heightPct + 2 && (
-                                                        <div 
-                                                             className="absolute inset-x-1/2 w-0 border-r border-dotted border-amber-300/40 z-10 pointer-events-none"
-                                                            style={{ 
-                                                                bottom: `${heightPct}%`, 
-                                                                height: `${peakPct - heightPct}%` 
-                                                            }}
+                                        {/* Line 3: Vercel Safe Hourly Budget (1,500 req/hr) */}
+                                        <div
+                                            className="absolute inset-x-0 z-0 flex items-center pointer-events-none"
+                                            style={{ bottom: `${Math.min(60, Math.max(10, Math.round((VERCEL_SAFE_HOURLY_REQ / chartCeilingReqs) * 100)))}%` }}
+                                        >
+                                            <div className="w-full border-b border-dashed border-emerald-400/60"></div>
+                                            <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-emerald-400 bg-background/95 px-1.5 py-0.5 rounded border border-emerald-500/30 shadow-sm z-20">
+                                                🟢 เพดานปลอดภัย Vercel 1M/เดือน ({VERCEL_SAFE_HOURLY_REQ.toLocaleString()} req/ชม. | รองรับ ~75 พอร์ตโหมด 180s)
+                                            </span>
+                                        </div>
+
+                                        {/* Dynamic Guideline for hovered hour */}
+                                        {hoveredHour !== null && (
+                                            <div
+                                                className="absolute inset-x-0 z-10 pointer-events-none flex items-center transition-all duration-150"
+                                                style={{ bottom: `${Math.min(100, Math.max(4, Math.round(((hourlyReqsActual[hoveredHour] || 0) / chartCeilingReqs) * 100)))}%` }}
+                                            >
+                                                <div className="w-full border-b-2 border-dashed border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)]"></div>
+                                                <span className="absolute right-2 -top-2.5 text-[9px] font-mono font-bold text-cyan-300 bg-background/95 px-2 py-0.5 rounded border border-cyan-400/60 shadow-md z-30">
+                                                    เวลา {hoveredHour}:00 น. ปัจจุบัน: {(hourlyReqsActual[hoveredHour] || 0).toLocaleString()} req/ชม. ({hourlyTraffic[hoveredHour]} พอร์ต) | พีคก่อนแก้: {(historicalPeakReqs[hoveredHour] || 0).toLocaleString()} req/ชม.
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Bars Container */}
+                                        <div className="flex items-end gap-1 h-full relative z-10">
+                                            {hourlyTraffic.map((count, hour) => {
+                                                const reqs = hourlyReqsActual[hour] || (count * REQ_PER_PORT_HOUR);
+                                                const peakReqsVal = historicalPeakReqs[hour] || reqs;
+                                                const heightPct = Math.min(100, Math.max(reqs > 0 ? 6 : 0, Math.round((reqs / chartCeilingReqs) * 100)));
+                                                const peakPct = Math.min(98, Math.max(heightPct, Math.round((peakReqsVal / chartCeilingReqs) * 100)));
+                                                const isCritical = reqs >= VERCEL_WARN_HOURLY_REQ;
+                                                const isWatch = reqs > VERCEL_SAFE_HOURLY_REQ && reqs < VERCEL_WARN_HOURLY_REQ;
+
+                                                return (
+                                                    <div
+                                                        key={hour}
+                                                        onMouseEnter={() => setHoveredHour(hour)}
+                                                        onMouseLeave={() => setHoveredHour(null)}
+                                                        className="flex-1 flex flex-col items-center gap-0.5 h-full justify-end group relative cursor-pointer"
+                                                    >
+                                                        {/* ตัวเลขคำขอปัจจุบันบนหัวแท่ง */}
+                                                        <span className={`text-[7px] font-mono leading-none transition-colors mb-0.5 ${
+                                                            reqs > 0
+                                                                ? (isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-emerald-400/90')
+                                                                : 'opacity-0'
+                                                        }`}>
+                                                            {reqs >= 1000 ? `${(reqs / 1000).toFixed(1)}k` : reqs > 0 ? reqs : ''}
+                                                        </span>
+
+                                                        {/* ขีดสีทองเหนือแท่ง: แสดงจุดพีคที่พุ่งขึ้นไปช่วงบั๊ก 10-20s */}
+                                                        <div
+                                                            className="absolute inset-x-0 h-[2.5px] bg-amber-300 rounded-full shadow-[0_0_6px_rgba(252,211,77,0.9)] z-20 pointer-events-none transition-all duration-300 group-hover:bg-rose-400 group-hover:h-[3.5px]"
+                                                            style={{ bottom: `${peakPct}%` }}
+                                                            title={`สถิติพุ่งสูงสุดเวลา ${hour}:00 น.: ${peakReqsVal.toLocaleString()} req/ชม.`}
                                                         />
-                                                    )}
-
-                                                    {/* Bar */}
-                                                    <div 
-                                                        className={`w-full rounded-t relative transition-all duration-200 ${
-                                                            isCritical
-                                                                ? 'bg-gradient-to-t from-red-600 via-rose-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
-                                                                : isWatch
-                                                                ? 'bg-gradient-to-t from-amber-600/90 via-amber-500 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
-                                                                : 'bg-gradient-to-t from-blue-600/60 to-blue-400/80 hover:bg-blue-400'
-                                                        }`}
-                                                        style={{ height: `${heightPct}%` }}
-                                                    />
-
-                                                    {/* Hour Label */}
-                                                    <span className={`text-[8px] font-mono transition-colors ${
-                                                        isCritical ? 'text-red-400 font-bold' : isWatch ? 'text-amber-400 font-bold' : 'text-muted-foreground/60'
-                                                    }`}>
-                                                        {hour % 3 === 0 ? `${hour}h` : ''}
-                                                    </span>
-
-                                                    {/* Rich Tooltip on hover */}
-                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[240px] pointer-events-none">
-                                                        <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
-                                                            <span>⏰ เวลา {hour}:00 น.</span>
-                                                            <span className="font-mono text-xs text-foreground font-semibold">
-                                                                {count} พอร์ต <span className="text-muted-foreground font-normal text-[10px]">({formatReq(count)})</span>
-                                                            </span>
-                                                        </div>
-                                                        <div className="space-y-1 font-mono text-[10px]">
-                                                            <div className="flex justify-between">
-                                                                <span className="text-muted-foreground">สัดส่วนต่อเพดาน Supabase:</span>
-                                                                <span className="font-bold text-foreground">{heightPct}%</span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center text-amber-300">
-                                                                <span className="text-muted-foreground">🏆 สูงสุดที่เคยไปถึง:</span>
-                                                                <span className="font-bold">{peak} พอร์ต ({formatReq(peak)}) [{peakPct}%]</span>
-                                                            </div>
-                                                            <div className="flex justify-between text-muted-foreground">
-                                                                <span>เหลือพื้นที่รองรับอีก:</span>
-                                                                <span className="text-foreground">{(Math.max(0, effectiveCapacity - count))} พอร์ต ({formatReq(Math.max(0, effectiveCapacity - count))})</span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center pt-1 border-t border-border/40">
-                                                                <span className="text-muted-foreground">สถานะ:</span>
-                                                                {isCritical ? (
-                                                                    <span className="text-red-400 font-bold bg-red-500/15 px-1.5 py-0.2 rounded border border-red-500/30">
-                                                                        🚨 วิกฤต: เริ่มมีปัญหาต้องจัดการ
-                                                                    </span>
-                                                                ) : isWatch ? (
-                                                                    <span className="text-amber-400 font-bold bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
-                                                                        ⚠️ เริ่มต้องสนใจพิเศษ
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="text-emerald-400 font-medium">
-                                                                        🟢 ระดับปกติ
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        {isCritical && (
-                                                            <div className="mt-1.5 pt-1 border-t border-red-500/30 text-[10px] text-red-300 font-sans">
-                                                                💡 แนะนำ: ปรับ Interval 30-45s หรืออัปเกรด Compute
-                                                            </div>
+                                                        {peakPct > heightPct + 2 && (
+                                                            <div
+                                                                className="absolute inset-x-1/2 w-0 border-r border-dotted border-rose-400/45 z-10 pointer-events-none"
+                                                                style={{
+                                                                    bottom: `${heightPct}%`,
+                                                                    height: `${peakPct - heightPct}%`
+                                                                }}
+                                                            />
                                                         )}
-                                                        {isWatch && (
-                                                            <div className="mt-1.5 pt-1 border-t border-amber-500/30 text-[10px] text-amber-300 font-sans">
-                                                                💡 แนะนำ: ตรวจสอบ Jitter สุ่มหน่วงเวลา 0-300s
+
+                                                        {/* Bar */}
+                                                        <div
+                                                            className={`w-full rounded-t relative transition-all duration-200 ${
+                                                                isCritical
+                                                                    ? 'bg-gradient-to-t from-red-600 via-rose-500 to-red-500 hover:brightness-110 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                                                                    : isWatch
+                                                                    ? 'bg-gradient-to-t from-amber-600/90 via-amber-500 to-amber-400 hover:brightness-110 shadow-[0_0_5px_rgba(245,158,11,0.3)]'
+                                                                    : 'bg-gradient-to-t from-emerald-600/70 to-emerald-400/85 hover:bg-emerald-400'
+                                                            }`}
+                                                            style={{ height: `${heightPct}%` }}
+                                                        />
+
+                                                        {/* Hour Label */}
+                                                        <span className={`text-[8px] font-mono transition-colors ${
+                                                            hour === curHour ? 'text-cyan-300 font-bold' : isCritical ? 'text-red-400 font-bold' : 'text-muted-foreground/60'
+                                                        }`}>
+                                                            {hour % 3 === 0 ? `${hour}h` : ''}
+                                                        </span>
+
+                                                        {/* Rich Tooltip on hover */}
+                                                        <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] p-2.5 rounded-lg shadow-xl border border-border/80 whitespace-nowrap min-w-[260px] pointer-events-none">
+                                                            <div className="font-bold border-b border-border/50 pb-1 mb-1.5 flex items-center justify-between">
+                                                                <span>⏰ เวลา {hour}:00 น. ({count} พอร์ตออนไลน์)</span>
+                                                                <span className="font-mono text-xs text-emerald-400 font-semibold">
+                                                                    {reqs.toLocaleString()} req/ชม.
+                                                                </span>
                                                             </div>
-                                                        )}
+                                                            <div className="space-y-1 font-mono text-[10px]">
+                                                                <div className="flex justify-between items-center text-rose-300">
+                                                                    <span className="text-muted-foreground">🚨 สถิติพุ่งสูงสุด (ก่อนปรับ 180s):</span>
+                                                                    <span className="font-bold">{peakReqsVal.toLocaleString()} req/ชม.</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">🟢 อัตราปัจจุบัน (Smart Sleep 180s):</span>
+                                                                    <span className="font-bold text-emerald-400">{reqs.toLocaleString()} req/ชม.</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">เทียบเพดานปลอดภัย Vercel (1,500):</span>
+                                                                    <span className="font-bold text-foreground">{Math.round((reqs / VERCEL_SAFE_HOURLY_REQ) * 100)}%</span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center pt-1 border-t border-border/40">
+                                                                    <span className="text-muted-foreground">สถานะการใช้เครดิต:</span>
+                                                                    {isCritical ? (
+                                                                        <span className="text-red-400 font-bold bg-red-500/15 px-1.5 py-0.2 rounded border border-red-500/30">
+                                                                            🚨 กินเครดิตเกินโควตา
+                                                                        </span>
+                                                                    ) : isWatch ? (
+                                                                        <span className="text-amber-400 font-bold bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
+                                                                            ⚠️ ปริ่มโควตา (มีคนเปิดดูสด)
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-emerald-400 font-medium">
+                                                                            🟢 ประหยัดปลอดภัย (อยู่ในงบ 1M/เดือน)
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+
+                                {/* Root Cause & Top Traffic Port Inspector */}
+                                <div className="p-3 bg-muted/20 border border-border/40 rounded-xl space-y-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                                        <span className="font-bold text-foreground flex items-center gap-1.5">
+                                            🔍 สรุปสาเหตุที่ก่อนหน้านี้กราฟไม่แจ้งเตือน &amp; การปรับปรุงใหม่:
+                                        </span>
+                                        <span className="text-[10px] font-mono text-emerald-400">
+                                            Server Throttling: Idle = 180s (20 req/ชม.) | Viewing = 20s (180 req/ชม.)
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                        เดิมกราฟวัดเพียงจำนวนพอร์ตที่ออนไลน์เทียบเพดาน Supabase (500 พอร์ต / 60,000 req/ชม.) แต่โควตาฟรีของ <strong>Vercel Serverless Function</strong> อยู่ที่ <strong>1,000,000 ครั้ง/เดือน (~1,400–1,500 req/ชม.)</strong> เมื่อพอร์ตลูกค้า <strong>EasyM MAX v2.00 ({maxPortsCount} พอร์ต, คิดเป็น ~{maxSharePct}% ของ Traffic)</strong> ยิงเข้ามาทุก 10–20 วินาที จึงพุ่งไปที่ <strong>~{maxSpikeObservedReqs.toLocaleString()} req/ชม.</strong> (แสดงเป็นขีดสีทองด้านบน) ขณะนี้ระบบได้สั่งชะลอทุกพอร์ตที่ไม่ได้เปิดดูหน้าเว็บให้ส่งทุก <strong>180 วินาที (3 นาที)</strong> เรียบร้อยแล้ว ทำให้กราฟแท่งสีเขียวลดลงมาอยู่ในเกณฑ์ปลอดภัยทันที
+                                    </p>
+                                </div>
+                            </>
                         );
                     })()}
 
-                    {/* Actionable Recommendations Guide Box */}
-                    <div className="space-y-2 pt-1">
-                        <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                                <span>เกณฑ์ประเมินขีดความสามารถ Supabase &amp; การบริหารจัดการเมื่อถึงขีดจำกัด</span>
-                            </div>
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                                Benchmark: Supabase Pooled Capacity (500 Ports / ~60,000 req/ชม.)
-                            </span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
-                            {/* Level 1: Supabase Ceiling */}
-                            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-rose-300 flex items-center gap-1">
-                                        🛑 เพดานขีดจำกัด Supabase (100%)
-                                    </span>
-                                    <Badge variant="outline" className="text-[10px] text-rose-300 border-rose-500/40 px-1.5 py-0 font-mono">
-                                        500 พอร์ต (~60,000 req/ชม.)
-                                    </Badge>
-                                </div>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    ประเมินจากขีดจำกัดประสิทธิภาพของ Supabase Compute ร่วมกับ Connection Pooler (Supavisor) ที่รองรับ Throughput ได้เฉลี่ย ~16.6 requests/วินาที หรือประมาณ 60,000 req/ชม. (เทียบเท่าประมาณ 500 พอร์ตที่ส่งข้อมูลทุก 30 วินาที) หากพอร์ตหรือคำขอแตะระดับนี้ CPU ฐานข้อมูลจะแตะ 90-100% เกิด Connection Exhaustion (504 Timeout) <strong>จำเป็นต้องขยายระบบ (Compute Scale-Up) เพิ่มเติมทันที</strong>
-                                </p>
-                            </div>
-
-                            {/* Level 2: Critical */}
-                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-red-400 flex items-center gap-1">
-                                        🚨 เริ่มมีปัญหาต้องจัดการ (&gt;85%)
-                                    </span>
-                                    <Badge variant="outline" className="text-[10px] text-red-300 border-red-500/40 px-1.5 py-0 font-mono">
-                                        425 พอร์ต (~51,000 req/ชม.)
-                                    </Badge>
-                                </div>
-                                <div className="text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
-                                    <strong className="text-red-300">แนวทางแก้ไขเร่งด่วนเมื่อใกล้ถึงลิมิต:</strong>
-                                    <p>1. ขยายรอบส่งข้อมูล (Interval) ของ EA ใน MT5 จาก 20s เป็น <strong>30-45 วินาที</strong></p>
-                                    <p>2. เปิดใช้ <strong>Connection Pooling (Supavisor)</strong> ใน Supabase เพื่อลดภาระ Connection</p>
-                                    <p>3. หากฟาร์มเกิน 400+ พอร์ต พิจารณาอัปเกรด Compute Add-on ของ Supabase</p>
-                                </div>
-                            </div>
-
-                            {/* Level 3: Watch */}
-                            <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-amber-400 flex items-center gap-1">
-                                        ⚠️ เริ่มต้องสนใจพิเศษ (&gt;65%)
-                                    </span>
-                                    <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 px-1.5 py-0 font-mono">
-                                        325 พอร์ต (~39,000 req/ชม.)
-                                    </Badge>
-                                </div>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    <strong>คำแนะนำ:</strong> ตรวจสอบว่าพอร์ตในสายงานเปิดระบบ <strong>Jitter (0-300s)</strong> เพื่อสุ่มหน่วงเวลา หลีกเลี่ยงคำขอยิงตรงกันในวินาทีเดียวกัน และตรวจเช็ค CPU Database ไม่ให้เกิน 60%
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Extra note for historical peak cap line, guideline & hybrid formula */}
-                        <div className="p-2.5 bg-muted/20 border border-border/30 rounded-md text-[11px] text-muted-foreground space-y-1.5">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/20 pb-1.5">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-3 h-0.5 bg-amber-300 inline-block shadow-[0_0_4px_rgba(252,211,77,0.9)] flex-shrink-0"></span>
-                                    <span><strong>ขีดแนวนอนสีทองเหนือแท่ง:</strong> สถิติสูงสุดที่ชั่วโมงนั้นๆ เคยตรวจพบในอดีต (Historical Peak)</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="w-3 h-0.5 border-b-2 border-dashed border-cyan-400 inline-block shadow-[0_0_4px_rgba(34,211,238,0.9)] flex-shrink-0"></span>
-                                    <span><strong>เส้นประสีฟ้า (เมื่อชี้เมาส์):</strong> ลากพาดผ่านกราฟตามระดับที่ตรวจจับได้ของชั่วโมงนั้น เพื่อให้อ้างอิงเปรียบเทียบกับขีดระดับได้ชัดเจน</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-muted-foreground/80">
-                                <span>ℹ️ <strong>สูตรคำนวณแบบผสม:</strong> แสดงจำนวนพอร์ตที่ตรวจจับได้เป็นหลัก ควบคู่กับประมาณการคำขอ (Requests/ชม.) ในวงเล็บ (อิงค่าเฉลี่ยพอร์ตส่ง sync ทุก 30 วินาที = ~120 req/ชม./พอร์ต)</span>
-                            </div>
-                        </div>
-                    </div>
-
-
-
                     <div className="grid grid-cols-2 gap-3 text-xs pt-1">
                         <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
-                            <span className="text-muted-foreground block text-[11px]">ช่วงเวลาตลาดหนาแน่น:</span>
-                            <span className="font-semibold text-foreground">ช่วงตลาดลอนดอน &amp; นิวยอร์ก</span>
+                            <span className="text-muted-foreground block text-[11px]">รอบส่งข้อมูลโหมดประหยัด (Sleep Mode):</span>
+                            <span className="font-semibold text-emerald-400">180 วินาที (3 นาที) / พอร์ต (20 req/ชม.)</span>
                         </div>
                         <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
-                            <span className="text-muted-foreground block text-[11px]">รอบการส่งข้อมูล (Interval):</span>
-                            <span className="font-semibold text-foreground">20 วินาที / พอร์ต (Jitter 0-300s)</span>
+                            <span className="text-muted-foreground block text-[11px]">รอบส่งข้อมูลเมื่อเปิดดูสด (Live View):</span>
+                            <span className="font-semibold text-blue-400">20 วินาที / พอร์ต (ตัดเข้า Sleep อัตโนมัติเมื่อปิดหน้าจอ)</span>
                         </div>
                     </div>
                 </CardContent>

@@ -4,6 +4,204 @@ import { getPortControl } from '@/lib/farm-control/store';
 
 export const dynamic = 'force-dynamic';
 
+interface PortTelemetryStat {
+    portNumber: string;
+    reqsToday: number;
+    lastPingMs: number;
+    lastIntervalSec: number;
+    avgIntervalSec: number;
+    assignedIntervalSec: number;
+    mode: 'LIVE_20S' | 'SLEEP_180S' | 'ANOMALY_FAST';
+    eaVersion: string;
+    systemCode: string;
+}
+
+interface TrafficTelemetryState {
+    dateKey: string;
+    hourlyReqs: number[];
+    hourlyPeakReqs: number[];
+    totalReqsToday: number;
+    byModel: Record<string, number>;
+    ports: Record<string, PortTelemetryStat>;
+    lastFlushMs: number;
+    hydrated: boolean;
+}
+
+function getBangkokDateAndHour(nowMs: number = Date.now()): { dateKey: string; hour: number } {
+    const bkk = new Date(nowMs + 7 * 3600 * 1000);
+    return {
+        dateKey: bkk.toISOString().slice(0, 10),
+        hour: bkk.getUTCHours()
+    };
+}
+
+const initBkk = getBangkokDateAndHour();
+const trafficState: TrafficTelemetryState = {
+    dateKey: initBkk.dateKey,
+    hourlyReqs: Array(24).fill(0),
+    hourlyPeakReqs: Array(24).fill(0),
+    totalReqsToday: 0,
+    byModel: {},
+    ports: {},
+    lastFlushMs: 0,
+    hydrated: false
+};
+
+async function hydrateTrafficStateIfNeeded() {
+    if (trafficState.hydrated) return;
+    trafficState.hydrated = true;
+    try {
+        const { data } = await supabase
+            .from('fleet_capital_snapshots')
+            .select('snapshot_meta')
+            .eq('period_key', 'mt5_traffic_telemetry')
+            .maybeSingle();
+
+        const meta = data?.snapshot_meta as any;
+        if (meta && typeof meta === 'object') {
+            const { dateKey } = getBangkokDateAndHour();
+            if (Array.isArray(meta.hourlyPeakReqs) && meta.hourlyPeakReqs.length === 24) {
+                for (let h = 0; h < 24; h++) {
+                    trafficState.hourlyPeakReqs[h] = Math.max(trafficState.hourlyPeakReqs[h], Number(meta.hourlyPeakReqs[h] || 0));
+                }
+            }
+            if (meta.dateKey === dateKey) {
+                if (Array.isArray(meta.hourlyReqs) && meta.hourlyReqs.length === 24) {
+                    for (let h = 0; h < 24; h++) {
+                        trafficState.hourlyReqs[h] += Number(meta.hourlyReqs[h] || 0);
+                        trafficState.hourlyPeakReqs[h] = Math.max(trafficState.hourlyPeakReqs[h], trafficState.hourlyReqs[h]);
+                    }
+                }
+                trafficState.totalReqsToday += Number(meta.totalReqsToday || 0);
+                if (meta.byModel && typeof meta.byModel === 'object') {
+                    for (const [k, v] of Object.entries(meta.byModel)) {
+                        trafficState.byModel[k] = (trafficState.byModel[k] || 0) + Number(v || 0);
+                    }
+                }
+                if (meta.ports && typeof meta.ports === 'object') {
+                    for (const [pKey, pVal] of Object.entries(meta.ports as Record<string, PortTelemetryStat>)) {
+                        if (!trafficState.ports[pKey]) {
+                            trafficState.ports[pKey] = pVal;
+                        } else {
+                            trafficState.ports[pKey].reqsToday += Number(pVal.reqsToday || 0);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // Ignore hydration errors
+    }
+}
+
+function recordIncomingSyncTelemetry(
+    portNumber: string,
+    rawSystemCode: string,
+    eaVersion: string,
+    isViewerActive: boolean,
+    assignedIntervalSec: number
+) {
+    const nowMs = Date.now();
+    const { dateKey, hour } = getBangkokDateAndHour(nowMs);
+
+    if (trafficState.dateKey !== dateKey) {
+        trafficState.dateKey = dateKey;
+        trafficState.hourlyReqs = Array(24).fill(0);
+        trafficState.totalReqsToday = 0;
+        trafficState.byModel = {};
+        trafficState.ports = {};
+    }
+
+    trafficState.hourlyReqs[hour] = (trafficState.hourlyReqs[hour] || 0) + 1;
+    if (trafficState.hourlyReqs[hour] > (trafficState.hourlyPeakReqs[hour] || 0)) {
+        trafficState.hourlyPeakReqs[hour] = trafficState.hourlyReqs[hour];
+    }
+    trafficState.totalReqsToday += 1;
+
+    const cleanSys = String(rawSystemCode || 'EasyM').split(':::')[0].trim();
+    const modelLabel = cleanSys.toLowerCase().includes('prime')
+        ? 'EasyM Prime'
+        : cleanSys.toLowerCase().includes('max') || eaVersion.includes('2.00')
+            ? `EasyM Max (${eaVersion})`
+            : `${cleanSys} (${eaVersion})`;
+
+    trafficState.byModel[modelLabel] = (trafficState.byModel[modelLabel] || 0) + 1;
+
+    const prev = trafficState.ports[portNumber];
+    let lastIntervalSec = assignedIntervalSec;
+    let avgIntervalSec = assignedIntervalSec;
+
+    if (prev && prev.lastPingMs > 0) {
+        const diffSec = Math.max(1, Math.round((nowMs - prev.lastPingMs) / 1000));
+        if (diffSec < 3600) {
+            lastIntervalSec = diffSec;
+            avgIntervalSec = Math.round(prev.avgIntervalSec * 0.6 + diffSec * 0.4);
+        }
+    }
+
+    const reqsToday = (prev?.reqsToday || 0) + 1;
+    let mode: 'LIVE_20S' | 'SLEEP_180S' | 'ANOMALY_FAST' = isViewerActive ? 'LIVE_20S' : 'SLEEP_180S';
+    if (reqsToday >= 3 && avgIntervalSec <= 15 && !isViewerActive) {
+        mode = 'ANOMALY_FAST';
+    } else if (avgIntervalSec <= 45) {
+        mode = 'LIVE_20S';
+    }
+
+    trafficState.ports[portNumber] = {
+        portNumber,
+        reqsToday,
+        lastPingMs: nowMs,
+        lastIntervalSec,
+        avgIntervalSec,
+        assignedIntervalSec,
+        mode,
+        eaVersion,
+        systemCode: cleanSys
+    };
+
+    // Throttled flush to Supabase once every 60 seconds (at most 1 write/minute across the entire fleet)
+    if (nowMs - trafficState.lastFlushMs > 60000) {
+        trafficState.lastFlushMs = nowMs;
+        void (async () => {
+            try {
+                await hydrateTrafficStateIfNeeded();
+                await supabase.from('fleet_capital_snapshots').upsert({
+                    period_key: 'mt5_traffic_telemetry',
+                    period_type: 'telemetry',
+                    active_ports_count: Object.keys(trafficState.ports).length,
+                    snapshot_meta: {
+                        dateKey: trafficState.dateKey,
+                        hourlyReqs: trafficState.hourlyReqs,
+                        hourlyPeakReqs: trafficState.hourlyPeakReqs,
+                        totalReqsToday: trafficState.totalReqsToday,
+                        byModel: trafficState.byModel,
+                        ports: trafficState.ports,
+                        updated_at: new Date(nowMs).toISOString()
+                    }
+                }, { onConflict: 'period_key' });
+            } catch (e) {
+                // Non-critical background telemetry flush
+            }
+        })();
+    }
+}
+
+export async function GET() {
+    await hydrateTrafficStateIfNeeded();
+    return NextResponse.json({
+        success: true,
+        telemetry: {
+            dateKey: trafficState.dateKey,
+            hourlyReqs: trafficState.hourlyReqs,
+            hourlyPeakReqs: trafficState.hourlyPeakReqs,
+            totalReqsToday: trafficState.totalReqsToday,
+            byModel: trafficState.byModel,
+            ports: trafficState.ports,
+            updatedAt: new Date().toISOString()
+        }
+    });
+}
+
 export async function POST(req: Request) {
     try {
         const apiKey = req.headers.get('x-api-key') || req.headers.get('apikey');
@@ -46,6 +244,7 @@ export async function POST(req: Request) {
 
         const nowIso = new Date().toISOString();
         const systemCode = snapshot?.identity?.system_code || payload.system_code || 'EasyM';
+        const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
         const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
 
         let lastViewedAt: string | null = null;
@@ -72,7 +271,6 @@ export async function POST(req: Request) {
 
             const accountType = (snapshot?.account?.currency === 'USC' || payload.account_type === 'USC') ? 'USC' : 'USD';
             const assetType = snapshot?.identity?.product_family || payload.asset_type || 'FOREX';
-            const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
 
             // Seamless dual-storage: Encode primeData into system_code as fallback
             // so telemetry works immediately even before the prime_data DB column is added
@@ -220,6 +418,11 @@ export async function POST(req: Request) {
             }
         }
 
+        const assignedInterval = isViewerActive ? 20 : 180;
+
+        // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
+        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
+
         // 8. Retrieve 2-Way Command & Web Control state for this port
         const webConfig = getPortControl(portNumber);
 
@@ -232,7 +435,7 @@ export async function POST(req: Request) {
             success: true,
             should_sync_full: true,
             viewer_active: isViewerActive,
-            sync_interval: isViewerActive ? 20 : 180,
+            sync_interval: assignedInterval,
             license_tier: isViewerActive ? 'pro' : 'free',
             is_trial: false,
             timestamp: nowIso,
