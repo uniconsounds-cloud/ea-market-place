@@ -265,7 +265,7 @@ function CheckoutContent({ productId }: { productId: string }) {
         });
     };
 
-    const calculateNewExpiry = (currentExpiry: string, type: 'monthly' | 'quarterly' | 'lifetime') => {
+    const calculateNewExpiry = (currentExpiry: string, type: string) => {
         if (type === 'lifetime') return 'ตลอดชีพ';
 
         let startDate = new Date();
@@ -281,6 +281,9 @@ function CheckoutContent({ productId }: { productId: string }) {
             newDate.setMonth(newDate.getMonth() + 1);
         } else if (type === 'quarterly') {
             newDate.setMonth(newDate.getMonth() + 3);
+        } else if (isIbRequest || type === 'ib') {
+            newDate.setMonth(newDate.getMonth() + 6);
+            return `${formatDate(newDate.toISOString())} (ตามรอบอนุมัติ IB ~6 เดือน)`;
         }
 
         return formatDate(newDate.toISOString());

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar, Mail } from 'lucide-react';
+import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar, Mail, RotateCw, RefreshCw } from 'lucide-react';
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
@@ -101,13 +101,42 @@ export default function AdminOrdersPage() {
                 }
             }
 
+            // Fetch Existing Licenses to identify Renewal requests
+            const allPorts = Array.from(new Set(allOrders.flatMap(o => (o.account_number || '').split(',').map((p: string) => p.trim())).filter(Boolean)));
+            let licensesMap: Record<string, any> = {};
+
+            if (allPorts.length > 0) {
+                for (let i = 0; i < allPorts.length; i += 100) {
+                    const chunk = allPorts.slice(i, i + 100);
+                    const { data: licensesChunk } = await supabase
+                        .from('licenses')
+                        .select('id, user_id, product_id, account_number, expiry_date, type, is_active, created_at')
+                        .in('account_number', chunk);
+
+                    if (licensesChunk) {
+                        licensesChunk.forEach(lic => {
+                            const key = `${lic.user_id}_${lic.product_id}_${lic.account_number?.trim()}`;
+                            licensesMap[key] = lic;
+                        });
+                    }
+                }
+            }
+
             const mappedData = allOrders.map(o => {
                 const port = o.account_number?.trim();
                 const key = `${o.user_id}_${port}`;
                 const matchedBroker = ibMembershipsMap[key];
+
+                const orderPorts = (o.account_number || '').split(',').map((p: string) => p.trim()).filter(Boolean);
+                const matchingLicenses = orderPorts.map((p: string) => licensesMap[`${o.user_id}_${o.product_id}_${p}`]).filter(Boolean);
+                const isRenewal = matchingLicenses.length > 0;
+                const existingLicense = matchingLicenses[0] || null;
+
                 return {
                     ...o,
-                    ib_broker_name: matchedBroker || o.ib_broker_name || undefined
+                    ib_broker_name: matchedBroker || o.ib_broker_name || undefined,
+                    is_renewal: isRenewal,
+                    existing_license: existingLicense
                 };
             });
 
@@ -144,7 +173,10 @@ export default function AdminOrdersPage() {
     const handleApproveClick = (order: any) => {
         if (order.is_ib_request) {
             setSelectedOrder(order);
-            const date = new Date();
+            const baseDate = (order.existing_license?.expiry_date && new Date(order.existing_license.expiry_date) > new Date())
+                ? new Date(order.existing_license.expiry_date)
+                : new Date();
+            const date = new Date(baseDate);
             date.setMonth(date.getMonth() + 6);
             setCustomDate(date.toISOString().split('T')[0]);
             setExpiryOption("6months");
@@ -159,17 +191,22 @@ export default function AdminOrdersPage() {
         if (!selectedOrder) return;
 
         let finalExpiryDate: Date;
-        const now = new Date();
+        const baseDate = (selectedOrder.existing_license?.expiry_date && new Date(selectedOrder.existing_license.expiry_date) > new Date())
+            ? new Date(selectedOrder.existing_license.expiry_date)
+            : new Date();
 
         if (expiryOption === "1month") {
-            now.setMonth(now.getMonth() + 1);
-            finalExpiryDate = now;
+            const date = new Date(baseDate);
+            date.setMonth(date.getMonth() + 1);
+            finalExpiryDate = date;
         } else if (expiryOption === "6months") {
-            now.setMonth(now.getMonth() + 6);
-            finalExpiryDate = now;
+            const date = new Date(baseDate);
+            date.setMonth(date.getMonth() + 6);
+            finalExpiryDate = date;
         } else if (expiryOption === "1year") {
-            now.setFullYear(now.getFullYear() + 1);
-            finalExpiryDate = now;
+            const date = new Date(baseDate);
+            date.setFullYear(date.getFullYear() + 1);
+            finalExpiryDate = date;
         } else {
             finalExpiryDate = new Date(customDate);
         }
@@ -178,7 +215,10 @@ export default function AdminOrdersPage() {
     };
 
     const handleApprove = async (order: any, customExpiryDate?: Date) => {
-        if (!customExpiryDate && !confirm('ยืนยันอนุมัติคำสั่งซื้อนี้? License จะถูกสร้าง/ต่ออายุทันที')) return;
+        const confirmMsg = order.is_renewal
+            ? 'ยืนยันอนุมัติ "ต่ออายุ" คำสั่งซื้อนี้? License เดิมจะได้รับการขยายเวลาใช้งานทันที'
+            : 'ยืนยันอนุมัติคำสั่งซื้อนี้? License จะถูกสร้าง/ต่ออายุทันที';
+        if (!customExpiryDate && !confirm(confirmMsg)) return;
 
         setApproveModalOpen(false);
         setProcessingId(order.id);
@@ -273,9 +313,11 @@ export default function AdminOrdersPage() {
                     commonExpiryDate = date.toISOString();
                 }
             } else {
-                // For non-IB (rental/lifetime), we extend from Today for the whole batch
-                // as requested to "make them all the same" in a single approval.
-                const startDate = new Date();
+                // For non-IB (rental/lifetime), extend from current expiry if in the future, or from Today
+                let startDate = new Date();
+                if (order.existing_license?.expiry_date && new Date(order.existing_license.expiry_date) > startDate) {
+                    startDate = new Date(order.existing_license.expiry_date);
+                }
                 if (order.plan_type === 'monthly') {
                     startDate.setMonth(startDate.getMonth() + 1);
                     commonExpiryDate = startDate.toISOString();
@@ -420,8 +462,9 @@ export default function AdminOrdersPage() {
         const matchesUser = order.profiles?.full_name?.toLowerCase().includes(searchLower) ||
             order.profiles?.email?.toLowerCase().includes(searchLower);
         const matchesAccount = order.account_number?.toLowerCase().includes(searchLower);
+        const matchesRenewal = (searchLower.includes('ต่ออายุ') || searchLower.includes('renew')) && order.is_renewal;
 
-        return matchesProduct || matchesUser || matchesAccount || searchQuery === '';
+        return matchesProduct || matchesUser || matchesAccount || matchesRenewal || searchQuery === '';
     }).sort((a, b) => {
         // Sort Logic
         if (sortOrder === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -503,15 +546,30 @@ export default function AdminOrdersPage() {
                     ) : (
                         <div className="grid gap-4">
                             {filteredOrders.length > 0 ? filteredOrders.map((order) => (
-                                <Card key={order.id} className={`transition-all duration-200 hover:bg-muted/5 ${order.status === 'pending' ? 'border-primary/50 bg-primary/5' : 'opacity-90'}`}>
+                                <Card 
+                                    key={order.id} 
+                                    className={`transition-all duration-200 hover:bg-muted/5 ${
+                                        order.status === 'pending' 
+                                            ? order.is_renewal
+                                                ? 'border-amber-500/70 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-card shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30'
+                                                : 'border-primary/50 bg-primary/5' 
+                                            : 'opacity-90'
+                                    }`}
+                                >
                                     <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
                                         {/* Slip Preview */}
                                         <div className="w-full md:w-32 h-48 md:h-32 bg-black/20 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border relative group cursor-pointer">
                                             {order.is_ib_request ? (
-                                                <div className="text-xs text-blue-400 flex flex-col items-center justify-center p-2 text-center h-full bg-blue-500/10">
-                                                    <Zap className="w-8 h-8 mb-2" />
-                                                    <span className="font-bold">IB {order.ib_broker_name || 'Request'}</span>
-                                                    <span>(Free License)</span>
+                                                <div className={`text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full ${order.is_renewal ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                                    {order.is_renewal ? (
+                                                        <RotateCw className="w-8 h-8 mb-1.5 text-amber-400" />
+                                                    ) : (
+                                                        <Zap className="w-8 h-8 mb-2" />
+                                                    )}
+                                                    <span className="font-bold">
+                                                        {order.is_renewal ? 'ต่ออายุสิทธิ์ IB' : `IB ${order.ib_broker_name || 'Request'}`}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground">{order.ib_broker_name || 'Free License'}</span>
                                                 </div>
                                             ) : order.slip_url ? (
                                                 <a href={order.slip_url} target="_blank" rel="noreferrer" className="w-full h-full">
@@ -531,14 +589,25 @@ export default function AdminOrdersPage() {
                                         <div className="flex-1 space-y-1.5 w-full">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h3 className="font-bold text-lg text-primary">
-                                                        {order.products?.name || 'Unknown Product'}
-                                                        {order.is_ib_request && (
-                                                            <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                                                                คำขอสิทธิ์ IB {order.ib_broker_name || 'Customer'}
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <h3 className="font-bold text-lg text-primary">
+                                                            {order.products?.name || 'Unknown Product'}
+                                                        </h3>
+                                                        {order.is_renewal ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm animate-pulse">
+                                                                <RotateCw className="w-3 h-3" /> ขอต่ออายุพอร์ตเดิม (Renewal)
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                                                ✨ สั่งซื้อใหม่ (New Order)
                                                             </span>
                                                         )}
-                                                    </h3>
+                                                        {order.is_ib_request && (
+                                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                                                คำขอสิทธิ์ IB {order.ib_broker_name ? `(${order.ib_broker_name})` : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
                                                         <span className="flex items-center gap-1.5 flex-wrap">
                                                             ลูกค้า: <span className="font-medium text-foreground">{order.profiles?.full_name || 'Guest'}</span>
@@ -583,6 +652,39 @@ export default function AdminOrdersPage() {
                                                     <span className="font-medium text-[13px]">{new Date(order.created_at).toLocaleString('th-TH')}</span>
                                                 </div>
                                             </div>
+
+                                            {/* Dedicated Renewal Information Box */}
+                                            {order.is_renewal && order.existing_license && (
+                                                <div className="mt-2.5 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1.5">
+                                                    <div className="flex items-center justify-between font-bold text-amber-300">
+                                                        <span className="flex items-center gap-1.5">
+                                                            <RotateCw className="w-3.5 h-3.5" />
+                                                            ข้อมูล License พอร์ตเดิมในระบบ (ก่อนต่ออายุ)
+                                                        </span>
+                                                        <span className={order.existing_license.is_active ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
+                                                            {order.existing_license.is_active ? "● ปัจจุบันยังเปิดใช้งานอยู่" : "○ หมดอายุแล้ว"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-stone-300 pt-1 border-t border-amber-500/20">
+                                                        <div>
+                                                            <span className="text-muted-foreground">วันหมดอายุเดิม:</span>{" "}
+                                                            <span className="font-semibold text-amber-200">
+                                                                {order.existing_license.type === 'lifetime' 
+                                                                    ? 'ตลอดชีพ' 
+                                                                    : order.existing_license.expiry_date 
+                                                                        ? new Date(order.existing_license.expiry_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+                                                                        : 'ไม่ระบุ'}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-muted-foreground">ประเภทสิทธิ์เดิม:</span>{" "}
+                                                            <span className="font-semibold text-stone-200 uppercase">
+                                                                {order.existing_license.type === 'ib' ? 'IB (ฟรี)' : order.existing_license.type}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Actions */}
@@ -629,6 +731,26 @@ export default function AdminOrdersPage() {
                     </DialogHeader>
                     {selectedOrder && (
                         <form onSubmit={submitIbApproval} className="space-y-6 pt-2">
+                            {selectedOrder.is_renewal && selectedOrder.existing_license && (
+                                <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-lg text-xs space-y-1.5">
+                                    <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                                        <RotateCw className="w-4 h-4" />
+                                        <span>คำสั่งซื้อนี้เป็นการขอต่ออายุ License เดิม</span>
+                                    </div>
+                                    <p className="text-stone-300">
+                                        วันหมดอายุเดิม: <span className="font-semibold text-amber-200">
+                                            {selectedOrder.existing_license.type === 'lifetime' 
+                                                ? 'ตลอดชีพ' 
+                                                : selectedOrder.existing_license.expiry_date 
+                                                    ? new Date(selectedOrder.existing_license.expiry_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+                                                    : 'ไม่ระบุ'}
+                                        </span>
+                                    </p>
+                                    <p className="text-[11px] text-amber-400/90 font-medium">
+                                        *ระบบจะคำนวณวันหมดอายุใหม่โดยต่อยอดจากวันหมดอายุเดิมให้อัตโนมัติ (หรือปรับเปลี่ยนวันที่ได้ตามต้องการ)
+                                    </p>
+                                </div>
+                            )}
                             <div className="bg-muted/50 p-4 rounded-md border border-border/50 text-sm space-y-2">
                                 <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">ลูกค้า:</span> <strong>{selectedOrder.profiles?.full_name || selectedOrder.profiles?.email || 'Guest'}</strong></p>
                                 <p><span className="text-muted-foreground mr-2 inline-block w-[100px]">สินค้า:</span> <strong>{selectedOrder.products?.name}</strong></p>

@@ -151,7 +151,7 @@ export default function DashboardPage() {
             const { data: licensesData } = await supabase
                 .from('licenses')
                 .select(`
-                    id, product_id, type, expiry_date, is_active, account_number, created_at, show_farm, port_name,
+                    id, product_id, type, expiry_date, is_active, account_number, created_at, show_farm, port_name, ib_broker_name, is_ib_request,
                     products ( id, name, image_url, file_url, product_key )
                 `)
                 .eq('user_id', user.id);
@@ -174,12 +174,12 @@ export default function DashboardPage() {
                     const matchedIb = (ibData || []).find((ib: any) => String(ib.verification_data).trim() === String(l.account_number).trim());
                     const isIbLicense = Boolean(matchedIb) || (legacyIbAccount && String(legacyIbAccount).trim() === String(l.account_number).trim());
 
-                    const brokerName = Array.isArray((matchedIb as any)?.brokers) ? (matchedIb as any)?.brokers[0]?.name : (matchedIb as any)?.brokers?.name;
+                    const brokerName = l.ib_broker_name || (Array.isArray((matchedIb as any)?.brokers) ? (matchedIb as any)?.brokers[0]?.name : (matchedIb as any)?.brokers?.name);
 
                     allItems.push({
                         ...l,
                         source: 'license',
-                        is_ib: isIbLicense,
+                        is_ib: isIbLicense || l.is_ib_request || l.type === 'ib',
                         ib_broker_name: brokerName
                     });
                 });
@@ -613,12 +613,20 @@ export default function DashboardPage() {
                                                                 </Button>
                                                             ) : null}
 
-                                                            {!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 30)) ? (
-                                                                <Link href={`/products/${group.productId}?renew=${item.account_number}`}>
-                                                                    <Button size="sm" variant="outline" className="h-8 text-xs bg-background">
-                                                                        ต่ออายุ
-                                                                    </Button>
-                                                                </Link>
+                                                            {!isOrder && (!item.is_active || !timeInfo?.isLifetime) ? (
+                                                                (() => {
+                                                                    const isIb = item.type === 'ib' || item.is_ib;
+                                                                    const brokerParam = item.ib_broker_name ? `&ibBrokerName=${encodeURIComponent(item.ib_broker_name)}` : '';
+                                                                    const planParam = item.type || (isIb ? 'lifetime' : 'monthly');
+                                                                    const renewCheckoutUrl = `/checkout/${group.productId}?accountNumber=${item.account_number}&plan=${planParam}${isIb ? '&isIbRequest=true' : ''}${brokerParam}`;
+                                                                    return (
+                                                                        <Link href={renewCheckoutUrl}>
+                                                                            <Button size="sm" variant="outline" className="h-8 text-xs bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-300 font-medium">
+                                                                                ต่ออายุ
+                                                                            </Button>
+                                                                        </Link>
+                                                                    );
+                                                                })()
                                                             ) : (
                                                                 <div className="w-[32px]"></div> // Minimal placeholder if no renew but has delete
                                                             )}
