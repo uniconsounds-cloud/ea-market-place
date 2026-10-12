@@ -128,9 +128,19 @@ export default function AdminOrdersPage() {
                 const matchedBroker = ibMembershipsMap[key];
 
                 const orderPorts = (o.account_number || '').split(',').map((p: string) => p.trim()).filter(Boolean);
-                const matchingLicenses = orderPorts.map((p: string) => licensesMap[`${o.user_id}_${o.product_id}_${p}`]).filter(Boolean);
-                const isRenewal = matchingLicenses.length > 0;
-                const existingLicense = matchingLicenses[0] || null;
+                const orderCreatedAt = new Date(o.created_at).getTime();
+
+                // To be a true renewal, the license must have already existed BEFORE this order was placed.
+                // If the order created the license upon approval, license.created_at is >= order.created_at.
+                const preExistingLicenses = orderPorts
+                    .map((p: string) => licensesMap[`${o.user_id}_${o.product_id}_${p}`])
+                    .filter((lic: any) => {
+                        if (!lic || !lic.created_at) return false;
+                        return new Date(lic.created_at).getTime() < orderCreatedAt - 10000;
+                    });
+
+                const isRenewal = preExistingLicenses.length > 0;
+                const existingLicense = isRenewal ? preExistingLicenses[0] : null;
 
                 return {
                     ...o,
