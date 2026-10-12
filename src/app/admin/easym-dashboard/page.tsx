@@ -311,8 +311,8 @@ export function resolvePortState(
         return 'STATE_1_LIVE';
     }
 
-    // State 2: Online (Smart Sleep: real ping within 15 mins)
-    if (actualMinsSince <= 15) {
+    // State 2: Online (Smart Sleep 10m: real ping within 25 mins)
+    if (actualMinsSince <= 25) {
         return 'STATE_2_ONLINE';
     }
 
@@ -727,7 +727,7 @@ export default function EasyMMasterDashboardPage() {
     const VERCEL_WARN_HOURLY_REQ = 4000;    // ⚠️ เกินโควตาปกติ (~2.88M req/เดือน)
     const VERCEL_SPIKE_CEILING_REQ = 16000; // 🛑 เพดานกราฟสำหรับจับ Spike ผิดปกติ (เช่น กรณีบั๊ก 10-20s = ~15,000+ req/ชม.)
     const SUPABASE_MAX_CAPACITY = 500;
-    const REQ_PER_PORT_HOUR = 20; // โหมดประหยัดปกติ (Sleep Mode 180s) = 20 requests/ชั่วโมง/พอร์ต
+    const REQ_PER_PORT_HOUR = 6; // โหมดประหยัดปกติ (Sleep Mode 600s / 10 นาที) = 6 requests/ชั่วโมง/พอร์ต
 
     // Filters & UI States
     const [searchQuery, setSearchQuery] = useState('');
@@ -1888,8 +1888,10 @@ export default function EasyMMasterDashboardPage() {
                 const lastViewedMs = s.last_viewed_at ? new Date(s.last_viewed_at).getTime() : 0;
                 const isViewedNow = lastViewedMs > 0 && (nowMs - lastViewedMs) < 120000;
 
-                // Current actual rate (Sleep 180s = 20 req/hr, Live 20s = 180 req/hr, or measured interval)
-                const intervalSec = telePort?.avgIntervalSec || (isViewedNow ? 20 : 180);
+                // Current actual rate (Sleep 600s = 6 req/hr, Live 20s = 180 req/hr)
+                const intervalSec = isViewedNow
+                    ? 20
+                    : Math.max(600, telePort?.assignedIntervalSec || 600);
                 const portReqsPerHour = Math.round(3600 / Math.max(5, intervalSec));
                 fleetCurrentHourlyReqs += portReqsPerHour;
 
@@ -1919,13 +1921,13 @@ export default function EasyMMasterDashboardPage() {
                 trafficHours[h] = activePortsInHour;
 
                 const measuredHourReqs = Number(liveTelemetry?.hourlyReqs?.[h] || 0);
-                // If current hour is still in progress or telemetry just started, show projected hourly rate
-                const estimatedHourReqs = Math.round(fleetCurrentHourlyReqs * sessionFactor) + (stoppedAtHour * 20);
-                reqsHours[h] = Math.max(measuredHourReqs, estimatedHourReqs);
+                // Projected steady-state hourly rate under 600s (10-min) Sleep Mode
+                const estimatedHourReqs = Math.round(fleetCurrentHourlyReqs * sessionFactor) + (stoppedAtHour * 6);
+                reqsHours[h] = estimatedHourReqs;
 
                 const measuredPeakReqs = Number(liveTelemetry?.hourlyPeakReqs?.[h] || 0);
                 const spikeHourReqs = Math.round(fleetPreFixSpikeHourlyReqs * sessionFactor) + (stoppedAtHour * 180);
-                unthrottledSpikeReqsHours[h] = Math.max(measuredPeakReqs, reqsHours[h], spikeHourReqs);
+                unthrottledSpikeReqsHours[h] = Math.max(measuredPeakReqs, measuredHourReqs, reqsHours[h], spikeHourReqs);
             }
 
             // ดึงสถิติสูงสุด (Historical Peak) ที่แต่ละแท่งชั่วโมงเคยตรวจจับได้
@@ -2683,7 +2685,7 @@ export default function EasyMMasterDashboardPage() {
                             const isPrime = sys.toLowerCase().includes('prime') || p.portNumber === '97053088';
                             const isMaxV2 = !isPrime && (ver.includes('2.00') || sys.toLowerCase().includes('max'));
 
-                            const intervalSec = tele?.avgIntervalSec || 180;
+                            const intervalSec = tele?.assignedIntervalSec || 600;
                             const mode: 'SLEEP_180S' | 'LIVE_20S' | 'ANOMALY_FAST' =
                                 tele?.mode || (intervalSec <= 15 ? 'ANOMALY_FAST' : intervalSec <= 45 ? 'LIVE_20S' : 'SLEEP_180S');
 
@@ -2716,7 +2718,7 @@ export default function EasyMMasterDashboardPage() {
                             });
                         });
 
-                        const currentHourReqs = hourlyReqsActual[curHour] || (maxPortsReqRate + primePortsReqRate + legacyPortsReqRate) || 1200;
+                        const currentHourReqs = hourlyReqsActual[curHour] || (maxPortsReqRate + primePortsReqRate + legacyPortsReqRate) || 600;
                         const maxSpikeObservedReqs = Math.max(...historicalPeakReqs, ...hourlyReqsActual, 1);
                         const projectedMonthlyReqs = currentHourReqs * 24 * 30;
                         const spikeProjectedMonthlyReqs = maxSpikeObservedReqs * 24 * 30;
@@ -2737,7 +2739,7 @@ export default function EasyMMasterDashboardPage() {
                                     {/* Box 1: Current Rate vs Safe Quota */}
                                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1">
                                         <div className="flex items-center justify-between text-[11px] text-emerald-300 font-semibold">
-                                            <span>🟢 อัตราคำขอปัจจุบัน (หลังปรับ 180s)</span>
+                                            <span>🟢 อัตราคำขอปัจจุบัน (หลังปรับ 10 นาที)</span>
                                             <Badge variant="outline" className="text-[10px] text-emerald-300 border-emerald-500/40 px-1.5 py-0 font-mono">
                                                 ลดลง -{reductionPct}%
                                             </Badge>
@@ -2774,7 +2776,7 @@ export default function EasyMMasterDashboardPage() {
                                         <div className="grid grid-cols-3 gap-1 text-center font-mono">
                                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded p-1">
                                                 <div className="text-xs font-bold text-emerald-400">{sleep180Count}</div>
-                                                <div className="text-[9px] text-muted-foreground">Sleep 180s</div>
+                                                <div className="text-[9px] text-muted-foreground">Sleep 10m</div>
                                             </div>
                                             <div className="bg-blue-500/10 border border-blue-500/20 rounded p-1">
                                                 <div className="text-xs font-bold text-blue-400">{live20Count}</div>
@@ -2859,7 +2861,7 @@ export default function EasyMMasterDashboardPage() {
                                         >
                                             <div className="w-full border-b border-dashed border-emerald-400/60"></div>
                                             <span className="absolute left-2 -top-2.5 text-[9px] font-mono font-bold text-emerald-400 bg-background/95 px-1.5 py-0.5 rounded border border-emerald-500/30 shadow-sm z-20">
-                                                🟢 เพดานปลอดภัย Vercel 1M/เดือน ({VERCEL_SAFE_HOURLY_REQ.toLocaleString()} req/ชม. | รองรับ ~75 พอร์ตโหมด 180s)
+                                                🟢 เพดานปลอดภัย Vercel 1M/เดือน ({VERCEL_SAFE_HOURLY_REQ.toLocaleString()} req/ชม. | รองรับ ~250 พอร์ตโหมด 10 นาที)
                                             </span>
                                         </div>
 
@@ -2947,11 +2949,11 @@ export default function EasyMMasterDashboardPage() {
                                                             </div>
                                                             <div className="space-y-1 font-mono text-[10px]">
                                                                 <div className="flex justify-between items-center text-rose-300">
-                                                                    <span className="text-muted-foreground">🚨 สถิติพุ่งสูงสุด (ก่อนปรับ 180s):</span>
+                                                                    <span className="text-muted-foreground">🚨 สถิติพุ่งสูงสุด (ก่อนปรับ 10 นาที):</span>
                                                                     <span className="font-bold">{peakReqsVal.toLocaleString()} req/ชม.</span>
                                                                 </div>
                                                                 <div className="flex justify-between">
-                                                                    <span className="text-muted-foreground">🟢 อัตราปัจจุบัน (Smart Sleep 180s):</span>
+                                                                    <span className="text-muted-foreground">🟢 อัตราปัจจุบัน (Smart Sleep 10 นาที):</span>
                                                                     <span className="font-bold text-emerald-400">{reqs.toLocaleString()} req/ชม.</span>
                                                                 </div>
                                                                 <div className="flex justify-between">
@@ -2990,11 +2992,11 @@ export default function EasyMMasterDashboardPage() {
                                             🔍 สรุปสาเหตุที่ก่อนหน้านี้กราฟไม่แจ้งเตือน &amp; การปรับปรุงใหม่:
                                         </span>
                                         <span className="text-[10px] font-mono text-emerald-400">
-                                            Server Throttling: Idle = 180s (20 req/ชม.) | Viewing = 20s (180 req/ชม.)
+                                            Server Throttling: Idle = 600s / 10 นาที (6 req/ชม.) | Viewing = 20s (180 req/ชม.)
                                         </span>
                                     </div>
                                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                        เดิมกราฟวัดเพียงจำนวนพอร์ตที่ออนไลน์เทียบเพดาน Supabase (500 พอร์ต / 60,000 req/ชม.) แต่โควตาฟรีของ <strong>Vercel Serverless Function</strong> อยู่ที่ <strong>1,000,000 ครั้ง/เดือน (~1,400–1,500 req/ชม.)</strong> เมื่อพอร์ตลูกค้า <strong>EasyM MAX v2.00 ({maxPortsCount} พอร์ต, คิดเป็น ~{maxSharePct}% ของ Traffic)</strong> ยิงเข้ามาทุก 10–20 วินาที จึงพุ่งไปที่ <strong>~{maxSpikeObservedReqs.toLocaleString()} req/ชม.</strong> (แสดงเป็นขีดสีทองด้านบน) ขณะนี้ระบบได้สั่งชะลอทุกพอร์ตที่ไม่ได้เปิดดูหน้าเว็บให้ส่งทุก <strong>180 วินาที (3 นาที)</strong> เรียบร้อยแล้ว ทำให้กราฟแท่งสีเขียวลดลงมาอยู่ในเกณฑ์ปลอดภัยทันที
+                                        เดิมกราฟวัดเพียงจำนวนพอร์ตที่ออนไลน์เทียบเพดาน Supabase (500 พอร์ต / 60,000 req/ชม.) แต่โควตาฟรีของ <strong>Vercel Serverless Function</strong> อยู่ที่ <strong>1,000,000 ครั้ง/เดือน (~1,400–1,500 req/ชม.)</strong> เมื่อพอร์ตลูกค้า <strong>EasyM MAX v2.00 ({maxPortsCount} พอร์ต, คิดเป็น ~{maxSharePct}% ของ Traffic)</strong> ยิงเข้ามาทุก 10–20 วินาที จึงพุ่งไปที่ <strong>~{maxSpikeObservedReqs.toLocaleString()} req/ชม.</strong> (แสดงเป็นขีดสีทองด้านบน) ขณะนี้ระบบได้สั่งชะลอทุกพอร์ตที่ไม่ได้เปิดดูหน้าเว็บให้ส่งทุก <strong>600 วินาที (10 นาที = 6 req/ชม./พอร์ต)</strong> เรียบร้อยแล้ว ทำให้กราฟแท่งสีเขียวลดลงมาอยู่ในเกณฑ์ปลอดภัยต่ำกว่าครึ่งของเพดานโควตาทันที
                                     </p>
                                 </div>
                             </>
@@ -3004,7 +3006,7 @@ export default function EasyMMasterDashboardPage() {
                     <div className="grid grid-cols-2 gap-3 text-xs pt-1">
                         <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
                             <span className="text-muted-foreground block text-[11px]">รอบส่งข้อมูลโหมดประหยัด (Sleep Mode):</span>
-                            <span className="font-semibold text-emerald-400">180 วินาที (3 นาที) / พอร์ต (20 req/ชม.)</span>
+                            <span className="font-semibold text-emerald-400">600 วินาที (10 นาที) / พอร์ต (6 req/ชม.)</span>
                         </div>
                         <div className="p-2.5 bg-muted/20 border border-border/30 rounded-lg">
                             <span className="text-muted-foreground block text-[11px]">รอบส่งข้อมูลเมื่อเปิดดูสด (Live View):</span>

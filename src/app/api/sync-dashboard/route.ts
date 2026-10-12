@@ -131,7 +131,7 @@ function recordIncomingSyncTelemetry(
     let lastIntervalSec = assignedIntervalSec;
     let avgIntervalSec = assignedIntervalSec;
 
-    if (prev && prev.lastPingMs > 0) {
+    if (prev && prev.lastPingMs > 0 && prev.assignedIntervalSec === assignedIntervalSec) {
         const diffSec = Math.max(1, Math.round((nowMs - prev.lastPingMs) / 1000));
         if (diffSec < 3600) {
             lastIntervalSec = diffSec;
@@ -418,7 +418,7 @@ export async function POST(req: Request) {
             }
         }
 
-        const assignedInterval = isViewerActive ? 20 : 180;
+        const assignedInterval = isViewerActive ? 20 : 600;
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
         recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
@@ -428,7 +428,7 @@ export async function POST(req: Request) {
 
         // Return response:
         // Note: should_sync_full is kept true so deployed EAs with EAE_WebSync.mqh
-        // respect sync_interval (180s when idle, 20s when viewed) and keep hash-throttling active,
+        // respect sync_interval (600s when idle, 20s when viewed) and keep hash-throttling active,
         // while license_tier ('free' when idle, 'pro' when viewed) skips uploading order arrays when idle.
         return NextResponse.json({
             status: 'success',
