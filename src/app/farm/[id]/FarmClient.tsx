@@ -1206,7 +1206,7 @@ export default function FarmClient({
         };
 
         // Quarantined and Locked pairs evaluation
-        let quarantinedDetails: Array<{ sym: string; abbr: string; ddPct: number; isHedged: boolean }> = [];
+        let quarantinedDetails: Array<{ sym: string; abbr: string; ddPct: number; isHedged: boolean; rescueOrders?: number }> = [];
         let quarantinedList: string[] = [];
         let quarantineSummary = 'QT: -';
 
@@ -1215,7 +1215,8 @@ export default function FarmClient({
                 sym: q.sym,
                 abbr: q.abbr || q.sym.substring(0, 2),
                 ddPct: Number(q.loss_pct || 0),
-                isHedged: Boolean(q.is_hedged)
+                isHedged: Boolean(q.is_hedged),
+                rescueOrders: Number(q.rescue_orders || 0)
             }));
             quarantinedList = quarantinedDetails.map(q => q.sym);
             quarantineSummary = quarantinedDetails.length > 0 
@@ -1225,8 +1226,8 @@ export default function FarmClient({
             // Default fallback if prime_data has not synced yet
             quarantinedList = ['EURJPY', 'GBPJPY'];
             quarantinedDetails = [
-                { sym: 'EURJPY', abbr: 'EJ', ddPct: 12.22, isHedged: false },
-                { sym: 'GBPJPY', abbr: 'GJ', ddPct: 19.93, isHedged: false }
+                { sym: 'EURJPY', abbr: 'EJ', ddPct: 12.22, isHedged: false, rescueOrders: 0 },
+                { sym: 'GBPJPY', abbr: 'GJ', ddPct: 19.93, isHedged: false, rescueOrders: 0 }
             ];
             quarantineSummary = 'QT: EJ 12.22% : GJ 19.93%';
         }
@@ -1513,90 +1514,28 @@ export default function FarmClient({
         // If no quarantined pairs exist, return empty array (plot stays empty/natural soil)
         if (details.length === 0) return [];
 
-        if (details.length === 1) {
-            return [{
-                id: 'q_preview_1',
-                c: 1.0,
+        return details.slice(0, 3).map((d, idx) => {
+            const sym = d.sym || 'EURJPY';
+            const pairInfo = (primeTelemetry?.pairData as any)?.[sym];
+            const rescueFromPair = pairInfo ? (Number(pairInfo.rescue_orders) || 0) : 0;
+            const rescueOrders = (d.rescueOrders && d.rescueOrders > 0)
+                ? d.rescueOrders
+                : (rescueFromPair > 0 ? rescueFromPair : (primeTelemetry?.rescueOrdersCount && idx === 0 ? primeTelemetry.rescueOrdersCount : 0));
+            const isRescue = Boolean(d.isHedged || rescueOrders > 0);
+            return {
+                id: `q_preview_${idx + 1}`,
+                c: 1.0 + idx * 0.8,
                 r: 5,
-                sym: details[0].sym,
-                ddPct: details[0].ddPct,
-                isRescue: details[0].isHedged,
-                src: details[0].isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
-                alt: details[0].isHedged ? 'Rescue Active Tree' : 'Quarantined Tree',
-                label: details[0].isHedged ? 'RESCUE GRID' : 'QUARANTINE',
-                delayMs: 0
-            }];
-        }
-
-        if (details.length === 2) {
-            // 2 Trees: Tree 1 stays at dome location (c: 1.0), Tree 2 unfolds right beside it touching (c: 1.8)
-            return [
-                {
-                    id: 'q_preview_1',
-                    c: 1.0,
-                    r: 5,
-                    sym: details[0].sym,
-                    ddPct: details[0].ddPct,
-                    isRescue: details[0].isHedged,
-                    src: details[0].isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
-                    alt: 'Quarantined Tree',
-                    label: details[0].isHedged ? 'RESCUE GRID' : 'QUARANTINE',
-                    delayMs: 0
-                },
-                {
-                    id: 'q_preview_2',
-                    c: 1.8,
-                    r: 5,
-                    sym: details[1].sym,
-                    ddPct: details[1].ddPct,
-                    isRescue: details[1].isHedged,
-                    src: details[1].isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
-                    alt: 'Rescue Active Tree',
-                    label: details[1].isHedged ? 'RESCUE GRID' : 'QUARANTINE',
-                    delayMs: 150
-                }
-            ];
-        }
-
-        // 3 Trees: Tree 1 at dome (c: 1.0), Tree 2 beside it (c: 1.8), Tree 3 next in line (c: 2.6)
-        return [
-            { 
-                id: 'q_preview_1', 
-                c: 1.0, 
-                r: 5, 
-                sym: details[0]?.sym || 'EURJPY',
-                ddPct: details[0]?.ddPct ?? 14.20,
-                isRescue: Boolean(details[0]?.isHedged),
-                src: details[0]?.isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2', 
-                alt: 'Quarantined Tree', 
-                label: details[0]?.isHedged ? 'RESCUE GRID' : 'QUARANTINE',
-                delayMs: 0
-            },
-            { 
-                id: 'q_preview_2', 
-                c: 1.8, 
-                r: 5, 
-                sym: details[1]?.sym || 'GBPJPY',
-                ddPct: details[1]?.ddPct ?? 16.80,
-                isRescue: true,
-                src: '/farm/Tree_aura.png?v=2',  
-                alt: 'Rescue Active Tree', 
-                label: 'RESCUE GRID',
-                delayMs: 150
-            },
-            { 
-                id: 'q_preview_3', 
-                c: 2.6, 
-                r: 5, 
-                sym: details[2]?.sym || 'USDJPY',
-                ddPct: details[2]?.ddPct ?? 11.50,
-                isRescue: Boolean(details[2]?.isHedged),
-                src: details[2]?.isHedged ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2', 
-                alt: 'Quarantined Tree', 
-                label: details[2]?.isHedged ? 'RESCUE GRID' : 'QUARANTINE',
-                delayMs: 300
-            },
-        ];
+                sym: sym,
+                ddPct: d.ddPct,
+                isRescue: isRescue,
+                rescueOrders: rescueOrders,
+                src: isRescue ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                alt: isRescue ? 'Rescue Active Tree' : 'Quarantined Tree',
+                label: isRescue ? 'RESCUE GRID' : 'QUARANTINE',
+                delayMs: idx * 150
+            };
+        });
     }, [primeTelemetry]);
 
     const totalQuarantineDD = useMemo(() => {
@@ -1648,7 +1587,10 @@ export default function FarmClient({
     const plot = useMemo(() => {
         const balance = Number(portStatus?.balance) || 51540.20;
         const equity = Number(portStatus?.equity) || balance;
-        const drawdown = Math.max(0, Math.floor(((balance - equity) / balance) * 100));
+        const effectiveActiveDD = (isPrime || portNumber === '97053088')
+            ? activeFarmDDPct
+            : Math.max(0, ((balance - equity) / balance) * 100);
+        const drawdown = Math.max(0, Math.round(effectiveActiveDD));
 
         const treeLevels = new Array(25).fill(4);
         let pointsToLose = drawdown;
@@ -1687,7 +1629,7 @@ export default function FarmClient({
         });
 
         return { pnl: stats.floatingPnl, trees };
-    }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority]);
+    }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority, activeFarmDDPct, isPrime, portNumber]);
 
     // --- Fetch Real History ---
     const [history, setHistory] = useState<any[]>([]);
@@ -1978,7 +1920,7 @@ export default function FarmClient({
                     todayProfit={smoothedTodayProfit}
                     todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                     dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
-                    drawdownPercent={primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent}
+                    drawdownPercent={totalPortDDPct}
                     drawdownAmount={stats.drawdownAmount}
                     assetType={assetType}
                     isShaking={isShaking}
@@ -2025,7 +1967,7 @@ export default function FarmClient({
                 accountType={portStatus?.account_type || 'USC'}
                 todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                 dailyMaxDrawdown={Number(portStatus?.daily_max_drawdown) || 0}
-                drawdownPercent={primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent}
+                drawdownPercent={totalPortDDPct}
                 drawdownAmount={stats.drawdownAmount}
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
@@ -2387,6 +2329,28 @@ export default function FarmClient({
                                             unoptimized
                                             priority
                                         />
+
+                                        {/* 🌸 Flower Badges for Rescue Orders on Quarantined / Hedged Tree */}
+                                        {qTree.isRescue && qTree.rescueOrders > 0 && (
+                                            <>
+                                                {Array.from({ length: Math.min(qTree.rescueOrders, 5) }).map((_, fIdx) => {
+                                                    const slotIdx = fIdx === 0 ? 7 : (fIdx === 1 ? 4 : (fIdx === 2 ? 10 : (fIdx * 2) % 15));
+                                                    const slot = TREE_SLOTS[slotIdx];
+                                                    return (
+                                                        <div
+                                                            key={`rescue_flower_${qTree.id}_${fIdx}`}
+                                                            className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl animate-pulse pointer-events-none"
+                                                            style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 5 }}
+                                                        >
+                                                            <Image src={theme.open} alt="Rescue Flower" fill className="object-contain" unoptimized />
+                                                            <span className="absolute -bottom-1 -right-1 px-1 py-0.2 rounded-full bg-emerald-950/90 border border-emerald-400 text-[8px] font-mono font-black text-emerald-300 leading-none shadow-[0_0_8px_rgba(16,185,129,0.9)]">
+                                                                R{fIdx + 1}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             );

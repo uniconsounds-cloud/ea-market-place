@@ -318,7 +318,15 @@ export default function FarmHud({
                                 <div className={`text-[8px] sm:text-[10px] font-mono font-black tracking-tighter ${floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
                                     <AnimatedNumber
                                         value={floatingPnl}
-                                        formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)} (${((v / balance) * 100).toFixed(2)}%)`}
+                                        formatter={v => {
+                                            if (v < 0) {
+                                                const ddVal = (drawdownPercent !== undefined && drawdownPercent > 0)
+                                                    ? drawdownPercent
+                                                    : Math.abs((v / balance) * 100);
+                                                return `${currencyPrefix}${v.toFixed(2)} (-${ddVal.toFixed(2)}%)`;
+                                            }
+                                            return `${currencyPrefix}+${v.toFixed(2)} (+${((v / balance) * 100).toFixed(2)}%)`;
+                                        }}
                                         colorClass={floatingPnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}
                                     />
                                 </div>
@@ -395,10 +403,10 @@ export default function FarmHud({
                            <span className="inline sm:inline text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-1">{todayClosedLots.toFixed(2)}</span></span>
                            <span className="inline sm:inline text-[7px] text-white/20 ml-1">|</span>
                            {(() => {
-                               const effectiveDdPct = drawdownPercent !== undefined ? drawdownPercent : (dailyMaxDrawdown || 0);
-                               const displayDd = effectiveDdPct > 0 ? `-${effectiveDdPct.toFixed(2)}%` : '0.00%';
+                               const maxDd = Math.abs(Number(dailyMaxDrawdown) || 0);
+                               const displayMaxDd = maxDd > 0 ? `-${maxDd.toFixed(2)}%` : '0.00%';
                                return (
-                                   <span className="inline sm:inline text-[8px] text-white/40 uppercase" title="Drawdown">DD:<span className="text-red-500/80 ml-1 font-mono font-bold">{displayDd}</span></span>
+                                   <span className="inline sm:inline text-[8px] text-white/40 uppercase" title="Max Drawdown วันนี้">MaxDD:<span className="text-red-500/80 ml-1 font-mono font-bold">{displayMaxDd}</span></span>
                                );
                            })()}
                         </div>
@@ -558,10 +566,10 @@ export function FarmMobileStatsOverlay({
                     </span>
                     <div className="flex flex-col gap-0 mt-[-2px]">
                         {(() => {
-                            const effectiveDdPct = drawdownPercent !== undefined ? drawdownPercent : (dailyMaxDrawdown || 0);
-                            const displayDd = effectiveDdPct > 0 ? `-${effectiveDdPct.toFixed(2)}%` : '0.00%';
+                            const maxDd = Math.abs(Number(dailyMaxDrawdown) || 0);
+                            const displayMaxDd = maxDd > 0 ? `-${maxDd.toFixed(2)}%` : '0.00%';
                             return (
-                                <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">DD: <span className="text-red-500/80 font-mono font-bold">{displayDd}</span></span>
+                                <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">MaxDD: <span className="text-red-500/80 font-mono font-bold">{displayMaxDd}</span></span>
                             );
                         })()}
                         <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">Lots: <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
