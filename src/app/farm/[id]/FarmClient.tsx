@@ -6,6 +6,7 @@ import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 import AdminFarmDiagnosticOverlay from '@/components/AdminFarmDiagnosticOverlay';
+import OwnerDevFarmController from '@/components/OwnerDevFarmController';
 import { toast } from 'sonner';
 import { 
     Shield, Layers, Zap, Crosshair, X, 
@@ -389,10 +390,63 @@ export default function FarmClient({
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
 
-    // EasyM Prime Dev Gate:
-    // 1. Restrict Prime UI exclusively to owner's 2 test ports (21692434 & 97053088) so all customer ports (even if running Prime) remain on Classic Farm UI during testing.
-    // 2. Within those 2 ports, dynamically switch between Prime UI (when running EasyM Prime) and Classic Farm UI (when running EasyM MAX / Farm / Mini / Gold).
+    // 👑 Owner Developer Sandbox & Customer Release Gate:
+    // 1. Owner's 2 test ports (21692434 & 97053088) have access to the Draggable Floating Controller Dock.
+    // 2. In Dev mode: Owner sees the in-development Prime Farm UI.
+    // 3. In Customer mode: Owner simulates what real customers currently see.
+    // 4. For real customers: Prime Farm UI is only shown if isGlobalPrimeReleased === true (default is false/private).
     const isOwnerTestPort = String(portNumber) === '21692434' || String(portNumber) === '97053088';
+    const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState(false);
+    const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
+
+    useEffect(() => {
+        const fetchReleaseState = async () => {
+            try {
+                const { data } = await supabase
+                    .from('fleet_capital_snapshots')
+                    .select('snapshot_meta')
+                    .eq('period_key', 'prime_farm_release_gate')
+                    .maybeSingle();
+                if (data?.snapshot_meta) {
+                    setIsGlobalPrimeReleased(Boolean((data.snapshot_meta as any)?.is_released));
+                }
+            } catch (e) {
+                // Default to false (private)
+            }
+        };
+        fetchReleaseState();
+
+        const sub = supabase
+            .channel('prime_release_gate_sub')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'fleet_capital_snapshots', filter: 'period_key=eq.prime_farm_release_gate' },
+                (payload) => {
+                    if (payload.new && (payload.new as any).snapshot_meta) {
+                        setIsGlobalPrimeReleased(Boolean(((payload.new as any).snapshot_meta as any)?.is_released));
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(sub);
+        };
+    }, []);
+
+    const handleUpdateGlobalRelease = async (released: boolean) => {
+        await supabase.from('fleet_capital_snapshots').upsert({
+            period_key: 'prime_farm_release_gate',
+            period_type: 'release_gate',
+            active_ports_count: 1,
+            snapshot_meta: {
+                is_released: released,
+                updated_at: new Date().toISOString(),
+                updated_by: 'owner'
+            }
+        }, { onConflict: 'period_key' });
+        setIsGlobalPrimeReleased(released);
+    };
 
     const isExplicitClassicEA =
         sysCode.includes('max') ||
@@ -401,7 +455,14 @@ export default function FarmClient({
         sysCode.includes('gold') ||
         sysCode.includes('turbo');
 
-    const isPrime = isOwnerTestPort && !isExplicitClassicEA && (
+    // Dynamic Prime Permission:
+    // - On owner's test ports: if in 'dev' mode, always show Prime UI (if running Prime); if in 'customer' mode, simulate release state
+    // - On all other customer ports: only show Prime UI if isGlobalPrimeReleased === true!
+    const isPrimeAllowed = isOwnerTestPort 
+        ? (devPreviewMode === 'dev' ? true : isGlobalPrimeReleased)
+        : isGlobalPrimeReleased;
+
+    const isPrime = isPrimeAllowed && !isExplicitClassicEA && (
         sysCode.includes('prime') ||
         Boolean((portStatus as any)?.prime_data?.mode) ||
         ((sysCode === '' || sysCode === 'easym') && (prodKey.includes('PRIME') || prodName.includes('prime')))
@@ -4062,6 +4123,19 @@ export default function FarmClient({
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* 👑 DRAGGABLE FLOATING OWNER DEV DOCK (STRICTLY OWNER ONLY) */}
+            {isOwnerTestPort && (
+                <OwnerDevFarmController
+                    isOwnerTestPort={isOwnerTestPort}
+                    portNumber={String(portNumber)}
+                    systemCode={sysCode}
+                    previewMode={devPreviewMode}
+                    onTogglePreviewMode={setDevPreviewMode}
+                    isGlobalPrimeReleased={isGlobalPrimeReleased}
+                    onUpdateGlobalRelease={handleUpdateGlobalRelease}
+                />
             )}
         </div>
     );
