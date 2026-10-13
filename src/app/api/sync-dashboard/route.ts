@@ -247,14 +247,17 @@ export async function POST(req: Request) {
         const systemCode = rawSystemCode.includes(':::') ? rawSystemCode.split(':::')[0].trim() : rawSystemCode;
         const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
 
-        // Any EA hitting /api/sync-dashboard (instead of Direct-to-Supabase RPC) is operating in 1-URL Fallback Mode:
-        // Enforce 10-minute-only summary sync, strip live per-pair/order telemetry, and tag with FALLBACK_1URL
-        const primeData = {
+        // Distinguish between:
+        // 1. New v2.00 EAs that support 2-URLs but are currently running in 1-URL Fallback mode (explicitly sends sync_mode: 'FALLBACK_1URL')
+        // 2. Legacy Classic EAs (older MAX, Farm, Mini, Gold) that natively run on 1-URL without the 2-URL architecture
+        const isFallback1UrlEA = payload.sync_mode === 'FALLBACK_1URL' || rawSystemCode.includes('FALLBACK_1URL');
+
+        const primeData = isFallback1UrlEA ? {
             sync_mode: 'FALLBACK_1URL',
             last_10m_sync: nowIso
-        };
+        } : null;
 
-        // 3. Process Status Sync (10-Minute Summary Only)
+        // 3. Process Status Sync
         if (snapshot || type === 'STATS_SYNC' || payload.balance !== undefined) {
             const balance = Number(snapshot?.account?.balance ?? payload.balance ?? 0);
             const equity = Number(snapshot?.account?.equity ?? payload.equity ?? balance);
@@ -276,8 +279,8 @@ export async function POST(req: Request) {
             const accountType = (snapshot?.account?.currency === 'USC' || payload.account_type === 'USC') ? 'USC' : 'USD';
             const assetType = snapshot?.identity?.product_family || payload.asset_type || 'FOREX';
 
-            // Encode FALLBACK_1URL marker into system_code so both Farm UIs know this port is in 10m Non-Live mode
-            const finalSystemCode = `${systemCode}:::${JSON.stringify(primeData)}`;
+            // Only encode FALLBACK_1URL into system_code for new EAs in fallback mode; legacy EAs retain clean system_code
+            const finalSystemCode = isFallback1UrlEA ? `${systemCode}:::${JSON.stringify(primeData)}` : systemCode;
 
             const statusPayload: any = {
                 port_number: portNumber,
@@ -312,8 +315,28 @@ export async function POST(req: Request) {
             }
         }
 
-        // 4. Clear any stale live orders in farm_active_orders (1-URL Fallback does not stream live Farm orders)
-        await supabase.from('farm_active_orders').delete().eq('port_number', portNumber);
+        // 4. Process Active Orders
+        if (isFallback1UrlEA) {
+            // New 1-URL Fallback mode does not stream live Farm orders to conserve Vercel bandwidth
+            await supabase.from('farm_active_orders').delete().eq('port_number', portNumber);
+        } else if (orders && Array.isArray(orders) && orders.length > 0) {
+            // Legacy Classic EA: Upsert orders as normal so classic farm flowers/lotuses render correctly
+            const upsertData = orders.map((o: any) => ({
+                ticket_id: o.ticket_id,
+                port_number: portNumber,
+                symbol: o.symbol || o.pair || '',
+                type: o.type || 'BUY',
+                status: o.status || 'OPEN',
+                current_pnl: o.current_pnl || 0,
+                sl_risk_percent: o.sl_risk_percent || 0,
+                raw_lot_size: o.raw_lot_size || 0,
+                updated_at: nowIso
+            }));
+
+            if (upsertData.length > 0) {
+                await supabase.from('farm_active_orders').upsert(upsertData, { onConflict: 'ticket_id' });
+            }
+        }
 
         // 5. Process Batch Closure Events (History Data)
         if (type === 'BATCH_CLOSE' || payload.event?.type === 'BATCH_CLOSE') {
@@ -350,25 +373,23 @@ export async function POST(req: Request) {
             }
         }
 
-        // 7. 1-URL Fallback Policy: Always enforce 10-minute (600s) standby interval (never switch to 20s live streaming)
-        const isViewerActive = false;
-        const assignedInterval = 600;
+        // 7. Interval policy
+        const assignedInterval = isFallback1UrlEA ? 600 : 20;
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
-        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
+        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, !isFallback1UrlEA, assignedInterval);
 
         // 8. Retrieve 2-Way Command & Web Control state for this port
         const webConfig = getPortControl(portNumber);
 
-        // Return 10-minute-only response (viewer_active: false, sync_interval: 600, license_tier: 'free')
         return NextResponse.json({
             status: 'success',
             success: true,
             should_sync_full: true,
-            viewer_active: false,
-            sync_interval: 600,
-            sync_mode: 'FALLBACK_1URL',
-            license_tier: 'free',
+            viewer_active: !isFallback1UrlEA,
+            sync_interval: assignedInterval,
+            sync_mode: isFallback1UrlEA ? 'FALLBACK_1URL' : 'CLASSIC_ONLINE',
+            license_tier: isFallback1UrlEA ? 'free' : 'pro',
             is_trial: false,
             timestamp: nowIso,
             web_config: webConfig
