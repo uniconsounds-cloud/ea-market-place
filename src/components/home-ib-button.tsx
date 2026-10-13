@@ -16,7 +16,13 @@ type Broker = {
     ib_link: string;
 };
 
-export function HomeIbButton() {
+export function HomeIbButton({ 
+    size = "lg", 
+    className = "px-8 text-base" 
+}: { 
+    size?: "default" | "sm" | "lg" | "icon", 
+    className?: string 
+} = {}) {
     const [user, setUser] = useState<any>(null);
     const [availableBrokers, setAvailableBrokers] = useState<Broker[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +190,7 @@ export function HomeIbButton() {
 
     return (
         <>
-            <Button variant="gold" size="lg" className="px-8 text-base" onClick={() => setIsOpen(true)}>
+            <Button variant="gold" size={size} className={className} onClick={() => setIsOpen(true)}>
                 รับสิทธิ์ใช้งาน EA ฟรี (สมัครเป็น IB)
             </Button>
             
