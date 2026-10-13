@@ -375,10 +375,10 @@ export default function FarmClient({
     // Determine product & asset types for default theme & behavior
     const prodKey = (licenseInfo?.productKey || '').toUpperCase();
     const prodName = (licenseInfo?.productName || '').toLowerCase();
-    const rawSysCode = initialPortStatus?.system_code || portStatus?.system_code || '';
-    const cleanSysCode = rawSysCode.split(':::')[0];
+    const rawSysCode = portStatus?.system_code || initialPortStatus?.system_code || '';
+    const cleanSysCode = rawSysCode.split(':::')[0].trim();
     const sysCode = cleanSysCode.toLowerCase();
-    const eaVer = (initialPortStatus?.ea_version || portStatus?.ea_version || '').toLowerCase();
+    const eaVer = (portStatus?.ea_version || initialPortStatus?.ea_version || '').toLowerCase();
     const rawAsset = portStatus?.asset_type || (prodName.includes('gold') || prodKey.includes('GOLD') || prodKey.includes('EZG') ? 'GOLD' : 'FOREX');
     const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
 
@@ -389,9 +389,19 @@ export default function FarmClient({
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
 
-    // EasyM Prime Dev Gate: Restrict Prime floating orbs and cockpit exclusively to user's ports (21692434 & 97053088)
-    // Other users running Prime will safely see the standard stable farm view until testing is finalized.
-    const isPrime = String(portNumber) === '21692434' || String(portNumber) === '97053088';
+    // Dynamically detect whether the port is currently running EasyM Prime vs Classic EA (EasyM Max, Farm, Mini, Gold)
+    const isExplicitClassicEA =
+        sysCode.includes('max') ||
+        sysCode.includes('farm') ||
+        sysCode.includes('mini') ||
+        sysCode.includes('gold') ||
+        sysCode.includes('turbo');
+
+    const isPrime = !isExplicitClassicEA && (
+        sysCode.includes('prime') ||
+        Boolean((portStatus as any)?.prime_data?.mode) ||
+        ((sysCode === '' || sysCode === 'easym') && (prodKey.includes('PRIME') || prodName.includes('prime')))
+    );
 
     const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);
 
@@ -1530,7 +1540,7 @@ export default function FarmClient({
     // 🛡️ Quarantined & Rescued Trees Dataset (Dynamic: 0, 1, 2, or 3 trees)
     // Anchored at Plot 2 (c: 1.0, r: 5) where the dome sits, and unfolding sequentially to the right
     const quarantinePreviewList = useMemo(() => {
-        if (isFallback1Url) return [];
+        if (!isPrime || isFallback1Url) return [];
         const details = primeTelemetry?.quarantinedDetails || [];
         // If no quarantined pairs exist, return empty array (plot stays empty/natural soil)
         if (details.length === 0) return [];
@@ -1557,7 +1567,7 @@ export default function FarmClient({
                 delayMs: idx * 150
             };
         });
-    }, [primeTelemetry, isFallback1Url]);
+    }, [primeTelemetry, isPrime, isFallback1Url]);
 
     const totalQuarantineDD = useMemo(() => {
         return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
@@ -1569,25 +1579,19 @@ export default function FarmClient({
     // 3. Badge on Quarantined Trees (บนต้นไม้ที่ถูกขัง) = DD ของคู่เงินที่ถูกขังทั้งหมด (Quarantine Total DD)
     const rawPortDD = primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent;
     const activeFarmDDPct = useMemo(() => {
-        if (isFallback1Url) return Number(rawPortDD.toFixed(2));
+        if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
         if (primeTelemetry?.modeDDPct !== undefined && primeTelemetry.modeDDPct >= 0) {
             return Number(primeTelemetry.modeDDPct.toFixed(2));
         }
-        if (portNumber === '97053088' || isPrime) {
-            return rawPortDD >= totalQuarantineDD 
-                ? Number((rawPortDD - totalQuarantineDD).toFixed(2)) 
-                : Number(rawPortDD.toFixed(2));
-        }
-        return rawPortDD;
-    }, [primeTelemetry, rawPortDD, totalQuarantineDD, portNumber, isPrime, isFallback1Url]);
+        return rawPortDD >= totalQuarantineDD 
+            ? Number((rawPortDD - totalQuarantineDD).toFixed(2)) 
+            : Number(rawPortDD.toFixed(2));
+    }, [primeTelemetry, rawPortDD, totalQuarantineDD, isPrime, isFallback1Url]);
 
     const totalPortDDPct = useMemo(() => {
-        if (isFallback1Url) return Number(rawPortDD.toFixed(2));
-        if (portNumber === '97053088' || isPrime) {
-            return Number((activeFarmDDPct + totalQuarantineDD).toFixed(2));
-        }
-        return rawPortDD;
-    }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, portNumber, isPrime, isFallback1Url]);
+        if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
+        return Number((activeFarmDDPct + totalQuarantineDD).toFixed(2));
+    }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, isPrime, isFallback1Url]);
 
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => pairControls[p]?.enabled !== false).length;
@@ -1610,7 +1614,7 @@ export default function FarmClient({
     const plot = useMemo(() => {
         const balance = Number(portStatus?.balance) || 51540.20;
         const equity = Number(portStatus?.equity) || balance;
-        const effectiveActiveDD = (isPrime || portNumber === '97053088')
+        const effectiveActiveDD = isPrime
             ? activeFarmDDPct
             : Math.max(0, ((balance - equity) / balance) * 100);
         const drawdown = Math.max(0, Math.round(effectiveActiveDD));
@@ -2063,13 +2067,21 @@ export default function FarmClient({
                                         <div className="flex items-start gap-2">
                                             <span className="text-amber-400 font-bold shrink-0">•</span>
                                             <span>
-                                                <strong className="text-amber-300">ข้อมูลที่ส่งทุก 10 นาที</strong> (Balance, Equity, Floating P/L, กำไรวันนี้, จำนวนไม้ B/S) จะ<strong className="text-amber-300 underline decoration-amber-400/60">กระพริบช้าๆ</strong> เพื่อเตือนว่าไม่ใช่ข้อมูลปัจจุบัน
+                                                <strong className="text-amber-300">ข้อมูลที่ส่งทุก 10 นาที</strong> (Balance, Equity, Floating P/L, กำไรวันนี้, จำนวนไม้ B/S, %DD) จะ<strong className="text-amber-300 underline decoration-amber-400/60">กระพริบช้าๆ</strong> เพื่อเตือนว่าไม่ใช่ข้อมูลปัจจุบัน
                                             </span>
                                         </div>
                                         <div className="flex items-start gap-2">
                                             <span className="text-amber-400 font-bold shrink-0">•</span>
                                             <span>
-                                                <strong className="text-amber-300">ข้อมูลสดที่ไม่ได้ส่งมา</strong> (ตาราง 20 คู่เงิน, ไม้เปิดบนต้นไม้, สถานะกักขัง/กู้ชีพ) จะแสดงเป็นเครื่องหมาย <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 font-mono font-black text-amber-300">**.**</span>
+                                                {isPrime ? (
+                                                    <>
+                                                        <strong className="text-amber-300">ข้อมูลสดที่ไม่ได้ส่งมา</strong> (ตาราง 20 คู่เงิน, ไม้เปิดบนต้นไม้, สถานะกักขัง/กู้ชีพ) จะแสดงเป็นเครื่องหมาย <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 font-mono font-black text-amber-300">**.**</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <strong className="text-amber-300">ข้อมูลออเดอร์สดรายไม้</strong> (ดอกบัว/ผลไม้บนต้นไม้แบบ Real-time) จะไม่ถูกส่งมาแสดงผลจนกว่าจะเพิ่ม URL ที่ 2
+                                                    </>
+                                                )}
                                             </span>
                                         </div>
                                     </div>
@@ -2209,7 +2221,7 @@ export default function FarmClient({
                             );
                         })}
 
-                        {/* 🔻 Floating Drawdown Badge (Placed in separate high z-index overlay so target tree never jumps to front) */}
+                        {/* 🔻 Floating Drawdown Badge (Classic Red Badge when !isPrime, Prime Mercury Badge when isPrime) */}
                         {(() => {
                             const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
                             const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
@@ -2223,6 +2235,45 @@ export default function FarmClient({
                             const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
                             const portDDPct = activeFarmDDPct;
                             const portMercuryFill = Math.min(100, Math.max(10, (portDDPct / 40) * 100));
+
+                            // Classic Farm View (Non-Prime: EasyM MAX, Farm, Mini, Gold): Original Red 2-line DD Badge
+                            if (!isPrime) {
+                                const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
+                                const currPrefix = isUSC ? '' : '$';
+                                const currSuffix = isUSC ? ' USC' : '';
+                                return (
+                                    <div
+                                        className="absolute pointer-events-none"
+                                        style={{
+                                            left: `${badgeLeft}px`,
+                                            top: `${badgeTop}px`,
+                                            zIndex: 99999,
+                                            width: '280px',
+                                            height: '280px'
+                                        }}
+                                    >
+                                        <div 
+                                            className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
+                                            style={{
+                                                transform: `translateX(-50%) scale(${badgeCounterScale})`,
+                                                transformOrigin: 'bottom center'
+                                            }}
+                                        >
+                                            <div className={`bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
+                                                {/* Line 1: Percentage */}
+                                                <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                    -{stats.drawdownPercent.toFixed(2)}%
+                                                </div>
+                                                {/* Line 2: DD Amount */}
+                                                <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
+                                                    -{currPrefix}{stats.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{currSuffix}
+                                                </div>
+                                            </div>
+                                            <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
+                                        </div>
+                                    </div>
+                                );
+                            }
 
                             return (
                                 <div
@@ -2410,7 +2461,7 @@ export default function FarmClient({
                         </div> {/* 🌾 End of animate-float-farm */}
 
                         {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกที่แปลงที่ 2: c: 1.0, r: 5 ก่อนคลิกขยาย) */}
-                        {isClient && (portNumber === '97053088' || isPrime) && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
+                        {isClient && isPrime && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
                             <div
                                 key="quarantine_greenhouse_dome"
                                 onClick={handleGreenhouseDomeClick}
@@ -2448,7 +2499,7 @@ export default function FarmClient({
                         )}
 
                         {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (คลี่ออกมาจากจุดที่โดมอยู่ เรียงเป็นลำดับ 1 -> 2 -> 3 และชิดกัน) */}
-                        {isClient && (portNumber === '97053088' || isPrime) && isQuarantineExpanded && quarantinePreviewList.map((qTree, idx) => {
+                        {isClient && isPrime && isQuarantineExpanded && quarantinePreviewList.map((qTree, idx) => {
                             const tZIndex = Math.round(qTree.c + qTree.r) + 20;
                             return (
                                 <div
@@ -2501,7 +2552,7 @@ export default function FarmClient({
                         })}
 
                         {/* 🌡️ QUARANTINE FLOATING OVERLAY: COMBINED DD BADGE OR EXPANDED INDIVIDUAL MERCURY BARS */}
-                        {isClient && (portNumber === '97053088' || isPrime) && quarantinePreviewList.length > 0 && (() => {
+                        {isClient && isPrime && quarantinePreviewList.length > 0 && (() => {
                             const previewList = quarantinePreviewList;
                             const quarantineMercuryFill = Math.min(100, Math.max(12, (totalQuarantineDD / 50) * 100));
                             const quarTheme = getDDLevelTheme(totalQuarantineDD);
