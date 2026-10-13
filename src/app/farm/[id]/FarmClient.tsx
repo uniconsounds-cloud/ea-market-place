@@ -389,7 +389,11 @@ export default function FarmClient({
                     sysCode.includes('easy m') ||
                     assetType === 'FOREX';
 
-    // Dynamically detect whether the port is currently running EasyM Prime vs Classic EA (EasyM Max, Farm, Mini, Gold)
+    // EasyM Prime Dev Gate:
+    // 1. Restrict Prime UI exclusively to owner's 2 test ports (21692434 & 97053088) so all customer ports (even if running Prime) remain on Classic Farm UI during testing.
+    // 2. Within those 2 ports, dynamically switch between Prime UI (when running EasyM Prime) and Classic Farm UI (when running EasyM MAX / Farm / Mini / Gold).
+    const isOwnerTestPort = String(portNumber) === '21692434' || String(portNumber) === '97053088';
+
     const isExplicitClassicEA =
         sysCode.includes('max') ||
         sysCode.includes('farm') ||
@@ -397,7 +401,7 @@ export default function FarmClient({
         sysCode.includes('gold') ||
         sysCode.includes('turbo');
 
-    const isPrime = !isExplicitClassicEA && (
+    const isPrime = isOwnerTestPort && !isExplicitClassicEA && (
         sysCode.includes('prime') ||
         Boolean((portStatus as any)?.prime_data?.mode) ||
         ((sysCode === '' || sysCode === 'easym') && (prodKey.includes('PRIME') || prodName.includes('prime')))
