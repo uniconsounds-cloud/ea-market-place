@@ -1058,6 +1058,7 @@ export default function AdminPrimeFarmLabPage() {
                     systemCode="EasyM Prime"
                     adminMessage="ติดต่อผ่าน line ID : @jharvest"
                     customName="EASYM PRIME"
+                    isNonLive10m={!isSimMode && String(livePortStatus?.system_code || '').includes('FALLBACK_1URL')}
                 />
 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -1107,6 +1108,7 @@ export default function AdminPrimeFarmLabPage() {
                 totalStandardLots={telemetry.totalLots}
                 customName="EASYM PRIME"
                 adminMessage="ติดต่อผ่าน line ID : @jharvest"
+                isNonLive10m={!isSimMode && String(livePortStatus?.system_code || '').includes('FALLBACK_1URL')}
             />
 
             {/* ═══════════════════════════════════════════════════════════════════ */}

@@ -87,6 +87,7 @@ type FarmHudProps = {
     title?: string;
     customName?: string;
     adminMessage?: string | null;
+    isNonLive10m?: boolean;
 };
 
 export default function FarmHud({
@@ -112,6 +113,7 @@ export default function FarmHud({
     title,
     customName,
     adminMessage,
+    isNonLive10m = false,
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
@@ -153,6 +155,7 @@ export default function FarmHud({
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
     const unitSuffix = isUSC ? ' USC' : ' USD';
+    const slowBlinkClass = isNonLive10m ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : '';
 
     return (
         <>
@@ -160,6 +163,10 @@ export default function FarmHud({
             @keyframes pnlBreathe {
                 0%, 100% { opacity: 0.65; }
                 50% { opacity: 1; }
+            }
+            @keyframes slowNonLiveBlink {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.2; }
             }
             @keyframes slotOutUp {
                 from { transform: translateY(0); opacity: 1; }
@@ -209,7 +216,7 @@ export default function FarmHud({
                 <div className="flex-1 flex items-center gap-3 sm:gap-8 min-w-0">
                     
                     {/* Buy/Sell Thermometers (4-bar Row on mobile, Detailed on desktop) */}
-                    <div className="hidden sm:flex gap-1.5 sm:gap-5 flex-shrink-0 items-center">
+                    <div className={`hidden sm:flex gap-1.5 sm:gap-5 flex-shrink-0 items-center ${slowBlinkClass}`}>
                         {/* BUY GROUP */}
                         <div className="flex flex-col items-center gap-1">
                             {/* Counter at TOP */}
@@ -291,24 +298,31 @@ export default function FarmHud({
                     <div className="flex-1 flex flex-col justify-center min-w-0">
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex flex-col">
-                                {title ? (
-                                    <h1 className="text-[11px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                        {title}
-                                    </h1>
-                                ) : (
-                                    <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none mb-1">
-                                        <span className="hidden sm:inline">
-                                            {systemCode && systemCode !== 'EAE_GENERIC' ? `${systemCode} | ` : 'EasyGold Farming | '}
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    {title ? (
+                                        <h1 className="text-[11px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none">
+                                            {title}
+                                        </h1>
+                                    ) : (
+                                        <h1 className="text-[10px] sm:text-xs font-black text-[#cfa545] tracking-widest uppercase truncate leading-none">
+                                            <span className="hidden sm:inline">
+                                                {systemCode && systemCode !== 'EAE_GENERIC' ? `${systemCode} | ` : 'EasyGold Farming | '}
+                                            </span>
+                                            {assetType} | {portNumber} | {accountType}
+                                        </h1>
+                                    )}
+                                    {isNonLive10m && (
+                                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/60 text-[8px] sm:text-[9px] font-mono font-black text-amber-300 tracking-wide shrink-0 animate-pulse">
+                                            ⚠️ 10m NON-LIVE
                                         </span>
-                                        {assetType} | {portNumber} | {accountType}
-                                    </h1>
-                                )}
-                                <div className="text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9]">
+                                    )}
+                                </div>
+                                <div className={`text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9] ${slowBlinkClass}`}>
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
                                     {currencyPrefix}{equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                             </div>
-                            <div className="text-right flex flex-col items-end">
+                            <div className={`text-right flex flex-col items-end ${slowBlinkClass}`}>
                                 <div className="flex gap-1 sm:gap-2 items-center mb-0.5">
                                     <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase">BALANCE</span>
                                     <span className="font-mono text-[10px] sm:text-sm font-bold text-[#cfa545] tracking-wider">
@@ -334,7 +348,7 @@ export default function FarmHud({
                         </div>
                         
                         {/* THE UNIFIED BAR: Balance as Anchor (75% mark) */}
-                        <div className="relative h-2.5 sm:h-3.5 w-full bg-black/50 rounded-full border border-amber-900/30 p-0.5 overflow-hidden shadow-inner">
+                        <div className={`relative h-2.5 sm:h-3.5 w-full bg-black/50 rounded-full border border-amber-900/30 p-0.5 overflow-hidden shadow-inner ${slowBlinkClass}`}>
                            {/* Target Point: Balance Marker (WHITE) */}
                            <div className="absolute left-[75%] top-0 bottom-0 w-[1px] bg-white/60 z-20" />
                            
@@ -385,7 +399,7 @@ export default function FarmHud({
                 </div>
 
                 {/* Right: Today Harvest Icon & Result */}
-                <div className="hidden sm:flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24">
+                <div className={`hidden sm:flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24 ${slowBlinkClass}`}>
                     <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
                         <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                     </div>
@@ -441,6 +455,7 @@ export function FarmMobileStatsOverlay({
     isShaking,
     customName,
     adminMessage,
+    isNonLive10m = false,
 }: {
     portNumber: string;
     buyCount: number;
@@ -458,8 +473,10 @@ export function FarmMobileStatsOverlay({
     isShaking?: boolean;
     customName?: string;
     adminMessage?: string | null;
+    isNonLive10m?: boolean;
 }) {
     const [messageIndex, setMessageIndex] = useState(0);
+    const slowBlinkClass = isNonLive10m ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : '';
 
     useEffect(() => {
         if (!adminMessage) return;
@@ -485,7 +502,7 @@ export function FarmMobileStatsOverlay({
         <div className="sm:hidden fixed top-[94px] left-0 w-full h-[88px] bg-black/5 backdrop-blur-[2px] z-[90] flex justify-between items-center px-1.5 pt-1 border-b border-amber-900/10 pointer-events-auto">
             
             {/* Left side B/S */}
-            <div className="flex gap-1.5 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/90 border border-amber-900/40 rounded-xl px-2 h-[80px]">
+            <div className={`flex gap-1.5 flex-shrink-0 items-center drop-shadow-xl bg-[#110e0b]/90 border border-amber-900/40 rounded-xl px-2 h-[80px] ${slowBlinkClass}`}>
                 {/* BUY GROUP */}
                 <div className="flex flex-col items-center gap-0.5">
                     <div className="flex items-center gap-1 text-[8px] font-mono font-black text-cyan-400 leading-none">
@@ -558,7 +575,7 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className="bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start p-[2px]">
+            <div className={`bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start p-[2px] ${slowBlinkClass}`}>
                 {/* Profit Text on Top-Left */}
                 <div className="relative z-20 flex-1 pl-[2px] pt-[2px]">
                     <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>

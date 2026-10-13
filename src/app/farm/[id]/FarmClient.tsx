@@ -181,7 +181,9 @@ const GlowingDdOrb = ({
     title,
     isHighlighted,
     onMouseEnter,
-    onMouseLeave
+    onMouseLeave,
+    displayText,
+    isSlowBlink
 }: {
     type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE';
     value: number;
@@ -192,6 +194,8 @@ const GlowingDdOrb = ({
     isHighlighted?: boolean;
     onMouseEnter?: () => void;
     onMouseLeave?: () => void;
+    displayText?: string;
+    isSlowBlink?: boolean;
 }) => {
     // ระดับสีของค่า DD (ต่ำกว่า 18% เขียว, 18-28% เหลืองส้ม, เกิน 28% แดง)
     const levelTheme = getDDLevelTheme(value);
@@ -309,8 +313,8 @@ const GlowingDdOrb = ({
                 <span className={`text-[5px] sm:text-[6px] font-black tracking-widest uppercase mb-0.5 ${config.labelColor}`}>
                     {config.label}
                 </span>
-                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${levelTheme.textColor}`}>
-                    -{value.toFixed(1)}%
+                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${levelTheme.textColor} ${isSlowBlink ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
+                    {displayText !== undefined ? displayText : `-${value.toFixed(1)}%`}
                 </span>
             </div>
 
@@ -429,6 +433,15 @@ export default function FarmClient({
     const [isDdOrbExpanded, setIsDdOrbExpanded] = useState(false);
     const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | null>(null);
     const [expandedActivePair, setExpandedActivePair] = useState<string | null>(null);
+    const [isFallbackBannerMinimized, setIsFallbackBannerMinimized] = useState(false);
+
+    const isFallback1Url = useMemo(() => {
+        const rawCode = String(portStatus?.system_code || initialPortStatus?.system_code || '');
+        if (rawCode.includes('FALLBACK_1URL')) return true;
+        const pData = (portStatus as any)?.prime_data;
+        if (pData && pData.sync_mode === 'FALLBACK_1URL') return true;
+        return false;
+    }, [portStatus, initialPortStatus]);
 
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -1210,7 +1223,11 @@ export default function FarmClient({
         let quarantinedList: string[] = [];
         let quarantineSummary = 'QT: -';
 
-        if (primeData?.quarantined && Array.isArray(primeData.quarantined)) {
+        if (isFallback1Url) {
+            quarantinedDetails = [];
+            quarantinedList = [];
+            quarantineSummary = 'QT: **.**';
+        } else if (primeData?.quarantined && Array.isArray(primeData.quarantined)) {
             quarantinedDetails = primeData.quarantined.map((q: any) => ({
                 sym: q.sym,
                 abbr: q.abbr || q.sym.substring(0, 2),
@@ -1237,16 +1254,16 @@ export default function FarmClient({
         const topQuarantined = sortedQuarantined.length > 0 ? sortedQuarantined[0] : null;
 
         let lockedPair = {
-            sym: topQuarantined ? topQuarantined.sym : '-',
-            abbr: topQuarantined ? topQuarantined.abbr : '-',
+            sym: topQuarantined ? topQuarantined.sym : (isFallback1Url ? '**.**' : '-'),
+            abbr: topQuarantined ? topQuarantined.abbr : (isFallback1Url ? '**.**' : '-'),
             ddPct: topQuarantined ? topQuarantined.ddPct : 0.0,
-            status: topQuarantined ? (topQuarantined.isHedged ? 'HEDGE' : 'QT') : 'NORMAL'
+            status: topQuarantined ? (topQuarantined.isHedged ? 'HEDGE' : 'QT') : (isFallback1Url ? '**.**' : 'NORMAL')
         };
 
         let worstItems: Array<{ sym: string; lossPct: number; flag: string; flagLabel: string }> = [];
 
         // 1. Live Parse Table D worst items transmitted directly from MT5 EA Dashboard (e.g. "NZDUSD 0.9- | EURAUD 0.1- | NZDJPY 10.3F")
-        if (primeData?.worst && primeData.worst !== '-' && typeof primeData.worst === 'string') {
+        if (!isFallback1Url && primeData?.worst && primeData.worst !== '-' && typeof primeData.worst === 'string') {
             const tokens = primeData.worst.split('|').map((t: string) => t.trim()).filter(Boolean);
             tokens.forEach((tok: string) => {
                 const match = tok.match(/([A-Z0-9]+)\s+([\d\.]+)([FS\-]?)/i);
@@ -1260,7 +1277,7 @@ export default function FarmClient({
             });
         }
 
-        if (worstItems.length === 0 && !primeData) {
+        if (!isFallback1Url && worstItems.length === 0 && !primeData) {
             worstItems = [
                 { sym: 'NZDUSD', lossPct: 1.0, flag: '-', flagLabel: 'ปกติ' },
                 { sym: 'NZDJPY', lossPct: 10.3, flag: 'F', flagLabel: 'FREEZE' }
@@ -1272,16 +1289,18 @@ export default function FarmClient({
             ddPct: worstItems[0].lossPct,
             status: worstItems[0].flag
         } : {
-            sym: '-',
+            sym: isFallback1Url ? '**.**' : '-',
             ddPct: 0.0,
-            status: '-'
+            status: isFallback1Url ? '**.**' : '-'
         };
 
-        let worstSummary = primeData?.worst && primeData.worst !== '-' 
-            ? primeData.worst 
-            : ((portStatus as any)?.worst_summary || (worstItems.length > 0 ? worstItems.map(w => `${w.sym} ${w.lossPct}${w.flag}`).join(' | ') : '-'));
+        let worstSummary = isFallback1Url
+            ? '**.**'
+            : (primeData?.worst && primeData.worst !== '-' 
+                ? primeData.worst 
+                : ((portStatus as any)?.worst_summary || (worstItems.length > 0 ? worstItems.map(w => `${w.sym} ${w.lossPct}${w.flag}`).join(' | ') : '-')));
 
-        if (orders && orders.length > 0) {
+        if (!isFallback1Url && orders && orders.length > 0) {
             let hasAnySymbol = false;
             orders.forEach(o => {
                 const sym = (o.symbol || o.pair || '').toUpperCase().replace(/[^A-Z]/g, '');
@@ -1327,7 +1346,7 @@ export default function FarmClient({
 
         // 🔗 Direct EA Telemetry Sync: Merge pair stats if transmitted directly by EasyM Prime EA
         const rawPairsFromEA = primeData?.pairs || primeData?.pair_stats || primeData?.symbols;
-        if (rawPairsFromEA && typeof rawPairsFromEA === 'object') {
+        if (!isFallback1Url && rawPairsFromEA && typeof rawPairsFromEA === 'object') {
             Object.entries(rawPairsFromEA).forEach(([sym, pInfo]: [string, any]) => {
                 const cleanSym = sym.toUpperCase().replace(/[^A-Z]/g, '');
                 if (pairData[cleanSym] && pInfo) {
@@ -1350,7 +1369,7 @@ export default function FarmClient({
             }
         });
 
-        if (orders && orders.length > 0) {
+        if (!isFallback1Url && orders && orders.length > 0) {
                 const sortedLosses = Object.entries(pairData)
                     .filter(([_, d]) => d.pnl < 0)
                     .map(([sym, d]) => {
@@ -1420,7 +1439,7 @@ export default function FarmClient({
             : ((portStatus as any)?.rescue_dd !== undefined ? Number((portStatus as any).rescue_dd) : 0.00);
 
         // Alert Action
-        const alertAction: string = primeData?.alert || (portStatus as any)?.alert_action || (quarantinedDetails.length > 0 ? 'lock withdraws' : 'system healthy');
+        const alertAction: string = isFallback1Url ? '10m NON-LIVE' : (primeData?.alert || (portStatus as any)?.alert_action || (quarantinedDetails.length > 0 ? 'lock withdraws' : 'system healthy'));
 
         return {
             portMode,
@@ -1445,11 +1464,12 @@ export default function FarmClient({
             settings,
             pairData
         };
-    }, [stats, orders, licenseInfo, portStatus]);
+    }, [stats, orders, licenseInfo, portStatus, isFallback1Url]);
 
     // Top 4 Worst Drawdown pairs for vertical dropdown under Active Farm DD
     // EXCLUDES all quarantined pairs, exactly matching Table D on the EA dashboard!
     const top4WorstPairs = useMemo(() => {
+        if (isFallback1Url) return [];
         const quarantinedSyms = new Set(primeTelemetry?.quarantinedList || []);
         const map = new Map<string, { sym: string; ddPct: number; isQuarantined: boolean; isRescue: boolean; status: string }>();
 
@@ -1505,11 +1525,12 @@ export default function FarmClient({
         return Array.from(map.values())
             .sort((a, b) => b.ddPct - a.ddPct)
             .slice(0, 4);
-    }, [primeTelemetry, stats.balance]);
+    }, [primeTelemetry, stats.balance, isFallback1Url]);
 
     // 🛡️ Quarantined & Rescued Trees Dataset (Dynamic: 0, 1, 2, or 3 trees)
     // Anchored at Plot 2 (c: 1.0, r: 5) where the dome sits, and unfolding sequentially to the right
     const quarantinePreviewList = useMemo(() => {
+        if (isFallback1Url) return [];
         const details = primeTelemetry?.quarantinedDetails || [];
         // If no quarantined pairs exist, return empty array (plot stays empty/natural soil)
         if (details.length === 0) return [];
@@ -1536,7 +1557,7 @@ export default function FarmClient({
                 delayMs: idx * 150
             };
         });
-    }, [primeTelemetry]);
+    }, [primeTelemetry, isFallback1Url]);
 
     const totalQuarantineDD = useMemo(() => {
         return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
@@ -1548,6 +1569,7 @@ export default function FarmClient({
     // 3. Badge on Quarantined Trees (บนต้นไม้ที่ถูกขัง) = DD ของคู่เงินที่ถูกขังทั้งหมด (Quarantine Total DD)
     const rawPortDD = primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent;
     const activeFarmDDPct = useMemo(() => {
+        if (isFallback1Url) return Number(rawPortDD.toFixed(2));
         if (primeTelemetry?.modeDDPct !== undefined && primeTelemetry.modeDDPct >= 0) {
             return Number(primeTelemetry.modeDDPct.toFixed(2));
         }
@@ -1557,14 +1579,15 @@ export default function FarmClient({
                 : Number(rawPortDD.toFixed(2));
         }
         return rawPortDD;
-    }, [primeTelemetry, rawPortDD, totalQuarantineDD, portNumber, isPrime]);
+    }, [primeTelemetry, rawPortDD, totalQuarantineDD, portNumber, isPrime, isFallback1Url]);
 
     const totalPortDDPct = useMemo(() => {
+        if (isFallback1Url) return Number(rawPortDD.toFixed(2));
         if (portNumber === '97053088' || isPrime) {
             return Number((activeFarmDDPct + totalQuarantineDD).toFixed(2));
         }
         return rawPortDD;
-    }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, portNumber, isPrime]);
+    }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, portNumber, isPrime, isFallback1Url]);
 
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => pairControls[p]?.enabled !== false).length;
@@ -1603,15 +1626,17 @@ export default function FarmClient({
 
         const trees = Array.from({ length: 25 }).map((_, i) => ({ assets: [] as any[], level: treeLevels[i] }));
         // Use real orders if available, otherwise generate synthetic flowers from portStatus counts
-        // (farm_active_orders may be empty due to heartbeat sync not sending orders)
+        // (When in 1-URL non-live fallback mode, do not display open lotus flowers since live orders are not sent)
         const realOpenOrders = displayOrders.filter(o => o.status === 'OPEN');
         const totalOpenFromStatus = (Number(portStatus?.buy_count) || 0) + (Number(portStatus?.sell_count) || 0);
         
-        const openLotusAssets = realOpenOrders.length > 0
-            ? realOpenOrders.map(o => ({ type: 'OPEN_LOTUS', ticketId: o.ticket_id }))
-            : totalOpenFromStatus > 0
-                ? Array.from({ length: Math.min(totalOpenFromStatus, 100) }).map((_, i) => ({ type: 'OPEN_LOTUS', ticketId: 90000 + i }))
-                : [];
+        const openLotusAssets = isFallback1Url
+            ? []
+            : realOpenOrders.length > 0
+                ? realOpenOrders.map(o => ({ type: 'OPEN_LOTUS', ticketId: o.ticket_id }))
+                : totalOpenFromStatus > 0
+                    ? Array.from({ length: Math.min(totalOpenFromStatus, 100) }).map((_, i) => ({ type: 'OPEN_LOTUS', ticketId: 90000 + i }))
+                    : [];
 
         const allAssets = [
             ...openLotusAssets,
@@ -1629,7 +1654,7 @@ export default function FarmClient({
         });
 
         return { pnl: stats.floatingPnl, trees };
-    }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority, activeFarmDDPct, isPrime, portNumber]);
+    }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority, activeFarmDDPct, isPrime, portNumber, isFallback1Url]);
 
     // --- Fetch Real History ---
     const [history, setHistory] = useState<any[]>([]);
@@ -1926,6 +1951,7 @@ export default function FarmClient({
                     isShaking={isShaking}
                     systemCode={portStatus?.system_code?.split(':::')[0]}
                     onClick={handleSecretToggle}
+                    isNonLive10m={isFallback1Url}
                 />
                 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -1972,7 +1998,120 @@ export default function FarmClient({
                 totalStandardLots={stats.totalLots}
                 isShaking={isShaking}
                 customName={currentCustomName || undefined}
+                isNonLive10m={isFallback1Url}
             />
+
+            {/* ⚠️ CENTERED NON-LIVE 10-MINUTE FALLBACK WARNING BANNER (WHEN URL #2 IS MISSING IN MT5) */}
+            {isFallback1Url && (
+                <>
+                    {/* Minimized persistent top-center warning pill */}
+                    {isFallbackBannerMinimized ? (
+                        <div className="fixed top-[186px] sm:top-[142px] left-1/2 -translate-x-1/2 z-[135] w-[94vw] max-w-xl pointer-events-auto">
+                            <div 
+                                onClick={() => setIsFallbackBannerMinimized(false)}
+                                className="bg-[#1c1104]/95 hover:bg-[#291906]/95 border-2 border-amber-500/90 rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_25px_rgba(245,158,11,0.5)] backdrop-blur-xl flex items-center justify-between gap-2 cursor-pointer transition-all"
+                            >
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="flex h-3 w-3 relative shrink-0">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                    </span>
+                                    <span className="text-[11px] sm:text-xs font-bold text-amber-200 truncate">
+                                        ⚠️ ข้อมูลไม่ได้แสดงผลสด (อัปเดตทุก 10 นาที) • ข้อมูลที่ไม่ได้ส่งแสดงเป็น <span className="font-mono font-black text-amber-400">**.**</span>
+                                    </span>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-400/50 text-[10px] font-mono font-black text-amber-300 shrink-0">
+                                    วิธีเปิดดูสด ▼
+                                </span>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Prominent Centered Warning Card in the middle of the Farm Screen */
+                        <div className="fixed inset-0 z-[145] flex items-center justify-center p-4 bg-black/45 backdrop-blur-[2px] pointer-events-auto animate-fade-in">
+                            <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1f1305]/98 via-[#140c03]/98 to-[#0c0702]/98 border-2 border-amber-500/90 rounded-3xl p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.95),0_0_45px_rgba(245,158,11,0.45)] text-amber-100">
+                                {/* Top warning badge */}
+                                <div className="flex items-start justify-between gap-3 border-b border-amber-500/30 pb-3.5 mb-3.5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border-2 border-amber-400/70 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(245,158,11,0.5)] animate-pulse">
+                                            <AlertTriangle className="w-6 h-6 text-amber-400" />
+                                        </div>
+                                        <div>
+                                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-300 text-[10px] font-mono font-black uppercase tracking-wider mb-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                                                NON-LIVE MODE (อัปเดตทุก 10 นาที)
+                                            </div>
+                                            <h3 className="text-sm sm:text-base font-black text-white leading-snug">
+                                                หน้าฟาร์มนี้ไม่ได้แสดงผลแบบสด (Missing URL #2)
+                                            </h3>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsFallbackBannerMinimized(true)}
+                                        className="text-amber-300/60 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                        title="ย่อแถบแจ้งเตือนไปไว้ด้านบน"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Explanation */}
+                                <div className="space-y-2.5 text-xs sm:text-[13px] text-amber-100/85 leading-relaxed">
+                                    <p>
+                                        พอร์ต <span className="font-mono font-black text-amber-300">{portNumber}</span> ตั้งค่า WebRequest ใน MT5 เพียงลิงก์เดียว ระบบสำรองจึงส่งเฉพาะข้อมูลสรุปทุก 10 นาที และ<strong className="text-rose-300">ไม่ส่งข้อมูลออเดอร์สดมาที่หน้าฟาร์ม</strong>:
+                                    </p>
+                                    <div className="bg-black/60 border border-amber-500/30 rounded-2xl p-3 space-y-1.5 text-[11px] sm:text-xs">
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-amber-400 font-bold shrink-0">•</span>
+                                            <span>
+                                                <strong className="text-amber-300">ข้อมูลที่ส่งทุก 10 นาที</strong> (Balance, Equity, Floating P/L, กำไรวันนี้, จำนวนไม้ B/S) จะ<strong className="text-amber-300 underline decoration-amber-400/60">กระพริบช้าๆ</strong> เพื่อเตือนว่าไม่ใช่ข้อมูลปัจจุบัน
+                                            </span>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-amber-400 font-bold shrink-0">•</span>
+                                            <span>
+                                                <strong className="text-amber-300">ข้อมูลสดที่ไม่ได้ส่งมา</strong> (ตาราง 20 คู่เงิน, ไม้เปิดบนต้นไม้, สถานะกักขัง/กู้ชีพ) จะแสดงเป็นเครื่องหมาย <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 font-mono font-black text-amber-300">**.**</span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* URL #2 Copy Box */}
+                                    <div className="pt-1">
+                                        <div className="text-[11px] font-bold text-emerald-300 mb-1.5">
+                                            ✅ วิธีเปิดใช้งานหน้าฟาร์มสด (Real-time 20 วินาที): เพิ่ม URL ที่ 2 ใน MT5 (`Tools &gt; Options &gt; Expert Advisors`):
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-black/80 border border-emerald-500/50 rounded-xl p-2">
+                                            <code className="text-[11px] sm:text-xs font-mono text-emerald-300 truncate flex-1 select-all">
+                                                https://mfrspvzxmpksqnzcrysz.supabase.co
+                                            </code>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText('https://mfrspvzxmpksqnzcrysz.supabase.co');
+                                                    toast.success('คัดลอก URL ที่ 2 เรียบร้อยแล้ว นำไปวางใน MT5 > Tools > Options > Expert Advisors ได้เลยครับ');
+                                                }}
+                                                className="px-2.5 py-1.5 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-400/60 text-emerald-200 font-mono text-[10px] sm:text-xs font-black shrink-0 cursor-pointer active:scale-95 transition-all"
+                                            >
+                                                📋 คัดลอก URL
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Action Button */}
+                                <div className="mt-4 pt-3 border-t border-amber-500/20 flex items-center justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFallbackBannerMinimized(true)}
+                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.4)] cursor-pointer transition-all active:scale-98"
+                                    >
+                                        รับทราบ • ดูหน้าฟาร์มตามข้อมูลที่มี (ย่อคำเตือนไว้ด้านบน)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
                 <div
@@ -2127,12 +2266,12 @@ export default function FarmClient({
                                                     <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                                         <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-emerald-400 uppercase">
-                                                            ACTIVE FARM
+                                                            {isFallback1Url ? 'PORT DD (10m)' : 'ACTIVE FARM'}
                                                         </span>
                                                     </div>
 
                                                     {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
-                                                    <div className="flex items-center gap-2">
+                                                    <div className={`flex items-center gap-2 ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
                                                         <span className={`font-mono font-black ${activeTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
                                                             isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
                                                         }`}>
@@ -2148,7 +2287,7 @@ export default function FarmClient({
                                                     {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
                                                     <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
                                                         isDdExpanded ? 'w-56 sm:w-64 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
-                                                    }`}>
+                                                    } ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
                                                         {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
                                                         <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${activeTheme.bulbBorder} ${activeTheme.bulbBg} transition-all duration-300 ${
                                                             isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
@@ -2179,6 +2318,11 @@ export default function FarmClient({
                                                 onClick={(e) => e.stopPropagation()}
                                                 className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
                                             >
+                                                {isFallback1Url && (
+                                                    <div className="w-full bg-[#1a1003]/95 border-2 border-amber-500/80 rounded-xl px-3.5 py-2.5 text-center font-mono text-xs font-black text-amber-300 shadow-xl">
+                                                        รายคู่เงิน: **.** (โหมด 10 นาที ไม่ส่งข้อมูลสด)
+                                                    </div>
+                                                )}
                                                 {top4WorstPairs.map((p, idx) => {
                                                     const isPairExpanded = expandedActivePair === p.sym;
                                                     const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
@@ -2676,10 +2820,11 @@ export default function FarmClient({
                                         <GlowingDdOrb
                                             type="QUARANTINE"
                                             value={totalQuarantineDD}
+                                            displayText={isFallback1Url ? '**.**' : undefined}
                                             isHighlighted={highlightTarget === 'QUARANTINE'}
                                             onMouseEnter={() => setHighlightTarget('QUARANTINE')}
                                             onMouseLeave={() => setHighlightTarget(null)}
-                                            title={`🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}% (เชื่อมโยงกับกล่องต้นไม้ที่ขัง)`}
+                                            title={isFallback1Url ? '🔒 DD คู่ที่ถูกขัง: **.** (โหมด 10 นาที)' : `🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}% (เชื่อมโยงกับกล่องต้นไม้ที่ขัง)`}
                                         />
                                     </div>
 
@@ -2687,11 +2832,12 @@ export default function FarmClient({
                                     <div className="animate-orb-disperse-mid">
                                         <GlowingDdOrb
                                             type="ACTIVE"
-                                            value={activeFarmDDPct}
+                                            value={isFallback1Url ? 0 : activeFarmDDPct}
+                                            displayText={isFallback1Url ? '**.**' : undefined}
                                             isHighlighted={highlightTarget === 'FARM'}
                                             onMouseEnter={() => setHighlightTarget('FARM')}
                                             onMouseLeave={() => setHighlightTarget(null)}
-                                            title={`🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}% (เชื่อมโยงกับกล่อง DD เหนือฟาร์ม)`}
+                                            title={isFallback1Url ? '🌾 DD ฟาร์มปัจจุบัน: **.** (โหมด 10 นาที)' : `🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}% (เชื่อมโยงกับกล่อง DD เหนือฟาร์ม)`}
                                         />
                                     </div>
                                 </>
@@ -2701,6 +2847,7 @@ export default function FarmClient({
                             <GlowingDdOrb
                                 type="TOTAL"
                                 value={totalPortDDPct}
+                                isSlowBlink={isFallback1Url}
                                 showPing
                                 onClick={() => setIsDdOrbExpanded(prev => !prev)}
                                 title={isDdOrbExpanded ? "คลิกเพื่อพับเก็บลูกแก้วย่อย" : `📊 DD รวมของพอร์ต: -${totalPortDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดู DD ฟาร์ม / DD ถูกขัง)`}
@@ -2854,7 +3001,7 @@ export default function FarmClient({
                                                     </svg>
                                                 </div>
 
-                                                <div className="text-sm sm:text-base font-mono font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] w-full">
+                                                <div className={`text-sm sm:text-base font-mono font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] w-full ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
                                                     {primeTelemetry.ddPct.toFixed(2)}%
                                                 </div>
                                             </div>
@@ -2864,11 +3011,12 @@ export default function FarmClient({
                                                 <div className="text-[9px] sm:text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider truncate w-full flex items-center justify-center gap-1">
                                                     <span>ค่าของโหมด</span>
                                                     <span className={`text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-black border ${
+                                                        isFallback1Url ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
                                                         primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 text-red-300 border-red-500/50' :
                                                         primeTelemetry.portMode === 'SLOW' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
                                                         'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                                                     }`}>
-                                                        {primeTelemetry.portMode}
+                                                        {isFallback1Url ? '**.**' : primeTelemetry.portMode}
                                                     </span>
                                                 </div>
 
@@ -2914,12 +3062,14 @@ export default function FarmClient({
                                                             const slowLimit = primeTelemetry.settings?.slowDD ?? 15;
                                                             const freezeLimit = primeTelemetry.settings?.freezeDD ?? 28;
                                                             let angleDeg = -90;
-                                                            if (primeTelemetry.modeDDPct <= slowLimit) {
-                                                                angleDeg = -90 + (Math.max(0, primeTelemetry.modeDDPct) / (slowLimit || 1)) * 60;
-                                                            } else if (primeTelemetry.modeDDPct <= freezeLimit) {
-                                                                angleDeg = -30 + ((primeTelemetry.modeDDPct - slowLimit) / Math.max(1, freezeLimit - slowLimit)) * 60;
-                                                            } else {
-                                                                angleDeg = 30 + Math.min(1, (primeTelemetry.modeDDPct - freezeLimit) / 10) * 60;
+                                                            if (!isFallback1Url) {
+                                                                if (primeTelemetry.modeDDPct <= slowLimit) {
+                                                                    angleDeg = -90 + (Math.max(0, primeTelemetry.modeDDPct) / (slowLimit || 1)) * 60;
+                                                                } else if (primeTelemetry.modeDDPct <= freezeLimit) {
+                                                                    angleDeg = -30 + ((primeTelemetry.modeDDPct - slowLimit) / Math.max(1, freezeLimit - slowLimit)) * 60;
+                                                                } else {
+                                                                    angleDeg = 30 + Math.min(1, (primeTelemetry.modeDDPct - freezeLimit) / 10) * 60;
+                                                                }
                                                             }
                                                             return (
                                                                 <g transform={`rotate(${angleDeg}, 65, 60)`} className="transition-transform duration-700 ease-out">
@@ -2933,11 +3083,12 @@ export default function FarmClient({
                                                 </div>
 
                                                 <div className={`text-sm sm:text-base font-mono font-black tracking-tight w-full ${
+                                                    isFallback1Url ? 'text-amber-300' :
                                                     primeTelemetry.portMode === 'FREEZE' ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]' :
                                                     primeTelemetry.portMode === 'SLOW' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]' :
                                                     'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]'
                                                 }`}>
-                                                    {primeTelemetry.modeDDPct.toFixed(2)}%
+                                                    {isFallback1Url ? '**.**' : `${primeTelemetry.modeDDPct.toFixed(2)}%`}
                                                 </div>
                                             </div>
 
@@ -2993,7 +3144,7 @@ export default function FarmClient({
                                                 </div>
 
                                                 <div className="text-sm sm:text-base font-mono font-black text-amber-300 tracking-tight drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] w-full">
-                                                    {primeTelemetry.lockedPair.ddPct.toFixed(2)}%
+                                                    {isFallback1Url ? '**.**' : `${primeTelemetry.lockedPair.ddPct.toFixed(2)}%`}
                                                 </div>
                                             </div>
                                         </div>
@@ -3007,8 +3158,8 @@ export default function FarmClient({
                                                     <span>EA PRIME DASHBOARD TELEMETRY</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-white/40">
-                                                    <span>MT5 LIVE FEED</span>
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                    <span>{isFallback1Url ? '⚠️ 10m NON-LIVE (**.**)' : 'MT5 LIVE FEED'}</span>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${isFallback1Url ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`} />
                                                 </div>
                                             </div>
 
@@ -3017,22 +3168,25 @@ export default function FarmClient({
                                                 <div className="md:col-span-5 flex items-center gap-2 px-2 py-1 bg-cyan-950/20 rounded-lg border border-cyan-500/20">
                                                     <span className="text-cyan-400 font-black text-[11px] tracking-wider shrink-0 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">MODE</span>
                                                     <span className={`font-black tracking-tight ${
+                                                        isFallback1Url ? 'text-amber-300' :
                                                         primeTelemetry.portMode === 'FREEZE' ? 'text-red-400' :
                                                         primeTelemetry.portMode === 'SLOW' ? 'text-amber-400' :
                                                         'text-emerald-400'
                                                     }`}>
-                                                        {primeTelemetry.portMode}
+                                                        {isFallback1Url ? '**.**' : primeTelemetry.portMode}
                                                     </span>
                                                     <span className="text-white/40 font-normal">DD=</span>
                                                     <span className="font-bold text-white tracking-tight">
-                                                        {primeTelemetry.modeDDPct.toFixed(2)}%
+                                                        {isFallback1Url ? '**.**' : `${primeTelemetry.modeDDPct.toFixed(2)}%`}
                                                     </span>
                                                 </div>
 
                                                 <div className="md:col-span-7 flex items-center gap-2 px-2 py-1 bg-cyan-950/20 rounded-lg border border-cyan-500/20 overflow-x-auto no-scrollbar">
                                                     <span className="text-cyan-400 font-black text-[11px] tracking-wider shrink-0 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">WORST</span>
                                                     <div className="flex items-center gap-2 whitespace-nowrap text-white/90">
-                                                        {primeTelemetry.worstItems.map((item, idx) => (
+                                                        {isFallback1Url ? (
+                                                            <span className="font-mono font-black text-amber-300">**.**</span>
+                                                        ) : primeTelemetry.worstItems.map((item, idx) => (
                                                             <span key={item.sym} className="flex items-center gap-1">
                                                                 <span className="font-semibold text-white/80">{item.sym}</span>
                                                                 <span className={item.flag === 'F' ? 'text-red-400 font-bold' : item.flag === 'S' ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
@@ -3051,27 +3205,31 @@ export default function FarmClient({
                                                 <div className="md:col-span-3 flex items-center gap-1.5 px-2 py-1 bg-emerald-950/20 rounded-lg border border-emerald-500/20">
                                                     <span className="text-emerald-400 font-black text-[11px] tracking-wider shrink-0">BUF:</span>
                                                     <span className="text-emerald-300 font-black tracking-tight">
-                                                        {primeTelemetry.bufPct >= 0 ? '+' : ''}{primeTelemetry.bufPct.toFixed(1)}%
+                                                        {isFallback1Url ? '**.**' : `${primeTelemetry.bufPct >= 0 ? '+' : ''}${primeTelemetry.bufPct.toFixed(1)}%`}
                                                     </span>
-                                                    <span className="text-emerald-400/70 text-[11px]">
-                                                        ({primeTelemetry.resMult.toFixed(1)}x)
-                                                    </span>
+                                                    {!isFallback1Url && (
+                                                        <span className="text-emerald-400/70 text-[11px]">
+                                                            ({primeTelemetry.resMult.toFixed(1)}x)
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 {/* Col 1: FUND */}
                                                 <div className="md:col-span-4 flex items-center gap-1.5 px-2 py-1 bg-amber-950/20 rounded-lg border border-amber-500/20">
                                                     <span className="text-amber-400 font-black text-[11px] tracking-wider shrink-0">FUND:</span>
                                                     <span className="text-amber-300 font-black tracking-tight">
-                                                        {primeTelemetry.reliefBudget.toFixed(2)}
+                                                        {isFallback1Url ? '**.**' : primeTelemetry.reliefBudget.toFixed(2)}
                                                     </span>
-                                                    <span className="text-amber-400/70 text-[10px]">
-                                                        (C:{primeTelemetry.reliefCap} | U:{primeTelemetry.reliefUsed.toFixed(2)})
-                                                    </span>
+                                                    {!isFallback1Url && (
+                                                        <span className="text-amber-400/70 text-[10px]">
+                                                            (C:{primeTelemetry.reliefCap} | U:{primeTelemetry.reliefUsed.toFixed(2)})
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 {/* Col 2: Alert, Rescue & Quarantine */}
                                                 <div className="md:col-span-5 flex items-center gap-2 px-2 py-1 bg-amber-950/30 rounded-lg border border-amber-500/30 overflow-x-auto no-scrollbar text-amber-300 font-medium text-[11px]">
-                                                    <span className="text-white/70 shrink-0">R{primeTelemetry.rescueOrdersCount}: {primeTelemetry.rescueDDPct.toFixed(2)}%</span>
+                                                    <span className="text-white/70 shrink-0">{isFallback1Url ? 'R: **.**' : `R${primeTelemetry.rescueOrdersCount}: ${primeTelemetry.rescueDDPct.toFixed(2)}%`}</span>
                                                     <span className="text-white/30">|</span>
                                                     <span className="text-amber-300 shrink-0 font-bold">{primeTelemetry.quarantineSummary}</span>
                                                     <span className="text-white/30">|</span>
@@ -3096,22 +3254,24 @@ export default function FarmClient({
                                                         <span className="text-[10px] font-mono font-bold text-white/60 tracking-wider">PORTFOLIO AUTO MODE (TABLE D)</span>
                                                     </div>
                                                     <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${
+                                                        isFallback1Url ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
                                                         primeTelemetry.portMode === 'FREEZE' ? 'bg-red-500/20 text-red-300 border-red-500/50' :
                                                         primeTelemetry.portMode === 'SLOW' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
                                                         'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                                                     }`}>
-                                                        {primeTelemetry.portMode}
+                                                        {isFallback1Url ? '**.**' : primeTelemetry.portMode}
                                                     </span>
                                                 </div>
 
                                                 <div className="my-2 flex items-baseline justify-between">
                                                     <div>
                                                         <div className={`text-2xl sm:text-3xl font-mono font-black ${
+                                                            isFallback1Url ? 'text-amber-300' :
                                                             primeTelemetry.portMode === 'FREEZE' ? 'text-red-400' :
                                                             primeTelemetry.portMode === 'SLOW' ? 'text-amber-400' :
                                                             'text-emerald-400'
                                                         }`}>
-                                                            DD = {primeTelemetry.modeDDPct.toFixed(2)}%
+                                                            DD = {isFallback1Url ? '**.**' : `${primeTelemetry.modeDDPct.toFixed(2)}%`}
                                                         </div>
                                                         <div className="text-[10px] font-mono text-white/50 mt-0.5">
                                                             Mode Drawdown (หักคู่เงินที่ถูกขังออกแล้ว)
@@ -3147,7 +3307,11 @@ export default function FarmClient({
                                                 </div>
 
                                                 <div className="my-2 space-y-2">
-                                                    {primeTelemetry.worstItems.map((item) => (
+                                                    {isFallback1Url ? (
+                                                        <div className="p-3 rounded-xl bg-black/40 border border-amber-500/30 text-center font-mono text-amber-300 font-black">
+                                                            **.** (ไม่มีการส่งข้อมูลรายคู่ในโหมด 10 นาที)
+                                                        </div>
+                                                    ) : primeTelemetry.worstItems.map((item) => (
                                                         <div key={item.sym} className="flex items-center justify-between p-2 rounded-xl bg-black/40 border border-white/10">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="font-mono font-black text-sm text-white tracking-wider">{item.sym}</span>
@@ -3184,13 +3348,13 @@ export default function FarmClient({
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-[10px] font-mono text-white/60 font-bold tracking-wider">CAPITAL BUFFER (BUF)</span>
                                                     <span className="text-[10px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
-                                                        {primeTelemetry.resMult.toFixed(2)}x RESILIENCE
+                                                        {isFallback1Url ? '**.**' : `${primeTelemetry.resMult.toFixed(2)}x RESILIENCE`}
                                                     </span>
                                                 </div>
 
                                                 <div className="my-2 flex items-baseline gap-2">
-                                                    <div className={`text-2xl sm:text-3xl font-mono font-black ${primeTelemetry.bufPct >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                        {primeTelemetry.bufPct >= 0 ? '+' : ''}{primeTelemetry.bufPct.toFixed(1)}%
+                                                    <div className={`text-2xl sm:text-3xl font-mono font-black ${isFallback1Url ? 'text-amber-300' : primeTelemetry.bufPct >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {isFallback1Url ? '**.**' : `${primeTelemetry.bufPct >= 0 ? '+' : ''}${primeTelemetry.bufPct.toFixed(1)}%`}
                                                     </div>
                                                     <div className="text-[11px] font-mono text-white/40">
                                                         above baseline capital
@@ -3202,7 +3366,7 @@ export default function FarmClient({
                                                     <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
                                                         <div 
                                                             className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-500"
-                                                            style={{ width: `${Math.min(100, Math.max(10, (primeTelemetry.resMult / 2) * 100))}%` }}
+                                                            style={{ width: `${isFallback1Url ? 0 : Math.min(100, Math.max(10, (primeTelemetry.resMult / 2) * 100))}%` }}
                                                         />
                                                     </div>
                                                     <div className="flex justify-between text-[9px] font-mono text-white/40">
@@ -3224,7 +3388,7 @@ export default function FarmClient({
 
                                                 <div className="my-2 flex items-baseline gap-2">
                                                     <div className="text-2xl sm:text-3xl font-mono font-black text-cyan-300 drop-shadow-[0_0_10px_rgba(6,182,212,0.4)]">
-                                                        ${primeTelemetry.reliefBudget.toFixed(2)}
+                                                        {isFallback1Url ? '**.**' : `$${primeTelemetry.reliefBudget.toFixed(2)}`}
                                                     </div>
                                                     <div className="text-[11px] font-mono text-white/50">
                                                         USC กองทุนสะสม
@@ -3236,12 +3400,12 @@ export default function FarmClient({
                                                     <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
                                                         <div 
                                                             className="h-full bg-gradient-to-r from-purple-500 to-cyan-400 rounded-full transition-all duration-500"
-                                                            style={{ width: `${Math.min(100, (primeTelemetry.reliefBudget / (primeTelemetry.reliefCap || 1)) * 100)}%` }}
+                                                            style={{ width: `${isFallback1Url ? 0 : Math.min(100, (primeTelemetry.reliefBudget / (primeTelemetry.reliefCap || 1)) * 100)}%` }}
                                                         />
                                                     </div>
                                                     <div className="flex justify-between text-[9px] font-mono text-white/40">
-                                                        <span>Used: ${primeTelemetry.reliefUsed.toFixed(2)}</span>
-                                                        <span>Cap: ${primeTelemetry.reliefCap.toLocaleString()} USC (5%)</span>
+                                                        <span>Used: {isFallback1Url ? '**.**' : `$${primeTelemetry.reliefUsed.toFixed(2)}`}</span>
+                                                        <span>Cap: {isFallback1Url ? '**.**' : `$${primeTelemetry.reliefCap.toLocaleString()} USC (5%)`}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -3264,11 +3428,11 @@ export default function FarmClient({
                                                 <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
                                                     <span className="text-[10px] text-white/50 font-bold mb-1">RESCUE GRID</span>
                                                     <div className="flex items-baseline gap-1.5">
-                                                        <span className="text-cyan-400 font-black text-base">R{primeTelemetry.rescueOrdersCount}</span>
-                                                        <span className="text-white/60 text-xs">({primeTelemetry.rescueDDPct.toFixed(2)}% DD)</span>
+                                                        <span className="text-cyan-400 font-black text-base">{isFallback1Url ? '**.**' : `R${primeTelemetry.rescueOrdersCount}`}</span>
+                                                        <span className="text-white/60 text-xs">{isFallback1Url ? '' : `(${primeTelemetry.rescueDDPct.toFixed(2)}% DD)`}</span>
                                                     </div>
                                                     <span className="text-[9px] text-white/40 mt-1">
-                                                        {primeTelemetry.rescueOrdersCount > 0 ? 'ระบบกริดกู้ชีพทำงาน' : 'สแตนด์บายปกติ'}
+                                                        {isFallback1Url ? 'ไม่ได้ส่งข้อมูลในโหมด 10 นาที' : (primeTelemetry.rescueOrdersCount > 0 ? 'ระบบกริดกู้ชีพทำงาน' : 'สแตนด์บายปกติ')}
                                                     </span>
                                                 </div>
 
@@ -3279,7 +3443,9 @@ export default function FarmClient({
                                                         <span className="text-[10px] text-amber-400 font-bold">{primeTelemetry.quarantineSummary}</span>
                                                     </div>
                                                     <div className="flex flex-wrap items-center gap-2 my-1">
-                                                        {primeTelemetry.quarantinedDetails.map(q => (
+                                                        {isFallback1Url ? (
+                                                            <span className="text-amber-300 font-mono font-black text-xs">**.**</span>
+                                                        ) : primeTelemetry.quarantinedDetails.map(q => (
                                                             <div key={q.sym} className="px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1.5">
                                                                 <span>{q.abbr} ({q.sym})</span>
                                                                 <span className="text-white font-mono">{q.ddPct.toFixed(2)}%</span>
@@ -3341,8 +3507,12 @@ export default function FarmClient({
                                                     };
                                                     const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
 
-                                                    // Direction badge (B / S / -)
-                                                    const dirBadge = data.side === 'B' ? (
+                                                    // Direction badge (B / S / - or **.**)
+                                                    const dirBadge = isFallback1Url ? (
+                                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded font-mono font-black text-[10px] bg-amber-500/15 border border-amber-400/40 text-amber-300">
+                                                            **.**
+                                                        </span>
+                                                    ) : data.side === 'B' ? (
                                                         <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded font-mono font-black text-[10px] bg-cyan-500/25 border border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]">
                                                             BUY
                                                         </span>
@@ -3358,16 +3528,15 @@ export default function FarmClient({
 
                                                     // Segmented VU Meter (8 ticks)
                                                     const maxTicks = 8;
-                                                    const filledTicks = Math.min(maxTicks, data.count);
+                                                    const filledTicks = isFallback1Url ? 0 : Math.min(maxTicks, data.count);
 
                                                     // P/L formatted and colored
                                                     const pnlVal = data.pnl;
-                                                    const pnlFormatted = pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal < 0 ? pnlVal.toFixed(2) : '0.00';
-                                                    const pnlColor = pnlVal > 0 ? 'text-emerald-400' : pnlVal < 0 ? 'text-rose-400' : 'text-white/40';
+                                                    const pnlColor = isFallback1Url ? 'text-amber-300/80' : (pnlVal > 0 ? 'text-emerald-400' : pnlVal < 0 ? 'text-rose-400' : 'text-white/40');
 
                                                     // DD% formatted and colored
                                                     const ddVal = data.ddPct;
-                                                    const ddColor = ddVal >= 8 ? 'text-rose-400 font-black animate-pulse' : ddVal >= 4 ? 'text-amber-400 font-bold' : ddVal > 0 ? 'text-emerald-400 font-semibold' : 'text-white/40';
+                                                    const ddColor = isFallback1Url ? 'text-amber-300/80' : (ddVal >= 8 ? 'text-rose-400 font-black animate-pulse' : ddVal >= 4 ? 'text-amber-400 font-bold' : ddVal > 0 ? 'text-emerald-400 font-semibold' : 'text-white/40');
 
                                                     return (
                                                         <div
@@ -3423,19 +3592,19 @@ export default function FarmClient({
                                                                         ))}
                                                                     </div>
                                                                     <span className="font-bold text-white/90">
-                                                                        {data.count} <span className="text-[9px] text-white/50 font-normal">ไม้</span>
+                                                                        {isFallback1Url ? '**.**' : data.count} <span className="text-[9px] text-white/50 font-normal">ไม้</span>
                                                                     </span>
                                                                 </div>
 
                                                                 {/* Lots */}
                                                                 <div className="text-cyan-200/90 font-bold">
-                                                                    {data.lot > 0 ? `${data.lot.toFixed(2)}L` : '0.00L'}
+                                                                    {isFallback1Url ? '**.**' : (data.lot > 0 ? `${data.lot.toFixed(2)}L` : '0.00L')}
                                                                 </div>
 
                                                                 {/* DD% */}
                                                                 <div className={`font-bold ${ddColor}`}>
                                                                     <span className="text-[9px] text-white/40 font-normal mr-0.5">DD:</span>
-                                                                    {data.ddPct > 0 ? `${data.ddPct.toFixed(2)}%` : '0.00%'}
+                                                                    {isFallback1Url ? '**.**' : (data.ddPct > 0 ? `${data.ddPct.toFixed(2)}%` : '0.00%')}
                                                                 </div>
                                                             </div>
 
@@ -3445,12 +3614,12 @@ export default function FarmClient({
                                                                     <span className="text-[9px] text-white/40 shrink-0">P/L:</span>
                                                                     <div className="relative w-full h-2 bg-slate-950 rounded-full border border-white/10 overflow-hidden">
                                                                         <div className="absolute top-0 bottom-0 left-1/2 w-[1.5px] -translate-x-1/2 bg-white/40 z-10" />
-                                                                        {pnlVal > 0 ? (
+                                                                        {!isFallback1Url && pnlVal > 0 ? (
                                                                             <div 
                                                                                 className="absolute top-0 bottom-0 left-1/2 bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_4px_rgba(16,185,129,0.8)]"
                                                                                 style={{ width: `${Math.min(50, (pnlVal / 50) * 50)}%` }}
                                                                             />
-                                                                        ) : pnlVal < 0 ? (
+                                                                        ) : !isFallback1Url && pnlVal < 0 ? (
                                                                             <div 
                                                                                 className="absolute top-0 bottom-0 right-1/2 bg-gradient-to-l from-rose-500 to-amber-500 shadow-[0_0_4px_rgba(244,63,94,0.8)]"
                                                                                 style={{ width: `${Math.min(50, (Math.abs(pnlVal) / 50) * 50)}%` }}
@@ -3460,7 +3629,7 @@ export default function FarmClient({
                                                                 </div>
 
                                                                 <div className={`font-bold text-right shrink-0 min-w-[48px] ${pnlColor}`}>
-                                                                    {pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal.toFixed(2)}
+                                                                    {isFallback1Url ? '**.**' : (pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal.toFixed(2))}
                                                                 </div>
                                                             </div>
                                                         </div>

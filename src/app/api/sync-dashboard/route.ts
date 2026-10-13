@@ -246,19 +246,15 @@ export async function POST(req: Request) {
         const rawSystemCode = String(snapshot?.identity?.system_code || payload.system_code || 'EasyM');
         const systemCode = rawSystemCode.includes(':::') ? rawSystemCode.split(':::')[0].trim() : rawSystemCode;
         const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
-        let primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
-        if (!primeData && rawSystemCode.includes(':::')) {
-            try {
-                primeData = JSON.parse(rawSystemCode.split(':::')[1]);
-            } catch {
-                // ignore malformed embedded prime_data
-            }
-        }
 
-        let lastViewedAt: string | null = null;
-        let checkedViewStatus = false;
+        // Any EA hitting /api/sync-dashboard (instead of Direct-to-Supabase RPC) is operating in 1-URL Fallback Mode:
+        // Enforce 10-minute-only summary sync, strip live per-pair/order telemetry, and tag with FALLBACK_1URL
+        const primeData = {
+            sync_mode: 'FALLBACK_1URL',
+            last_10m_sync: nowIso
+        };
 
-        // 3. Process Status Sync (From Snapshot or direct stats)
+        // 3. Process Status Sync (10-Minute Summary Only)
         if (snapshot || type === 'STATS_SYNC' || payload.balance !== undefined) {
             const balance = Number(snapshot?.account?.balance ?? payload.balance ?? 0);
             const equity = Number(snapshot?.account?.equity ?? payload.equity ?? balance);
@@ -280,11 +276,8 @@ export async function POST(req: Request) {
             const accountType = (snapshot?.account?.currency === 'USC' || payload.account_type === 'USC') ? 'USC' : 'USD';
             const assetType = snapshot?.identity?.product_family || payload.asset_type || 'FOREX';
 
-            // Seamless dual-storage: Encode primeData into system_code as fallback
-            // so telemetry works immediately even before the prime_data DB column is added
-            const finalSystemCode = (primeData && typeof primeData === 'object')
-                ? `${systemCode}:::${JSON.stringify(primeData)}`
-                : systemCode;
+            // Encode FALLBACK_1URL marker into system_code so both Farm UIs know this port is in 10m Non-Live mode
+            const finalSystemCode = `${systemCode}:::${JSON.stringify(primeData)}`;
 
             const statusPayload: any = {
                 port_number: portNumber,
@@ -310,62 +303,17 @@ export async function POST(req: Request) {
                 updated_at: nowIso
             };
 
-            if (primeData) {
-                statusPayload.prime_data = primeData;
-            }
-
-            let { data: upsertedRow, error: statusErr } = await supabase
+            const { error: statusErr } = await supabase
                 .from('farm_port_status')
-                .upsert(statusPayload, { onConflict: 'port_number' })
-                .select('last_viewed_at')
-                .maybeSingle();
+                .upsert(statusPayload, { onConflict: 'port_number' });
 
-            if (statusErr && primeData) {
-                console.warn('Initial farm_port_status upsert with prime_data failed, retrying without prime_data:', statusErr.message);
-                delete statusPayload.prime_data;
-                const retry = await supabase
-                    .from('farm_port_status')
-                    .upsert(statusPayload, { onConflict: 'port_number' })
-                    .select('last_viewed_at')
-                    .maybeSingle();
-                statusErr = retry.error;
-                upsertedRow = retry.data;
-            }
-
-            if (!statusErr) {
-                checkedViewStatus = true;
-                lastViewedAt = upsertedRow?.last_viewed_at || null;
-            } else {
+            if (statusErr) {
                 console.error('Error syncing farm_port_status:', statusErr);
             }
         }
 
-        // 4. Process Active Orders (Farm UI Data)
-        if (orders && Array.isArray(orders) && orders.length > 0) {
-            const upsertData = orders.map((o: any) => ({
-                ticket_id: o.ticket_id,
-                port_number: portNumber,
-                symbol: o.symbol || o.pair || '',
-                type: o.type || 'BUY',
-                status: o.status || 'OPEN',
-                current_pnl: o.current_pnl || 0,
-                sl_risk_percent: o.sl_risk_percent || 0,
-                raw_lot_size: o.raw_lot_size || 0,
-                updated_at: nowIso
-            }));
-
-            if (upsertData.length > 0) {
-                await supabase.from('farm_active_orders').upsert(upsertData, { onConflict: 'ticket_id' });
-
-                const closedTicketIds = upsertData
-                    .filter((o: any) => o.status && o.status.startsWith('CLOSED'))
-                    .map((o: any) => o.ticket_id);
-
-                if (closedTicketIds.length > 0) {
-                    await supabase.from('farm_active_orders').delete().in('ticket_id', closedTicketIds);
-                }
-            }
-        }
+        // 4. Clear any stale live orders in farm_active_orders (1-URL Fallback does not stream live Farm orders)
+        await supabase.from('farm_active_orders').delete().eq('port_number', portNumber);
 
         // 5. Process Batch Closure Events (History Data)
         if (type === 'BATCH_CLOSE' || payload.event?.type === 'BATCH_CLOSE') {
@@ -402,31 +350,9 @@ export async function POST(req: Request) {
             }
         }
 
-        // 7. Check if user is actively viewing this port on the web (within last 2 minutes)
-        let isViewerActive = false;
-        if (!checkedViewStatus) {
-            try {
-                const { data: viewCheck } = await supabase
-                    .from('farm_port_status')
-                    .select('last_viewed_at')
-                    .eq('port_number', portNumber)
-                    .maybeSingle();
-                lastViewedAt = viewCheck?.last_viewed_at || null;
-            } catch (e) {
-                // Ignore query error and default to sleep mode
-            }
-        }
-
-        if (lastViewedAt) {
-            const lastViewedMs = new Date(lastViewedAt).getTime();
-            const diffMs = Date.now() - lastViewedMs;
-            // If viewed within last 2 minutes (120,000 ms), live 20s sync is active
-            if (diffMs >= 0 && diffMs < 120000) {
-                isViewerActive = true;
-            }
-        }
-
-        const assignedInterval = isViewerActive ? 20 : 600;
+        // 7. 1-URL Fallback Policy: Always enforce 10-minute (600s) standby interval (never switch to 20s live streaming)
+        const isViewerActive = false;
+        const assignedInterval = 600;
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
         recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
@@ -434,17 +360,15 @@ export async function POST(req: Request) {
         // 8. Retrieve 2-Way Command & Web Control state for this port
         const webConfig = getPortControl(portNumber);
 
-        // Return response:
-        // Note: should_sync_full is kept true so deployed EAs with EAE_WebSync.mqh
-        // respect sync_interval (600s when idle, 20s when viewed) and keep hash-throttling active,
-        // while license_tier ('free' when idle, 'pro' when viewed) skips uploading order arrays when idle.
+        // Return 10-minute-only response (viewer_active: false, sync_interval: 600, license_tier: 'free')
         return NextResponse.json({
             status: 'success',
             success: true,
             should_sync_full: true,
-            viewer_active: isViewerActive,
-            sync_interval: assignedInterval,
-            license_tier: isViewerActive ? 'pro' : 'free',
+            viewer_active: false,
+            sync_interval: 600,
+            sync_mode: 'FALLBACK_1URL',
+            license_tier: 'free',
             is_trial: false,
             timestamp: nowIso,
             web_config: webConfig
