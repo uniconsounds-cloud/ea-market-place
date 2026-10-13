@@ -457,6 +457,38 @@ export default function FarmClient({
         return false;
     }, [portStatus, initialPortStatus]);
 
+    const prevFallbackRef = useRef<boolean>(isFallback1Url);
+    useEffect(() => {
+        // When transitioning from Non-Live (1-URL) to Live (2-URL), immediately fetch all active orders and notify user
+        if (prevFallbackRef.current && !isFallback1Url) {
+            prevFallbackRef.current = false;
+            supabase
+                .from('farm_active_orders')
+                .select('*')
+                .eq('port_number', portNumber)
+                .then(({ data }) => {
+                    if (data) setOrders(data);
+                });
+            toast.success('เชื่อมต่อโหมดดูหน้าฟาร์มแบบสด (Live Mode) สำเร็จแล้วครับ!');
+        } else {
+            prevFallbackRef.current = isFallback1Url;
+        }
+
+        if (!isFallback1Url) return;
+
+        // While in Non-Live mode, poll every 5s so as soon as the user adds URL #2 in MT5, the warning disappears automatically
+        const pollTimer = setInterval(async () => {
+            const [statusRes, ordersRes] = await Promise.all([
+                supabase.from('farm_port_status').select('*').eq('port_number', portNumber).maybeSingle(),
+                supabase.from('farm_active_orders').select('*').eq('port_number', portNumber)
+            ]);
+            if (statusRes.data) setPortStatus(statusRes.data);
+            if (ordersRes.data && ordersRes.data.length > 0) setOrders(ordersRes.data);
+        }, 5000);
+
+        return () => clearInterval(pollTimer);
+    }, [isFallback1Url, portNumber]);
+
     const handleQuarantineBoxClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         // ปรับการคลิกที่กรอบแสดง DD รวมของ quarantine ให้คลิกแล้วขยายใหญ่ขึ้นเหมือนเดิม แต่ไม่มีผลกับโดม เมื่อคลิกอีกครั้งก็หดลงเหมือนเดิม
@@ -2100,11 +2132,11 @@ export default function FarmClient({
                                                 2
                                             </span>
                                             <h4 className="text-xs sm:text-sm font-black text-white">
-                                                กดปุ่ม F7 บนกราฟ MT5 แล้วกด OK
+                                                กด OK แล้วสลับ Timeframe บนกราฟ 1 ครั้ง
                                             </h4>
                                         </div>
                                         <p className="text-[11px] sm:text-xs text-amber-100/80 leading-relaxed pl-8">
-                                            คลิกที่กราฟที่ติดตั้ง EA แล้วกดปุ่ม <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">F7</span> บนคีย์บอร์ด จากนั้นกด <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">OK</span> 1 ครั้ง หน้าฟาร์มจะแสดงผลแบบสดทันทีครับ
+                                            กด <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">OK</span> เพื่อบันทึกลิงก์ จากนั้นคลิกสลับ Timeframe บนกราฟที่รัน EA 1 ครั้ง (เช่น กด <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">M15</span> แล้วกดกลับ <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">M5</span>) หน้าฟาร์มจะแสดงผลแบบสดทันทีครับ
                                         </p>
                                     </div>
                                 </div>
