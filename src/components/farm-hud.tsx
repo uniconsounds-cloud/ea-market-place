@@ -313,7 +313,7 @@ export default function FarmHud({
                                     )}
                                     {isNonLive10m && (
                                         <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/60 text-[8px] sm:text-[9px] font-mono font-black text-amber-300 tracking-wide shrink-0 animate-pulse">
-                                            ⚠️ 10m NON-LIVE
+                                            ⚠️ NON-LIVE
                                         </span>
                                     )}
                                 </div>

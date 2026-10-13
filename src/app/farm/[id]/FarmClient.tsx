@@ -2009,93 +2009,74 @@ export default function FarmClient({
                 isNonLive10m={isFallback1Url}
             />
 
-            {/* ⚠️ CENTERED NON-LIVE 10-MINUTE FALLBACK WARNING BANNER (WHEN URL #2 IS MISSING IN MT5) */}
+            {/* ⚠️ CENTERED NON-LIVE SETUP GUIDE MODAL (WHEN URL #2 IS MISSING IN MT5) */}
             {isFallback1Url && (
                 <>
                     {/* Minimized persistent top-center warning pill */}
                     {isFallbackBannerMinimized ? (
-                        <div className="fixed top-[186px] sm:top-[142px] left-1/2 -translate-x-1/2 z-[135] w-[94vw] max-w-xl pointer-events-auto">
+                        <div className="fixed top-[186px] sm:top-[142px] left-1/2 -translate-x-1/2 z-[135] w-[94vw] max-w-md pointer-events-auto">
                             <div 
                                 onClick={() => setIsFallbackBannerMinimized(false)}
                                 className="bg-[#1c1104]/95 hover:bg-[#291906]/95 border-2 border-amber-500/90 rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_25px_rgba(245,158,11,0.5)] backdrop-blur-xl flex items-center justify-between gap-2 cursor-pointer transition-all"
                             >
                                 <div className="flex items-center gap-2 min-w-0">
-                                    <span className="flex h-3 w-3 relative shrink-0">
+                                    <span className="flex h-2.5 w-2.5 relative shrink-0">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
                                     </span>
                                     <span className="text-[11px] sm:text-xs font-bold text-amber-200 truncate">
-                                        ⚠️ ข้อมูลไม่ได้แสดงผลสด (อัปเดตทุก 10 นาที) • ข้อมูลที่ไม่ได้ส่งแสดงเป็น <span className="font-mono font-black text-amber-400">**.**</span>
+                                        ⚠️ หน้าฟาร์มยังไม่ได้เชื่อมต่อโหมดดูสด
                                     </span>
                                 </div>
-                                <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-400/50 text-[10px] font-mono font-black text-amber-300 shrink-0">
-                                    วิธีเปิดดูสด ▼
+                                <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 border border-amber-400/50 text-[10px] font-mono font-black text-amber-300 shrink-0">
+                                    วิธีเปิดดูสด (2 ขั้นตอน) ▼
                                 </span>
                             </div>
                         </div>
                     ) : (
-                        /* Prominent Centered Warning Card in the middle of the Farm Screen */
-                        <div className="fixed inset-0 z-[145] flex items-center justify-center p-4 bg-black/45 backdrop-blur-[2px] pointer-events-auto animate-fade-in">
-                            <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1f1305]/98 via-[#140c03]/98 to-[#0c0702]/98 border-2 border-amber-500/90 rounded-3xl p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.95),0_0_45px_rgba(245,158,11,0.45)] text-amber-100">
-                                {/* Top warning badge */}
-                                <div className="flex items-start justify-between gap-3 border-b border-amber-500/30 pb-3.5 mb-3.5">
+                        /* Clean 2-Step Centered Setup Guide Modal */
+                        <div className="fixed inset-0 z-[145] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[3px] pointer-events-auto animate-fade-in">
+                            <div className="relative w-full max-w-md bg-gradient-to-b from-[#1c1206]/98 via-[#120b03]/98 to-[#0a0602]/98 border-2 border-amber-500/85 rounded-3xl p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(245,158,11,0.35)] text-amber-100">
+                                {/* Header */}
+                                <div className="flex items-start justify-between gap-3 border-b border-amber-500/25 pb-4 mb-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border-2 border-amber-400/70 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(245,158,11,0.5)] animate-pulse">
-                                            <AlertTriangle className="w-6 h-6 text-amber-400" />
+                                        <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/70 flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(245,158,11,0.4)]">
+                                            <AlertTriangle className="w-5 h-5 text-amber-400" />
                                         </div>
                                         <div>
-                                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-300 text-[10px] font-mono font-black uppercase tracking-wider mb-1">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
-                                                NON-LIVE MODE (อัปเดตทุก 10 นาที)
+                                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-[10px] font-mono font-black uppercase tracking-wider mb-1">
+                                                PORT {portNumber} • LIVE FARM SETUP
                                             </div>
-                                            <h3 className="text-sm sm:text-base font-black text-white leading-snug">
-                                                หน้าฟาร์มนี้ไม่ได้แสดงผลแบบสด (Missing URL #2)
+                                            <h3 className="text-base sm:text-lg font-black text-white leading-snug">
+                                                วิธีเปิดดูหน้าฟาร์มแบบสด
                                             </h3>
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => setIsFallbackBannerMinimized(true)}
                                         className="text-amber-300/60 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        title="ย่อแถบแจ้งเตือนไปไว้ด้านบน"
+                                        title="ย่อคำแนะนำไว้ด้านบน"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
 
-                                {/* Explanation */}
-                                <div className="space-y-2.5 text-xs sm:text-[13px] text-amber-100/85 leading-relaxed">
-                                    <p>
-                                        พอร์ต <span className="font-mono font-black text-amber-300">{portNumber}</span> ตั้งค่า WebRequest ใน MT5 เพียงลิงก์เดียว ระบบสำรองจึงส่งเฉพาะข้อมูลสรุปทุก 10 นาที และ<strong className="text-rose-300">ไม่ส่งข้อมูลออเดอร์สดมาที่หน้าฟาร์ม</strong>:
-                                    </p>
-                                    <div className="bg-black/60 border border-amber-500/30 rounded-2xl p-3 space-y-1.5 text-[11px] sm:text-xs">
-                                        <div className="flex items-start gap-2">
-                                            <span className="text-amber-400 font-bold shrink-0">•</span>
-                                            <span>
-                                                <strong className="text-amber-300">ข้อมูลที่ส่งทุก 10 นาที</strong> (Balance, Equity, Floating P/L, กำไรวันนี้, จำนวนไม้ B/S, %DD) จะ<strong className="text-amber-300 underline decoration-amber-400/60">กระพริบช้าๆ</strong> เพื่อเตือนว่าไม่ใช่ข้อมูลปัจจุบัน
+                                {/* 2 Steps */}
+                                <div className="space-y-3.5">
+                                    {/* Step 1 */}
+                                    <div className="bg-black/55 border border-amber-500/30 rounded-2xl p-3.5 space-y-2.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(245,158,11,0.5)]">
+                                                1
                                             </span>
+                                            <h4 className="text-xs sm:text-sm font-black text-white">
+                                                กรุณาตั้งค่า WebRequest ที่ 2 ใน MT5
+                                            </h4>
                                         </div>
-                                        <div className="flex items-start gap-2">
-                                            <span className="text-amber-400 font-bold shrink-0">•</span>
-                                            <span>
-                                                {isPrime ? (
-                                                    <>
-                                                        <strong className="text-amber-300">ข้อมูลสดที่ไม่ได้ส่งมา</strong> (ตาราง 20 คู่เงิน, ไม้เปิดบนต้นไม้, สถานะกักขัง/กู้ชีพ) จะแสดงเป็นเครื่องหมาย <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 font-mono font-black text-amber-300">**.**</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <strong className="text-amber-300">ข้อมูลออเดอร์สดรายไม้</strong> (ดอกบัว/ผลไม้บนต้นไม้แบบ Real-time) จะไม่ถูกส่งมาแสดงผลจนกว่าจะเพิ่ม URL ที่ 2
-                                                    </>
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* URL #2 Copy Box */}
-                                    <div className="pt-1">
-                                        <div className="text-[11px] font-bold text-emerald-300 mb-1.5">
-                                            ✅ วิธีเปิดใช้งานหน้าฟาร์มสด (Real-time 20 วินาที): เพิ่ม URL ที่ 2 ใน MT5 (`Tools &gt; Options &gt; Expert Advisors`):
-                                        </div>
-                                        <div className="flex items-center gap-2 bg-black/80 border border-emerald-500/50 rounded-xl p-2">
+                                        <p className="text-[11px] sm:text-xs text-amber-100/80 leading-relaxed pl-8">
+                                            เปิดโปรแกรม MT5 ไปที่เมนู <span className="font-mono font-bold text-amber-300">Tools &gt; Options &gt; Expert Advisors</span> ติ๊กถูกที่ช่อง <span className="font-mono font-bold text-amber-300">Allow WebRequest for listed URL</span> แล้วเพิ่มลิงก์นี้ลงไป:
+                                        </p>
+                                        <div className="flex items-center gap-2 bg-[#051811]/90 border border-emerald-500/50 rounded-xl p-2 ml-8">
                                             <code className="text-[11px] sm:text-xs font-mono text-emerald-300 truncate flex-1 select-all">
                                                 https://mfrspvzxmpksqnzcrysz.supabase.co
                                             </code>
@@ -2103,7 +2084,7 @@ export default function FarmClient({
                                                 type="button"
                                                 onClick={() => {
                                                     navigator.clipboard.writeText('https://mfrspvzxmpksqnzcrysz.supabase.co');
-                                                    toast.success('คัดลอก URL ที่ 2 เรียบร้อยแล้ว นำไปวางใน MT5 > Tools > Options > Expert Advisors ได้เลยครับ');
+                                                    toast.success('คัดลอก URL เรียบร้อยแล้ว นำไปวางใน MT5 ได้เลยครับ');
                                                 }}
                                                 className="px-2.5 py-1.5 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-400/60 text-emerald-200 font-mono text-[10px] sm:text-xs font-black shrink-0 cursor-pointer active:scale-95 transition-all"
                                             >
@@ -2111,16 +2092,31 @@ export default function FarmClient({
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Step 2 */}
+                                    <div className="bg-black/55 border border-amber-500/30 rounded-2xl p-3.5 space-y-1.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(245,158,11,0.5)]">
+                                                2
+                                            </span>
+                                            <h4 className="text-xs sm:text-sm font-black text-white">
+                                                กดปุ่ม F7 บนกราฟ MT5 แล้วกด OK
+                                            </h4>
+                                        </div>
+                                        <p className="text-[11px] sm:text-xs text-amber-100/80 leading-relaxed pl-8">
+                                            คลิกที่กราฟที่ติดตั้ง EA แล้วกดปุ่ม <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">F7</span> บนคีย์บอร์ด จากนั้นกด <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/50 font-mono font-black text-amber-300">OK</span> 1 ครั้ง หน้าฟาร์มจะแสดงผลแบบสดทันทีครับ
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {/* Action Button */}
-                                <div className="mt-4 pt-3 border-t border-amber-500/20 flex items-center justify-end">
+                                <div className="mt-4 pt-3.5 border-t border-amber-500/20">
                                     <button
                                         type="button"
                                         onClick={() => setIsFallbackBannerMinimized(true)}
-                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.4)] cursor-pointer transition-all active:scale-98"
+                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm tracking-wide shadow-[0_0_20px_rgba(245,158,11,0.35)] cursor-pointer transition-all active:scale-98"
                                     >
-                                        รับทราบ • ดูหน้าฟาร์มตามข้อมูลที่มี (ย่อคำเตือนไว้ด้านบน)
+                                        รับทราบ • ย่อคำแนะนำไว้ด้านบน
                                     </button>
                                 </div>
                             </div>
