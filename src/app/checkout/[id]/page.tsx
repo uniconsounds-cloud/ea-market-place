@@ -136,7 +136,9 @@ function CheckoutContent({ productId }: { productId: string }) {
     };
 
     const handleSubmit = async () => {
-        if (!isIbRequest && !slipFile) {
+        const isFreeOrder = isIbRequest || product?.allow_rent === false;
+
+        if (!isFreeOrder && !slipFile) {
             alert('กรุณาแนบสลิปโอนเงิน');
             return;
         }
@@ -153,11 +155,11 @@ function CheckoutContent({ productId }: { productId: string }) {
                 return;
             }
 
-            // 1. Upload Slip (Skip for IB Requests)
+            // 1. Upload Slip (Skip for IB Requests & Free Non-Rental Products)
             let slipUrl = null;
-            if (!isIbRequest) {
+            if (!isFreeOrder) {
                 slipUrl = await handleUpload(user.id);
-            } else {
+            } else if (isIbRequest) {
                 // Verify user actually has an approved IB membership
                 const { data: memberships } = await supabase
                     .from('ib_memberships')
@@ -231,18 +233,18 @@ function CheckoutContent({ productId }: { productId: string }) {
             const { error } = await supabase.from('orders').insert({
                 user_id: user.id,
                 product_id: product.id,
-                amount: isIbRequest ? 0 : getAmount() + satang,
+                amount: isFreeOrder ? 0 : getAmount() + satang,
                 status: 'pending', // Both go to pending
-                is_ib_request: isIbRequest ? true : false,
+                is_ib_request: isFreeOrder,
                 ib_broker_name: isIbRequest ? ibBrokerName : null,
                 slip_url: slipUrl,
-                plan_type: planType,
+                plan_type: isFreeOrder ? 'ib' : planType,
                 account_number: accountNumber.trim() // Save account number
             });
 
             if (error) throw error;
 
-            if (isIbRequest) {
+            if (isFreeOrder) {
                 alert('ส่งคำขอรับสิทธิ์ใช้งาน IB เรียบร้อยแล้ว! แอดมินกำลังดำเนินการตรวจสอบ');
             } else {
                 alert('แจ้งชำระเงินเรียบร้อย! กรุณารอแอดมินตรวจสอบ');
@@ -290,6 +292,8 @@ function CheckoutContent({ productId }: { productId: string }) {
     };
 
     if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+
+    const isFreeOrder = isIbRequest || product?.allow_rent === false;
 
     return (
         <div className="container mx-auto px-4 py-12 max-w-2xl">
@@ -350,109 +354,117 @@ function CheckoutContent({ productId }: { productId: string }) {
                                     <div className="text-right">
                                         <span className="text-muted-foreground block mb-0.5">หมดอายุหลังต่ออายุ:</span>
                                         <span className="font-bold text-green-600 dark:text-green-500">
-                                            {calculateNewExpiry(currentLicense.expiry_date, planType)}
+                                            {calculateNewExpiry(currentLicense.expiry_date, isFreeOrder ? 'ib' : planType)}
                                         </span>
                                     </div>
                                 </div>
                             )}
                             {!currentLicense && <p className="text-xs text-muted-foreground">ระบบล็อคหมายเลขพอร์ตเพื่อความถูกต้องของข้อมูล</p>}
-                            {isIbRequest && (
+                            {isFreeOrder && (
                                 <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 rounded-md text-sm border border-blue-200 dark:border-blue-800 flex items-start gap-2">
                                     <BadgeCheck className="w-5 h-5 shrink-0 mt-0.5 text-blue-500" />
-                                    <p>รายการนี้เป็นการ <strong>ขอสิทธิ์ใช้งานฟรีในฐานะ IB</strong> โดยไม่ต้องชำระเงิน แอดมินจะทำการตรวจสอบบัญชีของท่านและอนุมัติสิทธิ์ให้โดยเร็วที่สุด</p>
+                                    <p>
+                                        {isIbRequest
+                                            ? <>รายการนี้เป็นการ <strong>ขอสิทธิ์ใช้งานฟรีในฐานะ IB</strong> โดยไม่ต้องชำระเงิน แอดมินจะทำการตรวจสอบบัญชีของท่านและอนุมัติสิทธิ์ให้โดยเร็วที่สุด</>
+                                            : <>สินค้านี้เปิดให้ <strong>ขอรับสิทธิ์ใช้งานฟรี</strong> โดยไม่ต้องชำระเงิน (ไม่มีแพ็กเกจเช่าหรือซื้อขาด) แอดมินจะทำการตรวจสอบบัญชีและอนุมัติสิทธิ์ให้โดยเร็วที่สุด</>
+                                        }
+                                    </p>
                                 </div>
                             )}
                         </div>
 
-                        {productId === '44d33c3e-2dd8-4804-9069-15d381ec8009' ? (
-                            <div className="space-y-2">
-                                <Label>แพ็กเกจมอนิเตอร์และสกินที่เลือก</Label>
-                                <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm space-y-1">
-                                    <div className="flex justify-between font-semibold">
-                                        <span className="capitalize">ระดับ: {planType.split('_')[1] || 'Free'} Tier</span>
-                                        <span>฿{
-                                            planType.split('_')[1] === 'pro' 
-                                            ? (isIbRequest ? '0 (IB ฟรี)' : '1,590') 
-                                            : planType.split('_')[1] === 'max' 
-                                            ? '4,990' 
-                                            : '0'
-                                        }</span>
-                                    </div>
-                                    {planType.includes('_skin_') && (
-                                        <div className="text-xs text-muted-foreground pt-1 border-t border-border/30 mt-2 space-y-1">
-                                            <span className="font-semibold text-foreground block mb-1">สกินเสริมที่เลือก:</span>
-                                            {planType.split('_skin_')[1].includes('pixel_farm') && (
-                                                <div className="flex justify-between">
-                                                    <span>• Pixel Farm 2.5D</span>
-                                                    <span>{planType.split('_')[1] === 'pro' || planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿990'}</span>
-                                                </div>
-                                            )}
-                                            {planType.split('_skin_')[1].includes('f1_cockpit') && (
-                                                <div className="flex justify-between">
-                                                    <span>• F1 Cockpit</span>
-                                                    <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,290'}</span>
-                                                </div>
-                                            )}
-                                            {planType.split('_skin_')[1].includes('fighter_jet') && (
-                                                <div className="flex justify-between">
-                                                    <span>• Fighter Jet</span>
-                                                    <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,290'}</span>
-                                                </div>
-                                            )}
-                                            {planType.split('_skin_')[1].includes('spaceship_commander') && (
-                                                <div className="flex justify-between">
-                                                    <span>• Spaceship Commander</span>
-                                                    <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,590'}</span>
-                                                </div>
-                                            )}
+                        {/* แสดงแพ็กเกจที่เลือก เฉพาะเมื่อสินค้านั้นเปิดให้เช่า/ซื้อขาด (product.allow_rent !== false) และไม่ใช่คำขอฟรี/IB */}
+                        {!isFreeOrder && (
+                            productId === '44d33c3e-2dd8-4804-9069-15d381ec8009' ? (
+                                <div className="space-y-2">
+                                    <Label>แพ็กเกจมอนิเตอร์และสกินที่เลือก</Label>
+                                    <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm space-y-1">
+                                        <div className="flex justify-between font-semibold">
+                                            <span className="capitalize">ระดับ: {planType.split('_')[1] || 'Free'} Tier</span>
+                                            <span>฿{
+                                                planType.split('_')[1] === 'pro' 
+                                                ? (isIbRequest ? '0 (IB ฟรี)' : '1,590') 
+                                                : planType.split('_')[1] === 'max' 
+                                                ? '4,990' 
+                                                : '0'
+                                            }</span>
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
-                                <Label>แพ็กเกจที่เลือก</Label>
-                                <RadioGroup value={planType} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
-                                    <div>
-                                        <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" disabled />
-                                        <Label
-                                            htmlFor="monthly"
-                                            className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
-                                        >
-                                            <span className="mb-2 text-sm font-semibold">รายเดือน</span>
-                                            <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
-                                        </Label>
+                                        {planType.includes('_skin_') && (
+                                            <div className="text-xs text-muted-foreground pt-1 border-t border-border/30 mt-2 space-y-1">
+                                                <span className="font-semibold text-foreground block mb-1">สกินเสริมที่เลือก:</span>
+                                                {planType.split('_skin_')[1].includes('pixel_farm') && (
+                                                    <div className="flex justify-between">
+                                                        <span>• Pixel Farm 2.5D</span>
+                                                        <span>{planType.split('_')[1] === 'pro' || planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿990'}</span>
+                                                    </div>
+                                                )}
+                                                {planType.split('_skin_')[1].includes('f1_cockpit') && (
+                                                    <div className="flex justify-between">
+                                                        <span>• F1 Cockpit</span>
+                                                        <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,290'}</span>
+                                                    </div>
+                                                )}
+                                                {planType.split('_skin_')[1].includes('fighter_jet') && (
+                                                    <div className="flex justify-between">
+                                                        <span>• Fighter Jet</span>
+                                                        <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,290'}</span>
+                                                    </div>
+                                                )}
+                                                {planType.split('_skin_')[1].includes('spaceship_commander') && (
+                                                    <div className="flex justify-between">
+                                                        <span>• Spaceship Commander</span>
+                                                        <span>{planType.split('_')[1] === 'max' ? '฿0 (แถมฟรี)' : '฿1,590'}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                    {product.price_quarterly && (
+                                </div>
+                            ) : (
+                                <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
+                                    <Label>แพ็กเกจที่เลือก</Label>
+                                    <RadioGroup value={planType} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
                                         <div>
-                                            <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" disabled />
+                                            <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" disabled />
                                             <Label
-                                                htmlFor="quarterly"
-                                                className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
+                                                htmlFor="monthly"
+                                                className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
                                             >
-                                                <span className="mb-2 text-sm font-semibold">3 เดือน</span>
-                                                <span className="text-xl font-bold">฿{product.price_quarterly.toLocaleString()}</span>
+                                                <span className="mb-2 text-sm font-semibold">รายเดือน</span>
+                                                <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
                                             </Label>
                                         </div>
-                                    )}
-                                    <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
-                                        <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" disabled />
-                                        <Label
-                                            htmlFor="lifetime"
-                                            className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
-                                        >
-                                            <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
-                                            <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
-                                        </Label>
-                                    </div>
-                                </RadioGroup>
-                            </div>
+                                        {product.price_quarterly && (
+                                            <div>
+                                                <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" disabled />
+                                                <Label
+                                                    htmlFor="quarterly"
+                                                    className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
+                                                >
+                                                    <span className="mb-2 text-sm font-semibold">3 เดือน</span>
+                                                    <span className="text-xl font-bold">฿{product.price_quarterly.toLocaleString()}</span>
+                                                </Label>
+                                            </div>
+                                        )}
+                                        <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
+                                            <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" disabled />
+                                            <Label
+                                                htmlFor="lifetime"
+                                                className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
+                                            >
+                                                <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
+                                                <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
+                                            </Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+                            )
                         )}
                     </CardContent>
                 </Card>
 
                 {/* Payment */}
-                {!isIbRequest && (
+                {!isFreeOrder && (
                     <Card>
                         <CardHeader>
                             <CardTitle>ชำระเงิน</CardTitle>
@@ -525,7 +537,7 @@ function CheckoutContent({ productId }: { productId: string }) {
                         </>
                     ) : (
                         <>
-                            <BadgeCheck className="mr-2 h-4 w-4" /> {isIbRequest ? 'ยืนยันขอสิทธิ์ใช้งานฟรี (บัญชี IB)' : 'ยืนยันการแจ้งชำระเงิน'}
+                            <BadgeCheck className="mr-2 h-4 w-4" /> {isFreeOrder ? 'ยืนยันขอสิทธิ์ใช้งานฟรี (บัญชี IB)' : 'ยืนยันการแจ้งชำระเงิน'}
                         </>
                     )}
                 </Button>
