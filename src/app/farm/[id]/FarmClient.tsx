@@ -401,17 +401,27 @@ export default function FarmClient({
 
     useEffect(() => {
         const fetchReleaseState = async () => {
+            if (typeof window !== 'undefined') {
+                const cached = localStorage.getItem('owner_prime_release_gate');
+                if (cached !== null) {
+                    setIsGlobalPrimeReleased(cached === 'true');
+                }
+            }
             try {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('fleet_capital_snapshots')
                     .select('snapshot_meta')
                     .eq('period_key', 'prime_farm_release_gate')
                     .maybeSingle();
-                if (data?.snapshot_meta) {
-                    setIsGlobalPrimeReleased(Boolean((data.snapshot_meta as any)?.is_released));
+                if (!error && data?.snapshot_meta) {
+                    const released = Boolean((data.snapshot_meta as any)?.is_released);
+                    setIsGlobalPrimeReleased(released);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('owner_prime_release_gate', String(released));
+                    }
                 }
             } catch (e) {
-                // Default to false (private)
+                // Keep local state on error
             }
         };
         fetchReleaseState();
@@ -423,7 +433,11 @@ export default function FarmClient({
                 { event: '*', schema: 'public', table: 'fleet_capital_snapshots', filter: 'period_key=eq.prime_farm_release_gate' },
                 (payload) => {
                     if (payload.new && (payload.new as any).snapshot_meta) {
-                        setIsGlobalPrimeReleased(Boolean(((payload.new as any).snapshot_meta as any)?.is_released));
+                        const released = Boolean(((payload.new as any).snapshot_meta as any)?.is_released);
+                        setIsGlobalPrimeReleased(released);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem('owner_prime_release_gate', String(released));
+                        }
                     }
                 }
             )
@@ -435,17 +449,24 @@ export default function FarmClient({
     }, []);
 
     const handleUpdateGlobalRelease = async (released: boolean) => {
-        await supabase.from('fleet_capital_snapshots').upsert({
-            period_key: 'prime_farm_release_gate',
-            period_type: 'release_gate',
-            active_ports_count: 1,
-            snapshot_meta: {
-                is_released: released,
-                updated_at: new Date().toISOString(),
-                updated_by: 'owner'
-            }
-        }, { onConflict: 'period_key' });
         setIsGlobalPrimeReleased(released);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('owner_prime_release_gate', String(released));
+        }
+        try {
+            await supabase.from('fleet_capital_snapshots').upsert({
+                period_key: 'prime_farm_release_gate',
+                period_type: 'release_gate',
+                active_ports_count: 1,
+                snapshot_meta: {
+                    is_released: released,
+                    updated_at: new Date().toISOString(),
+                    updated_by: 'owner'
+                }
+            }, { onConflict: 'period_key' });
+        } catch (e) {
+            console.warn('Sync release gate to fleet_capital_snapshots:', e);
+        }
     };
 
     const isExplicitClassicEA =
