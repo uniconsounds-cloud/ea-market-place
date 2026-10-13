@@ -113,8 +113,10 @@ export async function GET() {
                     // Check Gold EA mismatch
                     if (isGoldPort(acc, st)) return; // Exclude Gold EAs from EasyM stats!
 
-                    // Check ping within 48 hours (strictly use last_ping)
-                    const lastActive = st.last_ping ? new Date(st.last_ping).getTime() : 0;
+                    // Check ping within 48 hours (use newer of last_ping and updated_at for Direct Supabase RPC syncs)
+                    const pingMs = st.last_ping ? new Date(st.last_ping).getTime() : 0;
+                    const updMs = st.updated_at ? new Date(st.updated_at).getTime() : 0;
+                    const lastActive = Math.max(pingMs, updMs);
                     const diffHours = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
                     if (diffHours > 48) return; // Offline > 48h
 

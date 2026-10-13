@@ -1331,7 +1331,7 @@ export default function EasyMMasterDashboardPage() {
                     const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
                     const prodKey = prod?.product_key || 'EZM-MAX';
                     const rawProdName = prod?.name || 'EasyM MAX';
-                    const actualSys = status?.system_code || '';
+                    const actualSys = (status?.system_code || '').split(':::')[0].trim();
                     const prodName = (actualSys && actualSys !== 'UNKNOWN' && actualSys.toLowerCase().includes('easym')) 
                         ? actualSys 
                         : rawProdName;
@@ -1357,7 +1357,7 @@ export default function EasyMMasterDashboardPage() {
                     // Resolve accurate today pnl and drawdowns:
                     // CRITICAL: Only count status.today_pnl if not weekend, port sent ping today (<24h), and is NOT running a Gold EA!
                     const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
-                    const pingMarketDateStr = status?.last_ping ? getMarketTradingDateStr(new Date(status.last_ping)) : '';
+                    const pingMarketDateStr = effectiveLastPing ? getMarketTradingDateStr(new Date(effectiveLastPing)) : '';
                     const isPingToday = !isWeekend && pingMarketDateStr === day1DateStr && hoursSinceLastPing <= 24;
                     const statusTodayPnl = (isPingToday && !isGoldMismatch) ? (Number(status?.today_pnl) || 0) : 0;
                     const histPnl = Number(histToday?.profit) || 0;
@@ -1433,7 +1433,7 @@ export default function EasyMMasterDashboardPage() {
                         runStatus = 'tester';
                     } else if (isGoldMismatch) {
                         runStatus = 'mismatch_gold';
-                    } else if (!hasRealStatus || lastActive === 0 || !status?.last_ping) {
+                    } else if (!hasRealStatus || lastActive === 0 || !effectiveLastPing) {
                         runStatus = 'no_telemetry';
                     } else if (hoursSinceLastPing > 48) {
                         runStatus = 'offline_48h';
@@ -1450,8 +1450,8 @@ export default function EasyMMasterDashboardPage() {
 
                     const isRealRunning = (runStatus === 'running') || (accNum === '21692434' && hoursSinceLastPing <= 48 && balUSC >= requiredBalanceUSC);
 
-                    const lastActiveDateStr = status?.last_ping 
-                        ? status.last_ping.substring(0, 10) 
+                    const lastActiveDateStr = effectiveLastPing 
+                        ? effectiveLastPing.substring(0, 10) 
                         : (portLastDateMap.get(accNum) || null);
 
                     let endDateDisplay: string | null = null;

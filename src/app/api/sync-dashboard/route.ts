@@ -243,9 +243,17 @@ export async function POST(req: Request) {
         }
 
         const nowIso = new Date().toISOString();
-        const systemCode = snapshot?.identity?.system_code || payload.system_code || 'EasyM';
+        const rawSystemCode = String(snapshot?.identity?.system_code || payload.system_code || 'EasyM');
+        const systemCode = rawSystemCode.includes(':::') ? rawSystemCode.split(':::')[0].trim() : rawSystemCode;
         const eaVersion = snapshot?.identity?.ea_version || payload.ea_version || 'v2.00';
-        const primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
+        let primeData = payload.prime_data || payload.prime || snapshot?.prime_data || null;
+        if (!primeData && rawSystemCode.includes(':::')) {
+            try {
+                primeData = JSON.parse(rawSystemCode.split(':::')[1]);
+            } catch {
+                // ignore malformed embedded prime_data
+            }
+        }
 
         let lastViewedAt: string | null = null;
         let checkedViewStatus = false;
