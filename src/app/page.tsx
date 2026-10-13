@@ -40,13 +40,11 @@ export default async function Home() {
             ค้นพบ Expert Advisors (EA) คุณภาพสูง ออกแบบมาเพื่อเพิ่มประสิทธิภาพพอร์ตการเทรดของคุณ ปลอดภัย เชื่อถือได้ และขับเคลื่อนด้วยข้อมูลจริง
           </p>
 
-          <div className="flex flex-row gap-2.5 justify-center items-center">
-            <Link href="#products">
-              <Button size="sm" className="h-8 px-4 text-xs font-semibold shadow-sm">
-                ดูสินค้าทั้งหมด
-              </Button>
-            </Link>
-            <HomeIbButton size="sm" className="h-8 px-4 text-xs font-semibold shadow-sm" />
+          <div className="flex justify-center items-center">
+            <HomeIbButton 
+              size="default" 
+              className="h-9 sm:h-10 px-5 text-xs sm:text-sm font-bold rounded-lg shadow-md" 
+            />
           </div>
         </div>
       </section>

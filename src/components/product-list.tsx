@@ -116,7 +116,7 @@ export function ProductList({ initialProducts }: ProductListProps) {
                     <button
                         type="button"
                         onClick={() => handleGroupChange('easygold')}
-                        className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        className={`h-9 sm:h-10 flex items-center gap-2 px-4 sm:px-5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                             activeGroup === 'easygold'
                                 ? 'bg-gradient-to-r from-amber-500 via-amber-500 to-yellow-500 text-slate-950 shadow-md shadow-amber-500/30 font-black scale-[1.02]'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -135,7 +135,7 @@ export function ProductList({ initialProducts }: ProductListProps) {
                     <button
                         type="button"
                         onClick={() => handleGroupChange('easym_others')}
-                        className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        className={`h-9 sm:h-10 flex items-center gap-2 px-4 sm:px-5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                             activeGroup === 'easym_others'
                                 ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-blue-500/30 font-black scale-[1.02]'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -154,7 +154,7 @@ export function ProductList({ initialProducts }: ProductListProps) {
                     <button
                         type="button"
                         onClick={() => handleGroupChange('all')}
-                        className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                        className={`h-9 sm:h-10 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                             activeGroup === 'all'
                                 ? 'bg-secondary text-secondary-foreground font-bold shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -170,7 +170,7 @@ export function ProductList({ initialProducts }: ProductListProps) {
                         variant={isOpen ? "default" : "outline"}
                         size="sm"
                         onClick={() => setIsOpen(!isOpen)}
-                        className="gap-1.5 h-8 text-xs font-semibold"
+                        className="h-9 sm:h-10 px-3.5 gap-1.5 text-xs sm:text-sm font-semibold rounded-lg"
                     >
                         <Filter className="w-3.5 h-3.5" />
                         {isOpen ? 'ซ่อนตัวกรองย่อย' : 'ตัวกรองย่อย'}
