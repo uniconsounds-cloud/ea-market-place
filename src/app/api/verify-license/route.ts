@@ -131,9 +131,15 @@ export async function POST(req: Request) {
                 const cleanId = product_id.replace(/[-_\s]/g, '').toLowerCase();
                 const { data: allProds } = await supabase
                     .from('products')
-                    .select('id, min_balance, currency, product_key, name');
+                    .select('id, min_balance, currency, product_key, name, is_active');
                 if (allProds) {
+                    // Prioritize active products first
                     product = allProds.find(p => 
+                        p.is_active && (
+                            (p.product_key && p.product_key.replace(/[-_\s]/g, '').toLowerCase() === cleanId) ||
+                            (p.name && p.name.replace(/[-_\s]/g, '').toLowerCase() === cleanId)
+                        )
+                    ) || allProds.find(p => 
                         (p.product_key && p.product_key.replace(/[-_\s]/g, '').toLowerCase() === cleanId) ||
                         (p.name && p.name.replace(/[-_\s]/g, '').toLowerCase() === cleanId)
                     ) || null;
@@ -199,6 +205,39 @@ export async function POST(req: Request) {
                         license = fallbackLicense;
                         error = null;
                         resolvedProduct = altProduct;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Fallback check: EASYGOLD TP & other duplicate/historical product variants
+        if (error || !license) {
+            const cleanResolvedName = (resolvedProduct?.name || '').replace(/[-_\s]/g, '').toLowerCase();
+            const { data: siblingProds } = await supabase
+                .from('products')
+                .select('id, min_balance, currency, product_key, name')
+                .neq('id', targetProductUUID);
+            if (siblingProds) {
+                const candidates = siblingProds.filter(p => 
+                    (p.name && p.name.replace(/[-_\s]/g, '').toLowerCase() === cleanResolvedName) ||
+                    (cleanResolvedName.includes('easygoldtp') && (
+                        (p.name && p.name.replace(/[-_\s]/g, '').toLowerCase().includes('easygoldtp')) ||
+                        (p.product_key && p.product_key.replace(/[-_\s]/g, '').toLowerCase().includes('easygoldtp'))
+                    ))
+                );
+                for (const altProd of candidates) {
+                    const { data: fallbackLicense } = await supabase
+                        .from('licenses')
+                        .select('*')
+                        .eq('account_number', account_number)
+                        .eq('product_id', altProd.id)
+                        .eq('is_active', true)
+                        .maybeSingle();
+                    if (fallbackLicense) {
+                        license = fallbackLicense;
+                        error = null;
+                        resolvedProduct = altProd;
                         break;
                     }
                 }
