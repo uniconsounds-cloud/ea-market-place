@@ -405,7 +405,7 @@ export default function AdminOrdersPage() {
                             type: commonLicenseType,
                             is_active: true,
                             expiry_date: commonExpiryDate,
-                            ...(order.ib_broker_name && { ib_broker_name: order.ib_broker_name }),
+                            ...(order.plan_type !== 'upgrade' && order.ib_broker_name && { ib_broker_name: order.ib_broker_name }),
                             is_ib_request: order.is_ib_request // flag it as IB if it is one
                         })
                         .eq('id', existingLicense.id);
@@ -427,7 +427,7 @@ export default function AdminOrdersPage() {
                             is_active: true,
                             expiry_date: commonExpiryDate,
                             account_number: port,
-                            ib_broker_name: order.ib_broker_name || null,
+                            ib_broker_name: order.plan_type === 'upgrade' ? null : (order.ib_broker_name || null),
                             is_ib_request: order.is_ib_request
                         });
 
@@ -657,7 +657,7 @@ export default function AdminOrdersPage() {
                                                                 ✨ สั่งซื้อใหม่ (New Order)
                                                             </span>
                                                         )}
-                                                        {order.is_ib_request && (
+                                                        {order.is_ib_request && order.plan_type !== 'upgrade' && (
                                                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
                                                                 คำขอสิทธิ์ IB {order.ib_broker_name ? `(${order.ib_broker_name})` : ''}
                                                             </span>
@@ -763,10 +763,10 @@ export default function AdminOrdersPage() {
                                                             <span className="text-muted-foreground">เมื่ออนุมัติ:</span>{" "}
                                                             <span className="font-semibold text-emerald-300">อัปเกรดเป็น Prime Pro + ปลดล็อกดาวน์โหลด EA ทันที</span>
                                                         </div>
-                                                        {order.notes && (
+                                                        {(order.notes || order.ib_broker_name) && (
                                                             <div className="sm:col-span-2 bg-black/30 p-2 rounded border border-white/5 mt-1">
                                                                 <span className="text-muted-foreground">บันทึกเพิ่มเติมจากลูกค้า:</span>{" "}
-                                                                <span className="text-stone-200 italic">{order.notes}</span>
+                                                                <span className="text-stone-200 italic">{order.notes || order.ib_broker_name}</span>
                                                             </div>
                                                         )}
                                                     </div>

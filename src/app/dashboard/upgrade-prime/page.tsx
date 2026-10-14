@@ -151,6 +151,10 @@ function UpgradePrimeContent() {
                 targetId = fallbackProd?.id;
             }
 
+            const upgradeNote = notes.trim() 
+                ? `[UPGRADE PRIME] ${notes.trim()}`
+                : '[UPGRADE PRIME] ขอรับสิทธิ์อัปเกรดสู่ EasyM Prime ฟรี 2 เดือนเต็ม';
+
             const { error: orderError } = await supabase
                 .from('orders')
                 .insert({
@@ -161,9 +165,7 @@ function UpgradePrimeContent() {
                     is_ib_request: true,
                     plan_type: 'upgrade',
                     account_number: selectedPort.trim(),
-                    notes: notes.trim() 
-                        ? `[UPGRADE REQUEST TO PRIME] ${notes.trim()}`
-                        : '[UPGRADE REQUEST TO PRIME] ขอรับสิทธิ์อัปเกรดสู่ EasyM Prime ฟรี 2 เดือนเต็ม'
+                    ib_broker_name: upgradeNote
                 });
 
             if (orderError) throw orderError;
