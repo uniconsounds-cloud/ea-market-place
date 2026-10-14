@@ -62,7 +62,11 @@ void EM_BuildIdentity(EAE_SystemIdentity &id, long magicBase)
    id.product_family = EAE_AutoDetectAssetType(_Symbol);
 
 #ifdef EA_VERSION_STR
-   id.ea_version     = EA_VERSION_STR;
+   #ifdef EA_BUILD_ID
+      id.ea_version     = EA_VERSION_STR + " [" + EA_BUILD_ID + "]";
+   #else
+      id.ea_version     = EA_VERSION_STR;
+   #endif
 #else
    #ifdef EA_VERSION
       id.ea_version  = EA_VERSION;
@@ -77,7 +81,7 @@ void EM_BuildIdentity(EAE_SystemIdentity &id, long magicBase)
    id.magic_sell     = g_em_magic_base;
 }
 
-// Custom Collector for Multi-Currency EasyM
+// Custom Collector for Multi-Currency EasyM (includes Regular 2000+, Hedge 3000+, and Rescue 4000+)
 void EM_CollectRuntimeState()
 {
    // Reset states
@@ -91,12 +95,10 @@ void EM_CollectRuntimeState()
       if(ticket == 0 || !PositionSelectByTicket(ticket)) continue;
 
       long pos_magic = PositionGetInteger(POSITION_MAGIC);
-      // Only count orders belonging to EasyM (magic >= base and magic < base + 100)
-      if(pos_magic < g_em_magic_base || pos_magic >= g_em_magic_base + 100) continue;
+      if(!EAE_IsPortfolioMagic(pos_magic, g_em_magic_base)) continue;
 
       long pos_type = PositionGetInteger(POSITION_TYPE);
       double vol = PositionGetDouble(POSITION_VOLUME);
-      // Removed POSITION_COMMISSION to fix deprecation warning
       double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
 
       if(pos_type == POSITION_TYPE_BUY) {
@@ -114,7 +116,6 @@ void EM_CollectRuntimeState()
 // Init monitoring module
 void EM_MonitorInit(long magicBase)
 {
-   // [Single WebRequest Architecture]:
    // mini and Farm only verify license, no live farm UI streaming needed to save resources
 #ifdef EA_PRODUCT_ID
    if(StringFind(EA_PRODUCT_ID, "MIN") >= 0 || StringFind(EA_PRODUCT_ID, "FARM") >= 0)
@@ -128,10 +129,10 @@ void EM_MonitorInit(long magicBase)
    EAE_InitSideState(g_em_buy_state,  EAE_SIDE_BUY);
    EAE_InitSideState(g_em_sell_state, EAE_SIDE_SELL);
 
-   // Single URL Whitelist: eaeze.com only (no Supabase URL required in MT5)
-   EAE_WebSyncInit("https://eaeze.com/api/sync-dashboard", 20);
+   // Direct-to-Supabase RPC primary endpoint (with automatic fallback to eaeze.com)
+   EAE_WebSyncInit("https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data", 20);
    
-   // Set a Global Variable to signal that Universal EA monitor is active
+   // Set a Global Variable to signal that Universal EA monitor is active (prevents duplicate sync loop)
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
    string gvName = "EAE_Universal_Active_" + IntegerToString(login);
    GlobalVariableSet(gvName, (double)TimeCurrent());
@@ -149,7 +150,7 @@ void EM_MonitorDeinit()
 }
 
 // Timer update
-void EM_MonitorOnTimer()
+void EM_MonitorOnTimer(string extra_payload_json = "")
 {
    if(!g_em_initialized) return;
 
@@ -172,11 +173,11 @@ void EM_MonitorOnTimer()
    snap.sell_state   = g_em_sell_state;
    snap.timestamp    = TimeCurrent();
    
-   // --- [NEW] Self-Healing 30-Day Sync Check ---
+   // Self-Healing 14-30 Day Sync Check
    EAE_WebSyncCheckAndPushHistory(g_em_magic_base, g_em_magic_base);
    
-   // Sync to web
-   EAE_WebSyncPerform(snap);
+   // Sync to Supabase RPC (with auto-fallback)
+   EAE_WebSyncPerform(snap, false, extra_payload_json);
 }
 
 #endif // __EM_MONITOR_ADAPTER_MQH__

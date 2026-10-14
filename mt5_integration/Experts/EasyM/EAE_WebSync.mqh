@@ -4,10 +4,10 @@
 //|                                                                  |
 //| Purpose: modular synchronization of EA data to web dashboard.    |
 //| Features:                                                        |
-//|  - Partner-Base API Key authentication                           |
-//|  - Scalable performance (Throttling)                             |
-//|  - Non-blocking-style WebRequests                                |
-//|  - Full support for Farm UI and Spaceship Dashboard              |
+//|  - Direct-to-Supabase RPC primary endpoint (Zero Vercel quota)   |
+//|  - Automatic fallback to https://eaeze.com/api/sync-dashboard    |
+//|  - 10-minute (600s) Standby Sleep Mode / 20s Live Viewer Mode    |
+//|  - Full support for Farm UI, Prime Cockpit & 20-Pair Telemetry   |
 //+------------------------------------------------------------------+
 #ifndef __EAE_WEB_SYNC_MQH__
 #define __EAE_WEB_SYNC_MQH__
@@ -16,29 +16,58 @@
 #include "EAE_MonitorTypes.mqh"
 
 // --- Global Sync State ---
-// Default to direct Supabase integration for new EAs
-uint     g_eae_last_sync_ticks = 0;
-int      g_eae_sync_interval  = 20; // Default: Sync every 20 seconds
-int      g_eae_active_sync_interval = 0; // Dynamic server override (0 = use g_eae_sync_interval)
-bool     g_eae_full_sync_mode = true; // Start with true to ensure initial data
-string   g_eae_api_url        = "https://eaeze.com/api/sync-dashboard";
+uint     g_eae_last_sync_ticks        = 0;
+int      g_eae_sync_interval          = 20;    // Live mode default: Sync every 20 seconds
+int      g_eae_sleep_interval         = 600;   // Standby/Sleep mode default: 10 minutes (600s)
+int      g_eae_active_sync_interval   = 0;     // Dynamic server override (0 = use mode default)
+bool     g_eae_full_sync_mode         = false; // Default to standby after initial boot sync
+
+// Primary Direct-to-Supabase RPC Endpoints + Automatic Vercel Fallback
+string   g_eae_supabase_sync_url      = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data";
+string   g_eae_supabase_history_url   = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_history_batch";
+string   g_eae_fallback_url           = "https://eaeze.com/api/sync-dashboard";
+string   g_eae_api_url                = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data";
+bool     g_eae_using_fallback         = false;
 
 // Internal System Key (Do not change)
 string   g_eae_system_key     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo";
 
 // Current active partner key for identification
-string   g_eae_api_key        = "EZE-123456"; 
+string   g_eae_api_key        = "LICENSE_AUTO"; 
 
 // --- Smart Sync State ---
 string   g_eae_last_sync_hash = "";
 string   g_eae_sync_status    = "IDLE"; // Shared status for UI: IDLE, SYNCING, OK, ERR
 string   g_eae_sync_message   = "Connecting...";
 uint     g_eae_last_heartbeat_ticks = 0;
-const int g_eae_heartbeat_interval = 300; // Force full sync every 5 minutes even if no change
+const int g_eae_heartbeat_interval = 300; // Force full sync every 5 minutes when viewer is active
 bool     g_eae_history_checked = false;
 string   g_eae_license_tier   = "free";
 bool     g_eae_is_trial       = false;
 
+//+------------------------------------------------------------------+
+//| Helper: Check if magic belongs to EasyM / Prime portfolio        |
+//| Covers Regular (2000+), Hedge (3000+), and Rescue (4000+)        |
+//+------------------------------------------------------------------+
+bool EAE_IsPortfolioMagic(long magic, long baseMagic)
+{
+   if(baseMagic <= 0) return true;
+   if(magic >= baseMagic && magic < baseMagic + 100) return true;           // Regular Grid (2001-2023)
+   if(magic >= baseMagic + 1000 && magic < baseMagic + 1100) return true;   // Auto-Hedge (3001-3023)
+   if(magic >= baseMagic + 2000 && magic < baseMagic + 2100) return true;   // Smart 3 Rescue (4001-4023)
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Helper: Escape raw JSON string for embedding inside JSON string  |
+//+------------------------------------------------------------------+
+string EAE_EscapeJsonString(string raw)
+{
+   string out = raw;
+   StringReplace(out, "\\", "\\\\");
+   StringReplace(out, "\"", "\\\"");
+   return out;
+}
 
 //+------------------------------------------------------------------+
 //| Initialize the WebSync module with custom settings               |
@@ -48,19 +77,21 @@ void EAE_WebSyncInit(string api_url, int interval_sec)
    g_eae_api_url       = api_url;
    g_eae_api_key       = "LICENSE_AUTO"; // Auto-license mapping based on account number
    g_eae_sync_interval = (interval_sec < 5 ? 5 : interval_sec); // Min 5s
-   g_eae_history_checked = false; // Reset history check on EA Init
-   Print("EAE WebSync: Initialized (Auto-license mode).");
+   g_eae_history_checked = false;
+   g_eae_using_fallback  = false;
+   Print("EAE WebSync: Initialized (Direct-to-Supabase RPC + Auto-Fallback mode).");
 }
 
 //+------------------------------------------------------------------+
-//| Initialize the WebSync module with custom settings (compatibility overload)|
+//| Initialize the WebSync module with custom settings (overload)    |
 //+------------------------------------------------------------------+
 void EAE_WebSyncInit(string api_url, string api_key, int interval_sec)
 {
    g_eae_api_url       = api_url;
    g_eae_api_key       = api_key;
    g_eae_sync_interval = (interval_sec < 5 ? 5 : interval_sec); // Min 5s
-   g_eae_history_checked = false; // Reset history check on EA Init
+   g_eae_history_checked = false;
+   g_eae_using_fallback  = false;
    Print("EAE WebSync: Initialized (Custom API key mode: " + api_key + ").");
 }
 
@@ -82,7 +113,7 @@ string EAE_BuildOrdersJson(long magicB = 0, long magicS = 0)
          long magic = PositionGetInteger(POSITION_MAGIC);
          
          if(magicB == magicS) {
-            if(magicB != 0 && (magic < magicB || magic >= magicB + 100)) continue;
+            if(!EAE_IsPortfolioMagic(magic, magicB)) continue;
          }
          else {
             if(type == POSITION_TYPE_BUY) {
@@ -96,13 +127,19 @@ string EAE_BuildOrdersJson(long magicB = 0, long magicS = 0)
          if(!first) json += ",";
          
          string pos_type = (type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+         string sym_str  = PositionGetString(POSITION_SYMBOL);
+         int    sym_dig  = (int)SymbolInfoInteger(sym_str, SYMBOL_DIGITS);
+         if(sym_dig <= 0) sym_dig = 5;
+         double net_pnl  = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
          
          json += "{";
          json += "\"ticket_id\":" + IntegerToString(ticket) + ",";
-         json += "\"symbol\":\"" + PositionGetString(POSITION_SYMBOL) + "\",";
+         json += "\"symbol\":\"" + sym_str + "\",";
          json += "\"type\":\"" + pos_type + "\",";
          json += "\"status\":\"OPEN\",";
-         json += "\"current_pnl\":" + DoubleToString(PositionGetDouble(POSITION_PROFIT), 2) + ",";
+         json += "\"magic\":" + IntegerToString(magic) + ",";
+         json += "\"open_price\":" + DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN), sym_dig) + ",";
+         json += "\"current_pnl\":" + DoubleToString(net_pnl, 2) + ",";
          json += "\"raw_lot_size\":" + DoubleToString(PositionGetDouble(POSITION_VOLUME), 2);
          json += "}";
          
@@ -114,11 +151,9 @@ string EAE_BuildOrdersJson(long magicB = 0, long magicS = 0)
    return json;
 }
 
-
-
 //+------------------------------------------------------------------+
 //| Update and Get Daily Max Drawdown (PERCENTAGE)                   |
-//| Persists peak DD% in a Global Variable until midnight reset       |
+//| Persists peak DD% in a Global Variable until midnight reset      |
 //+------------------------------------------------------------------+
 double EAE_GetDailyMaxDrawdownPct()
 {
@@ -137,7 +172,7 @@ double EAE_GetDailyMaxDrawdownPct()
    // Reset if new day
    if(!GlobalVariableCheck(gv_date_name) || GlobalVariableGet(gv_date_name) != (double)today_start)
    {
-      GlobalVariableSet(gv_max_dd_name, 0);
+      GlobalVariableSet(gv_max_dd_name, current_dd_pct);
       GlobalVariableSet(gv_date_name, (double)today_start);
    }
    
@@ -194,7 +229,7 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
          if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
          {
             if(magicB == magicS) {
-               if(magic >= magicB && magic < magicB + 100) {
+               if(EAE_IsPortfolioMagic(magic, magicB)) {
                   out_sum.buy_cycles++;
                }
             }
@@ -237,7 +272,11 @@ void EAE_WebSyncPushDailySummary(const EAE_DailySummary &sum)
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    Print("EAE: Sending Daily Summary for ", TimeToString(sum.date, TIME_DATE));
-   WebRequest("POST", g_eae_api_url, headers, 3000, data, result, result_headers);
+   string target_url = (g_eae_using_fallback ? g_eae_fallback_url : g_eae_supabase_sync_url);
+   int res = WebRequest("POST", target_url, headers, 5000, data, result, result_headers);
+   if(res != 200 && !g_eae_using_fallback) {
+      WebRequest("POST", g_eae_fallback_url, headers, 5000, data, result, result_headers);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -245,7 +284,6 @@ void EAE_WebSyncPushDailySummary(const EAE_DailySummary &sum)
 //+------------------------------------------------------------------+
 string EAE_CalculateDataHash(const EAE_RealtimeSnapshot &snap)
 {
-   // Combine critical metrics into a string to detect "Real Changes"
    return StringFormat("%d|%.2f|%.2f|%.2f|%d|%.2f|%d|%.2f",
       AccountInfoInteger(ACCOUNT_LOGIN),
       snap.account.balance,
@@ -258,7 +296,7 @@ string EAE_CalculateDataHash(const EAE_RealtimeSnapshot &snap)
 }
 
 //+------------------------------------------------------------------+
-//| Send a full modular snapshot to the web server                   |
+//| Send a full modular snapshot to Supabase RPC (with Fallback)     |
 //+------------------------------------------------------------------+
 bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, string extra_payload_json = "")
 {
@@ -268,14 +306,25 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    string current_hash = "";
    
    // 1. Throttling / Sleep-Wake Check
+   // On initial boot (g_eae_last_sync_ticks == 0), sync immediately so dashboard has instant data!
    if(g_eae_last_sync_ticks > 0)
    {
       int current_interval = g_eae_sync_interval;
-      if(g_eae_active_sync_interval > 0) {
-         current_interval = g_eae_active_sync_interval;
-      }
-      if(!g_eae_full_sync_mode) {
-         current_interval = 180; // Standby / Sleep mode: ping heartbeat every 3 minutes (180s) when no active viewer
+      if(g_eae_using_fallback) {
+         // 1-URL Fallback Mode: Strictly locked to 10-minute (600s) summary sync only (no live 20s streaming)
+         current_interval = g_eae_sleep_interval;
+      } else if(g_eae_full_sync_mode) {
+         if(g_eae_active_sync_interval > 0 && g_eae_active_sync_interval <= 60) {
+            current_interval = g_eae_active_sync_interval;
+         } else {
+            current_interval = 20; // Live Viewer Mode (2-URL Direct Supabase): every 20 seconds
+         }
+      } else {
+         if(g_eae_active_sync_interval >= 180) {
+            current_interval = g_eae_active_sync_interval;
+         } else {
+            current_interval = g_eae_sleep_interval; // Standby Mode: every 10 minutes (600s)
+         }
       }
       
       if(!force_now && (int)(now_ticks - g_eae_last_sync_ticks) < current_interval * 1000) {
@@ -285,40 +334,16 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    
    g_eae_last_sync_ticks = now_ticks;
    
-   // 2. Build Payload
+   // 2. Build Primary Payload (2-URL Direct Supabase RPC)
    bool skip_orders = (g_eae_license_tier == "free" && !g_eae_is_trial);
    string orders_json = (g_eae_full_sync_mode && !skip_orders ? EAE_BuildOrdersJson(snap.identity.magic_buy, snap.identity.magic_sell) : "[]");
-   string payload = "{ \"p_payload\": {";
-   payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
-   payload += "\"server_time\":" + IntegerToString(now) + ",";
-   payload += "\"current_price\":" + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits) + ",";
-   payload += "\"ping_only\":" + (g_eae_full_sync_mode ? "false" : "true") + ",";
    
    // Daily stats
    EAE_DailySummary today;
    EAE_ScanHistoryDailySummary(now, snap.identity.magic_buy, snap.identity.magic_sell, today);
-   payload += "\"today_profit\":" + DoubleToString(today.total_profit, 2) + ",";
-   payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
-   payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
-   
-   // Snapshot
-   string sys_code = snap.identity.system_code;
-   payload += "\"snapshot\":{";
-   payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
-   payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
-   payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
-   payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + sys_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
-   payload += "},";
-   
-   payload += "\"orders\":" + orders_json;
-   if(StringLen(extra_payload_json) > 0)
-   {
-      payload += ",\"prime_data\":" + extra_payload_json;
-   }
-   payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
 
-   // Hash Check for Throttling (only applies in full sync mode)
-   if(g_eae_full_sync_mode)
+   // Hash Check for Throttling (only applies in live full sync mode on 2-URL)
+   if(g_eae_full_sync_mode && !g_eae_using_fallback)
    {
       current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2) + "_" + DoubleToString(today.total_profit, 2);
       if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now_ticks - g_eae_last_heartbeat_ticks) < g_eae_heartbeat_interval * 1000)
@@ -327,10 +352,42 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
       }
    }
 
-   
    g_eae_last_heartbeat_ticks = now_ticks;
    
-   // Check Daily Summary
+   // Embed prime_data into system_code (EasyM Prime:::<escaped_json>) so Direct Supabase RPC
+   // stores prime_data into farm_port_status.system_code natively without needing extra DB columns
+   string base_sys_code = snap.identity.system_code;
+   string sys_code_encoded = base_sys_code;
+   if(StringLen(extra_payload_json) > 0)
+   {
+      sys_code_encoded = base_sys_code + ":::" + EAE_EscapeJsonString(extra_payload_json);
+   }
+
+   string payload = "{ \"p_payload\": {";
+   payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+   payload += "\"server_time\":" + IntegerToString(now) + ",";
+   payload += "\"current_price\":" + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits) + ",";
+   payload += "\"ping_only\":false,";
+   payload += "\"today_profit\":" + DoubleToString(today.total_profit, 2) + ",";
+   payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
+   payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
+   
+   // Snapshot
+   payload += "\"snapshot\":{";
+   payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
+   payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
+   payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
+   payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + sys_code_encoded + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
+   payload += "},";
+   
+   payload += "\"orders\":" + orders_json;
+   if(StringLen(extra_payload_json) > 0)
+   {
+      payload += ",\"prime_data\":" + extra_payload_json;
+   }
+   payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
+   
+   // Check Daily Summary Rollover
    string gv_last_sync_date = "EAE_LastSyncDate_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    if(GlobalVariableCheck(gv_last_sync_date))
    {
@@ -352,7 +409,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
       GlobalVariableSet(gv_last_sync_date, (double)today_start);
    }
 
-   // 3. Dispatch WebRequest
+   // 3. Dispatch WebRequest (Always try Primary 2-URL Direct Supabase RPC first; if not whitelisted, fallback to 1-URL 10m summary mode)
    char data[]; char result[]; string result_headers;
    StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, ArraySize(data) - 1);
@@ -361,7 +418,58 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
    
    ResetLastError();
-   int res = WebRequest("POST", g_eae_api_url, headers, 10000, data, result, result_headers);
+   int res = WebRequest("POST", g_eae_supabase_sync_url, headers, 10000, data, result, result_headers);
+
+   if(res == 200)
+   {
+      if(g_eae_using_fallback)
+      {
+         Print("EAE WebSync: Direct Supabase URL #2 is now connected! Restoring full live Farm telemetry.");
+      }
+      g_eae_using_fallback = false;
+   }
+   else
+   {
+      int primary_err = GetLastError();
+      if(!g_eae_using_fallback)
+      {
+         g_eae_using_fallback = true;
+         if(res == -1 && (primary_err == 4060 || primary_err == 4014))
+         {
+            Print("EAE WebSync: URL #2 (https://mfrspvzxmpksqnzcrysz.supabase.co) is not whitelisted in MT5. Switching to 10-Minute Standby Fallback via https://eaeze.com (Live Farm disabled until URL #2 is added).");
+         }
+      }
+
+      // Build stripped 10-minute summary payload for 1-URL Fallback (no live orders, no live pair details, tagged FALLBACK_1URL)
+      string fb_meta = "{\"sync_mode\":\"FALLBACK_1URL\"}";
+      string fb_sys_code = base_sys_code + ":::" + EAE_EscapeJsonString(fb_meta);
+      string fb_payload = "{ \"p_payload\": {";
+      fb_payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+      fb_payload += "\"server_time\":" + IntegerToString(now) + ",";
+      fb_payload += "\"current_price\":0,";
+      fb_payload += "\"ping_only\":false,";
+      fb_payload += "\"sync_mode\":\"FALLBACK_1URL\",";
+      fb_payload += "\"today_profit\":" + DoubleToString(today.total_profit, 2) + ",";
+      fb_payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
+      fb_payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
+      fb_payload += "\"snapshot\":{";
+      fb_payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
+      fb_payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
+      fb_payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
+      fb_payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + fb_sys_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
+      fb_payload += "},";
+      fb_payload += "\"orders\":[],";
+      fb_payload += "\"prime_data\":" + fb_meta;
+      fb_payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
+
+      char fb_data[];
+      StringToCharArray(fb_payload, fb_data, 0, WHOLE_ARRAY, CP_UTF8);
+      ArrayResize(fb_data, ArraySize(fb_data) - 1);
+
+      ResetLastError();
+      res = WebRequest("POST", g_eae_fallback_url, headers, 10000, fb_data, result, result_headers);
+   }
+
    if(res == -1) {
       int err = GetLastError();
       g_eae_sync_status = "ERR: CONN";
@@ -370,7 +478,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
       if(err == 4060 || err == 4014) {
          static bool printed_sync_warning = false;
          if(!printed_sync_warning) {
-            Print("[EAE_SYSTEM WARNING] WebRequest is not whitelisted. Web Dashboard Sync is disabled. Please add 'https://eaeze.com' to MT5 WebRequest options if you wish to see the Web Dashboard.");
+            Print("[EAE_SYSTEM WARNING] WebRequest is not whitelisted. Please add 'https://eaeze.com' and 'https://mfrspvzxmpksqnzcrysz.supabase.co' to MT5 WebRequest options.");
             printed_sync_warning = true;
          }
       } else {
@@ -381,7 +489,6 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    
    if(res != 200) {
       if(res == 1003) {
-         // Transient internet network timeout (MQL5 internal code 1003) - Auto-recovering
          g_eae_sync_status = "RETRYING";
          g_eae_sync_message = "Network Timeout (Auto-recovering)";
          return false;
@@ -409,88 +516,109 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    
    // Update last hash on successful sync
    g_eae_last_sync_hash = current_hash;
-   g_eae_sync_status = "OK (ONLINE)";
-   g_eae_sync_message = "Connected to Farm 2.5D";
+   g_eae_sync_status = (g_eae_using_fallback ? "OK (10m FALLBACK)" : "OK (ONLINE)");
+   g_eae_sync_message = (g_eae_using_fallback ? "1-URL Mode (Add URL #2 for Live Farm)" : "Connected to Farm 2.5D");
    
-   // --- [NEW] Update Last Online Time for Self-Healing ---
+   // Update Last Online Time for Self-Healing
    string gv_last_online = "EAE_LastOnline_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    GlobalVariableSet(gv_last_online, (double)now);
    
-   // 4. Parse response for on-demand sync control
-   bool was_full = g_eae_full_sync_mode;
-   
-   if(StringFind(response, "\"should_sync_full\":true") >= 0 || StringFind(response, "\"should_sync_full\": true") >= 0) {
-      if(!g_eae_full_sync_mode) {
-         g_eae_last_sync_ticks = 0; // Trigger instant full sync on the very next tick!
-         g_eae_last_sync_hash = ""; // Clear hash to force a full update!
-         g_eae_last_heartbeat_ticks = 0;  // Reset heartbeat timer!
-         Print("🟢 EAE WebSync: >> FARM VIEWER ACTIVE << (Farm viewer online - Syncing live data every 20s)");
-      }
-      g_eae_full_sync_mode = true;
-   } else {
-      if(g_eae_full_sync_mode) {
-         Print("💤 EAE WebSync: >> STANDBY MODE << (Farm viewer closed - Low resource mode, Syncing every 3m)");
-      }
+   // 4. Parse response for on-demand viewer control
+   // CRITICAL: If using 1-URL fallback (g_eae_using_fallback), NEVER allow live 20s full_sync_mode!
+   if(g_eae_using_fallback)
+   {
       g_eae_full_sync_mode = false;
+      g_eae_active_sync_interval = g_eae_sleep_interval; // Locked to 600s (10 minutes)
+   }
+   else
+   {
+      bool viewer_active = false;
+      if(StringFind(response, "\"viewer_active\":true") >= 0 || StringFind(response, "\"viewer_active\": true") >= 0) {
+         viewer_active = true;
+      } else if(StringFind(response, "\"viewer_active\":false") >= 0 || StringFind(response, "\"viewer_active\": false") >= 0) {
+         viewer_active = false;
+      } else if(StringFind(response, "\"should_sync_full\":true") >= 0 || StringFind(response, "\"should_sync_full\": true") >= 0) {
+         viewer_active = true;
+      }
+
+      if(viewer_active) {
+         if(!g_eae_full_sync_mode) {
+            g_eae_last_sync_ticks = 0; // Trigger instant full sync with orders on next timer tick!
+            g_eae_last_sync_hash = "";
+            g_eae_last_heartbeat_ticks = 0;
+            Print("EAE WebSync: >> FARM VIEWER ACTIVE << (Viewer online - Syncing live data every 20s)");
+         }
+         g_eae_full_sync_mode = true;
+      } else {
+         if(g_eae_full_sync_mode) {
+            Print("EAE WebSync: >> STANDBY MODE << (Farm viewer closed - Low resource mode, syncing every 10m)");
+         }
+         g_eae_full_sync_mode = false;
+      }
+      
+      // Dynamic sync interval parsing
+      int pos = StringFind(response, "\"sync_interval\":");
+      if(pos >= 0) {
+         int start = pos + StringLen("\"sync_interval\":");
+         int end = start;
+         while(end < StringLen(response) && (response[end] == ' ' || response[end] == ':')) {
+            end++;
+         }
+         start = end;
+         while(end < StringLen(response) && response[end] >= '0' && response[end] <= '9') {
+            end++;
+         }
+         if(end > start) {
+            int parsed_interval = (int)StringToInteger(StringSubstr(response, start, end - start));
+            if(viewer_active) {
+               g_eae_active_sync_interval = parsed_interval;
+            } else {
+               // In standby mode, enforce at least 10m (600s) unless server sends an even longer interval
+               g_eae_active_sync_interval = (parsed_interval >= 600 ? parsed_interval : g_eae_sleep_interval);
+            }
+         }
+      }
+   }
+
+   // License tier parsing
+   int tier_pos = StringFind(response, "\"license_tier\":");
+   if(tier_pos >= 0) {
+      int start = tier_pos + StringLen("\"license_tier\":");
+      int end = start;
+      while(end < StringLen(response) && response[end] != '"') {
+         end++;
+      }
+      if(end < StringLen(response)) {
+         end++;
+         start = end;
+         while(end < StringLen(response) && response[end] != '"') {
+            end++;
+         }
+         if(end > start) {
+            g_eae_license_tier = StringSubstr(response, start, end - start);
+         }
+      }
+   }
+
+   // Is trial parsing
+   int trial_pos = StringFind(response, "\"is_trial\":");
+   if(trial_pos >= 0) {
+      int start = trial_pos + StringLen("\"is_trial\":");
+      int end = start;
+      while(end < StringLen(response) && response[end] != 't' && response[end] != 'f' && response[end] != 'T' && response[end] != 'F') {
+         end++;
+      }
+      start = end;
+      while(end < StringLen(response) && ((response[end] >= 'a' && response[end] <= 'z') || (response[end] >= 'A' && response[end] <= 'Z'))) {
+         end++;
+      }
+      if(end > start) {
+         string trial_val = StringSubstr(response, start, end - start);
+         g_eae_is_trial = (trial_val == "true" || trial_val == "TRUE");
+      }
    }
    
-   // Dynamic sync interval parsing
-    int pos = StringFind(response, "\"sync_interval\":");
-    if(pos >= 0) {
-       int start = pos + StringLen("\"sync_interval\":");
-       int end = start;
-       // Skip spaces or non-digit chars
-       while(end < StringLen(response) && (response[end] == ' ' || response[end] == ':')) {
-          end++;
-       }
-       start = end;
-       while(end < StringLen(response) && response[end] >= '0' && response[end] <= '9') {
-          end++;
-       }
-       if(end > start) {
-          g_eae_active_sync_interval = (int)StringToInteger(StringSubstr(response, start, end - start));
-       }
-    }
-
-    // License tier parsing
-    int tier_pos = StringFind(response, "\"license_tier\":");
-    if(tier_pos >= 0) {
-       int start = tier_pos + StringLen("\"license_tier\":");
-       int end = start;
-       while(end < StringLen(response) && response[end] != '"') {
-          end++;
-       }
-       if(end < StringLen(response)) {
-          end++;
-          start = end;
-          while(end < StringLen(response) && response[end] != '"') {
-             end++;
-          }
-          if(end > start) {
-             g_eae_license_tier = StringSubstr(response, start, end - start);
-          }
-       }
-    }
-
-    // Is trial parsing
-    int trial_pos = StringFind(response, "\"is_trial\":");
-    if(trial_pos >= 0) {
-       int start = trial_pos + StringLen("\"is_trial\":");
-       int end = start;
-       while(end < StringLen(response) && response[end] != 't' && response[end] != 'f' && response[end] != 'T' && response[end] != 'F') {
-          end++;
-       }
-       start = end;
-       while(end < StringLen(response) && ((response[end] >= 'a' && response[end] <= 'z') || (response[end] >= 'A' && response[end] <= 'Z'))) {
-          end++;
-       }
-       if(end > start) {
-          string trial_val = StringSubstr(response, start, end - start);
-          g_eae_is_trial = (trial_val == "true" || trial_val == "TRUE");
-       }
-    }
-   
-   // 5. Parse 2-Way Web Command & Control Config (Active in v2.00-1009+)
+   // 5. Parse 2-Way Web Command & Control Config (Active when ENABLE_EM_WEB_CONTROL is defined)
 #ifdef ENABLE_EM_WEB_CONTROL
    WebControlParseAndApplyResponse(response);
 #endif
@@ -499,7 +627,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
 }
 
 //+------------------------------------------------------------------+
-//| Push a Batch of Daily Histories to Supabase                      |
+//| Push a Batch of Daily Histories to Supabase (with Auto-Fallback) |
 //+------------------------------------------------------------------+
 bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
 {
@@ -518,7 +646,6 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
       ZeroMemory(summaries[i]);
       summaries[i].date          = today_start - (i * 86400);
       summaries[i].account_login = login;
-      // For the current day (i == 0), retrieve max drawdown from global variables
       if(i == 0)
       {
          summaries[i].max_dd_pct = EAE_GetDailyMaxDrawdownPct();
@@ -529,7 +656,7 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
       }
    }
    
-   // Select history once for the entire range (from start of the oldest day in the batch to now)
+   // Select history once for the entire range
    datetime start_time = today_start - (days_to_sync * 86400);
    if(HistorySelect(start_time, now))
    {
@@ -545,17 +672,16 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
             datetime deal_time = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
             datetime deal_day_start = (deal_time / 86400) * 86400;
             long diff_sec = today_start - deal_day_start;
-            if(diff_sec < 0) continue; // Deal in the future
+            if(diff_sec < 0) continue;
             
             int idx = (int)(diff_sec / 86400);
-            if(idx < 0 || idx >= days_to_sync) continue; // Deal outside the batch window
+            if(idx < 0 || idx >= days_to_sync) continue;
             
             long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
             long deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
             bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
             bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
             
-            // Match TodayClosedProfit(): in portfolio mode (magicB == magicS), include all closed deals
             if(magicB != magicS && magicB != 0) {
                if(is_buy_side && magic != magicB) continue;
                if(is_sell_side && magicS != 0 && magic != magicS) continue;
@@ -570,7 +696,7 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
             if(StringFind(comment, "CLOSE") >= 0 || StringFind(comment, "LOK") >= 0 || StringFind(comment, "BRK") >= 0)
             {
                if(magicB == magicS) {
-                  if(magic >= magicB && magic < magicB + 100) {
+                  if(EAE_IsPortfolioMagic(magic, magicB)) {
                      summaries[idx].buy_cycles++;
                   }
                }
@@ -614,11 +740,24 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
    StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, ArraySize(data) - 1);
    
-   string url = "https://eaeze.com/api/sync-dashboard";
-   string headers = "Content-Type: application/json\r\n";
+   string headers = "Content-Type: application/json\r\n" +
+                    "apikey: " + g_eae_system_key + "\r\n" +
+                    "Authorization: Bearer " + g_eae_system_key + "\r\n";
                     
+   string target_url = (g_eae_using_fallback ? g_eae_fallback_url : g_eae_supabase_history_url);
    ResetLastError();
-   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   int res = WebRequest("POST", target_url, headers, 10000, data, result, result_headers);
+   if((res == -1 || res != 200) && !g_eae_using_fallback)
+   {
+      int primary_err = GetLastError();
+      if(res == -1 && (primary_err == 4060 || primary_err == 4014))
+      {
+         g_eae_using_fallback = true;
+      }
+      ResetLastError();
+      res = WebRequest("POST", g_eae_fallback_url, headers, 10000, data, result, result_headers);
+   }
+
    string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
    
    if(res == 200 && StringFind(response, "\"success\":false") < 0 && StringFind(response, "\"success\": false") < 0) {
@@ -631,7 +770,6 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
 }
 
 //+------------------------------------------------------------------+
-//+------------------------------------------------------------------+
 //| [2026-08-20] Self-Healing Boot & Day-Change Rollover Sync        |
 //| Staggered execution prevents cloud server request spikes.        |
 //+------------------------------------------------------------------+
@@ -641,7 +779,6 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
    datetime now = TimeCurrent();
    datetime current_day = (now / 86400) * 86400;
 
-   // Static trackers for rollover detection and staggered execution
    static datetime last_synced_day = 0;
    static datetime scheduled_sync_time = 0;
    static bool boot_scheduled = false;
@@ -667,7 +804,6 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
 
    if(current_day > last_synced_day && scheduled_sync_time <= now)
    {
-      // Schedule new day sync with staggered jitter (0-300s) to avoid cloud spike at midnight
       MathSrand((uint)GetTickCount() + (uint)login);
       int day_delay = (int)(login % 180) + (MathRand() % 120);
       scheduled_sync_time = current_day + day_delay;
@@ -678,11 +814,9 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
    // 3. Check if scheduled time has arrived
    if(scheduled_sync_time == 0 || now < scheduled_sync_time) return;
 
-   // Reset scheduled time so it executes once per trigger
    scheduled_sync_time = 0;
 
-   // Calculate self-healing gap (default: last 14 days)
-   int days_to_sync = 14; // Sync past 14 days to wrap up yesterday & heal missing records
+   int days_to_sync = 14;
    string gv_last_history = "EAE_LastHistorySync_" + IntegerToString(login);
    if(GlobalVariableCheck(gv_last_history))
    {
@@ -694,19 +828,19 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
          if(gap_days > days_to_sync) days_to_sync = gap_days;
       }
    }
-   if(days_to_sync > 30) days_to_sync = 30; // Cap at 30 days to protect network
+   if(days_to_sync > 30) days_to_sync = 30;
 
-   Print("EAE WebSync: [2026-08-20] Executing auto history sync for last ", days_to_sync, " days...");
+   Print("EAE WebSync: Executing auto history sync for last ", days_to_sync, " days...");
    if(EAE_WebSyncPushHistoryBatch(days_to_sync, magicB, magicS))
    {
       GlobalVariableSet(gv_last_history, (double)now);
       last_synced_day = current_day;
-      Print("EAE WebSync: [2026-08-20] Auto history sync completed successfully.");
+      Print("EAE WebSync: Auto history sync completed successfully.");
    }
    else
    {
-      Print("EAE WebSync: [2026-08-20] Auto history sync failed. Will retry in 60s.");
-      scheduled_sync_time = now + 60; // Retry in 60 seconds
+      Print("EAE WebSync: Auto history sync failed. Will retry in 60s.");
+      scheduled_sync_time = now + 60;
    }
 }
 
@@ -730,7 +864,8 @@ void EAE_WebSyncTriggerEvent(string type, int total_orders, double total_lots, d
    string headers = "Content-Type: application/json\r\n" + 
                     "apikey: " + g_eae_system_key + "\r\n" +
                     "Authorization: Bearer " + g_eae_system_key + "\r\n";
-   WebRequest("POST", g_eae_api_url, headers, 2000, data, result, result_headers);
+   string target_url = (g_eae_using_fallback ? g_eae_fallback_url : g_eae_supabase_sync_url);
+   WebRequest("POST", target_url, headers, 2000, data, result, result_headers);
 }
 
 #endif // __EAE_WEB_SYNC_MQH__

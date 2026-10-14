@@ -272,14 +272,20 @@ void EaezeCheckLicensePeriodic(string product_id, string api_key = "KHUCHAI_SUPH
         if(cached_status > 1.0) {
             string alert_msg = "License Invalid or Expired";
             if(cached_status == 2.0) alert_msg = "Balance is too low for this EA.";
-            Print("EAEZE: Periodic check failed (cached status: ", cached_status, "). Removing EA.");
             ShowLicenseAlert(alert_msg + " (Account: " + account_no + ")");
+            if(product_id == "EZM-PRIME-V1" && PositionsTotal() > 0) {
+                return; // Allow Prime Safe Liquidation Protocol to close existing baskets first
+            }
+            Print("EAEZE: Periodic check failed (cached status: ", cached_status, "). Removing EA.");
             ExpertRemove();
             return;
         }
     }
     
     if (!EaezeCheckLicense(product_id, api_key, false)) {
+        if(product_id == "EZM-PRIME-V1" && PositionsTotal() > 0) {
+            return; // Allow Prime Safe Liquidation Protocol to close existing baskets first
+        }
         Print("EAEZE: Periodic license verification failed. Removing EA.");
         ExpertRemove();
     }
@@ -290,7 +296,8 @@ void EaezeCheckLicensePeriodic(string product_id, string api_key = "KHUCHAI_SUPH
 // =====================================================================
 #ifdef EAEZE_SYNC_ENABLED
 
-// Single URL Whitelist: eaeze.com only (no Supabase URL required in MT5)
+// Primary Direct-to-Supabase RPC + Automatic Fallback to eaeze.com
+#define EAE_SUPABASE_SYNC_URL "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_data"
 #define EAE_SYNC_URL "https://eaeze.com/api/sync-dashboard"
 #define EAE_SYSTEM_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mcnNwdnp4bXBrc3FuemNyeXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTcwMzMsImV4cCI6MjA4NTc5MzAzM30.Fm-h9TJTAUbBw_T6gj2IRwcy5xZMsw_SORv0Lvoxpgo"
 
@@ -572,11 +579,18 @@ bool EaezeWebSyncPushHistoryBatch(int days_to_sync, long magic_buy, long magic_s
    StringToCharArray(payload, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, ArraySize(data) - 1);
    
-   string url = "https://eaeze.com/api/sync-dashboard";
-   string headers = "Content-Type: application/json\r\n";
-                    
+   string supa_url = "https://mfrspvzxmpksqnzcrysz.supabase.co/rest/v1/rpc/sync_ea_history_batch";
+   string supa_headers = "Content-Type: application/json\r\n" +
+                         "apikey: " + EAE_SYSTEM_KEY + "\r\n" +
+                         "Authorization: Bearer " + EAE_SYSTEM_KEY + "\r\n";
    ResetLastError();
-   int res = WebRequest("POST", url, headers, 5000, data, result, result_headers);
+   int res = WebRequest("POST", supa_url, supa_headers, 5000, data, result, result_headers);
+   if(res == -1 || res < 200 || res >= 300) {
+      ResetLastError();
+      string fallback_url = "https://eaeze.com/api/sync-dashboard";
+      string fallback_headers = "Content-Type: application/json\r\n";
+      res = WebRequest("POST", fallback_url, fallback_headers, 5000, data, result, result_headers);
+   }
    
    if(res == 200) {
       string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
@@ -727,7 +741,14 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
       return;
    }
    
-   // --- [NEW] Self-Healing 30-Day Sync Check ---
+   // [Unified Single-Sync Loop Guard]:
+   // If EAE_WebSync / EM_MonitorAdapter is active on this account, skip duplicate sync loop here!
+   string gv_uni = "EAE_Universal_Active_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   if(GlobalVariableCheck(gv_uni) && GlobalVariableGet(gv_uni) > 0) {
+      return;
+   }
+   
+   // --- Self-Healing 30-Day Sync Check ---
    EaezeWebSyncCheckAndPushHistory(magic_buy, magic_sell);
    
    // 2. Perform the WebRequest sync
@@ -738,14 +759,14 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    static bool is_trial = false;
    
    if(active_sync_interval <= 0) {
-      active_sync_interval = sync_interval_sec;
+      active_sync_interval = (sync_interval_sec > 0 ? sync_interval_sec : 20);
    }
    
    uint now_ticks = GetTickCount();
    
    int current_interval = active_sync_interval;
    if(!full_sync_mode) {
-      current_interval = 180; // Sleep mode: ping heartbeat every 3 minutes (180s) when no active viewer
+      current_interval = 600; // Standby/Sleep mode: ping heartbeat every 10 minutes (600s) when no active viewer
    }
    
    if(last_sync_ticks > 0 && (int)(now_ticks - last_sync_ticks) < current_interval * 1000) {
@@ -782,12 +803,12 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    bool skip_orders = (license_tier == "free" && !is_trial);
    string orders_json = (full_sync_mode && !skip_orders ? EaezeBuildOrdersJson(magic_buy, magic_sell) : "[]");
 
-   // Build Simple Payload
+   // Build Simple Payload (always ping_only:false so Supabase sync_ea_data RPC updates farm_port_status)
    string payload = "{ \"p_payload\": {";
    payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
    payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
    payload += "\"current_price\":" + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits) + ",";
-   payload += "\"ping_only\":" + (full_sync_mode ? "false" : "true") + ",";
+   payload += "\"ping_only\":false,";
    payload += "\"today_profit\":" + DoubleToString(today_profit, 2) + ",";
    payload += "\"today_closed_lots\":" + DoubleToString(today_closed_lots, 2) + ",";
    payload += "\"daily_max_drawdown\":" + DoubleToString(max_dd_pct, 2) + ",";
@@ -815,15 +836,45 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
                     "Authorization: Bearer " + EAE_SYSTEM_KEY + "\r\n";
    
    ResetLastError();
-   int res = WebRequest("POST", EAE_SYNC_URL, headers, 10000, data, result, result_headers);
+   bool used_fallback = false;
+   int res = WebRequest("POST", EAE_SUPABASE_SYNC_URL, headers, 10000, data, result, result_headers);
+   if(res == -1 || res < 200 || res >= 300) {
+      used_fallback = true;
+      // 1-URL Auto-Fallback (Standby-Only 10m Policy):
+      // Strip live orders and per-pair telemetry; only sync summary every 10 minutes
+      string fb_payload = "{ \"p_payload\": {";
+      fb_payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+      fb_payload += "\"server_time\":" + IntegerToString(TimeCurrent()) + ",";
+      fb_payload += "\"current_price\":" + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits) + ",";
+      fb_payload += "\"ping_only\":false,";
+      fb_payload += "\"sync_mode\":\"FALLBACK_1URL\",";
+      fb_payload += "\"today_profit\":" + DoubleToString(today_profit, 2) + ",";
+      fb_payload += "\"today_closed_lots\":" + DoubleToString(today_closed_lots, 2) + ",";
+      fb_payload += "\"daily_max_drawdown\":" + DoubleToString(max_dd_pct, 2) + ",";
+      fb_payload += "\"snapshot\":{";
+      fb_payload += "\"account\":{\"balance\":" + DoubleToString(balance, 2) + ",\"equity\":" + DoubleToString(equity, 2) + ",\"margin_level\":" + DoubleToString(margin, 2) + ",\"currency\":\"" + currency + "\"},";
+      fb_payload += "\"buy_state\":{\"open_count\":" + IntegerToString(buy_count) + ",\"open_lots\":" + DoubleToString(buy_lots, 2) + ",\"floating_pnl\":" + DoubleToString(buy_pnl, 2) + "},";
+      fb_payload += "\"sell_state\":{\"open_count\":" + IntegerToString(sell_count) + ",\"open_lots\":" + DoubleToString(sell_lots, 2) + ",\"floating_pnl\":" + DoubleToString(sell_pnl, 2) + "},";
+      fb_payload += "\"identity\":{\"product_family\":\"" + prod_fam + "\",\"system_code\":\"" + system_code + "\",\"ea_version\":\"" + ea_version + "\"}";
+      fb_payload += "},";
+      fb_payload += "\"orders\":[],";
+      fb_payload += "\"prime_data\":{\"sync_mode\":\"FALLBACK_1URL\"}";
+      fb_payload += "}, \"p_api_key\":\"LICENSE_AUTO\" }";
+
+      char fb_data[];
+      StringToCharArray(fb_payload, fb_data, 0, WHOLE_ARRAY, CP_UTF8);
+      ArrayResize(fb_data, ArraySize(fb_data) - 1);
+
+      ResetLastError();
+      res = WebRequest("POST", EAE_SYNC_URL, "Content-Type: application/json\r\n", 10000, fb_data, result, result_headers);
+   }
    
    if(res == -1) {
       int err = GetLastError();
-      // If WebRequest host is not listed (ERR_WEBREQUEST_CANNOT_CONNECT = 4060 or ERR_FUNCTION_NOT_ALLOWED = 4014), fail silently
       if(err == 4060 || err == 4014) {
          static bool printed_warning = false;
          if(!printed_warning) {
-            Print("[EAE_SYSTEM WARNING] WebRequest is not whitelisted. Web Dashboard Sync is disabled. Please add 'https://eaeze.com' to MT5 WebRequest options if you wish to see the Web Dashboard.");
+            Print("[EAE_SYSTEM WARNING] WebRequest is not whitelisted. Please add 'https://mfrspvzxmpksqnzcrysz.supabase.co' and 'https://eaeze.com' to MT5 WebRequest options.");
             printed_warning = true;
          }
          return;
@@ -835,8 +886,19 @@ void EaezeCheckLicenseAndSync(string product_id, string system_code, string ea_v
    if(res == 200) {
       string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
       
-      // Smart sleep/wake parsing
-      if(StringFind(response, "\"should_sync_full\":true") >= 0 || StringFind(response, "\"should_sync_full\": true") >= 0) {
+      if(used_fallback) {
+         // 1-URL Fallback Policy: Force 10-minute standby only (no live 20s Farm streaming)
+         full_sync_mode = false;
+         active_sync_interval = 600;
+         return;
+      }
+
+      // Smart sleep/wake parsing (Direct-to-Supabase 2-URL mode only)
+      bool viewer_on = (StringFind(response, "\"should_sync_full\":true") >= 0 || 
+                        StringFind(response, "\"should_sync_full\": true") >= 0 ||
+                        StringFind(response, "\"viewer_active\":true") >= 0 ||
+                        StringFind(response, "\"viewer_active\": true") >= 0);
+      if(viewer_on) {
          if(!full_sync_mode) {
             last_sync_ticks = 0; // Trigger sync immediately on next tick!
          }

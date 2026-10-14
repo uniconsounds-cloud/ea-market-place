@@ -355,6 +355,7 @@ export default function FarmClient({
 }) {
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
+    const [history, setHistory] = useState<any[]>([]);
     const [currentCustomName, setCurrentCustomName] = useState(customName || '');
     
     useEffect(() => {
@@ -1042,21 +1043,28 @@ export default function FarmClient({
             return;
         }
         
+        const histToday = history.find(h => h.date && h.date.startsWith(activeTradingDateStr));
+        const histProfit = histToday ? Number(histToday.profit) : 0;
+        const histLots = histToday ? Number(histToday.closed_lots || histToday.lots || 0) : 0;
+        const effectivePnl = currentPnl > 0 ? currentPnl : (histProfit > 0 ? histProfit : currentPnl);
+        const effectiveLots = currentClosedLots > 0 ? currentClosedLots : histLots;
+
         if (lastDayRef.current !== activeTradingDateStr) {
-            // New day or first load: sync with current today_pnl immediately
+            // New day or first load: sync with current today_pnl or today's history immediately
             lastDayRef.current = activeTradingDateStr;
-            setSmoothedTodayProfit(currentPnl);
+            setSmoothedTodayProfit(effectivePnl);
         } else {
             // Same day: if 0 trades closed today, today's PnL is definitely 0
-            if (currentClosedLots === 0 && currentPnl === 0) {
+            if (effectiveLots === 0 && effectivePnl === 0) {
                 setSmoothedTodayProfit(0);
-            } else if (currentPnl === 0 && smoothedTodayProfit > 0 && currentClosedLots > 0) {
+            } else if (effectivePnl === 0 && smoothedTodayProfit > 0 && effectiveLots > 0) {
+                // Keep the last positive profit rather than collapsing to 0 due to an EA
                 // momentary 0 drop during position reload on the same day with existing closed lots
             } else {
-                setSmoothedTodayProfit(currentPnl);
+                setSmoothedTodayProfit(effectivePnl);
             }
         }
-    }, [portStatus?.today_pnl, portStatus?.today_closed_lots, portStatus?.asset_type, time, smoothedTodayProfit]);
+    }, [portStatus?.today_pnl, portStatus?.today_closed_lots, portStatus?.asset_type, time, smoothedTodayProfit, history]);
 
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -1116,6 +1124,16 @@ export default function FarmClient({
     };
 
     const stats = useMemo(() => {
+        const mDate = getMarketTradingDate(time || new Date());
+        const yyyy = mDate.getFullYear();
+        const mm = String(mDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(mDate.getDate()).padStart(2, '0');
+        const activeTradingDateStr = `${yyyy}-${mm}-${dd}`;
+        const histToday = history.find(h => h.date && h.date.startsWith(activeTradingDateStr));
+        const histProfit = histToday ? Number(histToday.profit) : 0;
+        const currentPnl = Number(portStatus?.today_pnl || 0);
+        const resolvedTodayProfit = currentPnl !== 0 ? currentPnl : (histProfit !== 0 ? histProfit : 0);
+
         // If EA is sending data to farm_port_status, use that directly
         if (portStatus?.floating_pnl !== undefined) {
             const floatingPnl = Number(portStatus.floating_pnl);
@@ -1136,7 +1154,7 @@ export default function FarmClient({
                 balance: Number(portStatus.balance),
                 equity: Number(portStatus.equity),
                 maxDrawdown: Number(portStatus.max_drawdown || 0),
-                todayProfit: Number(portStatus.today_pnl || 0),
+                todayProfit: resolvedTodayProfit,
                 serverTime: portStatus.server_time ? new Date(Number(portStatus.server_time) * 1000) : new Date(),
                 // Correct broker day progress: use modulo to extract HH:MM from raw broker timestamp
                 // (avoids timezone mismatch since MQL5 TimeCurrent is broker-local, not UTC)
@@ -1175,11 +1193,11 @@ export default function FarmClient({
             balance,
             equity,
             maxDrawdown: Math.max(0, Math.floor(((balance - equity) / balance) * 100)),
-            todayProfit: Number(portStatus?.today_pnl || 0),
+            todayProfit: resolvedTodayProfit,
             serverTime: new Date(),
             brokerDayPercent: null
         };
-    }, [displayOrders, portStatus, orders]);
+    }, [displayOrders, portStatus, orders, history, time]);
 
     // 🎛️ Prime 20-Pair Cockpit Matrix Controls (Persisted to localStorage)
     const [pairControls, setPairControls] = useState<Record<string, { enabled: boolean }>>(() => {
@@ -1361,20 +1379,16 @@ export default function FarmClient({
                 abbr: q.abbr || q.sym.substring(0, 2),
                 ddPct: Number(q.loss_pct || 0),
                 isHedged: Boolean(q.is_hedged),
-                rescueOrders: Number(q.rescue_orders || 0)
+                rescueOrders: Number(q.rescue_count || q.rescue_orders || 0)
             }));
             quarantinedList = quarantinedDetails.map(q => q.sym);
             quarantineSummary = quarantinedDetails.length > 0 
                 ? ('QT: ' + quarantinedDetails.map(q => `${q.abbr} ${q.ddPct.toFixed(2)}%`).join(' : ')) 
                 : 'QT: -';
         } else {
-            // Default fallback if prime_data has not synced yet
-            quarantinedList = ['EURJPY', 'GBPJPY'];
-            quarantinedDetails = [
-                { sym: 'EURJPY', abbr: 'EJ', ddPct: 12.22, isHedged: false, rescueOrders: 0 },
-                { sym: 'GBPJPY', abbr: 'GJ', ddPct: 19.93, isHedged: false, rescueOrders: 0 }
-            ];
-            quarantineSummary = 'QT: EJ 12.22% : GJ 19.93%';
+            quarantinedList = [];
+            quarantinedDetails = [];
+            quarantineSummary = 'QT: -';
         }
 
         // Locked pair for Dial 3: Top quarantined pair with highest DD
@@ -1779,7 +1793,6 @@ export default function FarmClient({
     }, [displayOrders, recentlyClosed, stats.floatingPnl, portStatus, treePriority, flowerPriority, activeFarmDDPct, isPrime, portNumber, isFallback1Url]);
 
     // --- Fetch Real History ---
-    const [history, setHistory] = useState<any[]>([]);
     useEffect(() => {
         if (!isTabVisible || isIdle) return;
 

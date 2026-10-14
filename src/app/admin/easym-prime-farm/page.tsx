@@ -343,11 +343,35 @@ export default function AdminPrimeFarmLabPage() {
     const [loadingAuth, setLoadingAuth] = useState(true);
     const router = useRouter();
 
-    // ─── Real Port 97053088 Data ───
-    const portNumber = '97053088';
+    // ─── Real Port Data (Supports 97053088 & 21692434) ───
+    const [portNumber, setPortNumber] = useState<string>('97053088');
+
+    // Initialize from URL search params if provided (?port=21692434)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const p = new URLSearchParams(window.location.search).get('port');
+            if (p && /^\d+$/.test(p)) {
+                setPortNumber(p);
+            }
+        }
+    }, []);
+
     const [liveOrders, setLiveOrders] = useState<any[]>([]);
     const [livePortStatus, setLivePortStatus] = useState<any>(null);
     const [rawHistory, setRawHistory] = useState<any[]>([]);
+
+    // 🛡️ Parse embedded prime_data transmitted directly from EasyM Prime EA
+    const primeData = useMemo(() => {
+        if (!livePortStatus?.system_code) return null;
+        if (!livePortStatus.system_code.includes(':::')) return null;
+        try {
+            const parts = livePortStatus.system_code.split(':::');
+            return JSON.parse(parts.slice(1).join(':::'));
+        } catch (e) {
+            console.error('Failed to parse prime_data from system_code in admin farm:', e);
+            return null;
+        }
+    }, [livePortStatus]);
 
     // ─── Simulation Sandbox States ───
     const [isSimMode, setIsSimMode] = useState(false);
@@ -528,7 +552,7 @@ export default function AdminPrimeFarmLabPage() {
             supabase.removeChannel(channel);
             clearInterval(pingInterval);
         };
-    }, [loadingAuth]);
+    }, [loadingAuth, portNumber]);
 
     // Auto-scroll history dock to right on mount
     useEffect(() => {
@@ -540,85 +564,127 @@ export default function AdminPrimeFarmLabPage() {
     // ─── Derived Telemetry Data (Merged with Simulation if Active) ───
     const telemetry = useMemo(() => {
         if (!isSimMode) {
-            // Live Real Data from port 97053088
+            // Live Real Data from port
             const bal = Number(livePortStatus?.balance) || 10000;
-            const eq = Number(livePortStatus?.equity) || 9850;
+            const eq = Number(livePortStatus?.equity) || bal;
             const floatPnl = eq - bal;
             const ddAmt = floatPnl < 0 ? Math.abs(floatPnl) : 0;
-            const ddPct = bal > 0 ? (ddAmt / bal) * 100 : 0;
-            const todayPnl = Number(livePortStatus?.today_pnl) || 0;
+            
+            // Total Port DD% & Mode DD% from EA telemetry
+            const liveTotalDD = primeData?.total_dd !== undefined 
+                ? Number(primeData.total_dd) 
+                : (bal > 0 ? (ddAmt / bal) * 100 : 0);
+            const ddPct = liveTotalDD;
+
+            const liveModeDD = primeData?.mode_dd !== undefined
+                ? Number(primeData.mode_dd)
+                : ddPct;
+
+            // Today's Profit: check livePortStatus, fallback to rawHistory today, or primeData
+            const todayDateStr = new Date().toISOString().split('T')[0];
+            const histToday = rawHistory.find(h => h.date && h.date.startsWith(todayDateStr));
+            const histProfit = histToday ? Number(histToday.profit) : 0;
+            const liveTodayPnl = Number(livePortStatus?.today_pnl || 0);
+            const todayPnl = liveTodayPnl !== 0 
+                ? liveTodayPnl 
+                : (histProfit !== 0 ? histProfit : Number(primeData?.today_profit || 0));
 
             const buyOrders = liveOrders.filter(o => o.type === 'BUY');
             const sellOrders = liveOrders.filter(o => o.type === 'SELL');
-            const buyCount = buyOrders.length;
-            const sellCount = sellOrders.length;
-            const buyPnl = buyOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0);
-            const sellPnl = sellOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0);
+            const buyCount = buyOrders.length || Number(livePortStatus?.buy_count || 0);
+            const sellCount = sellOrders.length || Number(livePortStatus?.sell_count || 0);
+            const buyPnl = buyOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0) || Number(livePortStatus?.buy_pnl || 0);
+            const sellPnl = sellOrders.reduce((acc, o) => acc + (Number(o.current_pnl) || 0), 0) || Number(livePortStatus?.sell_pnl || 0);
 
-            // Pair stats calculation
-            const pairStats: Record<string, { pnl: number; count: number }> = {};
-            liveOrders.forEach(o => {
-                const sym = o.symbol || 'UNKNOWN';
-                if (!pairStats[sym]) pairStats[sym] = { pnl: 0, count: 0 };
-                pairStats[sym].pnl += Number(o.current_pnl) || 0;
-                pairStats[sym].count += 1;
-            });
+            // Quarantined pairs from EA telemetry
+            const quarantinedList: string[] = [];
+            if (primeData?.quarantined && Array.isArray(primeData.quarantined)) {
+                primeData.quarantined.forEach((q: any) => {
+                    if (q.sym) quarantinedList.push(q.sym);
+                });
+            }
 
-            let worstSym = 'EURJPY';
-            let worstDdAmt = 0;
+            // Port Mode from EA telemetry (evaluated on mode_dd)
+            let livePortMode: PortMode = 'NORMAL';
+            if (primeData?.mode) {
+                const m = String(primeData.mode).toUpperCase();
+                if (m === 'FREEZE' || m === 'SLOW' || m === 'NORMAL') livePortMode = m;
+            } else {
+                livePortMode = liveModeDD >= 28 ? 'FREEZE' : liveModeDD >= 18 ? 'SLOW' : 'NORMAL';
+            }
+
+            // Worst pair from EA telemetry
+            let worstSym = '-';
+            let worstPairDdPct = 0;
             let worstOrders = 0;
-
-            Object.entries(pairStats).forEach(([sym, st]) => {
-                if (st.pnl < 0 && Math.abs(st.pnl) > worstDdAmt) {
-                    worstDdAmt = Math.abs(st.pnl);
-                    worstSym = sym;
-                    worstOrders = st.count;
+            if (primeData?.worst && primeData.worst !== '-') {
+                const tokens = String(primeData.worst).split('|').map(t => t.trim());
+                if (tokens.length > 0) {
+                    const match = tokens[0].match(/([A-Z0-9]+)\s+([\d\.]+)/i);
+                    if (match) {
+                        worstSym = match[1].toUpperCase();
+                        worstPairDdPct = parseFloat(match[2]);
+                    }
                 }
-            });
-            const worstPairDdPct = bal > 0 ? Number(((worstDdAmt / bal) * 100).toFixed(2)) : 0;
+            }
+            if (worstSym === '-' && quarantinedList.length > 0) {
+                worstSym = quarantinedList[0];
+                const qObj = primeData?.quarantined?.find((q: any) => q.sym === worstSym);
+                worstPairDdPct = qObj ? Number(qObj.loss_pct || 0) : 0;
+            }
 
-            const quarantined = Object.entries(pairStats)
-                .filter(([_, st]) => bal > 0 && ((Math.abs(st.pnl < 0 ? st.pnl : 0) / bal) * 100) >= 10)
-                .map(([sym]) => sym);
+            // Rescue status from EA
+            const rescueCount = Number(primeData?.rescue_orders ?? 0);
+            const rescueDD = Number(primeData?.rescue_dd ?? 0);
+            const isRescueActive = rescueCount > 0;
 
-            const livePortMode: PortMode = ddPct >= 30 ? 'FREEZE' : ddPct >= 15 ? 'SLOW' : 'NORMAL';
-            const isRescueActive = ddPct >= 25;
-            // Safe Liquidation is only for expired licenses, not for high drawdown on active accounts
-            const isSafeLiq = false;
+            // Relief fund from EA
+            const reliefBudget = primeData?.relief_budget !== undefined 
+                ? Number(primeData.relief_budget) 
+                : Math.max(0, Number((todayPnl * 0.40).toFixed(2)));
+            const reliefCap = primeData?.relief_cap !== undefined 
+                ? Number(primeData.relief_cap) 
+                : Math.round(bal * 0.05);
+            const reliefUsed = Number(primeData?.relief_used ?? 0);
+
+            const capitalBufferStr = primeData?.res_mult !== undefined 
+                ? `${Number(primeData.res_mult).toFixed(1)}x` 
+                : (liveModeDD >= 15 ? '1.5x' : '1.2x');
 
             return {
-                isSafeLiquidation: isSafeLiq,
+                isSafeLiquidation: false,
                 portMode: livePortMode,
                 balance: bal,
                 equity: eq,
                 floatingPnl: floatPnl,
                 drawdownAmount: ddAmt,
                 drawdownPercent: Number(ddPct.toFixed(2)),
+                modeDDPct: Number(liveModeDD.toFixed(2)),
                 buyCount: buyCount,
                 sellCount: sellCount,
                 buyPnl: Number(buyPnl.toFixed(2)),
                 sellPnl: Number(sellPnl.toFixed(2)),
                 totalLots: Number(livePortStatus?.total_lots) || 0,
                 todayPnl: todayPnl,
-                todayClosedLots: Number(livePortStatus?.today_closed_lots) || 0,
+                todayClosedLots: Number(livePortStatus?.today_closed_lots) || (histToday ? Number(histToday.closed_lots || histToday.lots || 0) : 0),
                 dailyMaxDrawdown: Number(livePortStatus?.daily_max_drawdown) || Number(ddPct.toFixed(2)),
                 worstPair: {
                     symbol: worstSym,
                     dd: worstPairDdPct,
-                    orders: worstOrders || liveOrders.filter(o => (o.symbol || '').includes(worstSym)).length
+                    orders: worstOrders
                 },
                 reliefFund: {
-                    balance: Math.max(0, Number((todayPnl * 0.40).toFixed(2))),
-                    cap: Math.round(bal * 0.05),
-                    used: 0
+                    balance: reliefBudget,
+                    cap: reliefCap,
+                    used: reliefUsed
                 },
                 rescue: {
                     isActive: isRescueActive,
-                    count: isRescueActive ? 1 : 0,
-                    ddPct: isRescueActive ? Number((ddPct * 0.15).toFixed(2)) : 0
+                    count: rescueCount,
+                    ddPct: rescueDD
                 },
-                quarantinePairs: quarantined,
-                capitalBuffer: ddPct >= 15 ? '1.5x' : '1.2x',
+                quarantinePairs: quarantinedList,
+                capitalBuffer: capitalBufferStr,
                 orders: liveOrders
             };
         }
@@ -724,65 +790,92 @@ export default function AdminPrimeFarmLabPage() {
             .slice(0, 4);
     }, [telemetry]);
 
-    // 🛡️ 3 Quarantined & Rescued Trees Dataset
+interface QuarantineTreeItem {
+    id: string;
+    c: number;
+    r: number;
+    sym: string;
+    abbr: string;
+    ddPct: number;
+    isRescue: boolean;
+    rescueOrders: number;
+    src: string;
+    alt: string;
+    label: string;
+    delayMs: number;
+}
+
+    // 🛡️ Quarantined & Rescued Trees Dataset
     // Anchored at Plot 2 (c: 1.0, r: 5) where the dome sits, and unfolding sequentially to the right
-    const quarantinePreviewList = useMemo(() => [
-        { 
-            id: 'q_preview_1', 
-            c: 1.0, 
-            r: 5, 
-            sym: 'EURJPY',
-            ddPct: 14.20,
-            isRescue: false,
-            src: '/farm/Tree_fence.png?v=2', 
-            alt: 'Quarantined Tree', 
-            label: 'QUARANTINE',
-            delayMs: 0
-        },
-        { 
-            id: 'q_preview_2', 
-            c: 1.8, 
-            r: 5, 
-            sym: 'GBPJPY',
-            ddPct: 16.80,
-            isRescue: true,
-            src: '/farm/Tree_aura.png?v=2',  
-            alt: 'Rescue Active Tree', 
-            label: 'RESCUE GRID',
-            delayMs: 150
-        },
-        { 
-            id: 'q_preview_3', 
-            c: 2.6, 
-            r: 5, 
-            sym: 'USDJPY',
-            ddPct: 11.50,
-            isRescue: false,
-            src: '/farm/Tree_fence.png?v=2', 
-            alt: 'Quarantined Tree', 
-            label: 'QUARANTINE',
-            delayMs: 300
-        },
-    ], []);
+    const quarantinePreviewList: QuarantineTreeItem[] = useMemo(() => {
+        if (isSimMode) {
+            if (telemetry.quarantinePairs.length === 0) return [];
+            return telemetry.quarantinePairs.slice(0, 3).map((sym, idx) => ({
+                id: `q_preview_${idx + 1}`,
+                c: 1.0 + idx * 0.8,
+                r: 5,
+                sym: sym,
+                abbr: sym.substring(0, 2),
+                ddPct: idx === 0 ? 14.20 : 16.80,
+                isRescue: idx === 1,
+                rescueOrders: idx === 1 ? 1 : 0,
+                src: idx === 1 ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                alt: idx === 1 ? 'Rescue Active Tree' : 'Quarantined Tree',
+                label: idx === 1 ? 'RESCUE GRID' : 'QUARANTINE',
+                delayMs: idx * 150
+            }));
+        }
+
+        if (!primeData?.quarantined || !Array.isArray(primeData.quarantined) || primeData.quarantined.length === 0) {
+            return [];
+        }
+
+        return primeData.quarantined.slice(0, 3).map((q: any, idx: number) => {
+            const sym = q.sym;
+            const ddPct = Number(q.loss_pct || 0);
+            const rescueOrders = Number(q.rescue_count || q.rescue_orders || 0);
+            const isRescue = Boolean(q.is_hedged || rescueOrders > 0);
+            return {
+                id: `q_preview_${idx + 1}`,
+                c: 1.0 + idx * 0.8,
+                r: 5,
+                sym: sym,
+                abbr: q.abbr || sym.substring(0, 2),
+                ddPct: ddPct,
+                isRescue: isRescue,
+                rescueOrders: rescueOrders,
+                src: isRescue ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                alt: isRescue ? 'Rescue Active Tree' : 'Quarantined Tree',
+                label: isRescue ? 'RESCUE GRID' : 'QUARANTINE',
+                delayMs: idx * 150
+            };
+        });
+    }, [isSimMode, telemetry.quarantinePairs, primeData]);
 
     const totalQuarantineDD = useMemo(() => {
-        return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
+        return Number(quarantinePreviewList.reduce((acc: number, t: QuarantineTreeItem) => acc + t.ddPct, 0).toFixed(2));
     }, [quarantinePreviewList]);
 
     // Definitions of DD at each location:
     // 1. Top Orb (ลูกแก้วบนสุด) = DD รวมของพอร์ต (Total Port DD)
     // 2. Badge above Farm (กรอบ DD เหนือฟาร์ม) = DD ของฟาร์มที่ทำงานอยู่ปัจจุบันโดยหัก DD ที่ถูกกักขังออกแล้ว (Active Farm DD = Total Port DD - Quarantine Total DD)
     // 3. Badge on Quarantined Trees (บนต้นไม้ที่ถูกขัง) = DD ของคู่เงินที่ถูกขังทั้งหมด (Quarantine Total DD)
-    const rawPortDD = telemetry.drawdownPercent;
     const activeFarmDDPct = useMemo(() => {
-        return rawPortDD >= totalQuarantineDD + 5 
+        if (!isSimMode && primeData?.mode_dd !== undefined) {
+            return Number(Number(primeData.mode_dd).toFixed(2));
+        }
+        const rawPortDD = telemetry.drawdownPercent;
+        return rawPortDD >= totalQuarantineDD 
             ? Number((rawPortDD - totalQuarantineDD).toFixed(2)) 
-            : (rawPortDD > 0 ? Number(rawPortDD.toFixed(2)) : 14.20);
-    }, [rawPortDD, totalQuarantineDD]);
+            : (rawPortDD > 0 ? Number(rawPortDD.toFixed(2)) : 0);
+    }, [isSimMode, primeData, telemetry.drawdownPercent, totalQuarantineDD]);
 
     const totalPortDDPct = useMemo(() => {
+        if (!isSimMode && primeData?.total_dd !== undefined) {
+            return Number(Number(primeData.total_dd).toFixed(2));
+        }
         return Number((activeFarmDDPct + totalQuarantineDD).toFixed(2));
-    }, [activeFarmDDPct, totalQuarantineDD]);
+    }, [isSimMode, primeData, activeFarmDDPct, totalQuarantineDD]);
 
     // ─── 25-Tree Plot Calculation (Matching Classic Algorithm) ───
     const plot = useMemo(() => {
@@ -1053,7 +1146,7 @@ export default function AdminPrimeFarmLabPage() {
                     todayProfit={telemetry.todayPnl}
                     todayClosedLots={telemetry.todayClosedLots}
                     dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
-                    drawdownPercent={telemetry.drawdownPercent}
+                    drawdownPercent={totalPortDDPct}
                     drawdownAmount={telemetry.drawdownAmount}
                     systemCode="EasyM Prime"
                     adminMessage="ติดต่อผ่าน line ID : @jharvest"
@@ -1103,7 +1196,7 @@ export default function AdminPrimeFarmLabPage() {
                 accountType="USC"
                 todayClosedLots={telemetry.todayClosedLots}
                 dailyMaxDrawdown={telemetry.dailyMaxDrawdown}
-                drawdownPercent={telemetry.drawdownPercent}
+                drawdownPercent={totalPortDDPct}
                 drawdownAmount={telemetry.drawdownAmount}
                 totalStandardLots={telemetry.totalLots}
                 customName="EASYM PRIME"
@@ -1163,7 +1256,7 @@ export default function AdminPrimeFarmLabPage() {
                             {/* Live vs Sandbox Switch */}
                             <div className="flex items-center bg-black/60 rounded-xl p-0.5 border border-slate-700">
                                 <button
-                                    onClick={() => { setIsSimMode(false); toast.info('📡 เชื่อมต่อข้อมูลจริงจากพอร์ต 97053088'); }}
+                                    onClick={() => { setIsSimMode(false); toast.info(`📡 เชื่อมต่อข้อมูลจริงจากพอร์ต ${portNumber}`); }}
                                     className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
                                         !isSimMode ? 'bg-cyan-500 text-black shadow font-black' : 'text-slate-400 hover:text-white'
                                     }`}
@@ -1179,6 +1272,36 @@ export default function AdminPrimeFarmLabPage() {
                                     🧪 Sandbox จำลอง
                                 </button>
                             </div>
+
+                            {/* Port Switcher (Real Ports) */}
+                            {!isSimMode && (
+                                <div className="flex items-center bg-black/60 rounded-xl p-0.5 border border-cyan-500/40">
+                                    <button
+                                        onClick={() => {
+                                            setPortNumber('97053088');
+                                            router.replace('/admin/easym-prime-farm?port=97053088');
+                                            toast.info('สลับไปยัง Port 97053088');
+                                        }}
+                                        className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                                            portNumber === '97053088' ? 'bg-cyan-500 text-black shadow font-black' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        97053088
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setPortNumber('21692434');
+                                            router.replace('/admin/easym-prime-farm?port=21692434');
+                                            toast.info('สลับไปยัง Port 21692434');
+                                        }}
+                                        className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                                            portNumber === '21692434' ? 'bg-cyan-500 text-black shadow font-black' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        21692434
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Scenarios (Visible when Sandbox Mode is active) */}
                             {isSimMode && (
