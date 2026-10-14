@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2 } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -434,7 +434,16 @@ export default function DashboardPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {/* Upgrade to Prime for EasyM products (except Prime itself) */}
+                                            {((group.productKey?.toUpperCase().startsWith('EZM') || group.productName?.toLowerCase().includes('easym') || group.productName?.toLowerCase().includes('easy m')) && !group.productName?.toLowerCase().includes('prime') && !group.productKey?.toUpperCase().includes('PRIME')) && (
+                                                <Link href={`/dashboard/upgrade-prime?fromProductId=${group.productId}`}>
+                                                    <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-semibold shadow-md shadow-cyan-500/20 border border-cyan-400/40">
+                                                        <Sparkles className="h-4 w-4 text-yellow-300 animate-spin" />
+                                                        ✨ สิทธิ์พิเศษ: อัปเกรดสู่ EasyM Prime
+                                                    </Button>
+                                                </Link>
+                                            )}
                                             {group.fileUrl && (
                                                 hasActiveLicense(group) ? (
                                                     <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">

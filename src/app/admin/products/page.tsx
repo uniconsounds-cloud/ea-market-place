@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, ArrowRight, Filter, X } from 'lucide-react';
+import { Plus, Pencil, ArrowRight, Filter, X, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -70,6 +70,36 @@ export default function AdminProductsPage() {
             .order('created_at', { ascending: false });
 
         if (data) {
+            // Auto-check if EasyM Prime exists; if not, create it hidden (is_active: false)
+            const primeExists = data.some(p => p.product_key === 'EZM-PRIME-V1');
+            if (!primeExists) {
+                try {
+                    await supabase.from('products').insert([{
+                        name: 'EasyM Prime',
+                        product_key: 'EZM-PRIME-V1',
+                        description: 'เรือธงใหม่ล่าสุด ระบบกู้พอร์ตอัจฉริยะ ห้องฟื้นฟู Dynamic Rescue Sniper และ Cross-Pair Drawdown Offset พร้อม Live Farm Telemetry สลับชุด 20 คู่เงินใหม่',
+                        price_lifetime: 19900,
+                        price_monthly: 1990,
+                        price_quarterly: 4990,
+                        file_url: '/downloads/EasyM_Prime_v200_B261014_1.ex5',
+                        image_url: '/assets/easym_max_box.png',
+                        version: '2.00',
+                        is_active: false,
+                        platform: 'mt5',
+                        asset_class: 'currency',
+                        strategy: 'grid',
+                        min_balance: 1000,
+                        currency: 'USC',
+                        allow_rent: false,
+                        allow_ib: true,
+                        is_multi_port: false,
+                        port_count: 1
+                    }]);
+                } catch (e) {
+                    console.error('Failed to auto-seed EasyM Prime:', e);
+                }
+            }
+
             // Compute stats for each product with full pagination (>1000 rows supported)
             let allLicenses: any[] = [];
             let from = 0;
@@ -219,11 +249,50 @@ export default function AdminProductsPage() {
                     <h1 className="text-3xl font-bold">จัดการสินค้า</h1>
                     <p className="text-muted-foreground">รายการ EA ทั้งหมด ({products.length})</p>
                 </div>
-                <Link href="/admin/products/new">
-                    <Button>
-                        <Plus className="mr-2 h-4 w-4" /> เพิ่มสินค้าใหม่
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                    {!products.some(p => p.product_key === 'EZM-PRIME-V1') && (
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                try {
+                                    await supabase.from('products').insert([{
+                                        name: 'EasyM Prime',
+                                        product_key: 'EZM-PRIME-V1',
+                                        description: 'เรือธงใหม่ล่าสุด ระบบกู้พอร์ตอัจฉริยะ ห้องฟื้นฟู Dynamic Rescue Sniper และ Cross-Pair Drawdown Offset พร้อม Live Farm Telemetry สลับชุด 20 คู่เงินใหม่',
+                                        price_lifetime: 19900,
+                                        price_monthly: 1990,
+                                        price_quarterly: 4990,
+                                        file_url: '/downloads/EasyM_Prime_v200_B261014_1.ex5',
+                                        image_url: '/assets/easym_max_box.png',
+                                        version: '2.00',
+                                        is_active: false,
+                                        platform: 'mt5',
+                                        asset_class: 'currency',
+                                        strategy: 'grid',
+                                        min_balance: 1000,
+                                        currency: 'USC',
+                                        allow_rent: false,
+                                        allow_ib: true,
+                                        is_multi_port: false,
+                                        port_count: 1
+                                    }]);
+                                    alert('เพิ่ม EasyM Prime (ปิดการมองเห็น) สำเร็จแล้ว!');
+                                    fetchProducts();
+                                } catch (err: any) {
+                                    alert('เกิดข้อผิดพลาด: ' + err.message);
+                                }
+                            }}
+                            className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-950/30"
+                        >
+                            <Sparkles className="mr-2 h-4 w-4 text-cyan-400" /> เพิ่ม EasyM Prime (ปิดการมองเห็น)
+                        </Button>
+                    )}
+                    <Link href="/admin/products/new">
+                        <Button>
+                            <Plus className="mr-2 h-4 w-4" /> เพิ่มสินค้าใหม่
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {loading ? (

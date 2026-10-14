@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar, Mail, RotateCw, RefreshCw } from 'lucide-react';
+import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar, Mail, RotateCw, RefreshCw, Sparkles } from 'lucide-react';
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
@@ -181,6 +181,16 @@ export default function AdminOrdersPage() {
     };
 
     const handleApproveClick = (order: any) => {
+        if (order.plan_type === 'upgrade') {
+            const confirmMsg = `🚀 ยืนยันอนุมัติคำขออัปเกรดเป็น EasyM Prime สำหรับพอร์ต ${order.account_number}?\n\n• ระบบจะอัปเกรด License เป็น EasyM Prime (Tier Pro)\n• ได้รับสิทธิ์ใช้งานฟรี 60 วัน (2 เดือนเต็ม)\n• สามารถดาวน์โหลดไฟล์ EA และเข้าถึงระบบ Live Farm ได้ทันที`;
+            if (!confirm(confirmMsg)) return;
+
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 60); // 2 months free
+            handleApprove(order, expiryDate);
+            return;
+        }
+
         if (order.is_ib_request) {
             setSelectedOrder(order);
             const baseDate = (order.existing_license?.expiry_date && new Date(order.existing_license.expiry_date) > new Date())
@@ -311,8 +321,29 @@ export default function AdminOrdersPage() {
             // Determine license data once for the whole order (ensures all ports in multi-port get same data)
             let commonExpiryDate: string | null = null;
             let commonLicenseType = order.is_ib_request ? 'ib' : (order.plan_type || 'lifetime');
+            let targetProductId = order.product_id;
 
-            if (order.is_ib_request) {
+            if (order.plan_type === 'upgrade') {
+                commonLicenseType = 'pro';
+                if (customExpiryDate) {
+                    commonExpiryDate = customExpiryDate.toISOString();
+                } else {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 60); // 2 months
+                    commonExpiryDate = d.toISOString();
+                }
+
+                // Retrieve EasyM Prime product ID
+                const { data: primeProd } = await supabase
+                    .from('products')
+                    .select('id')
+                    .eq('product_key', 'EZM-PRIME-V1')
+                    .maybeSingle();
+
+                if (primeProd) {
+                    targetProductId = primeProd.id;
+                }
+            } else if (order.is_ib_request) {
                 // IB Request gets the admin-specified expiry date
                 if (customExpiryDate) {
                     commonExpiryDate = customExpiryDate.toISOString();
@@ -341,18 +372,27 @@ export default function AdminOrdersPage() {
 
             // Loop through each port for Multi-Port support
             for (const port of accountNumbersToProcess) {
-                // Check for existing license by Account Number AND Product ID
-                const { data: existingLicenses, error: licenseCheckError } = await supabase
-                    .from('licenses')
-                    .select('*')
-                    .eq('product_id', order.product_id)
-                    .eq('account_number', port); // exact match
+                // If it's an upgrade order, check for existing license by Account Number (across any product, e.g. EasyM Max/mini)
+                let existingLicense: any = null;
+                if (order.plan_type === 'upgrade') {
+                    const { data: portLicenses } = await supabase
+                        .from('licenses')
+                        .select('*')
+                        .eq('account_number', port);
+                    existingLicense = portLicenses && portLicenses.length > 0 ? portLicenses[0] : null;
+                } else {
+                    const { data: existingLicenses, error: licenseCheckError } = await supabase
+                        .from('licenses')
+                        .select('*')
+                        .eq('product_id', order.product_id)
+                        .eq('account_number', port); // exact match
 
-                if (licenseCheckError) console.error('Error checking license:', licenseCheckError);
+                    if (licenseCheckError) console.error('Error checking license:', licenseCheckError);
+                    existingLicense = existingLicenses && existingLicenses.length > 0 ? existingLicenses[0] : null;
+                }
 
-                const existingLicense = existingLicenses && existingLicenses.length > 0 ? existingLicenses[0] : null;
                 console.log('Match Found for port', port, ':', existingLicense);
-                console.log('Applying Data for', port, ':', { type: commonLicenseType, expiry: commonExpiryDate });
+                console.log('Applying Data for', port, ':', { type: commonLicenseType, expiry: commonExpiryDate, product_id: targetProductId });
 
                 if (existingLicense) {
                     // Update existing license
@@ -361,6 +401,7 @@ export default function AdminOrdersPage() {
                         .from('licenses')
                         .update({
                             user_id: order.user_id,
+                            product_id: targetProductId,
                             type: commonLicenseType,
                             is_active: true,
                             expiry_date: commonExpiryDate,
@@ -381,7 +422,7 @@ export default function AdminOrdersPage() {
                         .from('licenses')
                         .insert({
                             user_id: order.user_id,
-                            product_id: order.product_id,
+                            product_id: targetProductId,
                             type: commonLicenseType,
                             is_active: true,
                             expiry_date: commonExpiryDate,
@@ -603,7 +644,11 @@ export default function AdminOrdersPage() {
                                                         <h3 className="font-bold text-lg text-primary">
                                                             {order.products?.name || 'Unknown Product'}
                                                         </h3>
-                                                        {order.is_renewal ? (
+                                                        {order.plan_type === 'upgrade' ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 text-cyan-300 border border-cyan-400/50 shadow-lg shadow-cyan-500/20 animate-pulse">
+                                                                <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> 🚀 ขออัปเกรด (UPGRADE TO PRIME)
+                                                            </span>
+                                                        ) : order.is_renewal ? (
                                                             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm animate-pulse">
                                                                 <RotateCw className="w-3 h-3" /> ขอต่ออายุพอร์ตเดิม (Renewal)
                                                             </span>
@@ -632,9 +677,10 @@ export default function AdminOrdersPage() {
                                                         )}
                                                         {!order.is_ib_request && (
                                                             <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
-                                                                {order.plan_type === 'monthly' ? 'รายเดือน' :
-                                                                    order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :
-                                                                        'ตลอดชีพ'}
+                                                                {order.plan_type === 'upgrade' ? 'อัปเกรด Prime (ทดลองฟรี 2 เดือน)' :
+                                                                    order.plan_type === 'monthly' ? 'รายเดือน' :
+                                                                        order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :
+                                                                            'ตลอดชีพ'}
                                                             </span>
                                                         )}
                                                     </p>
@@ -692,6 +738,37 @@ export default function AdminOrdersPage() {
                                                                 {order.existing_license.type === 'ib' ? 'IB (ฟรี)' : order.existing_license.type}
                                                             </span>
                                                         </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Dedicated Upgrade Information Box */}
+                                            {order.plan_type === 'upgrade' && (
+                                                <div className="mt-2.5 p-3.5 bg-gradient-to-r from-cyan-950/40 via-purple-950/40 to-slate-900/60 border border-cyan-500/40 rounded-lg text-xs space-y-2 shadow-inner">
+                                                    <div className="flex items-center justify-between font-bold text-cyan-300">
+                                                        <span className="flex items-center gap-1.5 text-sm">
+                                                            <Sparkles className="w-4 h-4 text-cyan-400 animate-spin" />
+                                                            คำขอสิทธิ์อัปเกรดสู่ EasyM Prime (ทดลองใช้งานฟรี 2 เดือน)
+                                                        </span>
+                                                        <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono text-[11px]">
+                                                            60 Days Free Trial
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-stone-300 pt-1 border-t border-cyan-500/20">
+                                                        <div>
+                                                            <span className="text-muted-foreground">พอร์ตที่ขออัปเกรด:</span>{" "}
+                                                            <span className="font-bold text-cyan-200 font-mono text-sm">{order.account_number}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-muted-foreground">เมื่ออนุมัติ:</span>{" "}
+                                                            <span className="font-semibold text-emerald-300">อัปเกรดเป็น Prime Pro + ปลดล็อกดาวน์โหลด EA ทันที</span>
+                                                        </div>
+                                                        {order.notes && (
+                                                            <div className="sm:col-span-2 bg-black/30 p-2 rounded border border-white/5 mt-1">
+                                                                <span className="text-muted-foreground">บันทึกเพิ่มเติมจากลูกค้า:</span>{" "}
+                                                                <span className="text-stone-200 italic">{order.notes}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
