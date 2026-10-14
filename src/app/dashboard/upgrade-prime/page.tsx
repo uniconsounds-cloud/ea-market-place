@@ -43,7 +43,6 @@ function UpgradePrimeContent() {
     // Form states
     const [userPorts, setUserPorts] = useState<string[]>([]);
     const [selectedPort, setSelectedPort] = useState<string>('');
-    const [notes, setNotes] = useState<string>('');
     const [primeProductId, setPrimeProductId] = useState<string>('');
     const [isSuccess, setIsSuccess] = useState(false);
     const [hasExistingPendingUpgrade, setHasExistingPendingUpgrade] = useState(false);
@@ -151,10 +150,6 @@ function UpgradePrimeContent() {
                 targetId = fallbackProd?.id;
             }
 
-            const upgradeNote = notes.trim() 
-                ? `[UPGRADE PRIME] ${notes.trim()}`
-                : '[UPGRADE PRIME] ขอรับสิทธิ์อัปเกรดสู่ EasyM Prime ฟรี 2 เดือนเต็ม';
-
             const { error: orderError } = await supabase
                 .from('orders')
                 .insert({
@@ -164,8 +159,7 @@ function UpgradePrimeContent() {
                     status: 'pending',
                     is_ib_request: true,
                     plan_type: 'upgrade',
-                    account_number: selectedPort.trim(),
-                    ib_broker_name: upgradeNote
+                    account_number: selectedPort.trim()
                 });
 
             if (orderError) throw orderError;
@@ -545,42 +539,25 @@ function UpgradePrimeContent() {
                         </div>
                     ) : (
                         <form onSubmit={handleSubmitUpgrade} className="space-y-5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-foreground">
-                                        เลือกหมายเลขพอร์ต EasyM ที่ต้องการอัปเกรด <span className="text-red-500">*</span>
-                                    </Label>
-                                    <select 
-                                        value={selectedPort}
-                                        onChange={(e) => setSelectedPort(e.target.value)}
-                                        className="w-full h-10 px-3 py-2 rounded-md bg-background border border-input text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                        required
-                                    >
-                                        {userPorts.map((port) => (
-                                            <option key={port} value={port}>
-                                                พอร์ตหมายเลข: {port}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="text-[11px] text-muted-foreground">
-                                        * ระบบจะสลับ License ของพอร์ตนี้เป็น EasyM Prime และเริ่มนับเวลาสิทธิ์ฟรี 2 เดือนหลังจากแอดมินอนุมัติ
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-foreground">
-                                        บันทึกเพิ่มเติม / แจ้งสถานะพอร์ตปัจจุบัน (ไม่บังคับ)
-                                    </Label>
-                                    <Input
-                                        placeholder="เช่น ทุนปัจจุบัน $1,500, ติดลบ EURUSD อยู่ $150 อยากให้ช่วยตรวจสอบ"
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        className="h-10 text-sm"
-                                    />
-                                    <p className="text-[11px] text-muted-foreground">
-                                        ข้อมูลนี้จะส่งตรงถึงทีมงานเพื่อช่วยเตรียมความพร้อมก่อนเริ่มรัน EA
-                                    </p>
-                                </div>
+                            <div className="max-w-lg mx-auto space-y-2">
+                                <Label className="text-sm font-semibold text-foreground">
+                                    เลือกหมายเลขพอร์ต EasyM ที่ต้องการอัปเกรด <span className="text-red-500">*</span>
+                                </Label>
+                                <select 
+                                    value={selectedPort}
+                                    onChange={(e) => setSelectedPort(e.target.value)}
+                                    className="w-full h-11 px-4 py-2 rounded-lg bg-background border border-input text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm"
+                                    required
+                                >
+                                    {userPorts.map((port) => (
+                                        <option key={port} value={port}>
+                                            พอร์ตหมายเลข: {port}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-muted-foreground">
+                                    * ระบบจะสลับ License ของพอร์ตนี้เป็น EasyM Prime และเริ่มนับเวลาสิทธิ์ฟรี 2 เดือนหลังจากแอดมินอนุมัติ
+                                </p>
                             </div>
 
                             {hasExistingPendingUpgrade && (
