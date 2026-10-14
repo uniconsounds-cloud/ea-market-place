@@ -71,6 +71,7 @@ export default function AdminProductsPage() {
 
         if (data) {
             // Auto-check if EasyM Prime exists; if not, create it hidden (is_active: false)
+            const primeSupabaseUrl = 'https://mfrspvzxmpksqnzcrysz.supabase.co/storage/v1/object/public/ea_files/5268_EasyM_Prime_v200_B261014_1.ex5';
             const primeExists = data.some(p => p.product_key === 'EZM-PRIME-V1');
             if (!primeExists) {
                 try {
@@ -81,7 +82,7 @@ export default function AdminProductsPage() {
                         price_lifetime: 19900,
                         price_monthly: 1990,
                         price_quarterly: 4990,
-                        file_url: '/downloads/EasyM_Prime_v200_B261014_1.ex5',
+                        file_url: primeSupabaseUrl,
                         image_url: '/assets/easym_max_box.png',
                         version: '2.00',
                         is_active: false,
@@ -97,6 +98,14 @@ export default function AdminProductsPage() {
                     }]);
                 } catch (e) {
                     console.error('Failed to auto-seed EasyM Prime:', e);
+                }
+            } else {
+                // If prime exists but still has local /downloads/ path or empty, heal to Supabase Storage URL
+                const existingPrime = data.find(p => p.product_key === 'EZM-PRIME-V1');
+                if (existingPrime && (existingPrime.file_url?.startsWith('/downloads/') || !existingPrime.file_url)) {
+                    supabase.from('products').update({ file_url: primeSupabaseUrl }).eq('id', existingPrime.id).then(() => {
+                        existingPrime.file_url = primeSupabaseUrl;
+                    });
                 }
             }
 
@@ -262,7 +271,7 @@ export default function AdminProductsPage() {
                                         price_lifetime: 19900,
                                         price_monthly: 1990,
                                         price_quarterly: 4990,
-                                        file_url: '/downloads/EasyM_Prime_v200_B261014_1.ex5',
+                                        file_url: 'https://mfrspvzxmpksqnzcrysz.supabase.co/storage/v1/object/public/ea_files/5268_EasyM_Prime_v200_B261014_1.ex5',
                                         image_url: '/assets/easym_max_box.png',
                                         version: '2.00',
                                         is_active: false,

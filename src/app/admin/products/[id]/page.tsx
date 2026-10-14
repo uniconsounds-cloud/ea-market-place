@@ -124,6 +124,15 @@ export default function ProductFormPage() {
     const fetchProduct = async () => {
         const { data } = await supabase.from('products').select('*').eq('id', id).single();
         if (data) {
+            let currentFileUrl = data.file_url || '';
+            const primeStorageUrl = 'https://mfrspvzxmpksqnzcrysz.supabase.co/storage/v1/object/public/ea_files/5268_EasyM_Prime_v200_B261014_1.ex5';
+            if (data.product_key === 'EZM-PRIME-V1' && (currentFileUrl.startsWith('/downloads/') || !currentFileUrl)) {
+                currentFileUrl = primeStorageUrl;
+                supabase.from('products').update({ file_url: primeStorageUrl }).eq('id', id).then(() => {
+                    console.log('Auto-healed Prime file_url to Supabase storage');
+                });
+            }
+
             setFormData({
                 name: data.name,
                 product_key: data.product_key || '',
@@ -132,7 +141,7 @@ export default function ProductFormPage() {
                 price_quarterly: data.price_quarterly || '',
                 price_lifetime: data.price_lifetime,
                 image_url: data.image_url || '',
-                file_url: data.file_url || '',
+                file_url: currentFileUrl,
                 version: data.version || '1.0',
                 is_active: data.is_active,
                 platform: data.platform || 'mt4',
@@ -290,7 +299,16 @@ export default function ProductFormPage() {
 
             const { data } = supabase.storage.from('ea_files').getPublicUrl(filePath);
             setFormData(prev => ({ ...prev, file_url: data.publicUrl }));
-            alert('อัพโหลดไฟล์ EA สำเร็จ!');
+
+            // Immediately persist to database if editing existing product
+            if (!isNew && id) {
+                const { error: dbErr } = await supabase.from('products').update({ file_url: data.publicUrl }).eq('id', id);
+                if (dbErr) {
+                    console.error('Error auto-updating product file_url:', dbErr);
+                }
+            }
+
+            alert('อัพโหลดไฟล์ EA และบันทึกลงระบบ Supabase สำเร็จเรียบร้อย!');
         } catch (error: any) {
             alert('Error uploading file: ' + error.message);
         } finally {
@@ -995,7 +1013,23 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
 
             {/* File Upload Block */}
             <div className="space-y-2">
-                <label className="text-sm font-medium">ไฟล์ EA (.ex4, .ex5, .zip)</label>
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">ไฟล์ EA (.ex4, .ex5, .zip)</label>
+                    {formData.file_url ? (
+                        formData.file_url.includes('supabase.co') ? (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium flex items-center gap-1.5">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                ☁️ จัดเก็บบน Supabase Storage แล้ว
+                            </span>
+                        ) : (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                                ⚠️ โฟลเดอร์เครื่อง {formData.file_url} (ควรอัปโหลดเข้า Supabase Storage)
+                            </span>
+                        )
+                    ) : (
+                        <span className="text-xs text-muted-foreground">ยังไม่มีไฟล์</span>
+                    )}
+                </div>
                 <div className="flex items-center gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -1003,9 +1037,8 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                                 name="file_url"
                                 value={formData.file_url}
                                 onChange={handleChange}
-                                placeholder="อัปโหลดไฟล์ EA ของคุณ..."
-                                className="bg-background font-mono text-muted-foreground"
-                                readOnly
+                                placeholder="https://...supabase.co/storage/v1/object/public/ea_files/..."
+                                className="bg-background font-mono text-xs text-muted-foreground"
                             />
                         </div>
                         <input
@@ -1019,11 +1052,11 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         <label htmlFor="file-upload">
                             <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 cursor-pointer w-full">
                                 {uploadingFile ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                                {uploadingFile ? 'กำลังอัพโหลด...' : 'อัพโหลดไฟล์ EA'}
+                                {uploadingFile ? 'กำลังอัพโหลดเข้า Supabase Storage...' : 'อัพโหลดไฟล์ EA ใหม่เข้า Supabase Storage'}
                             </div>
                         </label>
                         <p className="text-xs text-muted-foreground mt-2">
-                            อัพโหลดไฟล์ EA ที่ลูกค้าจะได้รับเมื่อชำระเงิน
+                            ไฟล์ EA ที่ลูกค้าจะได้รับสิทธิ์ดาวน์โหลดผ่านหน้าแดชบอร์ดและประวัติการสั่งซื้อ
                         </p>
                     </div>
                 </div>

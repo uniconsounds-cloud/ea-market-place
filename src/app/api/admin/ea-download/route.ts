@@ -21,6 +21,13 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
         }
 
+        const primeStorageUrl = "https://mfrspvzxmpksqnzcrysz.supabase.co/storage/v1/object/public/ea_files/5268_EasyM_Prime_v200_B261014_1.ex5";
+        const primeProd = dbProducts?.find((p) => p.product_key === "EZM-PRIME-V1");
+        if (primeProd && (primeProd.file_url?.startsWith("/downloads/") || !primeProd.file_url)) {
+            await supabase.from("products").update({ file_url: primeStorageUrl }).eq("id", primeProd.id);
+            primeProd.file_url = primeStorageUrl;
+        }
+
         interface DownloadableProduct {
             id: string;
             name: string;
