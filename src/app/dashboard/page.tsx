@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2, Sparkles } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2, Sparkles, Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,8 @@ interface ProductItem {
     ib_broker_name?: string;
     show_farm?: boolean;
     port_name?: string;
+    last_update_ms?: number;
+    is_online?: boolean;
 }
 
 interface GroupedProduct {
@@ -54,6 +56,24 @@ export default function DashboardPage() {
     const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
     const [tempPortName, setTempPortName] = useState<string>('');
     const [savingPortName, setSavingPortName] = useState<boolean>(false);
+    const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+    const handleCopy = (text: string, id: string) => {
+        if (navigator?.clipboard) {
+            navigator.clipboard.writeText(text);
+            setCopiedUrl(id);
+            setTimeout(() => setCopiedUrl(null), 2500);
+        }
+    };
+
+    const formatLastUpdated = (ms?: number) => {
+        if (!ms) return null;
+        const diffSec = Math.floor((Date.now() - ms) / 1000);
+        if (diffSec < 60) return 'เมื่อสักครู่';
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)} นาทีที่แล้ว`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ชม. ที่แล้ว`;
+        return new Date(ms).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    };
 
     const handleSavePortName = async (licenseId: string) => {
         setSavingPortName(true);
@@ -166,6 +186,31 @@ export default function DashboardPage() {
                 .eq('user_id', user.id)
                 .in('status', ['pending', 'rejected']);
 
+            // Fetch latest telemetry for accounts to sort by actual last update
+            const accountNumbers = (licensesData || [])
+                .map((l: any) => l.account_number ? String(l.account_number).trim() : null)
+                .filter(Boolean) as string[];
+
+            let portStatusMap: Record<string, { updated_at?: string; last_ping?: string; is_online?: boolean }> = {};
+            if (accountNumbers.length > 0) {
+                try {
+                    const { data: portStatuses } = await supabase
+                        .from('farm_port_status')
+                        .select('port_number, updated_at, last_ping, is_online')
+                        .in('port_number', accountNumbers);
+
+                    if (portStatuses) {
+                        portStatuses.forEach((ps: any) => {
+                            if (ps.port_number) {
+                                portStatusMap[String(ps.port_number).trim()] = ps;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch port telemetry:', e);
+                }
+            }
+
             // Process Data
             const allItems: ProductItem[] = [];
 
@@ -176,17 +221,27 @@ export default function DashboardPage() {
 
                     const brokerName = l.ib_broker_name || (Array.isArray((matchedIb as any)?.brokers) ? (matchedIb as any)?.brokers[0]?.name : (matchedIb as any)?.brokers?.name);
 
+                    const ps = l.account_number ? portStatusMap[String(l.account_number).trim()] : null;
+                    const lastUpdateMs = Math.max(
+                        ps?.last_ping ? new Date(ps.last_ping).getTime() : 0,
+                        ps?.updated_at ? new Date(ps.updated_at).getTime() : 0,
+                        l.created_at ? new Date(l.created_at).getTime() : 0
+                    );
+
                     allItems.push({
                         ...l,
                         source: 'license',
                         is_ib: isIbLicense || l.is_ib_request || l.type === 'ib',
-                        ib_broker_name: brokerName
+                        ib_broker_name: brokerName,
+                        last_update_ms: lastUpdateMs,
+                        is_online: ps?.is_online
                     });
                 });
             }
 
             if (ordersData) {
                 ordersData.forEach((o: any) => {
+                    const lastUpdateMs = o.created_at ? new Date(o.created_at).getTime() : 0;
                     allItems.push({
                         id: o.id,
                         product_id: o.product_id,
@@ -196,13 +251,14 @@ export default function DashboardPage() {
                         created_at: o.created_at,
                         products: o.products,
                         source: 'order',
-                        is_ib: o.is_ib_request // if we want orders to know too, though less relevant here
+                        is_ib: o.is_ib_request,
+                        last_update_ms: lastUpdateMs
                     });
                 });
             }
 
-            // Sort all by created_at desc
-            allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            // Sort all by last_update_ms desc (latest updated at the top)
+            allItems.sort((a, b) => (b.last_update_ms || 0) - (a.last_update_ms || 0));
 
             // Group by Product
             const groups: { [key: string]: GroupedProduct } = {};
@@ -221,7 +277,19 @@ export default function DashboardPage() {
                 groups[prodId].items.push(item);
             });
 
-            setGroupedProducts(Object.values(groups));
+            // Sort product groups so that the group containing the most recently updated item is at the top
+            const sortedGroupList = Object.values(groups).sort((a, b) => {
+                const maxA = Math.max(...a.items.map(i => i.last_update_ms || 0), 0);
+                const maxB = Math.max(...b.items.map(i => i.last_update_ms || 0), 0);
+                return maxB - maxA;
+            });
+
+            // Ensure items inside each group are also sorted by last_update_ms desc
+            sortedGroupList.forEach(g => {
+                g.items.sort((a, b) => (b.last_update_ms || 0) - (a.last_update_ms || 0));
+            });
+
+            setGroupedProducts(sortedGroupList);
             setLoading(false);
         };
 
@@ -409,6 +477,8 @@ export default function DashboardPage() {
                         const visibleItems = group.items.filter(item => isItemVisible(item, filter));
                         if (visibleItems.length === 0) return null;
 
+                        const isPrime = group.productName.toLowerCase().includes('prime') || group.productKey?.toUpperCase().includes('PRIME');
+
                         return (
                             <Card key={group.productId} className="overflow-hidden border-border/50">
                                 <CardHeader className="bg-muted/30 py-4 border-b border-border/30">
@@ -465,6 +535,80 @@ export default function DashboardPage() {
                                         </div>
                                     </div>
                                 </CardHeader>
+
+                                {/* EasyM Prime WebRequest Advice Ribbon */}
+                                {isPrime && (
+                                    <div className="bg-sky-500/10 dark:bg-sky-950/30 border-b border-sky-500/20 px-4 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+                                        <div className="flex items-center gap-2 text-sky-200">
+                                            <Globe className="w-4 h-4 text-sky-400 shrink-0" />
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <span className="font-semibold text-sky-300">คำแนะนำตั้งค่า MT5:</span>
+                                                <span className="text-muted-foreground text-[11px]">
+                                                    เพิ่ม Allow WebRequest 2 รายการ (Tools &gt; Options &gt; Expert Advisors)
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {/* URL 1 */}
+                                            <div className="flex items-center gap-1.5 bg-background/80 dark:bg-stone-900/90 border border-sky-500/30 rounded px-2 py-1 text-[11px] font-mono text-sky-200 shadow-sm">
+                                                <span className="select-all">https://eaeze.com</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopy('https://eaeze.com', 'url1')}
+                                                    className="ml-1 text-sky-400 hover:text-sky-200 p-0.5 rounded transition-colors inline-flex items-center"
+                                                    title="คัดลอก https://eaeze.com"
+                                                >
+                                                    {copiedUrl === 'url1' ? (
+                                                        <span className="text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-0.5">
+                                                            <Check className="w-3 h-3" /> คัดลอกแล้ว
+                                                        </span>
+                                                    ) : (
+                                                        <Copy className="w-3 h-3" />
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {/* URL 2 */}
+                                            <div className="flex items-center gap-1.5 bg-background/80 dark:bg-stone-900/90 border border-sky-500/30 rounded px-2 py-1 text-[11px] font-mono text-sky-200 shadow-sm">
+                                                <span className="select-all">https://mfrspvzxmpksqnzcrysz.supabase.co</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopy('https://mfrspvzxmpksqnzcrysz.supabase.co', 'url2')}
+                                                    className="ml-1 text-sky-400 hover:text-sky-200 p-0.5 rounded transition-colors inline-flex items-center"
+                                                    title="คัดลอก https://mfrspvzxmpksqnzcrysz.supabase.co"
+                                                >
+                                                    {copiedUrl === 'url2' ? (
+                                                        <span className="text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-0.5">
+                                                            <Check className="w-3 h-3" /> คัดลอกแล้ว
+                                                        </span>
+                                                    ) : (
+                                                        <Copy className="w-3 h-3" />
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {/* Quick Copy Both */}
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => handleCopy('https://eaeze.com\nhttps://mfrspvzxmpksqnzcrysz.supabase.co', 'both')}
+                                                className="h-6 px-2 text-[10px] text-sky-400 hover:text-sky-200 hover:bg-sky-950/40 border border-sky-500/20"
+                                                title="คัดลอกทั้ง 2 URLs พร้อมกัน"
+                                            >
+                                                {copiedUrl === 'both' ? (
+                                                    <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+                                                        <Check className="w-3 h-3" /> คัดลอกครบ 2 ลิงก์
+                                                    </span>
+                                                ) : (
+                                                    'คัดลอกทั้งคู่'
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <CardContent className="p-0 bg-card">
                                     <div className="divide-y divide-border/40">
                                         {visibleItems.map((item) => {
@@ -491,8 +635,14 @@ export default function DashboardPage() {
                                                             )}
 
                                                             <div>
-                                                                <div className="font-mono font-medium flex items-center gap-2 placeholder-transparent">
+                                                                <div className="font-mono font-medium flex items-center gap-2 placeholder-transparent flex-wrap">
                                                                     Port: {item.account_number || <span className="text-muted-foreground italic text-xs">รอการระบุ</span>}
+                                                                    {item.last_update_ms ? (
+                                                                        <span className="text-[10px] text-muted-foreground/75 font-sans font-normal inline-flex items-center gap-1">
+                                                                            <span className={`w-1.5 h-1.5 rounded-full ${item.is_online ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'}`}></span>
+                                                                            อัปเดต: {formatLastUpdated(item.last_update_ms)}
+                                                                        </span>
+                                                                    ) : null}
 
                                                                     {/* Status Badges */}
                                                                     {isOrder && item.status === 'pending' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 border-orange-500/20">รออนุมัติ</Badge>}
