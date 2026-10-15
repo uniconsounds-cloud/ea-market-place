@@ -439,18 +439,20 @@ export default function FarmClient({
                 // Network fallback
             }
 
-            // 2. Direct Supabase fallback on products table
+            // 2. Direct Supabase fallback on farm_port_status prime_release_gate_config
             try {
                 const { data } = await supabase
-                    .from('products')
-                    .select('is_active')
-                    .eq('product_key', 'EZM-PRIME-V1')
+                    .from('farm_port_status')
+                    .select('system_code')
+                    .eq('port_number', 'prime_release_gate_config')
                     .maybeSingle();
-                if (data && data.is_active !== undefined) {
-                    const released = Boolean(data.is_active);
-                    setIsGlobalPrimeReleased(released);
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem('owner_prime_release_gate', String(released));
+                if (data?.system_code && data.system_code.includes(':::')) {
+                    const parsed = JSON.parse(data.system_code.split(':::').slice(1).join(':::'));
+                    if (typeof parsed.released === 'boolean') {
+                        setIsGlobalPrimeReleased(parsed.released);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem('owner_prime_release_gate', String(parsed.released));
+                        }
                     }
                 }
             } catch (e) {
@@ -459,19 +461,24 @@ export default function FarmClient({
         };
         fetchReleaseState();
 
-        // 3. Realtime subscription on products table (EZM-PRIME-V1)
+        // 3. Realtime subscription on farm_port_status prime_release_gate_config
         const sub = supabase
             .channel('prime_release_gate_sub')
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'products', filter: 'product_key=eq.EZM-PRIME-V1' },
+                { event: '*', schema: 'public', table: 'farm_port_status', filter: 'port_number=eq.prime_release_gate_config' },
                 (payload) => {
-                    if (payload.new && (payload.new as any).is_active !== undefined) {
-                        const released = Boolean((payload.new as any).is_active);
-                        setIsGlobalPrimeReleased(released);
-                        if (typeof window !== 'undefined') {
-                            localStorage.setItem('owner_prime_release_gate', String(released));
-                        }
+                    const raw = (payload.new as any)?.system_code || '';
+                    if (raw.includes(':::')) {
+                        try {
+                            const parsed = JSON.parse(raw.split(':::').slice(1).join(':::'));
+                            if (typeof parsed.released === 'boolean') {
+                                setIsGlobalPrimeReleased(parsed.released);
+                                if (typeof window !== 'undefined') {
+                                    localStorage.setItem('owner_prime_release_gate', String(parsed.released));
+                                }
+                            }
+                        } catch (e) {}
                     }
                 }
             )
@@ -488,7 +495,24 @@ export default function FarmClient({
             localStorage.setItem('owner_prime_release_gate', String(released));
         }
 
-        // 1. Call persistent release-gate API
+        const nowIso = new Date().toISOString();
+
+        // 1. Direct Supabase upsert to farm_port_status (instant & realtime)
+        try {
+            await supabase
+                .from('farm_port_status')
+                .upsert({
+                    port_number: 'prime_release_gate_config',
+                    system_code: `RELEASE_GATE:::${JSON.stringify({ released, updated_at: nowIso })}`,
+                    updated_at: nowIso,
+                    is_online: true,
+                    last_ping: nowIso
+                }, { onConflict: 'port_number' });
+        } catch (e) {
+            console.warn('Sync release gate to farm_port_status:', e);
+        }
+
+        // 2. Call persistent release-gate API
         try {
             await fetch('/api/farm/release-gate', {
                 method: 'POST',
@@ -497,18 +521,6 @@ export default function FarmClient({
             });
         } catch (e) {
             console.warn('Sync release gate via API error:', e);
-        }
-
-        // 2. Direct Supabase update fallback
-        try {
-            await supabase
-                .from('products')
-                .update({ 
-                    is_active: released
-                })
-                .eq('product_key', 'EZM-PRIME-V1');
-        } catch (e) {
-            console.warn('Sync release gate to products table:', e);
         }
     };
 
@@ -536,7 +548,7 @@ export default function FarmClient({
         ((sysCode === '' || sysCode === 'easym') && (prodKey.includes('PRIME') || prodName.includes('prime')))
     );
 
-    const isPrime = isPrimeAllowed && !isExplicitClassicEA && (
+    const isPrime = isPrimeAllowed && (
         hasPrimeSignature ||
         (isOwnerTestPort && devPreviewMode === 'dev')
     );

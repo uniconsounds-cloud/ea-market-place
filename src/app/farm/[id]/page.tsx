@@ -88,13 +88,20 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .eq('port_number', portNumber)
         .single();
 
-    // Fetch Global Prime Release Gate status (persisted in products table)
-    const { data: primeProduct } = await supabase
-        .from('products')
-        .select('is_active')
-        .eq('product_key', 'EZM-PRIME-V1')
+    // Fetch Global Prime Release Gate status (persisted in farm_port_status prime_release_gate_config)
+    const { data: releaseGateRow } = await supabase
+        .from('farm_port_status')
+        .select('system_code')
+        .eq('port_number', 'prime_release_gate_config')
         .maybeSingle();
-    const initialIsGlobalPrimeReleased = Boolean(primeProduct?.is_active);
+
+    let initialIsGlobalPrimeReleased = false;
+    if (releaseGateRow?.system_code && releaseGateRow.system_code.includes(':::')) {
+        try {
+            const parsed = JSON.parse(releaseGateRow.system_code.split(':::').slice(1).join(':::'));
+            initialIsGlobalPrimeReleased = Boolean(parsed.released);
+        } catch (e) {}
+    }
 
     return (
         <div className="min-h-screen bg-[#1a120b] text-amber-50">

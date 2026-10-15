@@ -1,37 +1,46 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
-function getServiceSupabaseClient() {
+function getSupabaseClient() {
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
 }
 
+const CONFIG_PORT_KEY = 'prime_release_gate_config';
+
 export async function GET() {
     try {
-        const serverClient = await createSupabaseServerClient().catch(() => null);
-        const supabase = serverClient || getServiceSupabaseClient();
-
-        const { data: primeProduct, error } = await supabase
-            .from('products')
-            .select('id, name, product_key, is_active')
-            .eq('product_key', 'EZM-PRIME-V1')
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+            .from('farm_port_status')
+            .select('system_code, updated_at')
+            .eq('port_number', CONFIG_PORT_KEY)
             .maybeSingle();
 
         if (error) {
-            console.warn('[ReleaseGate GET] Error fetching product:', error);
+            console.warn('[ReleaseGate GET] Error fetching config:', error);
             return NextResponse.json({ success: true, released: false, error: error.message });
         }
 
-        const released = Boolean(primeProduct?.is_active);
+        let released = false;
+        let updatedAt = new Date().toISOString();
+
+        if (data?.system_code && data.system_code.includes(':::')) {
+            try {
+                const parsed = JSON.parse(data.system_code.split(':::').slice(1).join(':::'));
+                released = Boolean(parsed.released);
+                if (parsed.updated_at) updatedAt = parsed.updated_at;
+            } catch (e) {}
+        }
+
         return NextResponse.json({
             success: true,
             released,
-            product_id: primeProduct?.id || null
+            updated_at: updatedAt
         });
     } catch (err: any) {
         console.error('[ReleaseGate GET] Server error:', err);
@@ -43,67 +52,26 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         const released = Boolean(body.released);
+        const supabase = getSupabaseClient();
+        const nowIso = new Date().toISOString();
 
-        // Try server client with user session first (for logged-in admin)
-        let dbClient = await createSupabaseServerClient().catch(() => null);
-        if (!dbClient) {
-            dbClient = getServiceSupabaseClient();
-        }
+        const { error: upsertError } = await supabase
+            .from('farm_port_status')
+            .upsert({
+                port_number: CONFIG_PORT_KEY,
+                system_code: `RELEASE_GATE:::${JSON.stringify({ released, updated_at: nowIso })}`,
+                updated_at: nowIso,
+                is_online: true,
+                last_ping: nowIso
+            }, { onConflict: 'port_number' });
 
-        // 1. Check if EZM-PRIME-V1 product exists in database
-        const { data: existingPrime } = await dbClient
-            .from('products')
-            .select('id, is_active')
-            .eq('product_key', 'EZM-PRIME-V1')
-            .maybeSingle();
-
-        let updateSuccess = false;
-
-        if (existingPrime) {
-            const { error: updateError } = await dbClient
-                .from('products')
-                .update({ 
-                    is_active: released
-                })
-                .eq('id', existingPrime.id);
-
-            if (!updateError) {
-                updateSuccess = true;
-            } else {
-                console.warn('[ReleaseGate POST] Primary update error, trying service client fallback:', updateError);
-                const serviceClient = getServiceSupabaseClient();
-                const { error: serviceError } = await serviceClient
-                    .from('products')
-                    .update({ 
-                        is_active: released
-                    })
-                    .eq('id', existingPrime.id);
-
-                if (!serviceError) updateSuccess = true;
-                else console.error('[ReleaseGate POST] Service client update failed:', serviceError);
-            }
-        } else {
-            // Auto-create product record if not yet seeded
-            const { error: insertError } = await dbClient
-                .from('products')
-                .insert([{
-                    name: 'EasyM Prime',
-                    product_key: 'EZM-PRIME-V1',
-                    description: 'เรือธงใหม่ล่าสุด ระบบกู้พอร์ตอัจฉริยะ ห้องฟื้นฟู Dynamic Rescue Sniper และ Cross-Pair Drawdown Offset',
-                    version: '2.00',
-                    is_active: released,
-                    platform: 'mt5',
-                    asset_class: 'currency',
-                    strategy: 'grid',
-                    min_balance: 1000,
-                    currency: 'USC'
-                }]);
-
-            if (!insertError) updateSuccess = true;
+        if (upsertError) {
+            console.error('[ReleaseGate POST] Upsert error:', upsertError);
+            return NextResponse.json({ success: false, error: upsertError.message }, { status: 500 });
         }
 
         return NextResponse.json({
-            success: updateSuccess,
+            success: true,
             released,
             message: released 
                 ? 'EasyM Prime Farm released to all customers globally' 
