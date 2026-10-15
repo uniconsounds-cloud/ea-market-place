@@ -334,6 +334,7 @@ export default function FarmClient({
     portNumber, 
     initialOrders, 
     initialPortStatus,
+    initialIsGlobalPrimeReleased = false,
     licenseCreatedAt,
     customName,
     licenseTier = 'free',
@@ -345,6 +346,7 @@ export default function FarmClient({
     portNumber: string;
     initialOrders: any[];
     initialPortStatus?: any;
+    initialIsGlobalPrimeReleased?: boolean;
     licenseCreatedAt: string | null;
     customName?: string | null;
     licenseTier?: string;
@@ -384,6 +386,19 @@ export default function FarmClient({
     const rawAsset = portStatus?.asset_type || (prodName.includes('gold') || prodKey.includes('GOLD') || prodKey.includes('EZG') ? 'GOLD' : 'FOREX');
     const assetType = rawAsset.toUpperCase() === 'EASYGOLD' ? 'GOLD' : rawAsset;
 
+    // Extract embedded telemetry JSON if present in system_code (e.g. EasyM Prime:::{...} or EasyM:::{...})
+    const parsedPrimeData = useMemo(() => {
+        if ((portStatus as any)?.prime_data) return (portStatus as any).prime_data;
+        const raw = String(portStatus?.system_code || initialPortStatus?.system_code || '');
+        if (raw && raw.includes(':::')) {
+            try {
+                const jsonStr = raw.split(':::').slice(1).join(':::');
+                return JSON.parse(jsonStr);
+            } catch (e) {}
+        }
+        return null;
+    }, [portStatus?.system_code, initialPortStatus?.system_code]);
+
     const isEasyM = prodKey.includes('EZM') || 
                     prodName.includes('easym') || 
                     prodName.includes('easy m') ||
@@ -397,26 +412,44 @@ export default function FarmClient({
     // 3. In Customer mode: Owner simulates what real customers currently see.
     // 4. For real customers: Prime Farm UI is only shown if isGlobalPrimeReleased === true (default is false/private).
     const isOwnerTestPort = String(portNumber) === '21692434' || String(portNumber) === '97053088';
-    const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState(false);
+    const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem('owner_prime_release_gate');
+            if (cached !== null) return cached === 'true';
+        }
+        return initialIsGlobalPrimeReleased;
+    });
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
     const isOwnerDevUser = (isOwnerTestPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
 
     useEffect(() => {
         const fetchReleaseState = async () => {
-            if (typeof window !== 'undefined') {
-                const cached = localStorage.getItem('owner_prime_release_gate');
-                if (cached !== null) {
-                    setIsGlobalPrimeReleased(cached === 'true');
-                }
-            }
             try {
-                const { data, error } = await supabase
-                    .from('fleet_capital_snapshots')
-                    .select('snapshot_meta')
-                    .eq('period_key', 'prime_farm_release_gate')
+                // 1. Fetch from authoritative release-gate API
+                const res = await fetch('/api/farm/release-gate');
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json && typeof json.released === 'boolean') {
+                        setIsGlobalPrimeReleased(json.released);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem('owner_prime_release_gate', String(json.released));
+                        }
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Network fallback
+            }
+
+            // 2. Direct Supabase fallback on products table
+            try {
+                const { data } = await supabase
+                    .from('products')
+                    .select('is_active')
+                    .eq('product_key', 'EZM-PRIME-V1')
                     .maybeSingle();
-                if (!error && data?.snapshot_meta) {
-                    const released = Boolean((data.snapshot_meta as any)?.is_released);
+                if (data && data.is_active !== undefined) {
+                    const released = Boolean(data.is_active);
                     setIsGlobalPrimeReleased(released);
                     if (typeof window !== 'undefined') {
                         localStorage.setItem('owner_prime_release_gate', String(released));
@@ -428,14 +461,15 @@ export default function FarmClient({
         };
         fetchReleaseState();
 
+        // 3. Realtime subscription on products table (EZM-PRIME-V1)
         const sub = supabase
             .channel('prime_release_gate_sub')
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'fleet_capital_snapshots', filter: 'period_key=eq.prime_farm_release_gate' },
+                { event: 'UPDATE', schema: 'public', table: 'products', filter: 'product_key=eq.EZM-PRIME-V1' },
                 (payload) => {
-                    if (payload.new && (payload.new as any).snapshot_meta) {
-                        const released = Boolean(((payload.new as any).snapshot_meta as any)?.is_released);
+                    if (payload.new && (payload.new as any).is_active !== undefined) {
+                        const released = Boolean((payload.new as any).is_active);
                         setIsGlobalPrimeReleased(released);
                         if (typeof window !== 'undefined') {
                             localStorage.setItem('owner_prime_release_gate', String(released));
@@ -455,19 +489,29 @@ export default function FarmClient({
         if (typeof window !== 'undefined') {
             localStorage.setItem('owner_prime_release_gate', String(released));
         }
+
+        // 1. Call persistent release-gate API
         try {
-            await supabase.from('fleet_capital_snapshots').upsert({
-                period_key: 'prime_farm_release_gate',
-                period_type: 'release_gate',
-                active_ports_count: 1,
-                snapshot_meta: {
-                    is_released: released,
-                    updated_at: new Date().toISOString(),
-                    updated_by: 'owner'
-                }
-            }, { onConflict: 'period_key' });
+            await fetch('/api/farm/release-gate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ released, port_number: portNumber })
+            });
         } catch (e) {
-            console.warn('Sync release gate to fleet_capital_snapshots:', e);
+            console.warn('Sync release gate via API error:', e);
+        }
+
+        // 2. Direct Supabase update fallback
+        try {
+            await supabase
+                .from('products')
+                .update({ 
+                    is_active: released,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('product_key', 'EZM-PRIME-V1');
+        } catch (e) {
+            console.warn('Sync release gate to products table:', e);
         }
     };
 
@@ -479,16 +523,25 @@ export default function FarmClient({
         sysCode.includes('turbo');
 
     // Dynamic Prime Permission:
-    // - On owner's test ports: if in 'dev' mode, always show Prime UI (if running Prime); if in 'customer' mode, simulate release state
+    // - On owner's test ports: if in 'dev' mode, always show Prime UI; if in 'customer' mode, simulate release state
     // - On all other customer ports: only show Prime UI if isGlobalPrimeReleased === true!
     const isPrimeAllowed = isOwnerTestPort 
         ? (devPreviewMode === 'dev' ? true : isGlobalPrimeReleased)
         : isGlobalPrimeReleased;
 
-    const isPrime = isPrimeAllowed && !isExplicitClassicEA && (
+    const hasPrimeSignature = Boolean(
         sysCode.includes('prime') ||
-        Boolean((portStatus as any)?.prime_data?.mode) ||
+        rawSysCode.toLowerCase().includes('prime') ||
+        parsedPrimeData?.mode ||
+        parsedPrimeData?.sync_mode === 'FALLBACK_1URL' ||
+        eaVer.startsWith('2.') ||
+        eaVer.startsWith('v2.') ||
         ((sysCode === '' || sysCode === 'easym') && (prodKey.includes('PRIME') || prodName.includes('prime')))
+    );
+
+    const isPrime = isPrimeAllowed && !isExplicitClassicEA && (
+        hasPrimeSignature ||
+        (isOwnerTestPort && devPreviewMode === 'dev')
     );
 
     const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);

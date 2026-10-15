@@ -88,12 +88,21 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .eq('port_number', portNumber)
         .single();
 
+    // Fetch Global Prime Release Gate status (persisted in products table)
+    const { data: primeProduct } = await supabase
+        .from('products')
+        .select('is_active')
+        .eq('product_key', 'EZM-PRIME-V1')
+        .maybeSingle();
+    const initialIsGlobalPrimeReleased = Boolean(primeProduct?.is_active);
+
     return (
         <div className="min-h-screen bg-[#1a120b] text-amber-50">
             <FarmClient
                 portNumber={portNumber}
                 initialOrders={initialOrders || []}
                 initialPortStatus={portStatus || null}
+                initialIsGlobalPrimeReleased={initialIsGlobalPrimeReleased}
                 licenseCreatedAt={license?.created_at || null}
                 customName={license?.port_name || null}
                 licenseTier={effectiveLicenseTier}
