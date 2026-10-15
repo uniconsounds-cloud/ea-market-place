@@ -3666,11 +3666,14 @@ export default function FarmClient({
                                 {primeActiveOrb === 2 && (
                                     <div className="overflow-y-auto py-2 sm:py-3 space-y-2 sm:space-y-3 pr-0.5 sm:pr-1 no-scrollbar flex-1 flex flex-col">
                                         {/* Quick Telemetry Summary Bar (Clean, Display-only, Responsive) */}
-                                        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-black/60 border border-cyan-500/30 rounded-xl sm:rounded-2xl p-2 sm:p-3 backdrop-blur-md shrink-0">
+                                        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-black/60 border border-cyan-500/30 rounded-xl sm:rounded-2xl p-2 sm:p-3.5 backdrop-blur-md shrink-0">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)] shrink-0" />
                                                 <div className="text-[11px] sm:text-xs font-mono">
-                                                    <span className="text-white/50">COCKPIT MATRIX: </span>
+                                                    <span className="text-white/50">
+                                                        <span className="sm:hidden">COCKPIT: </span>
+                                                        <span className="hidden sm:inline">COCKPIT MATRIX: </span>
+                                                    </span>
                                                     <span className="text-emerald-400 font-black font-mono">{activeCount} ACTIVE</span>
                                                     <span className="text-white/30 mx-1.5">|</span>
                                                     <span className="text-amber-400 font-black font-mono">{closeOnlyCount} CLOSE-ONLY</span>
@@ -3679,7 +3682,8 @@ export default function FarmClient({
 
                                             <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono text-cyan-300/80 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20 shrink-0">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
-                                                <span>LIVE TELEMETRY</span>
+                                                <span className="sm:hidden">LIVE</span>
+                                                <span className="hidden sm:inline">LIVE TELEMETRY</span>
                                             </div>
                                         </div>
 
@@ -3696,21 +3700,21 @@ export default function FarmClient({
                                                     };
                                                     const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
 
-                                                    // Direction badge (B / S / - or **.**) - ultra-compact for narrow screens
+                                                    // Direction badge (B / S / - or **.**) - responsive width
                                                     const dirBadge = isFallback1Url ? (
-                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono font-black text-[8px] sm:text-[9px] bg-amber-500/15 border border-amber-400/40 text-amber-300 shrink-0">
+                                                        <span className="inline-flex items-center justify-center px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded font-mono font-black text-[8px] sm:text-[10px] bg-amber-500/15 border border-amber-400/40 text-amber-300 shrink-0">
                                                             **.**
                                                         </span>
                                                     ) : data.side === 'B' ? (
-                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono font-black text-[8px] sm:text-[9px] bg-cyan-500/25 border border-cyan-400/60 text-cyan-300 shadow-[0_0_6px_rgba(6,182,212,0.3)] shrink-0">
+                                                        <span className="inline-flex items-center justify-center px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded font-mono font-black text-[8px] sm:text-[10px] bg-cyan-500/25 border border-cyan-400/60 text-cyan-300 shadow-[0_0_6px_rgba(6,182,212,0.3)] shrink-0">
                                                             BUY
                                                         </span>
                                                     ) : data.side === 'S' ? (
-                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono font-black text-[8px] sm:text-[9px] bg-amber-500/25 border border-amber-400/60 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.3)] shrink-0">
+                                                        <span className="inline-flex items-center justify-center px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded font-mono font-black text-[8px] sm:text-[10px] bg-amber-500/25 border border-amber-400/60 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.3)] shrink-0">
                                                             SELL
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono text-[8px] sm:text-[9px] bg-white/5 border border-white/10 text-white/30 shrink-0">
+                                                        <span className="inline-flex items-center justify-center px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded font-mono text-[8px] sm:text-[10px] bg-white/5 border border-white/10 text-white/30 shrink-0">
                                                             -
                                                         </span>
                                                     );
@@ -3730,7 +3734,7 @@ export default function FarmClient({
                                                     return (
                                                         <div
                                                             key={pair}
-                                                            className={`p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl border transition-all duration-200 flex flex-col justify-between gap-1 sm:gap-1.5 ${
+                                                            className={`p-1.5 sm:p-3 rounded-xl sm:rounded-2xl border transition-all duration-200 flex flex-col justify-between gap-1 sm:gap-2 ${
                                                                 !isEnabled
                                                                     ? 'bg-amber-950/20 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.1)]'
                                                                     : isQuarantined
@@ -3738,40 +3742,71 @@ export default function FarmClient({
                                                                     : 'bg-black/55 border-cyan-500/30'
                                                             }`}
                                                         >
-                                                            {/* ═══ ROW 1: HEADER & STATUS BADGE (DISPLAY-ONLY, NON-CLICKABLE) ═══ */}
+                                                            {/* ═══ ROW 1: HEADER & STATUS BADGE (DUAL RESPONSIVE) ═══ */}
                                                             <div className="flex items-center justify-between gap-1">
-                                                                <div className="flex items-center gap-1 min-w-0">
+                                                                {/* Left: Pair name + Direction (zero clutter, only 2 items on mobile!) */}
+                                                                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                                                                     <span className="font-mono font-black text-[11px] sm:text-xs text-white tracking-wider px-1.5 py-0.5 rounded-md bg-slate-900 border border-white/15 shrink-0">
                                                                         {pair}
                                                                     </span>
                                                                     {dirBadge}
-                                                                    {isQuarantined && (
-                                                                        <span className="text-[8px] sm:text-[9px] font-mono font-black px-1 py-0.2 rounded bg-rose-500/25 border border-rose-500/40 text-rose-300 shrink-0">
-                                                                            QT
-                                                                        </span>
-                                                                    )}
                                                                 </div>
 
-                                                                {/* Display-Only Status Pill (Non-clickable, no button) */}
-                                                                <div className={`px-1.5 py-0.5 rounded-md font-mono text-[8px] sm:text-[9px] font-bold tracking-tight border shrink-0 select-none flex items-center gap-1 ${
-                                                                    isEnabled
-                                                                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
-                                                                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
-                                                                }`}>
-                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                                                                    <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                {/* Right: Status Pill(s) */}
+                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                    {/* On Desktop: Show QT badge separately if quarantined */}
+                                                                    {isQuarantined && (
+                                                                        <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-rose-500/25 border border-rose-500/50 text-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.3)]">
+                                                                            <Lock className="w-2.5 h-2.5" />
+                                                                            <span>QUARANTINED</span>
+                                                                        </span>
+                                                                    )}
+
+                                                                    {/* Status Pill:
+                                                                        On Mobile: If quarantined, replace ACTIVE with 🔒 QT!
+                                                                        If not quarantined: Show 🟢 ACTIVE or ⛔ CLOSE-ONLY
+                                                                    */}
+                                                                    {isQuarantined ? (
+                                                                        <>
+                                                                            {/* Mobile version: Shows 🔒 QT instead of ACTIVE to eliminate badge collisions */}
+                                                                            <div className="sm:hidden px-1.5 py-0.5 rounded-md font-mono text-[8px] font-black border bg-rose-500/20 border-rose-500/50 text-rose-300 shadow-[0_0_8px_rgba(244,63,94,0.3)] select-none flex items-center gap-1">
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0" />
+                                                                                <span>QT</span>
+                                                                            </div>
+
+                                                                            {/* Desktop version: Keeps regular ACTIVE/CLOSE-ONLY next to QUARANTINED badge */}
+                                                                            <div className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border select-none items-center gap-1 ${
+                                                                                isEnabled
+                                                                                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
+                                                                                    : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
+                                                                            }`}>
+                                                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                                <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                            </div>
+                                                                        </>
+                                                                    ) : (
+                                                                        /* Non-quarantined: Normal ACTIVE / CLOSE-ONLY on both mobile & desktop */
+                                                                        <div className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border select-none flex items-center gap-1 ${
+                                                                            isEnabled
+                                                                                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
+                                                                                : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
+                                                                        }`}>
+                                                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                            <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
                                                             {/* ═══ ROW 2: TRADING METRICS (SLENDER TALL VU METER | LOTS | DD%) ═══ */}
-                                                            <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[10px] font-mono bg-white/[0.03] px-1.5 sm:px-2 py-1 rounded-lg border border-white/[0.06]">
-                                                                {/* Slender & Tall Futuristic VU Meter + Orders Count (No "ไม้") */}
-                                                                <div className="flex items-center gap-1 sm:gap-1.5">
+                                                            <div className="flex items-center justify-between gap-1 text-[9px] sm:text-xs font-mono bg-white/[0.03] px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg border border-white/[0.06]">
+                                                                {/* Slender & Tall Futuristic VU Meter + Orders Count */}
+                                                                <div className="flex items-center gap-1 sm:gap-2">
                                                                     <div className="flex items-center gap-[1.5px] sm:gap-[2px] h-3.5 sm:h-4 px-1 py-0.5 bg-black/80 rounded border border-white/10 shrink-0">
                                                                         {Array.from({ length: maxTicks }).map((_, i) => (
                                                                             <div 
                                                                                 key={i} 
-                                                                                className={`w-[1.5px] sm:w-[2px] h-full rounded-[0.5px] transition-all duration-300 ${
+                                                                                className={`w-[1.5px] sm:w-[2.5px] h-full rounded-[0.5px] transition-all duration-300 ${
                                                                                     i < filledTicks 
                                                                                         ? (i >= 5 ? 'bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.9)]' : i >= 3 ? 'bg-amber-400 shadow-[0_0_4px_rgba(245,158,11,0.9)]' : 'bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.9)]')
                                                                                         : 'bg-white/10'
@@ -3781,24 +3816,38 @@ export default function FarmClient({
                                                                     </div>
                                                                     <span className="font-bold text-white/90">
                                                                         {isFallback1Url ? '**.**' : data.count}
+                                                                        <span className="hidden sm:inline text-[10px] text-white/50 font-normal ml-1">ไม้</span>
                                                                     </span>
                                                                 </div>
 
                                                                 {/* Lots */}
                                                                 <div className="text-cyan-200/90 font-bold">
-                                                                    {isFallback1Url ? '**.**' : (data.lot > 0 ? `${data.lot.toFixed(2)}L` : '0.00L')}
+                                                                    {isFallback1Url ? '**.**' : (data.lot > 0 ? (
+                                                                        <>
+                                                                            <span>{data.lot.toFixed(2)}</span>
+                                                                            <span className="text-[8px] sm:text-[10px] text-cyan-400/70 ml-0.5">
+                                                                                <span className="sm:hidden">L</span>
+                                                                                <span className="hidden sm:inline">Lots</span>
+                                                                            </span>
+                                                                        </>
+                                                                    ) : '0.00L')}
                                                                 </div>
 
                                                                 {/* DD% */}
                                                                 <div className={`font-bold ${ddColor}`}>
+                                                                    <span className="hidden sm:inline text-[10px] text-white/40 font-normal mr-1">Drawdown:</span>
+                                                                    <span className="sm:hidden text-[8px] text-white/40 font-normal mr-0.5">DD:</span>
                                                                     {isFallback1Url ? '**.**' : (data.ddPct > 0 ? `-${data.ddPct.toFixed(2)}%` : '0.00%')}
                                                                 </div>
                                                             </div>
 
                                                             {/* ═══ ROW 3: P/L CENTER-BALANCE BAR & VALUE ═══ */}
-                                                            <div className="flex items-center justify-between gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] font-mono bg-black/40 px-1.5 sm:px-2 py-1 rounded-lg border border-white/[0.06]">
-                                                                <div className="flex items-center gap-1 flex-1 min-w-0">
-                                                                    <span className="text-[8px] sm:text-[9px] text-white/40 shrink-0 font-sans">P/L:</span>
+                                                            <div className="flex items-center justify-between gap-1 sm:gap-2.5 text-[9px] sm:text-xs font-mono bg-black/40 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg border border-white/[0.06]">
+                                                                <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
+                                                                    <span className="text-[8px] sm:text-[10px] text-white/40 shrink-0 font-sans">
+                                                                        <span className="sm:hidden">P/L:</span>
+                                                                        <span className="hidden sm:inline">กำไร/ขาดทุน (P/L):</span>
+                                                                    </span>
                                                                     <div className="relative w-full h-1.5 sm:h-2 bg-slate-950 rounded-full border border-white/10 overflow-hidden">
                                                                         <div className="absolute top-0 bottom-0 left-1/2 w-[1.5px] -translate-x-1/2 bg-white/40 z-10" />
                                                                         {!isFallback1Url && pnlVal > 0 ? (
@@ -3815,8 +3864,9 @@ export default function FarmClient({
                                                                     </div>
                                                                 </div>
 
-                                                                <div className={`font-bold text-right shrink-0 min-w-[42px] ${pnlColor}`}>
+                                                                <div className={`font-mono font-bold text-right shrink-0 min-w-[42px] sm:min-w-[65px] ${pnlColor}`}>
                                                                     {isFallback1Url ? '**.**' : (pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal.toFixed(2))}
+                                                                    <span className="hidden sm:inline text-[9px] text-white/40 ml-1">USD</span>
                                                                 </div>
                                                             </div>
                                                         </div>
