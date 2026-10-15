@@ -399,6 +399,7 @@ export default function FarmClient({
     const isOwnerTestPort = String(portNumber) === '21692434' || String(portNumber) === '97053088';
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState(false);
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
+    const isOwnerDevUser = (isOwnerTestPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
 
     useEffect(() => {
         const fetchReleaseState = async () => {
@@ -3032,36 +3033,69 @@ export default function FarmClient({
                             />
                         </div>
 
-                        {/* Orb 2: Cyan/Blue Glow */}
+                        {/* Orb 2: Cyan/Blue Glow (Cockpit Matrix) */}
                         <button
-                            onClick={() => setPrimeActiveOrb(2)}
+                            onClick={() => {
+                                if (isOwnerDevUser) {
+                                    setPrimeActiveOrb(2);
+                                } else {
+                                    toast.info('🔮 ระบบ Cockpit Matrix อยู่ในระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
+                                }
+                            }}
                             className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title="Prime menu 2"
+                            title={isOwnerDevUser ? "Prime menu 2: Cockpit Matrix" : "🔒 20-Pair Cockpit Matrix (กำลังพัฒนา - เร็วๆ นี้)"}
                         >
                             <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                            {!isOwnerDevUser && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-cyan-500/40 text-[9px] shadow" title="เร็วๆ นี้">
+                                    🔒
+                                </span>
+                            )}
                         </button>
 
-                        {/* Orb 3: Purple/Violet Glow */}
+                        {/* Orb 3: Purple/Violet Glow (Recovery Engine) */}
                         <button
-                            onClick={() => setPrimeActiveOrb(3)}
+                            onClick={() => {
+                                if (isOwnerDevUser) {
+                                    setPrimeActiveOrb(3);
+                                } else {
+                                    toast.info('🔮 ระบบ Recovery Engine อยู่ในระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
+                                }
+                            }}
                             className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title="Prime menu 3"
+                            title={isOwnerDevUser ? "Prime menu 3: Recovery Engine" : "🔒 Recovery Engine (กำลังพัฒนา - เร็วๆ นี้)"}
                         >
                             <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400 group-hover:scale-125 transition-transform" />
+                            {!isOwnerDevUser && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-purple-500/40 text-[9px] shadow" title="เร็วๆ นี้">
+                                    🔒
+                                </span>
+                            )}
                         </button>
 
-                        {/* Orb 4: Amber/Orange Glow */}
+                        {/* Orb 4: Amber/Orange Glow (Defense & Offset Fund) */}
                         <button
-                            onClick={() => setPrimeActiveOrb(4)}
+                            onClick={() => {
+                                if (isOwnerDevUser) {
+                                    setPrimeActiveOrb(4);
+                                } else {
+                                    toast.info('🔮 ระบบ Defense & Offset Fund อยู่ในระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
+                                }
+                            }}
                             className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title="Prime menu 4"
+                            title={isOwnerDevUser ? "Prime menu 4: Defense & Offset Fund" : "🔒 Defense & Offset Fund (กำลังพัฒนา - เร็วๆ นี้)"}
                         >
                             <Crosshair className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400 group-hover:rotate-90 transition-transform" />
+                            {!isOwnerDevUser && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-amber-500/40 text-[9px] shadow" title="เร็วๆ นี้">
+                                    🔒
+                                </span>
+                            )}
                         </button>
                     </div>
 
                     {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
-                    {primeActiveOrb !== null && (
+                    {primeActiveOrb !== null && isOwnerDevUser && (
                         <div 
                             className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-[160] flex items-center justify-center p-3 animate-fade-in"
                             onClick={() => setPrimeActiveOrb(null)}
