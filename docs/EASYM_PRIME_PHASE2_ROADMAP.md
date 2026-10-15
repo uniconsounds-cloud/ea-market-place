@@ -116,18 +116,41 @@ flowchart TD
   * ปรับค่าคงที่ `#define EA_DASH_TITLE` และ `#property description` ในไฟล์โค้ด MQL5 ให้ตรงตามมาตรฐานนี้
 
 ### 4.2 เพิ่ม Table F: แถบแจ้งเตือนสถานะแยกเดี่ยวเต็มแถว (Dedicated Full-Width Alert Row)
-* **ปัญหาเดิม:** ข้อมูลแจ้งเตือน (Alert / Quarantine Status / Rescue Info) ถูกยัดรวมไว้ใน Table E ช่องที่ 3 (`Col 2`) ร่วมกับค่า Buffer และ Relief Fund ทำให้พื้นที่จำกัด ข้อความยาวถูกตัดทอน หรือเบียดเสียดจนมองเห็นได้ไม่ชัดเจน
-* **โครงสร้างและตำแหน่ง Table F:**
-  * ตำแหน่ง: วางต่อจาก Table E ลงมาด้านล่างสุดของแผงแดชบอร์ด (`ey0 + rowH + pad`)
-  * มิติ: ความยาวเต็มความกว้างของแผงแดชบอร์ด 100% (`dW`) ความสูง 1 แถวมาตรฐาน (`rowH`)
-  * ลักษณะกรอบ: สไตล์แถบ Sci-Fi HUD แบบกล่องข้อความเต็มแถวเดี่ยว ไม่มีเส้นคอลัมน์กั้นกลาง เพื่อให้อ่านข้อความยาวได้ต่อเนื่อง
-* **ระบบจัดลำดับความสำคัญของข้อความแจ้งเตือน (Alert Message Hierarchy):**
-  ข้อความใน Table F จะแสดงผลตามลำดับความสำคัญสูงสุด (Priority Queue) ดังนี้:
-  1. 🚨 **ระดับวิกฤต (Critical - สีแดง):** มาร์จิ้นต่ำ หรือเสี่ยงโดน Stop Out เช่น `[CRITICAL: MARGIN LEVEL < 150% - SUSPENDING ENTRIES]`
-  2. 📰 **ระดับข่าวสารและการป้องกัน (News & Shield - สีทอง/ส้ม):** เมื่อระบบป้องกันข่าวทำงาน เช่น `[NEWS SHIELD: USD HIGH IMPACT IN 08:32 - 1:100 LEVERAGE GUARD]`
-  3. 🛡️ **ระดับการกักขังและกู้ชีพ (Quarantine & Rescue - สีฟ้า/ทอง):** แจ้งเตือนคู่เงินที่ถูกขังหรือกำลังใช้ไม้กู้ชีพ เช่น `[QUARANTINE: EURUSD HEDGED | RESCUE R2 ACTIVE (DD: 2.15%)]`
-  4. ⛔ **ระดับการสั่งการจากระยะไกล (Remote Mode - สีส้ม):** แจ้งเตือนเมื่อมีคู่เงินถูกตั้งเป็น Close-Only จากหน้าเว็บ เช่น `[REMOTE: 2 PAIRS SET TO CLOSE-ONLY BY DASHBOARD]`
-  5. 🟢 **ระดับปกติ (Healthy - สีเขียว):** ระบบทำงานราบรื่น เช่น `[SYSTEM HEALTHY - ALL 20 SYSTEMS NOMINAL | CPU OK]`
+* **ปัญหาเดิม:** ข้อมูลแจ้งเตือน (Alert / Quarantine Status / Rescue Info / `lock withdraws` / `system healthy`) ถูกยัดรวมไว้ใน Table E ช่องที่ 3 (`Col 2`) ร่วมกับค่า Buffer และ Relief Fund ทำให้พื้นที่จำกัด ข้อความยาวถูกตัดทอน หรือเบียดเสียดจนมองไม่เห็น
+* **การปรับโครงสร้าง Table E & Table F:**
+  * **Table E (Financial Metrics):** ปรับเหลือเฉพาะข้อมูลทางการเงินหลัก 2 ช่อง ได้แก่ Buffer (`BUF: +X.X% (X.Xx)`) และ Relief Fund (`FUND: ... (C:... | U:...)`) ทำให้ตัวเลขขยายกว้าง ชัดเจน อ่านง่าย ไม่แออัด
+  * **Table F (Dedicated Alert Row):** ย้ายข้อความแจ้งเตือนทั้งหมดออกจาก Table E มาแสดงผลใน Table F แบบเต็มแถว 100% (`dW`) ความสูง 1 แถวมาตรฐาน (`rowH`)
+  * **ลักษณะกรอบ:** สไตล์แถบ Sci-Fi HUD แบบกล่องข้อความเต็มแถวเดี่ยว ไม่มีเส้นคอลัมน์กั้นกลาง เพื่อให้อ่านข้อความยาวได้ต่อเนื่อง
+
+### 4.3 การตรวจจับและแสดงสถานะคู่เงินค้างเก่าของ EasyM (Legacy Basket Monitoring)
+* **ที่มา:** ลูกค้าที่อัปเกรดมาจาก EasyM MAX หรือเวอร์ชันก่อนหน้า อาจมีออเดอร์ของคู่เงินเก่าที่ไม่ได้อยู่ในกระดาน 20 คู่ปัจจุบัน (เช่น `GBPCHF` Magic 2012) ค้างอยู่ในพอร์ต แม้ระบบภายในจะคอยจัดการปิดรวบ Close-Only ให้อัตโนมัติ แต่ลูกค้ามองไม่เห็นบนแดชบอร์ด ทำให้เกิดความกังวล
+* **ข้อกำหนด:**
+  * เพิ่มฟังก์ชันสแกนหาตระกร้าออเดอร์ของ EasyM รุ่นเก่าที่ยังเปิดค้างอยู่ (`ScanLegacyBaskets()`)
+  * หากพบออเดอร์ค้าง ให้แสดงสถานะใน Table F ชัดเจน เช่น:
+    $$\text{[LEGACY BASKET: GBPCHF (3 Orders, P/L: -45.20) AWAITING CLOSE-ONLY TP]}$$
+  * ทำให้ผู้ใช้มั่นใจได้ทันทีว่า Prime รับรู้และกำลังเฝ้ารอปิดรวบคู่นั้นให้อยู่จริง
+
+### 4.4 การตรวจจับออเดอร์นอกระบบ / เทรดมือ / Magic Number อื่น (External & Manual Trades Detection)
+* **ที่มา:** บ่อยครั้งที่ลูกค้าเปิดออเดอร์ด้วยมือเอง (Manual Trading) หรือใส่ EA ตัวอื่นเข้ามาช่วยเทรดในพอร์ตเดียวกัน ซึ่งออเดอร์เหล่านี้กิน Margin และส่งผลกระทบโดยตรงต่อ Equity/Drawdown ของระบบ Prime
+* **ข้อกำหนด:**
+  * เพิ่มฟังก์ชันสแกนพอร์ตหาออเดอร์ที่ไม่ใช่ของ Prime (`ScanExternalTrades()`):
+    * ออเดอร์ที่ออกด้วยมือ: `OrderMagicNumber() == 0`
+    * ออเดอร์จาก EA ตัวอื่น: `Magic != InpMagicPrime` และ `Magic != LegacyMagic`
+    * คู่เงินแปลกปลอมที่อยู่นอก 20 คู่เงินของ Prime (เช่น XAUUSD, BTCUSD)
+  * แสดงแจ้งเตือนเด่นชัดใน Table F (สลับเป็นสีส้มหรือแดง) เช่น:
+    $$\text{[ALERT: 2 MANUAL ORDERS DETECTED (XAUUSD, EURUSD) - UNMANAGED RISK]}$$
+    $$\text{[ALERT: EXTERNAL EA DETECTED (MAGIC: 88888, 3 ORDERS) - MARGIN IMPACT]}$$
+  * ช่วยให้เจ้าของพอร์ตหรือแอดมินตรวจพบความผิดปกติได้ทันที ก่อนที่จะส่งผลให้พอร์ตติด Margin Call
+
+### 4.5 ระบบจัดลำดับความสำคัญของข้อความแจ้งเตือน (Table F Alert Message Hierarchy)
+ข้อความใน Table F จะแสดงผลตามลำดับความสำคัญสูงสุด (Priority Queue Engine):
+1. 🚨 **ระดับวิกฤต (Critical - สีแดง):** มาร์จิ้นต่ำกว่าเกณฑ์ หรือเสี่ยง Stop Out เช่น `[CRITICAL: MARGIN LEVEL < 150% - SUSPENDING ENTRIES]`
+2. ⚠️ **ระดับออเดอร์นอกระบบ / เทรดมือ (External Trades - สีส้ม):** `[ALERT: EXTERNAL ORDERS DETECTED (2 MANUAL) - RISK UNMANAGED]`
+3. 📰 **ระดับข่าวสารและ Leverage Shield (News Shield - สีทอง/ส้ม):** `[NEWS SHIELD: USD HIGH IMPACT IN 08:32 - 1:100 LEVERAGE GUARD]`
+4. 🛡️ **ระดับการกักขังและกู้ชีพ (Quarantine & Rescue - สีฟ้า/ทอง):** `[QUARANTINE: EURUSD HEDGED | RESCUE R2 ACTIVE (DD: 2.15%) | LOCK WITHDRAWS]`
+5. 🔄 **ระดับคู่เงินเก่ารอปิดรวบ (Legacy Basket - สีฟ้าอ่อน):** `[LEGACY BASKET: GBPCHF (3 Orders, P/L: -45.20) AWAITING CLOSE-ONLY TP]`
+6. ⛔ **ระดับการสั่งการจากระยะไกล (Remote Mode - สีส้ม):** `[REMOTE: 2 PAIRS SET TO CLOSE-ONLY BY DASHBOARD]`
+7. 🟢 **ระดับปกติ (Healthy - สีเขียว):** `[SYSTEM HEALTHY - ALL 20 SYSTEMS NOMINAL | CPU OK]`
 
 ---
 
@@ -139,21 +162,27 @@ flowchart TD
   - [ ] สร้าง API Route `/api/farm/command/poll` สำหรับให้ EA ดึงคำสั่งไปรัน
 - [ ] **ขั้นตอนที่ 2: ฝั่ง EA (MQL5 Prime Codebase)**
   - [ ] ปรับชื่อใน `#define EA_DASH_TITLE` และ `#property description` เป็น `EasyM Prime v2.00 [BuildID]` (ตัดคำว่า Universal ออก)
+  - [ ] ปรับแก้ **Table E**: ตัดช่อง Col 2 เดิมออก ขยายพื้นที่แสดงเฉพาะ Buffer % และ Relief Fund ให้คมชัดสวยงาม
   - [ ] เพิ่มโครงสร้าง **Table F** ในฟังก์ชัน `DashboardBuild()` (สร้าง Rect กรอบเดี่ยวเต็มความกว้าง `dW` และ Text Object `F_MSG`)
-  - [ ] ย้ายข้อความแจ้งเตือนจาก Table E Col 2 มาแสดงผลใน Table F แบบเต็มแถวใน `DashboardUpdate()` พร้อมระบบแสดงสีตาม Priority
+  - [ ] ย้ายข้อความแจ้งเตือนทั้งหมด (`lock withdraws`, `rescue active`, `margin warning`, `system healthy`) มาประมวลผลที่ Table F
+  - [ ] พัฒนาฟังก์ชัน `ScanLegacyBaskets()` ตรวจจับคู่เงินเก่าของ EasyM ที่อยู่นอกกระดาน 20 คู่ เพื่อรายงานสถานะรอปิดรวบขึ้น Table F
+  - [ ] พัฒนาฟังก์ชัน `ScanExternalTrades()` ตรวจจับออเดอร์เทรดมือ (`Magic == 0`) หรือ EA อื่น และรายงานเตือนขึ้น Table F
+  - [ ] สร้างระบบ Priority Message Queue ใน `DashboardUpdate()` เพื่อเลือกข้อความสำคัญที่สุดขึ้นแสดงใน Table F พร้อมสลับสีตามระดับความสำคัญ
   - [ ] เพิ่มฟังก์ชันประมวลผลคำสั่งระยะไกล `ProcessRemoteWebCommands()`
   - [ ] เพิ่มโมดูลตรวจสอบข่าว `NewsFilterModule.mqh` (อ่านค่าข่าวและสกุลเงินที่ได้รับผลกระทบ)
   - [ ] ตรวจสอบ Leverage และ Margin ก่อนส่ง OrderSend ทุกครั้ง หากพบว่า Leverage ถูกลดเหลือ 1:100 และเงินไม่พอ ให้เข้าโหมด Safe Delay
 - [ ] **ขั้นตอนที่ 3: ฝั่ง Frontend (Farm Client & Dev Dock)**
   - [ ] เปิดสวิตช์ปุ่ม interactive ใน Orb 2 ให้ส่งคำสั่งเข้า API เมื่ออยู่ในโหมด Dev
   - [ ] เพิ่ม News Indicator แสดงไอคอนข่าวกล่องแดงบนคู่เงินในหน้าฟาร์ม
+  - [ ] เพิ่มการแสดงผล Legacy Baskets & External Orders Warning ใน Telemetry Payload ของหน้าฟาร์ม
   - [ ] ทดสอบการทำงาน End-to-End บนพอร์ตทดสอบของเจ้าของระบบ
 - [ ] **ขั้นตอนที่ 4: ปล่อยใช้งานจริง (Production Deployment)**
-  - [ ] ตรวจสอบความถูกต้องของแดชบอร์ดบนกราฟ MT5 (Table C ชื่อตรง, Table F แสดงข้อความแจ้งเตือนชัดเจน)
+  - [ ] ตรวจสอบความถูกต้องของแดชบอร์ดบนกราฟ MT5 (Table C ชื่อตรง, Table E สะอาด, Table F รายงานข้อความแจ้งเตือนครบถ้วน)
   - [ ] ประกาศอัปเดต EasyM Prime v2.10 ให้ลูกค้าดาวน์โหลดไฟล์ `.ex5` ใหม่
   - [ ] ปลดล็อคระบบ Two-Way สู่โหมดสาธารณะผ่าน Dev Controller
 
 ---
 *บันทึกโดย: Antigravity AI Pair Programmer & System Architect*  
 *ไฟล์อ้างอิงหลัก: `docs/EASYM_PRIME_PHASE2_ROADMAP.md`*
+
 
