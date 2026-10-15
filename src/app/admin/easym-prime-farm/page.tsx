@@ -398,6 +398,7 @@ export default function AdminPrimeFarmLabPage() {
 
     const handleGreenhouseDomeClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+        setIsDdExpanded(false);
         // เมื่อคลิกที่โดมแก้ว ให้กระจายแปลงต้นไม้พร้อมแสดงปรอทแยกต้นได้ทันที
         setIsQuarantineExpanded(true);
         setIsQuarantineEnlarged(false);
@@ -1402,7 +1403,9 @@ interface QuarantineTreeItem {
                         />
 
                         {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, SUBTLY RECEDING WHEN QUARANTINE IS FOCUSED) */}
-                        <div className={`animate-float-farm transition-all duration-500 ease-out ${
+                        <div className={`relative animate-float-farm transition-all duration-500 ease-out ${
+                            isDdExpanded ? 'z-[200]' : 'z-[20]'
+                        } ${
                             (isQuarantineExpanded || isQuarantineEnlarged)
                                 ? 'opacity-70 brightness-95 scale-[0.99]'
                                 : 'opacity-100 brightness-100 scale-100'
@@ -1505,7 +1508,7 @@ interface QuarantineTreeItem {
                                     style={{
                                         left: `${badgeLeft}px`,
                                         top: `${badgeTop}px`,
-                                        zIndex: 99999,
+                                        zIndex: isDdExpanded ? 999999 : 99999,
                                         width: '280px',
                                         height: '280px'
                                     }}
@@ -1524,7 +1527,14 @@ interface QuarantineTreeItem {
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setIsDdExpanded(prev => !prev);
+                                                        setIsDdExpanded(prev => {
+                                                            const next = !prev;
+                                                            if (next) {
+                                                                setIsQuarantineExpanded(false);
+                                                                setIsQuarantineEnlarged(false);
+                                                            }
+                                                            return next;
+                                                        });
                                                     }}
                                                     className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
                                                         highlightTarget === 'FARM'
@@ -1591,7 +1601,7 @@ interface QuarantineTreeItem {
                                         {isDdExpanded && (
                                             <div 
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
+                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[999999] pointer-events-auto select-none drop-shadow-[0_20px_50px_rgba(0,0,0,0.95)]"
                                             >
                                                 {top4WorstPairs.map((p, idx) => {
                                                     const isPairExpanded = expandedActivePair === p.sym;
@@ -1743,6 +1753,14 @@ interface QuarantineTreeItem {
                                             unoptimized
                                             priority
                                         />
+
+                                        {/* 🏷️ Pair Symbol & State Signboard at Tree Base */}
+                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-[#160e03]/95 border border-amber-500/70 shadow-[0_4px_12px_rgba(0,0,0,0.85)] flex items-center gap-1.5 pointer-events-none select-none z-30">
+                                            <span className={`w-1.5 h-1.5 rounded-full ${qTree.isRescue ? 'bg-cyan-400 animate-pulse' : 'bg-amber-400'}`} />
+                                            <span className="font-mono font-black text-[9px] text-amber-200 tracking-wider">
+                                                {qTree.sym}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -1878,15 +1896,15 @@ interface QuarantineTreeItem {
                                                     animationDelay: `${qTree.delayMs || idx * 150}ms`
                                                 }}
                                             >
-                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ขยายออกทางขวาไม่ล้นจอทางซ้าย) */}
+                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ตรงตำแหน่งต้นไม้พอดี ไม่เบี้ยวข้าง พร้อมก้านปรอทชี้ลงไปยังต้นไม้) */}
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setExpandedTreeId(prev => prev === qTree.id ? null : qTree.id);
                                                     }}
-                                                    className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
+                                                    className={`absolute top-4 sm:top-5 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
                                                         isTreeExpanded 
-                                                            ? 'left-1/2 -translate-x-12 scale-[2.0] sm:scale-[1.8] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
+                                                            ? 'left-1/2 -translate-x-1/2 scale-[1.7] sm:scale-[1.8] -translate-y-10 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
                                                             : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
                                                     }`}
                                                     style={{
@@ -1932,7 +1950,7 @@ interface QuarantineTreeItem {
                                                             <div 
                                                                 className={`h-full rounded-r-full transition-all duration-700 relative ${
                                                                     qTree.isRescue
-                                                                        ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
+                                                                        ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
                                                                         : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
                                                                 }`}
                                                                 style={{
@@ -1943,6 +1961,9 @@ interface QuarantineTreeItem {
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Vertical stem connecting mercury bar directly down to tree below */}
+                                                    <div className="w-0.5 sm:w-1 h-3 sm:h-5 bg-gradient-to-b from-amber-500 via-amber-500/60 to-transparent"></div>
                                                 </div>
                                             </div>
                                         );

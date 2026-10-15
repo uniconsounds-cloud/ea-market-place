@@ -581,6 +581,7 @@ export default function FarmClient({
 
     const handleGreenhouseDomeClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+        setIsDdExpanded(false);
         // เมื่อคลิกที่โดมแก้ว ให้กระจายแปลงต้นไม้พร้อมแสดงปรอทแยกต้นได้ทันที
         setIsQuarantineExpanded(true);
         setIsQuarantineEnlarged(false);
@@ -1679,19 +1680,31 @@ export default function FarmClient({
         if (details.length === 0) return [];
 
         return details.slice(0, 3).map((d, idx) => {
-            const sym = d.sym || 'EURJPY';
+            const sym = (d.sym || 'EURJPY').toUpperCase();
             const pairInfo = (primeTelemetry?.pairData as any)?.[sym];
             const rescueFromPair = pairInfo ? (Number(pairInfo.rescue_orders) || 0) : 0;
             const rescueOrders = (d.rescueOrders && d.rescueOrders > 0)
                 ? d.rescueOrders
-                : (rescueFromPair > 0 ? rescueFromPair : (primeTelemetry?.rescueOrdersCount && idx === 0 ? primeTelemetry.rescueOrdersCount : 0));
-            const isRescue = Boolean(d.isHedged || rescueOrders > 0);
+                : (rescueFromPair > 0 ? rescueFromPair : 0);
+            
+            // Strictly evaluate if this pair is hedged / in rescue mode or purely locked
+            const isRescue = Boolean(
+                d.isHedged || 
+                rescueOrders > 0 || 
+                (pairInfo && pairInfo.buyCount > 0 && pairInfo.sellCount > 0)
+            );
+
+            // Pair DD% directly matches pair telemetry / order calculation
+            const ddPct = (d.ddPct && d.ddPct > 0)
+                ? d.ddPct
+                : (pairInfo?.ddPct && pairInfo.ddPct > 0 ? pairInfo.ddPct : 0);
+
             return {
                 id: `q_preview_${idx + 1}`,
                 c: 1.0 + idx * 0.8,
                 r: 5,
                 sym: sym,
-                ddPct: d.ddPct,
+                ddPct: ddPct,
                 isRescue: isRescue,
                 rescueOrders: rescueOrders,
                 src: isRescue ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
@@ -2275,7 +2288,9 @@ export default function FarmClient({
                         />
 
                         {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, SUBTLY RECEDING WHEN QUARANTINE IS FOCUSED) */}
-                        <div className={`animate-float-farm transition-all duration-500 ease-out ${
+                        <div className={`relative animate-float-farm transition-all duration-500 ease-out ${
+                            isDdExpanded ? 'z-[200]' : 'z-[20]'
+                        } ${
                             (isQuarantineExpanded || isQuarantineEnlarged)
                                 ? 'opacity-70 brightness-95 scale-[0.99]'
                                 : 'opacity-100 brightness-100 scale-100'
@@ -2409,7 +2424,7 @@ export default function FarmClient({
                                     style={{
                                         left: `${badgeLeft}px`,
                                         top: `${badgeTop}px`,
-                                        zIndex: 99999,
+                                        zIndex: isDdExpanded ? 999999 : 99999,
                                         width: '280px',
                                         height: '280px'
                                     }}
@@ -2428,7 +2443,14 @@ export default function FarmClient({
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setIsDdExpanded(prev => !prev);
+                                                        setIsDdExpanded(prev => {
+                                                            const next = !prev;
+                                                            if (next) {
+                                                                setIsQuarantineExpanded(false);
+                                                                setIsQuarantineEnlarged(false);
+                                                            }
+                                                            return next;
+                                                        });
                                                     }}
                                                     className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
                                                         highlightTarget === 'FARM'
@@ -2495,7 +2517,7 @@ export default function FarmClient({
                                         {isDdExpanded && (
                                             <div 
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[100] pointer-events-auto select-none"
+                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[999999] pointer-events-auto select-none drop-shadow-[0_20px_50px_rgba(0,0,0,0.95)]"
                                             >
                                                 {isFallback1Url && (
                                                     <div className="w-full bg-[#1a1003]/95 border-2 border-amber-500/80 rounded-xl px-3.5 py-2.5 text-center font-mono text-xs font-black text-amber-300 shadow-xl">
@@ -2665,15 +2687,23 @@ export default function FarmClient({
                                                             className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-xl animate-pulse pointer-events-none"
                                                             style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 5 }}
                                                         >
-                                                            <Image src={theme.open} alt="Rescue Flower" fill className="object-contain" unoptimized />
-                                                            <span className="absolute -bottom-1 -right-1 px-1 py-0.2 rounded-full bg-emerald-950/90 border border-emerald-400 text-[8px] font-mono font-black text-emerald-300 leading-none shadow-[0_0_8px_rgba(16,185,129,0.9)]">
-                                                                R{fIdx + 1}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </>
-                                        )}
+                                                                    <Image src={theme.open} alt="Rescue Flower" fill className="object-contain" unoptimized />
+                                                                    <span className="absolute -bottom-1 -right-1 px-1 py-0.2 rounded-full bg-emerald-950/90 border border-emerald-400 text-[8px] font-mono font-black text-emerald-300 leading-none shadow-[0_0_8px_rgba(16,185,129,0.9)]">
+                                                                        R{fIdx + 1}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </>
+                                                )}
+
+                                                {/* 🏷️ Pair Symbol & State Signboard at Tree Base */}
+                                                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-[#160e03]/95 border border-amber-500/70 shadow-[0_4px_12px_rgba(0,0,0,0.85)] flex items-center gap-1.5 pointer-events-none select-none z-30">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${qTree.isRescue ? 'bg-cyan-400 animate-pulse' : 'bg-amber-400'}`} />
+                                                    <span className="font-mono font-black text-[9px] text-amber-200 tracking-wider">
+                                                        {qTree.sym}
+                                                    </span>
+                                                </div>
                                     </div>
                                 </div>
                             );
@@ -2809,15 +2839,15 @@ export default function FarmClient({
                                                     animationDelay: `${qTree.delayMs || idx * 150}ms`
                                                 }}
                                             >
-                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ขยายใหญ่ขึ้น ขยายออกทางขวาไม่ล้นจอทางซ้าย) */}
+                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ตรงตำแหน่งต้นไม้พอดี ไม่เบี้ยวข้าง พร้อมก้านปรอทชี้ลงไปยังต้นไม้) */}
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setExpandedTreeId(prev => prev === qTree.id ? null : qTree.id);
                                                     }}
-                                                    className={`absolute top-0 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
+                                                    className={`absolute top-4 sm:top-5 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
                                                         isTreeExpanded 
-                                                            ? 'left-1/2 -translate-x-12 scale-[2.0] sm:scale-[1.8] -translate-y-8 origin-bottom-left shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
+                                                            ? 'left-1/2 -translate-x-1/2 scale-[1.7] sm:scale-[1.8] -translate-y-10 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
                                                             : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
                                                     }`}
                                                     style={{
@@ -2874,6 +2904,9 @@ export default function FarmClient({
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Vertical stem connecting mercury bar directly down to tree below */}
+                                                    <div className="w-0.5 sm:w-1 h-3 sm:h-5 bg-gradient-to-b from-amber-500 via-amber-500/60 to-transparent"></div>
                                                 </div>
                                             </div>
                                         );
