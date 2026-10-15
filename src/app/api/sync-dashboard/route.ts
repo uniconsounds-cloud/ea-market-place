@@ -143,8 +143,10 @@ function recordIncomingSyncTelemetry(
     let mode: 'LIVE_20S' | 'SLEEP_180S' | 'ANOMALY_FAST' = isViewerActive ? 'LIVE_20S' : 'SLEEP_180S';
     if (reqsToday >= 3 && avgIntervalSec <= 15 && !isViewerActive) {
         mode = 'ANOMALY_FAST';
-    } else if (avgIntervalSec <= 45) {
+    } else if (isViewerActive) {
         mode = 'LIVE_20S';
+    } else {
+        mode = 'SLEEP_180S';
     }
 
     trafficState.ports[portNumber] = {
@@ -257,6 +259,8 @@ export async function POST(req: Request) {
             last_10m_sync: nowIso
         } : null;
 
+        let lastViewedAtStr: string | null = null;
+
         // 3. Process Status Sync
         if (snapshot || type === 'STATS_SYNC' || payload.balance !== undefined) {
             const balance = Number(snapshot?.account?.balance ?? payload.balance ?? 0);
@@ -306,9 +310,15 @@ export async function POST(req: Request) {
                 updated_at: nowIso
             };
 
-            const { error: statusErr } = await supabase
+            const { data: upsertedStatus, error: statusErr } = await supabase
                 .from('farm_port_status')
-                .upsert(statusPayload, { onConflict: 'port_number' });
+                .upsert(statusPayload, { onConflict: 'port_number' })
+                .select('last_viewed_at')
+                .maybeSingle();
+
+            if (upsertedStatus?.last_viewed_at) {
+                lastViewedAtStr = upsertedStatus.last_viewed_at;
+            }
 
             if (statusErr) {
                 console.error('Error syncing farm_port_status:', statusErr);
@@ -373,11 +383,26 @@ export async function POST(req: Request) {
             }
         }
 
-        // 7. Interval policy
-        const assignedInterval = isFallback1UrlEA ? 600 : 20;
+        // 7. Dynamic Interval policy (Live 20s vs Standby 180s/600s)
+        if (!lastViewedAtStr) {
+            const { data: vData } = await supabase
+                .from('farm_port_status')
+                .select('last_viewed_at')
+                .eq('port_number', portNumber)
+                .maybeSingle();
+            lastViewedAtStr = vData?.last_viewed_at || null;
+        }
+
+        const nowMs = Date.now();
+        const lastViewedMs = lastViewedAtStr ? new Date(lastViewedAtStr).getTime() : 0;
+        // Viewer is active if the web farm page sent a ping within the last 120 seconds (2 minutes)
+        const isViewerActive = !isFallback1UrlEA && ((nowMs - lastViewedMs) < 120000);
+
+        // Fallback 1-URL = 600s, Live viewer = 20s, Sleep standby = 180s (3 minutes)
+        const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? 20 : 180);
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
-        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, !isFallback1UrlEA, assignedInterval);
+        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
 
         // 8. Retrieve 2-Way Command & Web Control state for this port
         const webConfig = getPortControl(portNumber);
@@ -385,10 +410,10 @@ export async function POST(req: Request) {
         return NextResponse.json({
             status: 'success',
             success: true,
-            should_sync_full: true,
-            viewer_active: !isFallback1UrlEA,
+            should_sync_full: isViewerActive,
+            viewer_active: isViewerActive,
             sync_interval: assignedInterval,
-            sync_mode: isFallback1UrlEA ? 'FALLBACK_1URL' : 'CLASSIC_ONLINE',
+            sync_mode: isFallback1UrlEA ? 'FALLBACK_1URL' : (isViewerActive ? 'LIVE_20S' : 'SLEEP_180S'),
             license_tier: isFallback1UrlEA ? 'free' : 'pro',
             is_trial: false,
             timestamp: nowIso,
