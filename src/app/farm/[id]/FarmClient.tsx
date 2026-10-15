@@ -407,11 +407,9 @@ export default function FarmClient({
                     assetType === 'FOREX';
 
     // 👑 Owner Developer Sandbox & Customer Release Gate:
-    // 1. Owner's 2 test ports (21692434 & 97053088) have access to the Draggable Floating Controller Dock.
-    // 2. In Dev mode: Owner sees the in-development Prime Farm UI.
-    // 3. In Customer mode: Owner simulates what real customers currently see.
-    // 4. For real customers: Prime Farm UI is only shown if isGlobalPrimeReleased === true (default is false/private).
-    const isOwnerTestPort = String(portNumber) === '21692434' || String(portNumber) === '97053088';
+    // 1. Only Port 97053088 has access to the Draggable Floating Controller Dock.
+    // 2. Port 21692434 and customer ports act as standard client ports to observe the true released experience.
+    const isOwnerTestPort = String(portNumber) === '97053088';
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem('owner_prime_release_gate');
@@ -506,8 +504,7 @@ export default function FarmClient({
             await supabase
                 .from('products')
                 .update({ 
-                    is_active: released,
-                    updated_at: new Date().toISOString()
+                    is_active: released
                 })
                 .eq('product_key', 'EZM-PRIME-V1');
         } catch (e) {
