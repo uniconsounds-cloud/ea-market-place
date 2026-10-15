@@ -106,6 +106,31 @@ flowchart TD
 
 ---
 
+## 📊 เสาหลักที่ 4: การปรับแต่งแดชบอร์ดบนกราฟ MT5 (MT5 On-Chart HUD Upgrade)
+
+### 4.1 ปรับมาตรฐานชื่อ EA บน Table C (Unified Branding)
+* **ปัญหาเดิม:** บนแถบสถานะพอร์ต Table C ยังมีคำว่า `Universal` ปรากฏอยู่ เช่น `=== EasyM Prime Universal v2.00 1014 [B261014.1] ===` ซึ่งไม่ตรงกับชื่อเรียกอย่างเป็นทางการบนหน้าเว็บฟาร์มและระบบไลเซนส์
+* **ข้อกำหนดใหม่:**
+  * **ตัดคำว่า `Universal` ออกทั้งหมด** เพื่อให้ชื่อผลิตภัณฑ์เป็นเอกภาพ (Unified Name) ทั่วทั้งระบบ
+  * รูปแบบมาตรฐานที่กำหนด: `EasyM Prime v2.00 [BuildID]` (เช่น `EasyM Prime v2.00 [B261014.1]` หรือ `EasyM Prime v2.00 1014 [B261014.1]`)
+  * ปรับค่าคงที่ `#define EA_DASH_TITLE` และ `#property description` ในไฟล์โค้ด MQL5 ให้ตรงตามมาตรฐานนี้
+
+### 4.2 เพิ่ม Table F: แถบแจ้งเตือนสถานะแยกเดี่ยวเต็มแถว (Dedicated Full-Width Alert Row)
+* **ปัญหาเดิม:** ข้อมูลแจ้งเตือน (Alert / Quarantine Status / Rescue Info) ถูกยัดรวมไว้ใน Table E ช่องที่ 3 (`Col 2`) ร่วมกับค่า Buffer และ Relief Fund ทำให้พื้นที่จำกัด ข้อความยาวถูกตัดทอน หรือเบียดเสียดจนมองเห็นได้ไม่ชัดเจน
+* **โครงสร้างและตำแหน่ง Table F:**
+  * ตำแหน่ง: วางต่อจาก Table E ลงมาด้านล่างสุดของแผงแดชบอร์ด (`ey0 + rowH + pad`)
+  * มิติ: ความยาวเต็มความกว้างของแผงแดชบอร์ด 100% (`dW`) ความสูง 1 แถวมาตรฐาน (`rowH`)
+  * ลักษณะกรอบ: สไตล์แถบ Sci-Fi HUD แบบกล่องข้อความเต็มแถวเดี่ยว ไม่มีเส้นคอลัมน์กั้นกลาง เพื่อให้อ่านข้อความยาวได้ต่อเนื่อง
+* **ระบบจัดลำดับความสำคัญของข้อความแจ้งเตือน (Alert Message Hierarchy):**
+  ข้อความใน Table F จะแสดงผลตามลำดับความสำคัญสูงสุด (Priority Queue) ดังนี้:
+  1. 🚨 **ระดับวิกฤต (Critical - สีแดง):** มาร์จิ้นต่ำ หรือเสี่ยงโดน Stop Out เช่น `[CRITICAL: MARGIN LEVEL < 150% - SUSPENDING ENTRIES]`
+  2. 📰 **ระดับข่าวสารและการป้องกัน (News & Shield - สีทอง/ส้ม):** เมื่อระบบป้องกันข่าวทำงาน เช่น `[NEWS SHIELD: USD HIGH IMPACT IN 08:32 - 1:100 LEVERAGE GUARD]`
+  3. 🛡️ **ระดับการกักขังและกู้ชีพ (Quarantine & Rescue - สีฟ้า/ทอง):** แจ้งเตือนคู่เงินที่ถูกขังหรือกำลังใช้ไม้กู้ชีพ เช่น `[QUARANTINE: EURUSD HEDGED | RESCUE R2 ACTIVE (DD: 2.15%)]`
+  4. ⛔ **ระดับการสั่งการจากระยะไกล (Remote Mode - สีส้ม):** แจ้งเตือนเมื่อมีคู่เงินถูกตั้งเป็น Close-Only จากหน้าเว็บ เช่น `[REMOTE: 2 PAIRS SET TO CLOSE-ONLY BY DASHBOARD]`
+  5. 🟢 **ระดับปกติ (Healthy - สีเขียว):** ระบบทำงานราบรื่น เช่น `[SYSTEM HEALTHY - ALL 20 SYSTEMS NOMINAL | CPU OK]`
+
+---
+
 ## 📋 แผนงานและขั้นตอนการลงมือพัฒนา (Implementation Checklist)
 
 - [ ] **ขั้นตอนที่ 1: ฝั่ง Database & API**
@@ -113,6 +138,9 @@ flowchart TD
   - [ ] สร้าง API Route `/api/farm/command/send` สำหรับรับคำสั่งจากเว็บ
   - [ ] สร้าง API Route `/api/farm/command/poll` สำหรับให้ EA ดึงคำสั่งไปรัน
 - [ ] **ขั้นตอนที่ 2: ฝั่ง EA (MQL5 Prime Codebase)**
+  - [ ] ปรับชื่อใน `#define EA_DASH_TITLE` และ `#property description` เป็น `EasyM Prime v2.00 [BuildID]` (ตัดคำว่า Universal ออก)
+  - [ ] เพิ่มโครงสร้าง **Table F** ในฟังก์ชัน `DashboardBuild()` (สร้าง Rect กรอบเดี่ยวเต็มความกว้าง `dW` และ Text Object `F_MSG`)
+  - [ ] ย้ายข้อความแจ้งเตือนจาก Table E Col 2 มาแสดงผลใน Table F แบบเต็มแถวใน `DashboardUpdate()` พร้อมระบบแสดงสีตาม Priority
   - [ ] เพิ่มฟังก์ชันประมวลผลคำสั่งระยะไกล `ProcessRemoteWebCommands()`
   - [ ] เพิ่มโมดูลตรวจสอบข่าว `NewsFilterModule.mqh` (อ่านค่าข่าวและสกุลเงินที่ได้รับผลกระทบ)
   - [ ] ตรวจสอบ Leverage และ Margin ก่อนส่ง OrderSend ทุกครั้ง หากพบว่า Leverage ถูกลดเหลือ 1:100 และเงินไม่พอ ให้เข้าโหมด Safe Delay
@@ -121,9 +149,11 @@ flowchart TD
   - [ ] เพิ่ม News Indicator แสดงไอคอนข่าวกล่องแดงบนคู่เงินในหน้าฟาร์ม
   - [ ] ทดสอบการทำงาน End-to-End บนพอร์ตทดสอบของเจ้าของระบบ
 - [ ] **ขั้นตอนที่ 4: ปล่อยใช้งานจริง (Production Deployment)**
+  - [ ] ตรวจสอบความถูกต้องของแดชบอร์ดบนกราฟ MT5 (Table C ชื่อตรง, Table F แสดงข้อความแจ้งเตือนชัดเจน)
   - [ ] ประกาศอัปเดต EasyM Prime v2.10 ให้ลูกค้าดาวน์โหลดไฟล์ `.ex5` ใหม่
   - [ ] ปลดล็อคระบบ Two-Way สู่โหมดสาธารณะผ่าน Dev Controller
 
 ---
 *บันทึกโดย: Antigravity AI Pair Programmer & System Architect*  
 *ไฟล์อ้างอิงหลัก: `docs/EASYM_PRIME_PHASE2_ROADMAP.md`*
+
