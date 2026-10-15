@@ -507,12 +507,13 @@ export default function DashboardPage() {
                                                                             IB {item.ib_broker_name || 'Customer'}
                                                                         </Badge>
                                                                     )}
-                                                                    <div className="text-xs text-muted-foreground capitalize">
-                                                                        {item.type === 'monthly' ? 'เช่ารายเดือน' :
-                                                                            item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
-                                                                                item.type === 'yearly' ? 'เช่ารายปี' :
-                                                                                    'สิทธิ์ใช้งานตลอดชีพ (Lifetime)'}
-                                                                    </div>
+                                                                    {!item.is_ib && (item.type === 'monthly' || item.type === 'quarterly' || item.type === 'yearly') && (
+                                                                        <div className="text-xs text-muted-foreground capitalize">
+                                                                            {item.type === 'monthly' ? 'เช่ารายเดือน' :
+                                                                                item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
+                                                                                    'เช่ารายปี'}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                                 {!isOrder && item.account_number && (
                                                                     <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-1.5">
