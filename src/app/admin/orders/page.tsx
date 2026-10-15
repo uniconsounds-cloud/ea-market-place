@@ -609,25 +609,25 @@ export default function AdminOrdersPage() {
                                             : 'opacity-90'
                                     }`}
                                 >
-                                    <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
-                                        {/* Slip Preview */}
-                                        <div className="w-full md:w-32 h-48 md:h-32 bg-black/20 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border relative group cursor-pointer">
+                                    <CardContent className="p-5 flex flex-col md:flex-row gap-5 items-start md:items-center">
+                                        {/* Slip Preview / Icon Box (Uniform Height for All) */}
+                                        <div className="w-full md:w-32 h-36 md:h-28 bg-black/20 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border border-border/40 relative group cursor-pointer">
                                             {order.plan_type === 'upgrade' ? (
                                                 <div className="text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full bg-cyan-950/40 text-cyan-300">
-                                                    <Sparkles className="w-8 h-8 mb-1.5 text-cyan-400" />
+                                                    <Sparkles className="w-7 h-7 mb-1 text-cyan-400" />
                                                     <span className="font-bold text-xs text-white">ขออัปเกรด</span>
                                                     <span className="text-[10px] text-cyan-400">ฟรี 2 เดือน</span>
                                                 </div>
+                                            ) : order.is_renewal ? (
+                                                <div className="text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full bg-amber-500/15 text-amber-400">
+                                                    <RotateCw className="w-7 h-7 mb-1 text-amber-400" />
+                                                    <span className="font-bold text-xs text-amber-200">ต่ออายุสิทธิ์</span>
+                                                    <span className="text-[10px] text-amber-400/80">{order.ib_broker_name || 'พอร์ตเดิม'}</span>
+                                                </div>
                                             ) : order.is_ib_request ? (
-                                                <div className={`text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full ${order.is_renewal ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                                                    {order.is_renewal ? (
-                                                        <RotateCw className="w-8 h-8 mb-1.5 text-amber-400" />
-                                                    ) : (
-                                                        <Zap className="w-8 h-8 mb-2" />
-                                                    )}
-                                                    <span className="font-bold">
-                                                        {order.is_renewal ? 'ต่ออายุสิทธิ์ IB' : `IB ${order.ib_broker_name || 'Request'}`}
-                                                    </span>
+                                                <div className="text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full bg-blue-500/10 text-blue-400">
+                                                    <Zap className="w-7 h-7 mb-1 text-blue-400" />
+                                                    <span className="font-bold text-xs text-blue-200">สิทธิ์ IB</span>
                                                     <span className="text-[10px] text-muted-foreground">{order.ib_broker_name || 'Free License'}</span>
                                                 </div>
                                             ) : order.slip_url ? (
@@ -638,8 +638,9 @@ export default function AdminOrdersPage() {
                                                     </div>
                                                 </a>
                                             ) : (
-                                                <div className="text-xs text-muted-foreground flex flex-col items-center">
-                                                    <FileText className="mb-1" /> No Slip
+                                                <div className="text-xs text-muted-foreground flex flex-col items-center justify-center h-full">
+                                                    <FileText className="w-6 h-6 mb-1 text-muted-foreground/60" />
+                                                    <span className="text-[11px]">ไม่มีสลิป</span>
                                                 </div>
                                             )}
                                         </div>
@@ -658,11 +659,11 @@ export default function AdminOrdersPage() {
                                                             </span>
                                                         ) : order.is_renewal ? (
                                                             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm animate-pulse">
-                                                                <RotateCw className="w-3 h-3" /> ขอต่ออายุพอร์ตเดิม (Renewal)
+                                                                <RotateCw className="w-3 h-3" /> ขอต่ออายุพอร์ตเดิม
                                                             </span>
                                                         ) : (
                                                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                                                ✨ สั่งซื้อใหม่ (New Order)
+                                                                ✨ สั่งซื้อใหม่
                                                             </span>
                                                         )}
                                                         {order.is_ib_request && order.plan_type !== 'upgrade' && (
@@ -671,11 +672,11 @@ export default function AdminOrdersPage() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+                                                    <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
                                                         <span className="flex items-center gap-1.5 flex-wrap">
                                                             ลูกค้า: <span className="font-medium text-foreground">{order.profiles?.full_name || 'Guest'}</span>
                                                             {order.profiles?.email && (
-                                                                <span className="text-[11px] px-1.5 py-0.5 bg-muted rounded border border-border/50 text-muted-foreground flex items-center gap-1">
+                                                                <span className="text-[11px] px-1.5 py-0.5 bg-muted rounded border border-border/50 text-muted-foreground flex items-center gap-1 font-mono">
                                                                     <Mail className="w-3 h-3" /> {order.profiles.email}
                                                                 </span>
                                                             )}
@@ -683,17 +684,9 @@ export default function AdminOrdersPage() {
                                                         {order.profiles?.is_tester && (
                                                             <span className="text-[10px] text-orange-500 font-bold ml-1 bg-orange-500/10 px-1 rounded uppercase">Tester</span>
                                                         )}
-                                                        {!order.is_ib_request && (
-                                                            <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
-                                                                {order.plan_type === 'upgrade' ? 'อัปเกรด Prime (ทดลองฟรี 2 เดือน)' :
-                                                                    order.plan_type === 'monthly' ? 'รายเดือน' :
-                                                                        order.plan_type === 'quarterly' ? 'ราย 3 เดือน' :
-                                                                            'ตลอดชีพ'}
-                                                            </span>
-                                                        )}
                                                     </p>
                                                 </div>
-                                                <div className="text-right">
+                                                <div className="text-right shrink-0">
                                                     <div className="text-xl font-bold font-mono">
                                                         {order.is_ib_request ? '฿0' : `฿${order.amount?.toLocaleString()}`}
                                                     </div>
@@ -706,69 +699,68 @@ export default function AdminOrdersPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Order Details Sub-Box */}
-                                            {order.plan_type === 'upgrade' ? (
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 p-3 bg-gradient-to-r from-cyan-950/30 via-slate-900/60 to-muted/20 rounded-lg border border-cyan-500/30 text-xs">
-                                                    <div className="flex flex-col gap-0.5 overflow-hidden">
-                                                        <span className="text-muted-foreground text-[11px]">Account Port:</span>
-                                                        <span className="font-mono font-bold text-cyan-300 text-sm break-all">{order.account_number || '-'}</span>
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="text-muted-foreground text-[11px]">สิทธิ์ที่ได้รับ:</span>
-                                                        <span className="font-semibold text-emerald-400 text-xs flex items-center gap-1">
-                                                            <Sparkles className="w-3 h-3 text-yellow-300" /> Prime Pro (ฟรี 2 เดือน)
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 sm:items-end">
-                                                        <span className="text-muted-foreground text-[11px]">สั่งซื้อเมื่อ:</span>
-                                                        <span className="font-medium text-slate-300 text-xs">{new Date(order.created_at).toLocaleString('th-TH')}</span>
-                                                    </div>
+                                            {/* Standardized 3-Column Order Sub-Box (Exact same height and padding for ALL order types!) */}
+                                            <div className={`grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 p-3 rounded-lg border text-xs ${
+                                                order.plan_type === 'upgrade'
+                                                    ? 'bg-gradient-to-r from-cyan-950/25 via-slate-900/60 to-muted/20 border-cyan-500/30'
+                                                    : order.is_renewal
+                                                        ? 'bg-gradient-to-r from-amber-950/20 via-slate-900/60 to-muted/20 border-amber-500/30'
+                                                        : 'bg-muted/30 border-border/50'
+                                            }`}>
+                                                {/* Col 1: Account Port */}
+                                                <div className="flex flex-col gap-0.5 overflow-hidden">
+                                                    <span className="text-muted-foreground text-[11px]">Account Port:</span>
+                                                    <span className={`font-mono font-bold text-sm break-all ${
+                                                        order.plan_type === 'upgrade' ? 'text-cyan-300' : order.is_renewal ? 'text-amber-200' : 'text-accent'
+                                                    }`}>
+                                                        {order.account_number || '-'}
+                                                    </span>
                                                 </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3.5 bg-muted/30 rounded-lg border border-border/50">
-                                                    <div className="flex flex-col gap-1 overflow-hidden">
-                                                        <span className="text-muted-foreground text-xs">Account Port:</span>
-                                                        <span className="font-mono font-bold text-accent break-all">{order.account_number || '-'}</span>
-                                                    </div>
-                                                    <div className="flex flex-col gap-1 md:items-end">
-                                                        <span className="text-muted-foreground text-xs">สั่งซื้อเมื่อ:</span>
-                                                        <span className="font-medium text-[13px]">{new Date(order.created_at).toLocaleString('th-TH')}</span>
-                                                    </div>
-                                                </div>
-                                            )}
 
-                                            {/* Dedicated Renewal Information Box (Only for actual renewals) */}
-                                            {order.is_renewal && order.existing_license && (
-                                                <div className="mt-2.5 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1.5">
-                                                    <div className="flex items-center justify-between font-bold text-amber-300">
-                                                        <span className="flex items-center gap-1.5">
-                                                            <RotateCw className="w-3.5 h-3.5" />
-                                                            ข้อมูล License พอร์ตเดิมในระบบ (ก่อนต่ออายุ)
-                                                        </span>
-                                                        <span className={order.existing_license.is_active ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
-                                                            {order.existing_license.is_active ? "● ปัจจุบันยังเปิดใช้งานอยู่" : "○ หมดอายุแล้ว"}
-                                                        </span>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-stone-300 pt-1 border-t border-amber-500/20">
-                                                        <div>
-                                                            <span className="text-muted-foreground">วันหมดอายุเดิม:</span>{" "}
-                                                            <span className="font-semibold text-amber-200">
-                                                                {order.existing_license.type === 'lifetime' 
-                                                                    ? 'ตลอดชีพ' 
-                                                                    : order.existing_license.expiry_date 
-                                                                        ? new Date(order.existing_license.expiry_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
-                                                                        : 'ไม่ระบุ'}
+                                                {/* Col 2: Contextual Info based on Order Type */}
+                                                <div className="flex flex-col gap-0.5">
+                                                    {order.plan_type === 'upgrade' ? (
+                                                        <>
+                                                            <span className="text-muted-foreground text-[11px]">สิทธิ์ที่ได้รับ:</span>
+                                                            <span className="font-semibold text-emerald-400 text-xs flex items-center gap-1">
+                                                                <Sparkles className="w-3 h-3 text-yellow-300" /> Prime Pro (ฟรี 2 เดือน)
                                                             </span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">ประเภทสิทธิ์เดิม:</span>{" "}
-                                                            <span className="font-semibold text-stone-200 uppercase">
-                                                                {order.existing_license.type === 'ib' ? 'IB (ฟรี)' : order.existing_license.type}
+                                                        </>
+                                                    ) : order.is_renewal ? (
+                                                        <>
+                                                            <span className="text-muted-foreground text-[11px]">วันหมดอายุเดิม:</span>
+                                                            <span className="font-semibold text-amber-200 text-xs flex items-center gap-1">
+                                                                <RotateCw className="w-3 h-3 text-amber-400 shrink-0" />
+                                                                <span className="truncate">
+                                                                    {order.existing_license?.type === 'lifetime' 
+                                                                        ? 'ตลอดชีพ' 
+                                                                        : order.existing_license?.expiry_date 
+                                                                            ? new Date(order.existing_license.expiry_date).toLocaleDateString('th-TH')
+                                                                            : 'ไม่ระบุ'}
+                                                                </span>
+                                                                {order.existing_license?.is_active ? (
+                                                                    <span className="text-[10px] text-emerald-400 font-normal shrink-0">(เปิดใช้)</span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-rose-400 font-normal shrink-0">(หมดอายุ)</span>
+                                                                )}
                                                             </span>
-                                                        </div>
-                                                    </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-muted-foreground text-[11px]">แพ็กเกจ:</span>
+                                                            <span className="font-semibold text-emerald-400 text-xs flex items-center gap-1">
+                                                                ✨ {order.is_ib_request ? 'สิทธิ์ IB (ฟรี)' : (order.plan_type === 'lifetime' ? 'ตลอดชีพ' : order.plan_type === 'quarterly' ? 'ราย 3 เดือน' : 'รายเดือน')}
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
-                                            )}
+
+                                                {/* Col 3: Order Timestamp */}
+                                                <div className="flex flex-col gap-0.5 sm:items-end">
+                                                    <span className="text-muted-foreground text-[11px]">สั่งซื้อเมื่อ:</span>
+                                                    <span className="font-medium text-slate-300 text-xs">{new Date(order.created_at).toLocaleString('th-TH')}</span>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Actions */}
