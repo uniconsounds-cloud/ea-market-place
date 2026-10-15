@@ -3033,24 +3033,13 @@ export default function FarmClient({
                             />
                         </div>
 
-                        {/* Orb 2: Cyan/Blue Glow (Cockpit Matrix) */}
+                        {/* Orb 2: Cyan/Blue Glow (Cockpit Matrix - 20-Pair Telemetry) */}
                         <button
-                            onClick={() => {
-                                if (isOwnerDevUser) {
-                                    setPrimeActiveOrb(2);
-                                } else {
-                                    toast.info('🔮 ระบบ Cockpit Matrix อยู่ในระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
-                                }
-                            }}
+                            onClick={() => setPrimeActiveOrb(2)}
                             className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title={isOwnerDevUser ? "Prime menu 2: Cockpit Matrix" : "🔒 20-Pair Cockpit Matrix (กำลังพัฒนา - เร็วๆ นี้)"}
+                            title="20-Pair Cockpit Matrix (รายงานสถานะ 20 คู่เงิน)"
                         >
                             <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
-                            {!isOwnerDevUser && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-cyan-500/40 text-[9px] shadow" title="เร็วๆ นี้">
-                                    🔒
-                                </span>
-                            )}
                         </button>
 
                         {/* Orb 3: Purple/Violet Glow (Recovery Engine) */}
@@ -3095,17 +3084,17 @@ export default function FarmClient({
                     </div>
 
                     {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
-                    {primeActiveOrb !== null && isOwnerDevUser && (
+                    {primeActiveOrb !== null && (isOwnerDevUser || primeActiveOrb === 1 || primeActiveOrb === 2) && (
                         <div 
-                            className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-[160] flex items-center justify-center p-3 animate-fade-in"
+                            className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-[160] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
                             onClick={() => setPrimeActiveOrb(null)}
                         >
                             <div 
                                 className={`relative ${
                                     primeActiveOrb === 2 
-                                        ? 'w-[96vw] sm:w-[95vw] lg:w-[92vw] max-w-6xl max-h-[88vh] sm:max-h-[90vh]' 
-                                        : 'w-[90vw] sm:w-[70vw] max-w-xl max-h-[70vh] sm:max-h-[72vh]'
-                                } flex flex-col rounded-3xl p-3.5 sm:p-5 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
+                                        ? 'w-[98vw] sm:w-[95vw] lg:w-[92vw] max-w-6xl max-h-[92vh] sm:max-h-[90vh]' 
+                                        : 'w-[92vw] sm:w-[70vw] max-w-xl max-h-[70vh] sm:max-h-[72vh]'
+                                } flex flex-col rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 backdrop-blur-2xl border-2 shadow-2xl animate-fade-in transition-all overflow-hidden ${
                                     primeActiveOrb === 1 ? 'bg-[#061512]/90 border-emerald-500/60 shadow-[0_0_50px_rgba(16,185,129,0.35)]' :
                                     primeActiveOrb === 2 ? 'bg-[#06121a]/95 border-cyan-500/60 shadow-[0_0_50px_rgba(6,182,212,0.35)]' :
                                     primeActiveOrb === 3 ? 'bg-[#12081d]/90 border-purple-500/60 shadow-[0_0_50px_rgba(168,85,247,0.35)]' :
@@ -3140,12 +3129,12 @@ export default function FarmClient({
                                                     'bg-white/10 border-white/20 text-white/60'
                                                 }`}>
                                                     {primeActiveOrb === 1 ? 'TABLE D & E' :
-                                                     primeActiveOrb === 2 ? 'CONTROL' : 'COMING SOON'}
+                                                     primeActiveOrb === 2 ? 'TELEMETRY' : 'COMING SOON'}
                                                 </span>
                                             </div>
                                             <p className="text-[10px] sm:text-[11px] text-white/50 font-sans">
                                                 {primeActiveOrb === 1 ? 'มาตรวัดและสเกลความปลอดภัยพอร์ต Real-time' :
-                                                 primeActiveOrb === 2 ? 'ควบคุมสั่งการเปิด-ปิดคู่เงิน (Active vs Close-Only)' :
+                                                 primeActiveOrb === 2 ? 'รายงานและตรวจจับสถานะ 20 คู่เงิน Real-time' :
                                                  'ระบบสั่งการ EasyM Prime'}
                                             </p>
                                         </div>
@@ -3675,39 +3664,27 @@ export default function FarmClient({
 
                                 {/* 🎛️ ORB 2: 20-PAIR COCKPIT MATRIX (MT5 EA DASHBOARD MIRROR) */}
                                 {primeActiveOrb === 2 && (
-                                    <div className="overflow-y-auto py-2.5 sm:py-3 space-y-3 pr-1 no-scrollbar flex-1 flex flex-col">
-                                        {/* Quick Actions & Pair Status Summary */}
-                                        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-black/60 border border-cyan-500/30 rounded-2xl p-2.5 sm:p-3.5 backdrop-blur-md shrink-0">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-                                                <div className="text-xs font-mono">
-                                                    <span className="text-white/50">COCKPIT STATUS: </span>
+                                    <div className="overflow-y-auto py-2 sm:py-3 space-y-2 sm:space-y-3 pr-0.5 sm:pr-1 no-scrollbar flex-1 flex flex-col">
+                                        {/* Quick Telemetry Summary Bar (Clean, Display-only, Responsive) */}
+                                        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-black/60 border border-cyan-500/30 rounded-xl sm:rounded-2xl p-2 sm:p-3 backdrop-blur-md shrink-0">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)] shrink-0" />
+                                                <div className="text-[11px] sm:text-xs font-mono">
+                                                    <span className="text-white/50">COCKPIT MATRIX: </span>
                                                     <span className="text-emerald-400 font-black font-mono">{activeCount} ACTIVE</span>
                                                     <span className="text-white/30 mx-1.5">|</span>
                                                     <span className="text-amber-400 font-black font-mono">{closeOnlyCount} CLOSE-ONLY</span>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => requestSetAllPairs(true)}
-                                                    className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] sm:text-xs font-mono font-bold transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
-                                                >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                    <span>SET ALL ACTIVE</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => requestSetAllPairs(false)}
-                                                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] sm:text-xs font-mono font-bold transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
-                                                >
-                                                    <Power className="w-3.5 h-3.5" />
-                                                    <span>SET ALL CLOSE-ONLY</span>
-                                                </button>
+                                            <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono text-cyan-300/80 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20 shrink-0">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                                                <span>LIVE TELEMETRY</span>
                                             </div>
                                         </div>
 
-                                        {/* 20 PAIRS TWO-COLUMN CARDS MATRIX (10 ROWS x 2 CARDS MATCHING MT5 DASHBOARD) */}
-                                        <div className="grid grid-cols-2 gap-2 sm:gap-3 overflow-y-auto max-h-[58vh] sm:max-h-[62vh] pr-1 no-scrollbar overflow-x-hidden">
+                                        {/* 20 PAIRS TWO-COLUMN CARDS MATRIX (10 ROWS x 2 CARDS) */}
+                                        <div className="grid grid-cols-2 gap-1.5 sm:gap-3 overflow-y-auto max-h-[58vh] sm:max-h-[62vh] pr-0.5 sm:pr-1 no-scrollbar overflow-x-hidden">
                                             {Array.from({ length: 10 }).map((_, idx) => {
                                                 const leftPair = PRIME_LEFT_PAIRS[idx];
                                                 const rightPair = PRIME_RIGHT_PAIRS[idx];
@@ -3719,26 +3696,26 @@ export default function FarmClient({
                                                     };
                                                     const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
 
-                                                    // Direction badge (B / S / - or **.**)
+                                                    // Direction badge (B / S / - or **.**) - ultra-compact for narrow screens
                                                     const dirBadge = isFallback1Url ? (
-                                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded font-mono font-black text-[10px] bg-amber-500/15 border border-amber-400/40 text-amber-300">
+                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono font-black text-[8px] sm:text-[9px] bg-amber-500/15 border border-amber-400/40 text-amber-300 shrink-0">
                                                             **.**
                                                         </span>
                                                     ) : data.side === 'B' ? (
-                                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded font-mono font-black text-[10px] bg-cyan-500/25 border border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono font-black text-[8px] sm:text-[9px] bg-cyan-500/25 border border-cyan-400/60 text-cyan-300 shadow-[0_0_6px_rgba(6,182,212,0.3)] shrink-0">
                                                             BUY
                                                         </span>
                                                     ) : data.side === 'S' ? (
-                                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded font-mono font-black text-[10px] bg-amber-500/25 border border-amber-400 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.4)]">
+                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono font-black text-[8px] sm:text-[9px] bg-amber-500/25 border border-amber-400/60 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.3)] shrink-0">
                                                             SELL
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded font-mono text-[10px] bg-white/5 border border-white/10 text-white/30">
+                                                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded font-mono text-[8px] sm:text-[9px] bg-white/5 border border-white/10 text-white/30 shrink-0">
                                                             -
                                                         </span>
                                                     );
 
-                                                    // Segmented VU Meter (8 ticks)
+                                                    // Slender & tall high-tech VU meter (8 ticks)
                                                     const maxTicks = 8;
                                                     const filledTicks = isFallback1Url ? 0 : Math.min(maxTicks, data.count);
 
@@ -3753,58 +3730,57 @@ export default function FarmClient({
                                                     return (
                                                         <div
                                                             key={pair}
-                                                            className={`p-2 sm:p-2.5 rounded-2xl border transition-all duration-200 flex flex-col justify-between gap-1.5 sm:gap-2 ${
+                                                            className={`p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl border transition-all duration-200 flex flex-col justify-between gap-1 sm:gap-1.5 ${
                                                                 !isEnabled
-                                                                    ? 'bg-amber-950/20 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.1)] hover:border-amber-400'
+                                                                    ? 'bg-amber-950/20 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.1)]'
                                                                     : isQuarantined
-                                                                    ? 'bg-rose-950/20 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.1)] hover:border-rose-400'
-                                                                    : 'bg-black/55 border-cyan-500/30 hover:border-cyan-400/70 hover:bg-cyan-950/20'
+                                                                    ? 'bg-rose-950/20 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.1)]'
+                                                                    : 'bg-black/55 border-cyan-500/30'
                                                             }`}
                                                         >
-                                                            {/* ═══ ROW 1: HEADER & TOGGLE COMMAND BUTTON ═══ */}
+                                                            {/* ═══ ROW 1: HEADER & STATUS BADGE (DISPLAY-ONLY, NON-CLICKABLE) ═══ */}
                                                             <div className="flex items-center justify-between gap-1">
-                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                    <span className="font-mono font-black text-xs sm:text-[13px] text-white tracking-wider px-1.5 sm:px-2 py-0.5 rounded-lg bg-slate-900/90 border border-white/15 shrink-0">
+                                                                <div className="flex items-center gap-1 min-w-0">
+                                                                    <span className="font-mono font-black text-[11px] sm:text-xs text-white tracking-wider px-1.5 py-0.5 rounded-md bg-slate-900 border border-white/15 shrink-0">
                                                                         {pair}
                                                                     </span>
                                                                     {dirBadge}
                                                                     {isQuarantined && (
-                                                                        <span className="text-[9px] font-mono font-black px-1 py-0.5 rounded bg-rose-500/25 border border-rose-500/40 text-rose-300">
+                                                                        <span className="text-[8px] sm:text-[9px] font-mono font-black px-1 py-0.2 rounded bg-rose-500/25 border border-rose-500/40 text-rose-300 shrink-0">
                                                                             QT
                                                                         </span>
                                                                     )}
                                                                 </div>
 
-                                                                <button
-                                                                    onClick={() => requestTogglePair(pair, isEnabled)}
-                                                                    className={`px-2 sm:px-2.5 py-1 rounded-lg font-mono text-[9px] sm:text-[10px] font-black tracking-wide border transition-all duration-200 cursor-pointer shadow-sm active:scale-95 shrink-0 ${
-                                                                        isEnabled
-                                                                            ? 'bg-emerald-500/20 hover:bg-emerald-500/35 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
-                                                                            : 'bg-amber-500/20 hover:bg-amber-500/35 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
-                                                                    }`}
-                                                                >
-                                                                    {isEnabled ? '🟢 ACTIVE' : '⛔ CLOSE'}
-                                                                </button>
+                                                                {/* Display-Only Status Pill (Non-clickable, no button) */}
+                                                                <div className={`px-1.5 py-0.5 rounded-md font-mono text-[8px] sm:text-[9px] font-bold tracking-tight border shrink-0 select-none flex items-center gap-1 ${
+                                                                    isEnabled
+                                                                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
+                                                                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
+                                                                }`}>
+                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                    <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                </div>
                                                             </div>
 
-                                                            {/* ═══ ROW 2: TRADING METRICS (ORDERS VU METER | LOTS | DD%) ═══ */}
-                                                            <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono bg-white/[0.03] px-2 py-1 sm:py-1.5 rounded-xl border border-white/[0.06]">
-                                                                {/* Orders VU Meter */}
+                                                            {/* ═══ ROW 2: TRADING METRICS (SLENDER TALL VU METER | LOTS | DD%) ═══ */}
+                                                            <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[10px] font-mono bg-white/[0.03] px-1.5 sm:px-2 py-1 rounded-lg border border-white/[0.06]">
+                                                                {/* Slender & Tall Futuristic VU Meter + Orders Count (No "ไม้") */}
                                                                 <div className="flex items-center gap-1 sm:gap-1.5">
-                                                                    <div className="flex items-center gap-0.5 w-9 sm:w-12 h-2.5 bg-black/60 rounded px-1 border border-white/10 shrink-0">
+                                                                    <div className="flex items-center gap-[1.5px] sm:gap-[2px] h-3.5 sm:h-4 px-1 py-0.5 bg-black/80 rounded border border-white/10 shrink-0">
                                                                         {Array.from({ length: maxTicks }).map((_, i) => (
                                                                             <div 
                                                                                 key={i} 
-                                                                                className={`flex-1 h-1.5 rounded-[1px] transition-all ${
+                                                                                className={`w-[1.5px] sm:w-[2px] h-full rounded-[0.5px] transition-all duration-300 ${
                                                                                     i < filledTicks 
-                                                                                        ? (i >= 5 ? 'bg-rose-500 shadow-[0_0_3px_rgba(244,63,94,0.8)]' : i >= 3 ? 'bg-amber-400 shadow-[0_0_3px_rgba(245,158,11,0.8)]' : 'bg-emerald-400 shadow-[0_0_3px_rgba(16,185,129,0.8)]')
+                                                                                        ? (i >= 5 ? 'bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.9)]' : i >= 3 ? 'bg-amber-400 shadow-[0_0_4px_rgba(245,158,11,0.9)]' : 'bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.9)]')
                                                                                         : 'bg-white/10'
                                                                                 }`} 
                                                                             />
                                                                         ))}
                                                                     </div>
                                                                     <span className="font-bold text-white/90">
-                                                                        {isFallback1Url ? '**.**' : data.count} <span className="text-[9px] text-white/50 font-normal">ไม้</span>
+                                                                        {isFallback1Url ? '**.**' : data.count}
                                                                     </span>
                                                                 </div>
 
@@ -3815,16 +3791,15 @@ export default function FarmClient({
 
                                                                 {/* DD% */}
                                                                 <div className={`font-bold ${ddColor}`}>
-                                                                    <span className="text-[9px] text-white/40 font-normal mr-0.5">DD:</span>
-                                                                    {isFallback1Url ? '**.**' : (data.ddPct > 0 ? `${data.ddPct.toFixed(2)}%` : '0.00%')}
+                                                                    {isFallback1Url ? '**.**' : (data.ddPct > 0 ? `-${data.ddPct.toFixed(2)}%` : '0.00%')}
                                                                 </div>
                                                             </div>
 
                                                             {/* ═══ ROW 3: P/L CENTER-BALANCE BAR & VALUE ═══ */}
-                                                            <div className="flex items-center justify-between gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] font-mono bg-black/40 px-2 py-1 sm:py-1.5 rounded-xl border border-white/[0.06]">
-                                                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                                    <span className="text-[9px] text-white/40 shrink-0">P/L:</span>
-                                                                    <div className="relative w-full h-2 bg-slate-950 rounded-full border border-white/10 overflow-hidden">
+                                                            <div className="flex items-center justify-between gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] font-mono bg-black/40 px-1.5 sm:px-2 py-1 rounded-lg border border-white/[0.06]">
+                                                                <div className="flex items-center gap-1 flex-1 min-w-0">
+                                                                    <span className="text-[8px] sm:text-[9px] text-white/40 shrink-0 font-sans">P/L:</span>
+                                                                    <div className="relative w-full h-1.5 sm:h-2 bg-slate-950 rounded-full border border-white/10 overflow-hidden">
                                                                         <div className="absolute top-0 bottom-0 left-1/2 w-[1.5px] -translate-x-1/2 bg-white/40 z-10" />
                                                                         {!isFallback1Url && pnlVal > 0 ? (
                                                                             <div 
@@ -3840,7 +3815,7 @@ export default function FarmClient({
                                                                     </div>
                                                                 </div>
 
-                                                                <div className={`font-bold text-right shrink-0 min-w-[48px] ${pnlColor}`}>
+                                                                <div className={`font-bold text-right shrink-0 min-w-[42px] ${pnlColor}`}>
                                                                     {isFallback1Url ? '**.**' : (pnlVal > 0 ? `+${pnlVal.toFixed(2)}` : pnlVal.toFixed(2))}
                                                                 </div>
                                                             </div>
@@ -3857,11 +3832,11 @@ export default function FarmClient({
                                             })}
                                         </div>
 
-                                        {/* Cockpit Safety Guard Note */}
-                                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/30 text-[10px] sm:text-[11px] font-mono text-cyan-200/80 shrink-0">
-                                            <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
-                                            <span>
-                                                <strong className="text-cyan-300">ความปลอดภัยของระบบ:</strong> สั่งการได้เฉพาะเปิดรับออเดอร์ใหม่ (ACTIVE) หรือปิดรับออเดอร์ใหม่ให้เคลียร์ไม้เดิม (CLOSE-ONLY) เท่านั้น • ปิดการสั่งกักขังเพื่อไม่ให้กระทบกลไกคำนวณและเสถียรภาพพอร์ตของ EA
+                                        {/* Cockpit Real-time Telemetry Note */}
+                                        <div className="flex items-center gap-2 p-2 sm:p-2.5 rounded-xl bg-cyan-950/25 border border-cyan-500/30 text-[9px] sm:text-[10px] font-mono text-cyan-200/80 shrink-0">
+                                            <Shield className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                            <span className="leading-tight">
+                                                <strong className="text-cyan-300">20-Pair Telemetry:</strong> ตรวจจับและแสดงสถานะคู่เงินแบบ Real-time (ไม้สะสม, หลอด VU Meter, Drawdown, P/L) ซิงค์ตรงจาก EA EasyM Prime
                                             </span>
                                         </div>
                                     </div>
