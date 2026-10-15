@@ -139,7 +139,7 @@ export default function AdminOrdersPage() {
                         return new Date(lic.created_at).getTime() < orderCreatedAt - 10000;
                     });
 
-                const isRenewal = preExistingLicenses.length > 0;
+                const isRenewal = preExistingLicenses.length > 0 && o.plan_type !== 'upgrade';
                 const existingLicense = isRenewal ? preExistingLicenses[0] : null;
 
                 return {
@@ -601,16 +601,24 @@ export default function AdminOrdersPage() {
                                     key={order.id} 
                                     className={`transition-all duration-200 hover:bg-muted/5 ${
                                         order.status === 'pending' 
-                                            ? order.is_renewal
-                                                ? 'border-amber-500/70 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-card shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30'
-                                                : 'border-primary/50 bg-primary/5' 
+                                            ? order.plan_type === 'upgrade'
+                                                ? 'border-cyan-500/70 bg-gradient-to-r from-cyan-950/20 via-purple-950/10 to-card shadow-lg shadow-cyan-500/5 ring-1 ring-cyan-500/30'
+                                                : order.is_renewal
+                                                    ? 'border-amber-500/70 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-card shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30'
+                                                    : 'border-primary/50 bg-primary/5' 
                                             : 'opacity-90'
                                     }`}
                                 >
                                     <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
                                         {/* Slip Preview */}
                                         <div className="w-full md:w-32 h-48 md:h-32 bg-black/20 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border relative group cursor-pointer">
-                                            {order.is_ib_request ? (
+                                            {order.plan_type === 'upgrade' ? (
+                                                <div className="text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full bg-cyan-950/40 text-cyan-300">
+                                                    <Sparkles className="w-8 h-8 mb-1.5 text-cyan-400" />
+                                                    <span className="font-bold text-xs text-white">ขออัปเกรด</span>
+                                                    <span className="text-[10px] text-cyan-400">ฟรี 2 เดือน</span>
+                                                </div>
+                                            ) : order.is_ib_request ? (
                                                 <div className={`text-xs flex flex-col items-center justify-center p-2 text-center h-full w-full ${order.is_renewal ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>
                                                     {order.is_renewal ? (
                                                         <RotateCw className="w-8 h-8 mb-1.5 text-amber-400" />
@@ -645,8 +653,8 @@ export default function AdminOrdersPage() {
                                                             {order.products?.name || 'Unknown Product'}
                                                         </h3>
                                                         {order.plan_type === 'upgrade' ? (
-                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 text-cyan-300 border border-cyan-400/50 shadow-lg shadow-cyan-500/20 animate-pulse">
-                                                                <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> 🚀 ขออัปเกรด (UPGRADE TO PRIME)
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+                                                                <Sparkles className="w-3 h-3 text-yellow-300" /> ขออัปเกรด Prime
                                                             </span>
                                                         ) : order.is_renewal ? (
                                                             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm animate-pulse">
@@ -698,18 +706,38 @@ export default function AdminOrdersPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3.5 bg-muted/30 rounded-lg border border-border/50">
-                                                <div className="flex flex-col gap-1 overflow-hidden">
-                                                    <span className="text-muted-foreground text-xs">Account Port:</span>
-                                                    <span className="font-mono font-bold text-accent break-all">{order.account_number || '-'}</span>
+                                            {/* Order Details Sub-Box */}
+                                            {order.plan_type === 'upgrade' ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 p-3 bg-gradient-to-r from-cyan-950/30 via-slate-900/60 to-muted/20 rounded-lg border border-cyan-500/30 text-xs">
+                                                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                                                        <span className="text-muted-foreground text-[11px]">Account Port:</span>
+                                                        <span className="font-mono font-bold text-cyan-300 text-sm break-all">{order.account_number || '-'}</span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-muted-foreground text-[11px]">สิทธิ์ที่ได้รับ:</span>
+                                                        <span className="font-semibold text-emerald-400 text-xs flex items-center gap-1">
+                                                            <Sparkles className="w-3 h-3 text-yellow-300" /> Prime Pro (ฟรี 2 เดือน)
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5 sm:items-end">
+                                                        <span className="text-muted-foreground text-[11px]">สั่งซื้อเมื่อ:</span>
+                                                        <span className="font-medium text-slate-300 text-xs">{new Date(order.created_at).toLocaleString('th-TH')}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex flex-col gap-1 md:items-end">
-                                                    <span className="text-muted-foreground text-xs">สั่งซื้อเมื่อ:</span>
-                                                    <span className="font-medium text-[13px]">{new Date(order.created_at).toLocaleString('th-TH')}</span>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3.5 bg-muted/30 rounded-lg border border-border/50">
+                                                    <div className="flex flex-col gap-1 overflow-hidden">
+                                                        <span className="text-muted-foreground text-xs">Account Port:</span>
+                                                        <span className="font-mono font-bold text-accent break-all">{order.account_number || '-'}</span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1 md:items-end">
+                                                        <span className="text-muted-foreground text-xs">สั่งซื้อเมื่อ:</span>
+                                                        <span className="font-medium text-[13px]">{new Date(order.created_at).toLocaleString('th-TH')}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
 
-                                            {/* Dedicated Renewal Information Box */}
+                                            {/* Dedicated Renewal Information Box (Only for actual renewals) */}
                                             {order.is_renewal && order.existing_license && (
                                                 <div className="mt-2.5 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1.5">
                                                     <div className="flex items-center justify-between font-bold text-amber-300">
@@ -738,37 +766,6 @@ export default function AdminOrdersPage() {
                                                                 {order.existing_license.type === 'ib' ? 'IB (ฟรี)' : order.existing_license.type}
                                                             </span>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Dedicated Upgrade Information Box */}
-                                            {order.plan_type === 'upgrade' && (
-                                                <div className="mt-2.5 p-3.5 bg-gradient-to-r from-cyan-950/40 via-purple-950/40 to-slate-900/60 border border-cyan-500/40 rounded-lg text-xs space-y-2 shadow-inner">
-                                                    <div className="flex items-center justify-between font-bold text-cyan-300">
-                                                        <span className="flex items-center gap-1.5 text-sm">
-                                                            <Sparkles className="w-4 h-4 text-cyan-400 animate-spin" />
-                                                            คำขอสิทธิ์อัปเกรดสู่ EasyM Prime (ทดลองใช้งานฟรี 2 เดือน)
-                                                        </span>
-                                                        <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono text-[11px]">
-                                                            60 Days Free Trial
-                                                        </span>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-stone-300 pt-1 border-t border-cyan-500/20">
-                                                        <div>
-                                                            <span className="text-muted-foreground">พอร์ตที่ขออัปเกรด:</span>{" "}
-                                                            <span className="font-bold text-cyan-200 font-mono text-sm">{order.account_number}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-muted-foreground">เมื่ออนุมัติ:</span>{" "}
-                                                            <span className="font-semibold text-emerald-300">อัปเกรดเป็น Prime Pro + ปลดล็อกดาวน์โหลด EA ทันที</span>
-                                                        </div>
-                                                        {(order.notes || order.ib_broker_name) && (
-                                                            <div className="sm:col-span-2 bg-black/30 p-2 rounded border border-white/5 mt-1">
-                                                                <span className="text-muted-foreground">บันทึกเพิ่มเติมจากลูกค้า:</span>{" "}
-                                                                <span className="text-stone-200 italic">{order.notes || order.ib_broker_name}</span>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
                                             )}
