@@ -607,6 +607,10 @@ export default function DemoChallengeAdminPage() {
                                             const isOnlineOk = hoursSincePing <= 48;
                                             const isHealthy = isBalOk && isOnlineOk;
 
+                                            const rawCode = s?.system_code || 'EasyM Max';
+                                            const botName = rawCode.split(':::')[0].trim() || 'EasyM Max';
+                                            const isPrime = botName.toLowerCase().includes('prime');
+
                                             return (
                                                 <TableRow key={portNum} className="hover:bg-muted/40 font-mono text-xs">
                                                     <TableCell className="text-center font-bold text-muted-foreground">{idx + 1}</TableCell>
@@ -620,7 +624,11 @@ export default function DemoChallengeAdminPage() {
                                                             #{portNum}
                                                         </a>
                                                     </TableCell>
-                                                    <TableCell className="text-blue-400 font-sans">{s?.system_code || 'EasyM Max'}</TableCell>
+                                                    <TableCell className="font-sans whitespace-nowrap">
+                                                        <span className={isPrime ? "text-amber-300 font-medium" : "text-blue-400 font-medium"}>
+                                                            {botName}
+                                                        </span>
+                                                    </TableCell>
                                                     <TableCell className="text-right font-bold">
                                                         {balUSC.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {s?.account_type || 'USC'}
                                                     </TableCell>
@@ -743,6 +751,9 @@ export default function DemoChallengeAdminPage() {
                                             const pingTime = s?.last_ping ? new Date(s.last_ping).getTime() : 0;
                                             const hoursSincePing = (Date.now() - pingTime) / (1000 * 60 * 60);
                                             const isReady = balUSC >= 100000 && hoursSincePing <= 48;
+                                            const rawCode = s?.system_code || 'EasyM Max';
+                                            const botName = rawCode.split(':::')[0].trim() || 'EasyM Max';
+                                            const isPrime = botName.toLowerCase().includes('prime');
 
                                             return (
                                                 <TableRow key={portNum} className="hover:bg-muted/40 font-mono text-xs">
@@ -752,7 +763,11 @@ export default function DemoChallengeAdminPage() {
                                                             #{portNum}
                                                         </a>
                                                     </TableCell>
-                                                    <TableCell className="text-blue-400 font-sans">{s?.system_code || 'EasyM Max'}</TableCell>
+                                                    <TableCell className="font-sans whitespace-nowrap">
+                                                        <span className={isPrime ? "text-amber-300 font-medium" : "text-blue-400 font-medium"}>
+                                                            {botName}
+                                                        </span>
+                                                    </TableCell>
                                                     <TableCell className="text-right font-bold">
                                                         {balUSC.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC
                                                     </TableCell>
