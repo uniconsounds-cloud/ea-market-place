@@ -247,11 +247,13 @@ export async function getSyntheticLiveTrackerData(
         });
     });
 
-    const totalActiveModelPorts = Math.max(1, activePorts.length);
     Array.from(dateMap.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([date, profits]) => {
-            const avgProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / totalActiveModelPorts : 0;
+            const nonZeroProfits = profits.filter(p => p !== 0);
+            const avgProfit = nonZeroProfits.length > 0
+                ? nonZeroProfits.reduce((a, b) => a + b, 0) / nonZeroProfits.length
+                : (profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / Math.max(1, activePorts.length) : 0);
             combinedDailyHistory.push({
                 id: `synth-${date}`,
                 date,
@@ -262,11 +264,21 @@ export async function getSyntheticLiveTrackerData(
     // Compute live status
     const statuses = statusesRes.data || [];
     const validCount = Math.max(1, statuses.length);
-    const avgTodayProfit = statuses.reduce((sum, s) => sum + (Number(s.today_pnl) || 0), 0) / validCount;
+
+    // คำนวณกำไรเฉลี่ยวันนี้เฉพาะพอร์ตที่ไม่เป็น 0 (มีกำไร/การปิดรอบ)
+    const nonZeroStatuses = statuses.filter(s => (Number(s.today_pnl) || 0) !== 0);
+    const avgTodayProfit = nonZeroStatuses.length > 0
+        ? nonZeroStatuses.reduce((sum, s) => sum + (Number(s.today_pnl) || 0), 0) / nonZeroStatuses.length
+        : 0;
+
+    const nonZeroClosedLots = statuses.filter(s => (Number(s.today_closed_lots) || 0) > 0);
+    const avgTodayClosedLots = nonZeroClosedLots.length > 0
+        ? nonZeroClosedLots.reduce((sum, s) => sum + (Number(s.today_closed_lots) || 0), 0) / nonZeroClosedLots.length
+        : 0;
+
     const avgFloatingPnl = statuses.reduce((sum, s) => sum + (Number(s.floating_pnl) || 0), 0) / validCount;
     const avgDD = statuses.reduce((sum, s) => sum + (Number(s.daily_max_drawdown) || 0), 0) / validCount;
     const avgTotalLots = statuses.reduce((sum, s) => sum + (Number(s.total_lots) || 0), 0) / validCount;
-    const avgTodayClosedLots = statuses.reduce((sum, s) => sum + (Number(s.today_closed_lots) || 0), 0) / validCount;
     const avgBuyPnl = statuses.reduce((sum, s) => sum + (Number(s.buy_pnl) || 0), 0) / validCount;
     const avgSellPnl = statuses.reduce((sum, s) => sum + (Number(s.sell_pnl) || 0), 0) / validCount;
     const avgBuyCount = Math.round(statuses.reduce((sum, s) => sum + (Number(s.buy_count) || 0), 0) / validCount);
