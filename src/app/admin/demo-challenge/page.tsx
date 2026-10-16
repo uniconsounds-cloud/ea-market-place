@@ -323,14 +323,23 @@ export default function DemoChallengeAdminPage() {
         let totalTodayProfit = 0;
         let totalFloating = 0;
         let healthyCount = 0;
+        let nonZeroProfitCount = 0;
+        let totalNonZeroProfit = 0;
 
         ports.forEach(p => {
             const s = poolStatuses[p];
             if (s) {
                 const bal = Number(s.balance) || 0;
                 totalBal += s.account_type === 'USD' ? bal * 100 : bal;
-                totalTodayProfit += Number(s.today_pnl) || 0;
+                const tp = Number(s.today_pnl) || 0;
+                totalTodayProfit += tp;
                 totalFloating += Number(s.floating_pnl) || 0;
+
+                // ตรวจสอบเฉพาะพอร์ตที่มีกำไร/ผลงานในวันนี้ (ไม่เป็น 0)
+                if (tp !== 0) {
+                    nonZeroProfitCount++;
+                    totalNonZeroProfit += tp;
+                }
 
                 const pingTime = s.last_ping ? new Date(s.last_ping).getTime() : 0;
                 const hoursSincePing = (Date.now() - pingTime) / (1000 * 60 * 60);
@@ -341,9 +350,15 @@ export default function DemoChallengeAdminPage() {
         });
 
         const count = Math.max(1, ports.length);
+        const avgTodayProfit = nonZeroProfitCount > 0 ? (totalNonZeroProfit / nonZeroProfitCount) : 0;
+        const rawAvgTodayProfit = totalTodayProfit / count;
+
         return {
             avgBalance: totalBal / count,
-            avgTodayProfit: totalTodayProfit / count,
+            avgTodayProfit,
+            rawAvgTodayProfit,
+            nonZeroProfitCount,
+            totalTodayProfit,
             avgFloating: totalFloating / count,
             healthyCount,
             totalPorts: ports.length
@@ -536,11 +551,22 @@ export default function DemoChallengeAdminPage() {
                                     <span className="text-[10px] text-muted-foreground block">(${(activeStats.avgBalance / 100).toFixed(0)})</span>
                                 </div>
                                 <div className="p-3 rounded-xl bg-black/40 border border-emerald-500/20">
-                                    <span className="text-[11px] font-mono text-muted-foreground block">กำไรเฉลี่ยวันนี้</span>
-                                    <span className={`text-xl font-bold font-mono ${activeStats.avgTodayProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-mono text-muted-foreground block">กำไรเฉลี่ยวันนี้</span>
+                                        {activeStats.nonZeroProfitCount > 0 && activeStats.nonZeroProfitCount < activeStats.totalPorts && (
+                                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                                                {activeStats.nonZeroProfitCount}/{activeStats.totalPorts} พอร์ต
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className={`text-xl font-bold font-mono block mt-0.5 ${activeStats.avgTodayProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                         {activeStats.avgTodayProfit >= 0 ? '+' : ''}{activeStats.avgTodayProfit.toFixed(2)} USC
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground block">เฉลี่ยต่อพอร์ต</span>
+                                    <span className="text-[10px] text-muted-foreground block truncate" title={`เฉลี่ยเฉพาะ ${activeStats.nonZeroProfitCount} พอร์ตที่มีผลงานวันนี้ (หากหารเฉลี่ยรวม 10 พอร์ต: ${activeStats.rawAvgTodayProfit >= 0 ? '+' : ''}${activeStats.rawAvgTodayProfit.toFixed(2)} USC)`}>
+                                        {activeStats.nonZeroProfitCount > 0 && activeStats.nonZeroProfitCount < activeStats.totalPorts
+                                            ? `เฉลี่ยจาก ${activeStats.nonZeroProfitCount} พอร์ตที่ทำกำไร`
+                                            : 'เฉลี่ยต่อพอร์ต'}
+                                    </span>
                                 </div>
                                 <div className="p-3 rounded-xl bg-black/40 border border-emerald-500/20">
                                     <span className="text-[11px] font-mono text-muted-foreground block">สุขภาพพอร์ตหลัก</span>
