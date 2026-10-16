@@ -429,6 +429,8 @@ export default function FarmClient({
     });
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
     const isOwnerDevUser = (isOwnerTestPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
+    // 🧪 Simulated Buffer for testing dome buffer aura (Dev testing)
+    const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchReleaseState = async () => {
@@ -1861,14 +1863,15 @@ export default function FarmClient({
         return Math.max(20, Math.ceil(totalQuarantineDD / 10) * 10);
     }, [totalQuarantineDD]);
 
+    const actualBufferPct = Math.max(0, primeTelemetry?.bufPct ?? 0);
+    const capitalBufferPct = simulatedBuffer !== null ? simulatedBuffer : actualBufferPct;
+
     const isBufferSafe = useMemo(() => {
-        const currentBuf = primeTelemetry?.bufPct ?? 0;
-        return currentBuf >= recommendedBuffer;
-    }, [primeTelemetry?.bufPct, recommendedBuffer]);
+        return capitalBufferPct >= recommendedBuffer;
+    }, [capitalBufferPct, recommendedBuffer]);
 
     // 🍩 Dynamic Buffer Aura Thickness:
     // Donut thickness over dome: min 4px, max 26px based on capital buffer %
-    const capitalBufferPct = Math.max(0, primeTelemetry?.bufPct ?? 0);
     const donutThickness = Math.min(26, Math.max(4, Math.round(4 + (capitalBufferPct / 100) * 18)));
     // Rectangular halo thickness around DD box: min 4px, max 20px based on capital buffer %
     const boxAuraThickness = Math.min(20, Math.max(4, Math.round(4 + (capitalBufferPct / 100) * 14)));
@@ -3057,6 +3060,11 @@ export default function FarmClient({
                                                         <span className="font-mono font-black text-[11px] sm:text-xs">
                                                             {isFallback1Url ? '**.**' : `${capitalBufferPct >= 0 ? '+' : ''}${capitalBufferPct.toFixed(1)}%`}
                                                         </span>
+                                                        {simulatedBuffer !== null && (
+                                                            <span className="px-1 py-0.2 rounded bg-amber-500/30 border border-amber-400/50 text-[7px] font-mono font-bold text-amber-300">
+                                                                SIM
+                                                            </span>
+                                                        )}
                                                         {primeTelemetry?.resMult != null && (
                                                             <span className="text-[9px] font-mono opacity-80">
                                                                 ({primeTelemetry.resMult.toFixed(1)}x)
@@ -4650,6 +4658,10 @@ export default function FarmClient({
                     onUpdateGlobalRelease={handleUpdateGlobalRelease}
                     isPhase2Released={isPhase2Released}
                     onUpdatePhase2Release={handleUpdatePhase2Release}
+                    simulatedBuffer={simulatedBuffer}
+                    onSetSimulatedBuffer={setSimulatedBuffer}
+                    actualBufferPct={actualBufferPct}
+                    recommendedBuffer={recommendedBuffer}
                 />
             )}
         </div>

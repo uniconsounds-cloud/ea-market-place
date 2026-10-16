@@ -9,7 +9,10 @@ import {
     X, 
     Send,
     RotateCcw,
-    Zap
+    Zap,
+    Sliders,
+    ShieldAlert,
+    ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,6 +26,10 @@ export interface OwnerDevFarmControllerProps {
     onUpdateGlobalRelease: (released: boolean) => Promise<void>;
     isPhase2Released: boolean;
     onUpdatePhase2Release: (released: boolean) => Promise<void>;
+    simulatedBuffer: number | null;
+    onSetSimulatedBuffer: (val: number | null) => void;
+    actualBufferPct: number;
+    recommendedBuffer: number;
 }
 
 export default function OwnerDevFarmController({
@@ -34,7 +41,11 @@ export default function OwnerDevFarmController({
     isGlobalPrimeReleased,
     onUpdateGlobalRelease,
     isPhase2Released,
-    onUpdatePhase2Release
+    onUpdatePhase2Release,
+    simulatedBuffer,
+    onSetSimulatedBuffer,
+    actualBufferPct,
+    recommendedBuffer
 }: OwnerDevFarmControllerProps) {
     // 🛡️ STRICT SAFETY GUARD: Never render anything for customers
     if (!isOwnerTestPort) return null;
@@ -180,13 +191,16 @@ export default function OwnerDevFarmController({
         }
     };
 
+    const currentBufferVal = simulatedBuffer !== null ? simulatedBuffer : actualBufferPct;
+    const isCurrentBufferSafe = currentBufferVal >= recommendedBuffer;
+
     // Calculate clamped position for expanded modal to prevent overflowing viewport on mobile
-    const panelWidth = typeof window !== 'undefined' ? Math.min(295, window.innerWidth - 20) : 295;
+    const panelWidth = typeof window !== 'undefined' ? Math.min(310, window.innerWidth - 20) : 310;
     const clampedX = typeof window !== 'undefined' 
         ? Math.max(10, Math.min(window.innerWidth - panelWidth - 10, position.x)) 
         : position.x;
     const clampedY = typeof window !== 'undefined' 
-        ? Math.max(60, Math.min(window.innerHeight - 380, position.y)) 
+        ? Math.max(50, Math.min(window.innerHeight - 450, position.y)) 
         : position.y;
 
     return (
@@ -214,7 +228,12 @@ export default function OwnerDevFarmController({
 
                         {/* Status Pulse Dot */}
                         <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                            {isPhase2Released ? (
+                            {simulatedBuffer !== null ? (
+                                <>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-90" />
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400 border border-black/80" />
+                                </>
+                            ) : isPhase2Released ? (
                                 <>
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-black/80" />
@@ -238,13 +257,13 @@ export default function OwnerDevFarmController({
                     style={{ left: `${clampedX}px`, top: `${clampedY}px` }}
                     className="fixed z-[999999] select-none transition-shadow animate-fade-in"
                 >
-                    <div className="relative w-[285px] sm:w-[305px] max-w-[calc(100vw-20px)] rounded-2xl bg-gradient-to-b from-[#14120e]/98 via-[#0d0c0a]/98 to-[#080705]/98 border-2 border-amber-500/80 shadow-[0_15px_40px_rgba(0,0,0,0.9),0_0_30px_rgba(245,158,11,0.35)] backdrop-blur-2xl text-amber-100 overflow-hidden font-sans">
+                    <div className="relative w-[290px] sm:w-[315px] max-w-[calc(100vw-20px)] max-h-[85vh] flex flex-col rounded-2xl bg-gradient-to-b from-[#14120e]/98 via-[#0d0c0a]/98 to-[#080705]/98 border-2 border-amber-500/80 shadow-[0_15px_40px_rgba(0,0,0,0.9),0_0_30px_rgba(245,158,11,0.35)] backdrop-blur-2xl text-amber-100 overflow-hidden font-sans">
                         
                         {/* Draggable Header */}
                         <div 
                             onMouseDown={handleMouseDown}
                             onTouchStart={handleTouchStart}
-                            className="px-3 py-2 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 border-b border-amber-500/40 flex items-center justify-between cursor-grab active:cursor-grabbing hover:bg-amber-500/30 transition-colors"
+                            className="px-3 py-2 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 border-b border-amber-500/40 flex items-center justify-between cursor-grab active:cursor-grabbing hover:bg-amber-500/30 transition-colors shrink-0"
                             title="คลิกค้างเพื่อลากย้ายตำแหน่ง"
                         >
                             <div className="flex items-center gap-2">
@@ -274,7 +293,7 @@ export default function OwnerDevFarmController({
                         </div>
 
                         {/* Controller Content */}
-                        <div className="p-3 space-y-3 text-xs">
+                        <div className="p-3 space-y-3 text-xs overflow-y-auto max-h-[calc(85vh-50px)] scrollbar-thin">
                             
                             {/* Section 1: Real-time View Switcher */}
                             <div className="space-y-1.5">
@@ -318,7 +337,144 @@ export default function OwnerDevFarmController({
                                 </p>
                             </div>
 
-                            {/* Section 2: Phase 2 Release (ไซโลเสบียงแก้ว & เขื่อนพลังงาน) */}
+                            {/* 🧪 Section 2: Buffer Aura Testing Slider (บาร์เลื่อนจำลองค่าบัฟเฟอร์ & ปุ่มยกเลิก) */}
+                            <div className="pt-2 border-t border-amber-500/20 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                                        <span className="text-[10px] font-bold text-amber-300/80 uppercase">
+                                            ทดสอบรัศมีบัฟเฟอร์ (Buffer Aura)
+                                        </span>
+                                    </div>
+                                    {simulatedBuffer !== null ? (
+                                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-[9px] font-mono font-black text-amber-300 animate-pulse flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                            SIMULATED
+                                        </span>
+                                    ) : (
+                                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-[9px] font-mono font-bold text-emerald-300 flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                            LIVE
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Slider & Control Box */}
+                                <div className="p-2.5 rounded-xl bg-black/60 border border-amber-500/30 space-y-2">
+                                    {/* Value & Status row */}
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="text-[9px] text-white/50 font-mono uppercase">
+                                                {simulatedBuffer !== null ? 'ค่าบัฟเฟอร์จำลอง' : 'ค่าบัฟเฟอร์จริง'}
+                                            </div>
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className={`text-base font-black font-mono ${
+                                                    isCurrentBufferSafe ? 'text-emerald-400' : 'text-amber-400'
+                                                }`}>
+                                                    {currentBufferVal >= 0 ? '+' : ''}{currentBufferVal.toFixed(1)}%
+                                                </span>
+                                                <span className="text-[10px] text-white/40 font-mono">
+                                                    (เกณฑ์ ≥ {recommendedBuffer}%)
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Aura Shield Status Pill */}
+                                        <div className={`px-2 py-1 rounded-lg border text-[9px] font-bold flex items-center gap-1 ${
+                                            isCurrentBufferSafe 
+                                                ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' 
+                                                : 'bg-amber-950/60 border-amber-500/50 text-amber-300'
+                                        }`}>
+                                            {isCurrentBufferSafe ? (
+                                                <>
+                                                    <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                    <span>หนาฟู ปลอดภัย</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ShieldAlert className="w-3 h-3 text-amber-400 shrink-0 animate-pulse" />
+                                                    <span>บางเฉียบ เตือนภัย</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Range Slider */}
+                                    <div className="space-y-1">
+                                        <input 
+                                            type="range"
+                                            min="0"
+                                            max="120"
+                                            step="1"
+                                            value={Math.round(currentBufferVal)}
+                                            onChange={(e) => onSetSimulatedBuffer(Number(e.target.value))}
+                                            className="w-full h-2 bg-gradient-to-r from-amber-600 via-amber-400 to-emerald-400 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300"
+                                        />
+                                        <div className="flex justify-between text-[8px] font-mono text-white/40 px-0.5">
+                                            <span>0% (บางสุด)</span>
+                                            <span className="text-amber-300/80 font-bold">เกณฑ์ {recommendedBuffer}%</span>
+                                            <span>120% (หนาสุด)</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Quick Presets */}
+                                    <div className="grid grid-cols-4 gap-1 pt-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => onSetSimulatedBuffer(0)}
+                                            className="py-1 px-1 rounded bg-white/5 hover:bg-white/10 text-[9px] font-mono font-bold text-amber-200/80 hover:text-white border border-white/10 text-center transition-colors cursor-pointer"
+                                            title="ทดสอบ 0% (บางสุด)"
+                                        >
+                                            0%
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onSetSimulatedBuffer(Math.max(5, recommendedBuffer - 10))}
+                                            className="py-1 px-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-[9px] font-mono font-bold text-amber-400 border border-amber-500/30 text-center transition-colors cursor-pointer"
+                                            title={`ทดสอบ ${Math.max(5, recommendedBuffer - 10)}% (ต่ำกว่าเกณฑ์)`}
+                                        >
+                                            {Math.max(5, recommendedBuffer - 10)}% (เตือน)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onSetSimulatedBuffer(recommendedBuffer)}
+                                            className="py-1 px-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-[9px] font-mono font-bold text-emerald-400 border border-emerald-500/30 text-center transition-colors cursor-pointer"
+                                            title={`ทดสอบ ${recommendedBuffer}% (พอดีเกณฑ์)`}
+                                        >
+                                            {recommendedBuffer}% (เกณฑ์)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onSetSimulatedBuffer(80)}
+                                            className="py-1 px-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-[9px] font-mono font-bold text-cyan-300 border border-cyan-500/30 text-center transition-colors cursor-pointer"
+                                            title="ทดสอบ 80% (หนาฟู ปลอดภัย)"
+                                        >
+                                            80% (หนาฟู)
+                                        </button>
+                                    </div>
+
+                                    {/* Cancel Simulation Button (ปุ่มยกเลิกค่าจำลองเพื่อแสดงค่าจริงจากพอร์ต) */}
+                                    {simulatedBuffer !== null ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                onSetSimulatedBuffer(null);
+                                                toast.info(`ยกเลิกค่าจำลองแล้ว แสดงค่าจริงจากพอร์ต (${actualBufferPct.toFixed(1)}%)`);
+                                            }}
+                                            className="w-full py-1.5 px-2 rounded-lg bg-gradient-to-r from-stone-800 to-stone-900 hover:from-amber-950 hover:to-stone-900 border border-amber-400/60 text-amber-300 hover:text-amber-100 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-98 cursor-pointer"
+                                        >
+                                            <RotateCcw className="w-3 h-3 text-amber-400" />
+                                            <span>ยกเลิกค่าจำลอง (ใช้ค่าจริง: {actualBufferPct.toFixed(1)}%)</span>
+                                        </button>
+                                    ) : (
+                                        <div className="text-[9px] text-center text-emerald-400/80 font-mono py-0.5">
+                                            ✓ กำลังแสดงค่าจริงจากพอร์ต ({actualBufferPct.toFixed(1)}%)
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Section 3: Phase 2 Release (ไซโลเสบียงแก้ว & เขื่อนพลังงาน) */}
                             <div className="pt-2 border-t border-amber-500/20 space-y-2">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-bold text-amber-300/80 uppercase">
