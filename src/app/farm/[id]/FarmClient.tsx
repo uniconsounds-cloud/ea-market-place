@@ -336,6 +336,7 @@ export default function FarmClient({
     initialOrders, 
     initialPortStatus,
     initialIsGlobalPrimeReleased = false,
+    initialIsPhase2Released = false,
     licenseCreatedAt,
     customName,
     licenseTier = 'free',
@@ -348,6 +349,7 @@ export default function FarmClient({
     initialOrders: any[];
     initialPortStatus?: any;
     initialIsGlobalPrimeReleased?: boolean;
+    initialIsPhase2Released?: boolean;
     licenseCreatedAt: string | null;
     customName?: string | null;
     licenseTier?: string;
@@ -418,6 +420,13 @@ export default function FarmClient({
         }
         return initialIsGlobalPrimeReleased;
     });
+    const [isPhase2Released, setIsPhase2Released] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem('owner_prime_phase2_gate');
+            if (cached !== null) return cached === 'true';
+        }
+        return initialIsPhase2Released || false;
+    });
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
     const isOwnerDevUser = (isOwnerTestPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
 
@@ -433,8 +442,14 @@ export default function FarmClient({
                         if (typeof window !== 'undefined') {
                             localStorage.setItem('owner_prime_release_gate', String(json.released));
                         }
-                        return;
                     }
+                    if (json && typeof json.phase2_released === 'boolean') {
+                        setIsPhase2Released(json.phase2_released);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem('owner_prime_phase2_gate', String(json.phase2_released));
+                        }
+                    }
+                    return;
                 }
             } catch (e) {
                 // Network fallback
@@ -453,6 +468,12 @@ export default function FarmClient({
                         setIsGlobalPrimeReleased(parsed.released);
                         if (typeof window !== 'undefined') {
                             localStorage.setItem('owner_prime_release_gate', String(parsed.released));
+                        }
+                    }
+                    if (typeof parsed.phase2_released === 'boolean') {
+                        setIsPhase2Released(parsed.phase2_released);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem('owner_prime_phase2_gate', String(parsed.phase2_released));
                         }
                     }
                 }
@@ -477,6 +498,12 @@ export default function FarmClient({
                                 setIsGlobalPrimeReleased(parsed.released);
                                 if (typeof window !== 'undefined') {
                                     localStorage.setItem('owner_prime_release_gate', String(parsed.released));
+                                }
+                            }
+                            if (typeof parsed.phase2_released === 'boolean') {
+                                setIsPhase2Released(parsed.phase2_released);
+                                if (typeof window !== 'undefined') {
+                                    localStorage.setItem('owner_prime_phase2_gate', String(parsed.phase2_released));
                                 }
                             }
                         } catch (e) {}
@@ -504,7 +531,11 @@ export default function FarmClient({
                 .from('farm_port_status')
                 .upsert({
                     port_number: 'prime_release_gate_config',
-                    system_code: `RELEASE_GATE:::${JSON.stringify({ released, updated_at: nowIso })}`,
+                    system_code: `RELEASE_GATE:::${JSON.stringify({ 
+                        released, 
+                        phase2_released: isPhase2Released, 
+                        updated_at: nowIso 
+                    })}`,
                     updated_at: nowIso,
                     is_online: true,
                     last_ping: nowIso
@@ -518,12 +549,54 @@ export default function FarmClient({
             await fetch('/api/farm/release-gate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ released, port_number: portNumber })
+                body: JSON.stringify({ released, phase2_released: isPhase2Released, port_number: portNumber })
             });
         } catch (e) {
             console.warn('Sync release gate via API error:', e);
         }
     };
+
+    const handleUpdatePhase2Release = async (released: boolean) => {
+        setIsPhase2Released(released);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('owner_prime_phase2_gate', String(released));
+        }
+
+        const nowIso = new Date().toISOString();
+
+        try {
+            await supabase
+                .from('farm_port_status')
+                .upsert({
+                    port_number: 'prime_release_gate_config',
+                    system_code: `RELEASE_GATE:::${JSON.stringify({ 
+                        released: isGlobalPrimeReleased, 
+                        phase2_released: released, 
+                        updated_at: nowIso 
+                    })}`,
+                    updated_at: nowIso,
+                    is_online: true,
+                    last_ping: nowIso
+                }, { onConflict: 'port_number' });
+        } catch (e) {
+            console.warn('Sync phase2 gate to farm_port_status:', e);
+        }
+
+        try {
+            await fetch('/api/farm/release-gate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ released: isGlobalPrimeReleased, phase2_released: released, port_number: portNumber })
+            });
+        } catch (e) {
+            console.warn('Sync phase2 gate via API error:', e);
+        }
+    };
+
+    // Phase 2 (Silo & Bio-Shield) Active flag:
+    // - On owner test port in dev mode: ALWAYS active so owner can tune layout
+    // - On customer ports (or owner simulating customer view): ONLY active if isPhase2Released is true!
+    const isPhase2Active = isOwnerDevUser ? true : isPhase2Released;
 
     const isExplicitClassicEA =
         sysCode.includes('max') ||
@@ -1772,7 +1845,7 @@ export default function FarmClient({
 
             return {
                 id: `q_preview_${idx + 1}`,
-                c: 1.5 + idx * 0.8,
+                c: isPhase2Active ? (1.5 + idx * 0.8) : (1.0 + idx * 0.8),
                 r: 5,
                 sym: sym,
                 ddPct: ddPct,
@@ -1784,7 +1857,7 @@ export default function FarmClient({
                 delayMs: idx * 150
             };
         });
-    }, [primeTelemetry, isPrime, isFallback1Url]);
+    }, [primeTelemetry, isPrime, isFallback1Url, isPhase2Active]);
 
     const totalQuarantineDD = useMemo(() => {
         return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
@@ -2703,8 +2776,8 @@ export default function FarmClient({
                         })()}
                         </div> {/* 🌾 End of animate-float-farm */}
 
-                        {/* ⚡ BIO-SHIELD AURA & FLOATING CENTRAL FORCEFIELD (เขื่อนพลังงานกั้นพายุ - ลอยตรงกลางฟาร์มพร้อมรัศมีเรืองแสง) */}
-                        {isClient && isPrime && (
+                        {/* ⚡ BIO-SHIELD AURA & FLOATING CENTRAL FORCEFIELD (เขื่อนพลังงานกั้นพายุ - แสดงเฉพาะโหมดพัฒนาหรือเมื่อปล่อยให้ลูกค้าแล้ว) */}
+                        {isClient && isPrime && isPhase2Active && (
                             <div
                                 key="prime_bio_shield_center_complex"
                                 className="absolute pointer-events-none select-none"
@@ -2905,8 +2978,8 @@ export default function FarmClient({
                             </div>
                         )}
 
-                        {/* ⚗️ GOLDEN SILO (ไซโลเสบียงแก้วทองคำ - แสดงคู่กับโดมตรงกลางแถบแปลงฝั่งนี้) */}
-                        {isClient && isPrime && (
+                        {/* ⚗️ GOLDEN SILO (ไซโลเสบียงแก้วทองคำ - แสดงเฉพาะโหมดพัฒนาหรือเมื่อปล่อยให้ลูกค้าแล้ว) */}
+                        {isClient && isPrime && isPhase2Active && (
                             <div
                                 key="prime_golden_silo_complex"
                                 className="absolute pointer-events-auto select-none"
@@ -3092,9 +3165,9 @@ export default function FarmClient({
                                 onClick={handleGreenhouseDomeClick}
                                 className="absolute cursor-pointer transition-all duration-300 group select-none"
                                 style={{
-                                    left: `${(2.3 - 5) * TILE_W}px`,
-                                    top: `${(2.3 + 5) * TILE_H_OFFSET}px`,
-                                    zIndex: Math.round(2.3 + 5) + 20,
+                                    left: `${((isPhase2Active ? 2.3 : 1.0) - 5) * TILE_W}px`,
+                                    top: `${((isPhase2Active ? 2.3 : 1.0) + 5) * TILE_H_OFFSET}px`,
+                                    zIndex: Math.round((isPhase2Active ? 2.3 : 1.0) + 5) + 20,
                                     width: '280px',
                                     height: '280px'
                                 }}
@@ -3196,8 +3269,8 @@ export default function FarmClient({
                                         key="quarantine_combined_badge"
                                         className="absolute pointer-events-none"
                                         style={{
-                                            left: `${(2.3 - 5) * TILE_W}px`,
-                                            top: `${(2.3 + 5) * TILE_H_OFFSET}px`,
+                                            left: `${((isPhase2Active ? 2.3 : 1.0) - 5) * TILE_W}px`,
+                                            top: `${((isPhase2Active ? 2.3 : 1.0) + 5) * TILE_H_OFFSET}px`,
                                             zIndex: 90,
                                             width: '280px',
                                             height: '280px'
@@ -3277,8 +3350,8 @@ export default function FarmClient({
                                     <div
                                         className="absolute pointer-events-none"
                                         style={{
-                                            left: `${(2.3 - 5) * TILE_W}px`,
-                                            top: `${(2.3 + 5) * TILE_H_OFFSET}px`,
+                                            left: `${((isPhase2Active ? 2.3 : 1.8) - 5) * TILE_W}px`,
+                                            top: `${((isPhase2Active ? 2.3 : 1.8) + 5) * TILE_H_OFFSET}px`,
                                             zIndex: 99998,
                                             width: '280px',
                                             height: '280px'
@@ -4810,6 +4883,8 @@ export default function FarmClient({
                     onTogglePreviewMode={setDevPreviewMode}
                     isGlobalPrimeReleased={isGlobalPrimeReleased}
                     onUpdateGlobalRelease={handleUpdateGlobalRelease}
+                    isPhase2Released={isPhase2Released}
+                    onUpdatePhase2Release={handleUpdatePhase2Release}
                 />
             )}
         </div>

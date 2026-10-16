@@ -21,6 +21,8 @@ export interface OwnerDevFarmControllerProps {
     onTogglePreviewMode: (mode: 'dev' | 'customer') => void;
     isGlobalPrimeReleased: boolean;
     onUpdateGlobalRelease: (released: boolean) => Promise<void>;
+    isPhase2Released: boolean;
+    onUpdatePhase2Release: (released: boolean) => Promise<void>;
 }
 
 export default function OwnerDevFarmController({
@@ -30,7 +32,9 @@ export default function OwnerDevFarmController({
     previewMode,
     onTogglePreviewMode,
     isGlobalPrimeReleased,
-    onUpdateGlobalRelease
+    onUpdateGlobalRelease,
+    isPhase2Released,
+    onUpdatePhase2Release
 }: OwnerDevFarmControllerProps) {
     // 🛡️ STRICT SAFETY GUARD: Never render anything for customers
     if (!isOwnerTestPort) return null;
@@ -38,7 +42,7 @@ export default function OwnerDevFarmController({
     // Start collapsed as a small "Dev" circle by default to not obstruct mobile screen
     const [isOpen, setIsOpen] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<'phase2' | 'global' | null>(null);
 
     // Draggable position state
     const [position, setPosition] = useState<{ x: number; y: number }>(() => {
@@ -151,14 +155,24 @@ export default function OwnerDevFarmController({
     const handleConfirmToggleRelease = async () => {
         setIsPublishing(true);
         try {
-            const nextState = !isGlobalPrimeReleased;
-            await onUpdateGlobalRelease(nextState);
-            toast.success(
-                nextState 
-                    ? '🚀 ปล่อยหน้าฟาร์ม Prime ให้ลูกค้าจริงเห็นแล้วเรียบร้อย!' 
-                    : '🔒 ดึงกลับเข้าสู่โหมดส่วนตัวเรียบร้อยแล้ว (ลูกค้าเห็นหน้าคลาสสิกเดิม)'
-            );
-            setShowConfirmModal(false);
+            if (confirmAction === 'phase2') {
+                const nextState = !isPhase2Released;
+                await onUpdatePhase2Release(nextState);
+                toast.success(
+                    nextState 
+                        ? '🚀 ปล่อยไซโลเสบียงแก้วและเขื่อนพลังงานให้ลูกค้าจริงเห็นแล้วเรียบร้อย!' 
+                        : '🔒 ดึงไซโลและเขื่อนกลับเข้าสู่โหมดพัฒนาแล้ว (ลูกค้าเห็นเวอร์ชั่นก่อนหน้า)'
+                );
+            } else if (confirmAction === 'global') {
+                const nextState = !isGlobalPrimeReleased;
+                await onUpdateGlobalRelease(nextState);
+                toast.success(
+                    nextState 
+                        ? '🚀 ปล่อยหน้าฟาร์ม Prime ให้ลูกค้าจริงเห็นแล้วเรียบร้อย!' 
+                        : '🔒 ดึงกลับเข้าสู่โหมดส่วนตัวเรียบร้อยแล้ว (ลูกค้าเห็นหน้าคลาสสิกเดิม)'
+                );
+            }
+            setConfirmAction(null);
         } catch (err: any) {
             toast.error('เกิดข้อผิดพลาดในการบันทึก: ' + (err.message || 'Error'));
         } finally {
@@ -200,7 +214,7 @@ export default function OwnerDevFarmController({
 
                         {/* Status Pulse Dot */}
                         <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                            {isGlobalPrimeReleased ? (
+                            {isPhase2Released ? (
                                 <>
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-black/80" />
@@ -298,24 +312,24 @@ export default function OwnerDevFarmController({
 
                                 <p className="text-[10px] text-amber-200/70 leading-tight">
                                     {previewMode === 'dev' 
-                                        ? '🧪 กำลังแสดง Prime Farm รุ่นพัฒนา (ลูกแก้ว, โดมฟื้นฟู, DD Dial) เฉพาะคุณ'
-                                        : '👁️ กำลังจำลองหน้าฟาร์มแบบที่ลูกค้าทั่วไปกำลังมองเห็นอยู่ในขณะนี้'
+                                        ? '🧪 กำลังแสดงไซโล + เขื่อนพลังงาน + โดมตำแหน่งใหม่ เฉพาะคุณ'
+                                        : '👁️ กำลังจำลองหน้าฟาร์มแบบที่ลูกค้าทั่วไปมองเห็น (เวอร์ชั่นก่อนหน้า)'
                                     }
                                 </p>
                             </div>
 
-                            {/* Section 2: Release Status & Publish Action */}
+                            {/* Section 2: Phase 2 Release (ไซโลเสบียงแก้ว & เขื่อนพลังงาน) */}
                             <div className="pt-2 border-t border-amber-500/20 space-y-2">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-bold text-amber-300/80 uppercase">
-                                        สถานะการปล่อยให้ลูกค้า
+                                        ไซโล & เขื่อนพลังงาน (Phase 2)
                                     </span>
                                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
-                                        isGlobalPrimeReleased 
+                                        isPhase2Released 
                                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' 
-                                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/50'
+                                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
                                     }`}>
-                                        {isGlobalPrimeReleased ? (
+                                        {isPhase2Released ? (
                                             <>
                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                                                 PUBLIC LIVE
@@ -323,34 +337,51 @@ export default function OwnerDevFarmController({
                                         ) : (
                                             <>
                                                 <Lock className="w-2.5 h-2.5" />
-                                                PRIVATE (เห็นคนเดียว)
+                                                DEV ONLY (เห็นคนเดียว)
                                             </>
                                         )}
                                     </span>
                                 </div>
 
-                                {/* Publish / Revert Button */}
+                                {/* Publish / Revert Button for Phase 2 */}
                                 <button
                                     type="button"
-                                    onClick={() => setShowConfirmModal(true)}
+                                    onClick={() => setConfirmAction('phase2')}
                                     disabled={isPublishing}
                                     className={`w-full py-2 px-3 rounded-xl font-black text-xs tracking-wide flex items-center justify-center gap-1.5 transition-all shadow-lg cursor-pointer active:scale-98 ${
-                                        isGlobalPrimeReleased
-                                            ? 'bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 text-rose-300 border border-rose-500/40'
-                                            : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
+                                        isPhase2Released
+                                            ? 'bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 text-amber-300 border border-amber-500/40'
+                                            : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
                                     }`}
                                 >
-                                    {isGlobalPrimeReleased ? (
+                                    {isPhase2Released ? (
                                         <>
                                             <RotateCcw className="w-3.5 h-3.5" />
-                                            <span>ดึงกลับเป็นโหมดส่วนตัว (Revert)</span>
+                                            <span>ดึงไซโล & เขื่อนกลับเป็นโหมดพัฒนา</span>
                                         </>
                                     ) : (
                                         <>
                                             <Send className="w-3.5 h-3.5" />
-                                            <span>อัปเดตปล่อยหน้าฟาร์มนี้ให้ลูกค้า</span>
+                                            <span>อัปเดตปล่อยไซโล & เขื่อนให้ลูกค้า</span>
                                         </>
                                     )}
+                                </button>
+                            </div>
+
+                            {/* Section 3: Master Gate (EasyM Prime รวม) */}
+                            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-white/60">Prime Master Gate:</span>
+                                    <span className={`font-mono font-bold ${isGlobalPrimeReleased ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {isGlobalPrimeReleased ? 'PUBLIC' : 'PRIVATE'}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmAction('global')}
+                                    className="text-[9px] font-bold text-amber-400 hover:text-amber-200 underline cursor-pointer"
+                                >
+                                    {isGlobalPrimeReleased ? 'ดึงกลับเป็นคลาสสิก' : 'เปิด Prime ทั้งระบบ'}
                                 </button>
                             </div>
 
@@ -360,7 +391,7 @@ export default function OwnerDevFarmController({
             )}
 
             {/* Confirmation Modal */}
-            {showConfirmModal && (
+            {confirmAction && (
                 <div className="fixed inset-0 z-[1000000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-auto">
                     <div className="relative w-full max-w-sm bg-gradient-to-b from-[#1c1206]/98 to-[#0a0602]/98 border-2 border-amber-500/90 rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.95),0_0_40px_rgba(245,158,11,0.4)] text-amber-100">
                         <div className="flex items-center gap-3 mb-3">
@@ -369,25 +400,33 @@ export default function OwnerDevFarmController({
                             </div>
                             <div>
                                 <h4 className="text-sm font-black text-white">
-                                    {isGlobalPrimeReleased ? 'ยืนยันการดึงกลับสู่โหมดส่วนตัว' : 'ยืนยันการปล่อยหน้าฟาร์มให้ลูกค้า'}
+                                    {confirmAction === 'phase2'
+                                        ? (isPhase2Released ? 'ดึงไซโล & เขื่อนกลับเป็นโหมดพัฒนา' : 'ยืนยันปล่อยไซโล & เขื่อนให้ลูกค้า')
+                                        : (isGlobalPrimeReleased ? 'ดึง Prime ทั้งระบบกลับสู่โหมดส่วนตัว' : 'ยืนยันปล่อย Prime ให้ลูกค้า')
+                                    }
                                 </h4>
                                 <span className="text-[10px] text-amber-300/80 font-mono">
-                                    RELEASE GATE CONTROLLER
+                                    {confirmAction === 'phase2' ? 'PHASE 2 RELEASE GATE' : 'MASTER RELEASE GATE'}
                                 </span>
                             </div>
                         </div>
 
                         <p className="text-xs text-amber-100/80 leading-relaxed mb-4">
-                            {isGlobalPrimeReleased
-                                ? 'คุณต้องการดึงหน้าฟาร์ม Prime กลับเข้าสู่โหมดส่วนตัวหรือไม่? ลูกค้าจริงจะกลับไปเห็นหน้าฟาร์มแบบคลาสสิกเดิมทันที'
-                                : 'คุณตรวจสอบหน้าฟาร์ม Prime ในโหมดพัฒนาจนพอใจแล้ว และต้องการปล่อยให้ลูกค้าจริงเห็นหน้าฟาร์มใหม่นี้พร้อมกันเลยใช่หรือไม่?'
-                            }
+                            {confirmAction === 'phase2' ? (
+                                isPhase2Released
+                                    ? 'คุณต้องการดึงไซโลและเขื่อนพลังงานกลับเข้าสู่โหมดพัฒนาหรือไม่? ลูกค้าจะกลับไปเห็นหน้าฟาร์มเวอร์ชั่นก่อนหน้า (ที่ไม่มีไซโล) ทันที'
+                                    : 'คุณตรวจสอบการจัดวางไซโลและเขื่อนพลังงานบนมือถือและจอคอมพิวเตอร์จนพอใจแล้ว และต้องการปล่อยให้ลูกค้าจริงเห็นหน้าฟาร์มนี้พร้อมกันใช่หรือไม่?'
+                            ) : (
+                                isGlobalPrimeReleased
+                                    ? 'คุณต้องการดึงหน้าฟาร์ม Prime ทั้งระบบกลับสู่โหมดส่วนตัวหรือไม่? ลูกค้าจริงจะกลับไปเห็นหน้าฟาร์มแบบคลาสสิกเดิมทันที'
+                                    : 'คุณต้องการปล่อยหน้าฟาร์ม Prime ให้ลูกค้าจริงเห็นหน้าฟาร์มใหม่นี้พร้อมกันเลยใช่หรือไม่?'
+                            )}
                         </p>
 
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 type="button"
-                                onClick={() => setShowConfirmModal(false)}
+                                onClick={() => setConfirmAction(null)}
                                 className="py-2 rounded-xl bg-white/10 hover:bg-white/15 text-stone-300 font-bold text-xs transition-colors cursor-pointer"
                             >
                                 ยกเลิก
@@ -397,12 +436,12 @@ export default function OwnerDevFarmController({
                                 onClick={handleConfirmToggleRelease}
                                 disabled={isPublishing}
                                 className={`py-2 rounded-xl font-black text-xs transition-all cursor-pointer ${
-                                    isGlobalPrimeReleased
+                                    (confirmAction === 'phase2' ? isPhase2Released : isGlobalPrimeReleased)
                                         ? 'bg-rose-600 hover:bg-rose-500 text-white'
                                         : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black'
                                 }`}
                             >
-                                {isPublishing ? 'กำลังบันทึก...' : (isGlobalPrimeReleased ? 'ดึงกลับทันที' : 'ยืนยันปล่อยใช้งาน')}
+                                {isPublishing ? 'กำลังบันทึก...' : ((confirmAction === 'phase2' ? isPhase2Released : isGlobalPrimeReleased) ? 'ดึงกลับทันที' : 'ยืนยันปล่อยใช้งาน')}
                             </button>
                         </div>
                     </div>

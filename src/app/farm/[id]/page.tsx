@@ -96,10 +96,12 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .maybeSingle();
 
     let initialIsGlobalPrimeReleased = false;
+    let initialIsPhase2Released = false;
     if (releaseGateRow?.system_code && releaseGateRow.system_code.includes(':::')) {
         try {
             const parsed = JSON.parse(releaseGateRow.system_code.split(':::').slice(1).join(':::'));
             initialIsGlobalPrimeReleased = Boolean(parsed.released);
+            initialIsPhase2Released = Boolean(parsed.phase2_released);
         } catch (e) {}
     }
 
@@ -110,6 +112,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 initialOrders={initialOrders || []}
                 initialPortStatus={portStatus || null}
                 initialIsGlobalPrimeReleased={initialIsGlobalPrimeReleased}
+                initialIsPhase2Released={initialIsPhase2Released}
                 licenseCreatedAt={license?.created_at || null}
                 customName={license?.port_name || null}
                 licenseTier={effectiveLicenseTier}
