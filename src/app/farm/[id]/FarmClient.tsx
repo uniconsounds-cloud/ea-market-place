@@ -1772,7 +1772,7 @@ export default function FarmClient({
 
             return {
                 id: `q_preview_${idx + 1}`,
-                c: 1.0 + idx * 0.8,
+                c: 1.5 + idx * 0.8,
                 r: 5,
                 sym: sym,
                 ddPct: ddPct,
@@ -2703,23 +2703,225 @@ export default function FarmClient({
                         })()}
                         </div> {/* 🌾 End of animate-float-farm */}
 
-                        {/* ⚗️ GOLDEN SILO (ไซโลเสบียงแก้วทองคำ - Cross-Pair Relief Fund Vault) */}
+                        {/* ⚡ BIO-SHIELD AURA & FLOATING CENTRAL FORCEFIELD (เขื่อนพลังงานกั้นพายุ - ลอยตรงกลางฟาร์มพร้อมรัศมีเรืองแสง) */}
+                        {isClient && isPrime && (
+                            <div
+                                key="prime_bio_shield_center_complex"
+                                className="absolute pointer-events-none select-none"
+                                style={{
+                                    left: `${(2 - 2) * TILE_W}px`,
+                                    top: `${(2 + 2) * TILE_H_OFFSET}px`,
+                                    zIndex: 65,
+                                    width: '320px',
+                                    height: '320px',
+                                    transform: 'translate(-50%, -50%) translateY(-110px)'
+                                }}
+                            >
+                                {/* 🌟 1. RAYS & RADIAL EXPANSIVE GLOW (รัศมีวงกลมเรืองแสงแผ่รอบรูปโล่) */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    {/* Outer Energy Forcefield Halo (วงรัศมีเรืองแสงชั้นนอกสุด) */}
+                                    <div 
+                                        className={`w-72 h-72 sm:w-80 sm:h-80 rounded-full border border-dashed transition-all duration-700 ${
+                                            isBufferSafe 
+                                                ? 'border-emerald-400/35 shadow-[0_0_50px_rgba(16,185,129,0.3)] animate-[spin_40s_linear_infinite]' 
+                                                : 'border-amber-400/45 shadow-[0_0_60px_rgba(245,158,11,0.4)] animate-[spin_20s_linear_infinite]'
+                                        }`} 
+                                        style={{
+                                            background: isBufferSafe 
+                                                ? 'radial-gradient(circle, rgba(16,185,129,0.18) 0%, rgba(6,182,212,0.08) 50%, transparent 75%)' 
+                                                : 'radial-gradient(circle, rgba(245,158,11,0.25) 0%, rgba(239,68,68,0.12) 50%, transparent 75%)'
+                                        }} 
+                                    />
+
+                                    {/* Middle Concentric Ripple Ring (วงแหวนคลื่นพลังงานชั้นกลาง) */}
+                                    <div className={`absolute w-52 h-52 sm:w-56 sm:h-56 rounded-full border-2 transition-all duration-700 ${
+                                        isBufferSafe 
+                                            ? 'border-emerald-400/50 shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-pulse' 
+                                            : 'border-amber-400/60 shadow-[0_0_35px_rgba(245,158,11,0.5)] animate-ping'
+                                    }`} />
+
+                                    {/* Inner Radiant Core Halo (รัศมีเรืองแสงชั้นใน) */}
+                                    <div className={`absolute w-36 h-36 sm:w-40 sm:h-40 rounded-full blur-xl transition-all duration-700 ${
+                                        isBufferSafe ? 'bg-emerald-400/30 animate-pulse' : 'bg-amber-400/40 animate-pulse'
+                                    }`} />
+
+                                    {/* Radar Crosshairs / Energy Nodes (ขีดตำแหน่งเขื่อน 4 ทิศ) */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+                                        <div className={`w-64 h-[1px] ${isBufferSafe ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                        <div className={`h-64 w-[1px] absolute ${isBufferSafe ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                    </div>
+                                </div>
+
+                                {/* 🛡️ 2. FLOATING CENTRAL CIRCULAR SHIELD (วงกลมรูปโล่ลอยตรงกลางฟาร์ม) */}
+                                <div 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsShieldExpanded(prev => !prev);
+                                        setIsSiloExpanded(false);
+                                    }}
+                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-auto cursor-pointer group"
+                                    title="เขื่อนพลังงานกั้นพายุชีวภาพ (แตะเพื่อดูรายละเอียด Buffer และระดับความทนทาน)"
+                                >
+                                    {/* Floating Shield Disc */}
+                                    <div className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center border-2 sm:border-3 transition-transform duration-300 group-hover:scale-110 shadow-2xl ${
+                                        isBufferSafe 
+                                            ? 'border-emerald-300 bg-gradient-to-br from-emerald-900/90 via-[#021810]/95 to-teal-950/90 shadow-[0_0_30px_rgba(16,185,129,0.95)]' 
+                                            : 'border-amber-300 bg-gradient-to-br from-amber-900/90 via-[#1c0f02]/95 to-red-950/90 shadow-[0_0_35px_rgba(245,158,11,1)] animate-pulse'
+                                    } ${isShieldExpanded ? 'ring-4 ring-emerald-400/80 scale-110' : ''}`}>
+                                        {/* Orbiting Specular Ring */}
+                                        <div className="absolute inset-1 rounded-full border border-white/20 pointer-events-none" />
+
+                                        {/* Shield Icon in Core */}
+                                        {isBufferSafe ? (
+                                            <ShieldCheck className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-300 drop-shadow-[0_0_12px_rgba(52,211,153,1)] transition-transform group-hover:scale-105" />
+                                        ) : (
+                                            <ShieldAlert className="w-10 h-10 sm:w-12 sm:h-12 text-amber-300 drop-shadow-[0_0_15px_rgba(251,191,36,1)] animate-bounce" />
+                                        )}
+
+                                        {/* Tiny Spinning Energy Nodes on Perimeter */}
+                                        <div className="absolute inset-0 rounded-full animate-[spin_12s_linear_infinite] pointer-events-none">
+                                            <div className={`w-2 h-2 rounded-full absolute -top-1 left-1/2 -translate-x-1/2 shadow-lg ${
+                                                isBufferSafe ? 'bg-cyan-300 shadow-[0_0_8px_#67e8f9]' : 'bg-yellow-300 shadow-[0_0_8px_#fde047]'
+                                            }`} />
+                                        </div>
+                                    </div>
+
+                                    {/* Floating Readout Pill Badge below Shield */}
+                                    <div className={`mt-2.5 px-3 py-1 rounded-full bg-[#02140d]/95 border shadow-[0_0_20px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center gap-1.5 transition-transform duration-300 group-hover:scale-105 whitespace-nowrap ${
+                                        isBufferSafe ? 'border-emerald-400/80 text-emerald-300' : 'border-amber-400/90 text-amber-300'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full ${isBufferSafe ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-bounce'}`} />
+                                        <span className="font-mono font-black text-xs sm:text-sm">
+                                            {isFallback1Url ? '**.**' : `${(primeTelemetry?.bufPct ?? 0) >= 0 ? '+' : ''}${(primeTelemetry?.bufPct ?? 0).toFixed(1)}%`}
+                                        </span>
+                                        <span className={`text-[8px] font-black px-1.5 py-0.2 rounded font-mono ${
+                                            isBufferSafe ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/25 text-amber-300 border border-amber-500/50 animate-pulse'
+                                        }`}>
+                                            REC:{recommendedBuffer}%
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* 📋 EXPANDED BIO-SHIELD MODAL / CAPSULE CARD */}
+                                {isShieldExpanded && (
+                                    <div 
+                                        className="absolute left-1/2 -translate-x-1/2 top-20 w-84 bg-[#02140d]/95 border-2 border-emerald-500/90 rounded-2xl p-4 shadow-[0_0_40px_rgba(16,185,129,0.95)] backdrop-blur-xl z-[99999] animate-fade-in pointer-events-auto"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="flex items-center justify-between pb-2 border-b border-emerald-500/30">
+                                            <div className="flex items-center gap-2">
+                                                <Shield className="w-5 h-5 text-emerald-400" />
+                                                <div>
+                                                    <h3 className="font-mono font-black text-xs text-emerald-200 tracking-wider uppercase">
+                                                        BIO-SHIELD GAUGE • เขื่อนพลังงานกั้นพายุ
+                                                    </h3>
+                                                    <p className="text-[9px] text-emerald-400/70 font-mono">
+                                                        Capital Buffer & Storm Defense Resilience
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => setIsShieldExpanded(false)}
+                                                className="w-6 h-6 rounded-full bg-emerald-950/60 hover:bg-emerald-800 text-emerald-300 flex items-center justify-center transition-colors"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Status Indicator */}
+                                        <div className={`my-3 p-2.5 rounded-xl border flex items-center gap-2.5 ${
+                                            isBufferSafe 
+                                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' 
+                                                : 'bg-amber-950/40 border-amber-500/50 text-amber-200 animate-pulse'
+                                        }`}>
+                                            {isBufferSafe ? (
+                                                <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+                                            ) : (
+                                                <ShieldAlert className="w-6 h-6 text-amber-400 shrink-0" />
+                                            )}
+                                            <div className="text-[11px] font-mono leading-tight">
+                                                <span className="font-black block uppercase">
+                                                    {isBufferSafe ? '🟢 FORTRESS INTEGRITY: OPTIMAL' : '🟠 STORM ALERT: VULNERABLE'}
+                                                </span>
+                                                <span className="text-[9px] text-white/70">
+                                                    {isBufferSafe 
+                                                        ? 'ระดับ Buffer ปัจจุบันสูงกว่าพายุที่ถูกขัง บาเรียรองรับได้ 100%' 
+                                                        : 'Buffer ต่ำกว่าพายุที่ถูกขัง แนะนำระงับการถอนเงินหรือเติมทุน'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Comparative Metrics Grid */}
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                            <div className="p-2 rounded-xl bg-black/60 border border-emerald-500/30">
+                                                <span className="text-[9px] font-mono text-white/50 block">Buffer ปัจจุบัน</span>
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className="text-xl font-mono font-black text-emerald-300">
+                                                        {isFallback1Url ? '**.**' : `${(primeTelemetry?.bufPct ?? 0) >= 0 ? '+' : ''}${(primeTelemetry?.bufPct ?? 0).toFixed(1)}%`}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-emerald-400/70">
+                                                        ({(primeTelemetry?.resMult ?? 1.8).toFixed(1)}x)
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="p-2 rounded-xl bg-black/60 border border-cyan-500/30">
+                                                <span className="text-[9px] font-mono text-white/50 block">Buffer แนะนำ (Rec.)</span>
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className="text-xl font-mono font-black text-cyan-300">
+                                                        {recommendedBuffer}%
+                                                    </span>
+                                                    <span className="text-[9px] font-mono text-white/40">
+                                                        (พายุ {totalQuarantineDD.toFixed(1)}%)
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Visual Ratio Bar */}
+                                        <div className="space-y-1 mb-2">
+                                            <div className="w-full h-2 rounded-full bg-black/80 border border-emerald-500/30 overflow-hidden relative">
+                                                <div 
+                                                    className="absolute top-0 bottom-0 w-1 bg-cyan-400 z-20 shadow-[0_0_6px_#22d3ee]"
+                                                    style={{ left: `${Math.min(100, Math.max(10, (recommendedBuffer / 120) * 100))}%` }}
+                                                    title={`Recommended Target: ${recommendedBuffer}%`}
+                                                />
+                                                <div 
+                                                    className={`h-full transition-all duration-500 ${
+                                                        isBufferSafe 
+                                                            ? 'bg-gradient-to-r from-teal-500 to-emerald-400' 
+                                                            : 'bg-gradient-to-r from-amber-600 to-orange-400'
+                                                    }`}
+                                                    style={{ width: `${Math.min(100, Math.max(10, ((primeTelemetry?.bufPct ?? 0) / 120) * 100))}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between text-[9px] font-mono text-white/50">
+                                                <span>0% Baseline</span>
+                                                <span className="text-cyan-300 font-bold">เป้าหมาย: {recommendedBuffer}%</span>
+                                                <span>120%+ Fortress</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ⚗️ GOLDEN SILO (ไซโลเสบียงแก้วทองคำ - แสดงคู่กับโดมตรงกลางแถบแปลงฝั่งนี้) */}
                         {isClient && isPrime && (
                             <div
                                 key="prime_golden_silo_complex"
                                 className="absolute pointer-events-auto select-none"
                                 style={{
-                                    left: `${(0.05 - 5.3) * TILE_W}px`,
-                                    top: `${(0.05 + 5.3) * TILE_H_OFFSET}px`,
-                                    zIndex: 24,
+                                    left: `${(1.45 - 5.0) * TILE_W}px`,
+                                    top: `${(1.45 + 5.0) * TILE_H_OFFSET}px`,
+                                    zIndex: 25,
                                     width: '240px',
                                     height: '240px'
                                 }}
                             >
-                                {/* Glowing Nutrient Pipe connecting Silo to Greenhouse Dome */}
+                                {/* Glowing Nutrient Pipe connecting Silo directly to Greenhouse Dome */}
                                 {quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
-                                    <div className="absolute left-[110px] top-[130px] w-[160px] h-[65px] pointer-events-none z-10">
-                                        <svg className="w-full h-full overflow-visible" viewBox="0 0 160 65">
+                                    <div className="absolute left-[110px] top-[140px] w-[110px] h-[60px] pointer-events-none z-10">
+                                        <svg className="w-full h-full overflow-visible" viewBox="0 0 110 60">
                                             <defs>
                                                 <linearGradient id="siloPipeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                                                     <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.85" />
@@ -2732,13 +2934,13 @@ export default function FarmClient({
                                                 </filter>
                                             </defs>
                                             {/* Shadow Pipe */}
-                                            <path d="M 8 20 C 50 45, 110 30, 150 48" fill="none" stroke="#000" strokeWidth="8" opacity="0.6" strokeLinecap="round" />
+                                            <path d="M 10 10 C 40 25, 70 30, 95 47" fill="none" stroke="#000" strokeWidth="8" opacity="0.6" strokeLinecap="round" />
                                             {/* Outer Glass Conduit */}
-                                            <path d="M 8 20 C 50 45, 110 30, 150 48" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="6" strokeLinecap="round" />
+                                            <path d="M 10 10 C 40 25, 70 30, 95 47" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="6" strokeLinecap="round" />
                                             {/* Inner Glowing Fluid Core */}
-                                            <path d="M 8 20 C 50 45, 110 30, 150 48" fill="none" stroke="url(#siloPipeGrad)" strokeWidth="3.5" strokeLinecap="round" filter="url(#pipeGlow)" />
+                                            <path d="M 10 10 C 40 25, 70 30, 95 47" fill="none" stroke="url(#siloPipeGrad)" strokeWidth="3.5" strokeLinecap="round" filter="url(#pipeGlow)" />
                                             {/* Pulsing White Highlights inside fluid */}
-                                            <path d="M 8 20 C 50 45, 110 30, 150 48" fill="none" stroke="#ffffff" strokeWidth="2" strokeDasharray="6 12" strokeLinecap="round" className="animate-pulse" opacity="0.8" />
+                                            <path d="M 10 10 C 40 25, 70 30, 95 47" fill="none" stroke="#ffffff" strokeWidth="2" strokeDasharray="6 12" strokeLinecap="round" className="animate-pulse" opacity="0.8" />
                                         </svg>
                                     </div>
                                 )}
@@ -2883,217 +3085,6 @@ export default function FarmClient({
                             </div>
                         )}
 
-                        {/* ⚡ BIO-SHIELD GAUGE (เขื่อนพลังงานกั้นพายุ - Buffer Resilience Complex) */}
-                        {isClient && isPrime && (
-                            <div
-                                key="prime_bio_shield_complex"
-                                className="absolute pointer-events-auto select-none"
-                                style={{
-                                    left: `${(2.4 - 5.35) * TILE_W}px`,
-                                    top: `${(2.4 + 5.35) * TILE_H_OFFSET}px`,
-                                    zIndex: 28,
-                                    width: '240px',
-                                    height: '240px'
-                                }}
-                            >
-                                {/* Curved Holographic Bio-Shield Arc Wall protecting the farm perimeter */}
-                                <div className="absolute -left-20 -top-14 w-72 h-40 pointer-events-none z-0">
-                                    <svg className="w-full h-full overflow-visible" viewBox="0 0 288 160">
-                                        <defs>
-                                            <linearGradient id="shieldWallGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                <stop offset="0%" stopColor={isBufferSafe ? "#10b981" : "#f59e0b"} stopOpacity="0.3" />
-                                                <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.8" />
-                                                <stop offset="100%" stopColor={isBufferSafe ? "#059669" : "#d97706"} stopOpacity="0.3" />
-                                            </linearGradient>
-                                        </defs>
-                                        {/* Curved Barrier Beam */}
-                                        <path 
-                                            d="M 15 130 C 90 70, 190 60, 270 110" 
-                                            fill="none" 
-                                            stroke="url(#shieldWallGrad)" 
-                                            strokeWidth="4" 
-                                            strokeLinecap="round" 
-                                            className={isBufferSafe ? "drop-shadow-[0_0_12px_rgba(16,185,129,0.8)]" : "drop-shadow-[0_0_15px_rgba(245,158,11,0.9)] animate-pulse"} 
-                                        />
-                                        {/* Secondary Decorative Arc */}
-                                        <path 
-                                            d="M 20 135 C 95 75, 185 65, 265 115" 
-                                            fill="none" 
-                                            stroke="rgba(255,255,255,0.4)" 
-                                            strokeWidth="1.5" 
-                                            strokeDasharray="6 8" 
-                                            strokeLinecap="round" 
-                                        />
-                                    </svg>
-                                </div>
-
-                                {/* Bio-Shield Terminal / Pylon Structure */}
-                                <div 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsShieldExpanded(prev => !prev);
-                                        setIsSiloExpanded(false);
-                                    }}
-                                    className="absolute left-1/2 -translate-x-1/2 top-4 flex flex-col items-center cursor-pointer group"
-                                    title="เขื่อนพลังงานกั้นพายุ (แตะเพื่อดูระดับ Buffer ปัจจุบันและ Buffer แนะนำ)"
-                                >
-                                    {/* Luminous Pulsing Aura */}
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className={`w-32 h-32 rounded-full blur-xl animate-pulse transition-all ${
-                                            isBufferSafe ? 'bg-emerald-500/20 group-hover:bg-emerald-400/35' : 'bg-amber-500/25 group-hover:bg-amber-400/40'
-                                        }`}></div>
-                                    </div>
-
-                                    {/* Floating Top Badge */}
-                                    <div className={`mb-2 px-2.5 py-1 rounded-full bg-[#02140d]/95 border shadow-[0_0_15px_rgba(16,185,129,0.6)] backdrop-blur-md flex items-center gap-1.5 transition-transform duration-300 group-hover:scale-105 ${
-                                        isBufferSafe ? 'border-emerald-400/80 text-emerald-300' : 'border-amber-400/90 text-amber-300'
-                                    } ${isShieldExpanded ? 'ring-2 ring-emerald-400 scale-105' : ''}`}>
-                                        {isBufferSafe ? (
-                                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                                        ) : (
-                                            <ShieldAlert className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
-                                        )}
-                                        <span className="font-mono font-black text-xs">
-                                            {isFallback1Url ? '**.**' : `${(primeTelemetry?.bufPct ?? 0) >= 0 ? '+' : ''}${(primeTelemetry?.bufPct ?? 0).toFixed(1)}%`}
-                                        </span>
-                                        <span className={`text-[8px] font-black px-1 py-0.2 rounded font-mono ${
-                                            isBufferSafe ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/25 text-amber-300 border border-amber-500/50 animate-pulse'
-                                        }`}>
-                                            REC:{recommendedBuffer}%
-                                        </span>
-                                    </div>
-
-                                    {/* Futuristic Bio-Shield Pylon Terminal */}
-                                    <div className="relative w-16 h-32 flex flex-col items-center drop-shadow-[0_12px_24px_rgba(0,0,0,0.85)]">
-                                        {/* Rotating / Pulsing Core Orb */}
-                                        <div className={`relative z-20 w-12 h-12 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors ${
-                                            isBufferSafe 
-                                                ? 'bg-gradient-to-br from-emerald-400 via-teal-700 to-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.8)]' 
-                                                : 'bg-gradient-to-br from-amber-400 via-orange-700 to-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.9)] animate-pulse'
-                                        }`}>
-                                            <Shield className="w-6 h-6 text-white drop-shadow-md" />
-                                        </div>
-
-                                        {/* Energy Conduit Spine */}
-                                        <div className="relative z-10 w-4 flex-1 -mt-2 bg-gradient-to-b from-slate-800 via-slate-900 to-black border-x border-emerald-500/40 flex flex-col items-center justify-around py-2">
-                                            <div className={`w-2 h-2 rounded-full animate-ping ${isBufferSafe ? 'bg-emerald-400' : 'bg-amber-400'}`}></div>
-                                            <div className={`w-1.5 h-1.5 rounded-full ${isBufferSafe ? 'bg-emerald-300' : 'bg-amber-300'}`}></div>
-                                        </div>
-
-                                        {/* Hexagonal Cyber Base */}
-                                        <div className="relative z-20 w-16 h-5 -mt-1 rounded-b-lg bg-gradient-to-b from-slate-900 to-black border-b-2 border-x border-emerald-500/50 shadow-2xl flex items-center justify-center">
-                                            <span className="text-[7px] font-mono font-black tracking-widest text-emerald-400 uppercase">
-                                                SHIELD
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 📋 EXPANDED BIO-SHIELD MODAL / CAPSULE CARD */}
-                                {isShieldExpanded && (
-                                    <div 
-                                        className="absolute left-1/2 -translate-x-1/2 -top-64 w-84 bg-[#02140d]/95 border-2 border-emerald-500/90 rounded-2xl p-4 shadow-[0_0_35px_rgba(16,185,129,0.85)] backdrop-blur-xl z-[99999] animate-fade-in pointer-events-auto"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <div className="flex items-center justify-between pb-2 border-b border-emerald-500/30">
-                                            <div className="flex items-center gap-2">
-                                                <Shield className="w-5 h-5 text-emerald-400" />
-                                                <div>
-                                                    <h3 className="font-mono font-black text-xs text-emerald-200 tracking-wider uppercase">
-                                                        BIO-SHIELD GAUGE • เขื่อนพลังงานกั้นพายุ
-                                                    </h3>
-                                                    <p className="text-[9px] text-emerald-400/70 font-mono">
-                                                        Capital Buffer & Storm Defense Resilience
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <button 
-                                                onClick={() => setIsShieldExpanded(false)}
-                                                className="w-6 h-6 rounded-full bg-emerald-950/60 hover:bg-emerald-800 text-emerald-300 flex items-center justify-center transition-colors"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-
-                                        {/* Status Indicator */}
-                                        <div className={`my-3 p-2.5 rounded-xl border flex items-center gap-2.5 ${
-                                            isBufferSafe 
-                                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' 
-                                                : 'bg-amber-950/40 border-amber-500/50 text-amber-200 animate-pulse'
-                                        }`}>
-                                            {isBufferSafe ? (
-                                                <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
-                                            ) : (
-                                                <ShieldAlert className="w-6 h-6 text-amber-400 shrink-0" />
-                                            )}
-                                            <div className="text-[11px] font-mono leading-tight">
-                                                <span className="font-black block uppercase">
-                                                    {isBufferSafe ? '🟢 FORTRESS INTEGRITY: OPTIMAL' : '🟠 STORM ALERT: VULNERABLE'}
-                                                </span>
-                                                <span className="text-[9px] text-white/70">
-                                                    {isBufferSafe 
-                                                        ? 'ระดับ Buffer ปัจจุบันสูงกว่าพายุที่ถูกขัง บาเรียรองรับได้ 100%' 
-                                                        : 'Buffer ต่ำกว่าพายุที่ถูกขัง แนะนำระงับการถอนเงินหรือเติมทุน'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Comparative Metrics Grid */}
-                                        <div className="grid grid-cols-2 gap-2 mb-3">
-                                            <div className="p-2 rounded-xl bg-black/60 border border-emerald-500/30">
-                                                <span className="text-[9px] font-mono text-white/50 block">Buffer ปัจจุบัน</span>
-                                                <div className="flex items-baseline gap-1">
-                                                    <span className="text-xl font-mono font-black text-emerald-300">
-                                                        {isFallback1Url ? '**.**' : `${(primeTelemetry?.bufPct ?? 0) >= 0 ? '+' : ''}${(primeTelemetry?.bufPct ?? 0).toFixed(1)}%`}
-                                                    </span>
-                                                    <span className="text-[10px] font-mono text-emerald-400/70">
-                                                        ({(primeTelemetry?.resMult ?? 1.8).toFixed(1)}x)
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="p-2 rounded-xl bg-black/60 border border-cyan-500/30">
-                                                <span className="text-[9px] font-mono text-white/50 block">Buffer แนะนำ (Rec.)</span>
-                                                <div className="flex items-baseline gap-1">
-                                                    <span className="text-xl font-mono font-black text-cyan-300">
-                                                        {recommendedBuffer}%
-                                                    </span>
-                                                    <span className="text-[9px] font-mono text-white/40">
-                                                        (พายุ {totalQuarantineDD.toFixed(1)}%)
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Visual Ratio Bar */}
-                                        <div className="space-y-1 mb-2">
-                                            <div className="w-full h-2 rounded-full bg-black/80 border border-emerald-500/30 overflow-hidden relative">
-                                                {/* Target Marker */}
-                                                <div 
-                                                    className="absolute top-0 bottom-0 w-1 bg-cyan-400 z-20 shadow-[0_0_6px_#22d3ee]"
-                                                    style={{ left: `${Math.min(100, Math.max(10, (recommendedBuffer / 120) * 100))}%` }}
-                                                    title={`Recommended Target: ${recommendedBuffer}%`}
-                                                />
-                                                {/* Current Buffer Fill */}
-                                                <div 
-                                                    className={`h-full transition-all duration-500 ${
-                                                        isBufferSafe 
-                                                            ? 'bg-gradient-to-r from-teal-500 to-emerald-400' 
-                                                            : 'bg-gradient-to-r from-amber-600 to-orange-400'
-                                                    }`}
-                                                    style={{ width: `${Math.min(100, Math.max(10, ((primeTelemetry?.bufPct ?? 0) / 120) * 100))}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between text-[9px] font-mono text-white/50">
-                                                <span>0% Baseline</span>
-                                                <span className="text-cyan-300 font-bold">เป้าหมาย: {recommendedBuffer}%</span>
-                                                <span>120%+ Fortress</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกที่แปลงที่ 2: c: 1.0, r: 5 ก่อนคลิกขยาย) */}
                         {isClient && isPrime && quarantinePreviewList.length > 0 && !isQuarantineExpanded && (
                             <div
@@ -3101,9 +3092,9 @@ export default function FarmClient({
                                 onClick={handleGreenhouseDomeClick}
                                 className="absolute cursor-pointer transition-all duration-300 group select-none"
                                 style={{
-                                    left: `${(1 - 5) * TILE_W}px`,
-                                    top: `${(1 + 5) * TILE_H_OFFSET}px`,
-                                    zIndex: (1 + 5) + 20,
+                                    left: `${(2.3 - 5) * TILE_W}px`,
+                                    top: `${(2.3 + 5) * TILE_H_OFFSET}px`,
+                                    zIndex: Math.round(2.3 + 5) + 20,
                                     width: '280px',
                                     height: '280px'
                                 }}
@@ -3205,8 +3196,8 @@ export default function FarmClient({
                                         key="quarantine_combined_badge"
                                         className="absolute pointer-events-none"
                                         style={{
-                                            left: `${(1 - 5) * TILE_W}px`,
-                                            top: `${(1 + 5) * TILE_H_OFFSET}px`,
+                                            left: `${(2.3 - 5) * TILE_W}px`,
+                                            top: `${(2.3 + 5) * TILE_H_OFFSET}px`,
                                             zIndex: 90,
                                             width: '280px',
                                             height: '280px'
@@ -3286,8 +3277,8 @@ export default function FarmClient({
                                     <div
                                         className="absolute pointer-events-none"
                                         style={{
-                                            left: `${(1.8 - 5) * TILE_W}px`,
-                                            top: `${(1.8 + 5) * TILE_H_OFFSET}px`,
+                                            left: `${(2.3 - 5) * TILE_W}px`,
+                                            top: `${(2.3 + 5) * TILE_H_OFFSET}px`,
                                             zIndex: 99998,
                                             width: '280px',
                                             height: '280px'
