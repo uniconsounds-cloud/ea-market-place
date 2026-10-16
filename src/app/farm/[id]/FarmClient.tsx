@@ -429,8 +429,9 @@ export default function FarmClient({
     });
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
     const isOwnerDevUser = (isOwnerTestPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
-    // 🧪 Simulated Buffer for testing dome buffer aura (Dev testing)
+    // 🧪 Simulated Buffer & Threshold for testing dome buffer aura (Dev testing)
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
+    const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchReleaseState = async () => {
@@ -1858,10 +1859,12 @@ export default function FarmClient({
     }, [quarantinePreviewList]);
 
     // ⚡ Bio-Shield: Recommended Buffer calculated from Quarantine Total DD (rounded up to nearest 10%, min 20%)
-    const recommendedBuffer = useMemo(() => {
+    const actualRecommendedBuffer = useMemo(() => {
         if (totalQuarantineDD <= 0) return 20;
         return Math.max(20, Math.ceil(totalQuarantineDD / 10) * 10);
     }, [totalQuarantineDD]);
+
+    const recommendedBuffer = simulatedThreshold !== null ? simulatedThreshold : actualRecommendedBuffer;
 
     const actualBufferPct = Math.max(0, primeTelemetry?.bufPct ?? 0);
     const capitalBufferPct = simulatedBuffer !== null ? simulatedBuffer : actualBufferPct;
@@ -2791,10 +2794,18 @@ export default function FarmClient({
                                 }}
                                 title="โรงเรือนกระจกฟื้นฟูพืช (แตะเพื่อขยายดูคู่เงินที่ถูกกักขัง)"
                             >
-                                {/* Subtle breathing magical amber aura under the dome */}
+                                {/* Subtle breathing magical aura under the dome: emerald/cyan when safe, alert rose/amber when low buffer */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-40 h-40 rounded-full bg-amber-500/15 group-hover:bg-amber-400/25 blur-2xl animate-pulse transition-all"></div>
-                                    <div className="w-28 h-28 rounded-full bg-orange-400/15 group-hover:bg-orange-300/25 blur-xl animate-pulse delay-700 transition-all"></div>
+                                    <div className={`w-40 h-40 rounded-full blur-2xl transition-all ${
+                                        isBufferSafe 
+                                            ? 'bg-emerald-500/15 group-hover:bg-emerald-400/25 animate-pulse' 
+                                            : 'bg-rose-500/25 group-hover:bg-rose-400/35 animate-[pulse_1.2s_ease-in-out_infinite]'
+                                    }`} />
+                                    <div className={`w-28 h-28 rounded-full blur-xl transition-all ${
+                                        isBufferSafe 
+                                            ? 'bg-cyan-400/15 group-hover:bg-cyan-300/25 animate-pulse delay-700' 
+                                            : 'bg-amber-500/25 group-hover:bg-amber-400/35 animate-[pulse_1.2s_ease-in-out_infinite] delay-300'
+                                    }`} />
                                 </div>
 
                                 {/* Greenhouse Dome Graphic: Compact & clean scale with subtle hover feedback */}
@@ -2838,17 +2849,17 @@ export default function FarmClient({
                                             return (
                                                 <svg className="w-full h-full overflow-visible" viewBox="0 0 280 280">
                                                     <defs>
-                                                        {/* Linear Gradients for safe (emerald/cyan) vs alert (amber/coral) */}
+                                                        {/* Linear Gradients for safe (emerald/cyan) vs alert (crimson/amber flare) */}
                                                         <linearGradient id="bufferAuraCoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.95" />
+                                                            <stop offset="0%" stopColor={isBufferSafe ? "#34d399" : "#f43f5e"} stopOpacity="0.95" />
                                                             <stop offset="50%" stopColor={isBufferSafe ? "#a7f3d0" : "#fef08a"} stopOpacity="1" />
-                                                            <stop offset="100%" stopColor={isBufferSafe ? "#22d3ee" : "#f97316"} stopOpacity="0.95" />
+                                                            <stop offset="100%" stopColor={isBufferSafe ? "#22d3ee" : "#ea580c"} stopOpacity="0.95" />
                                                         </linearGradient>
 
                                                         <linearGradient id="bufferAuraMidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isBufferSafe ? "#10b981" : "#f59e0b"} stopOpacity="0.75" />
-                                                            <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.85" />
-                                                            <stop offset="100%" stopColor={isBufferSafe ? "#06b6d4" : "#ea580c"} stopOpacity="0.75" />
+                                                            <stop offset="0%" stopColor={isBufferSafe ? "#10b981" : "#e11d48"} stopOpacity="0.8" />
+                                                            <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#f97316"} stopOpacity="0.85" />
+                                                            <stop offset="100%" stopColor={isBufferSafe ? "#06b6d4" : "#c2410c"} stopOpacity="0.8" />
                                                         </linearGradient>
 
                                                         {/* Filter for Outermost Soft Haze */}
@@ -2874,11 +2885,11 @@ export default function FarmClient({
                                                     <path
                                                         d={p4_d}
                                                         fill="none"
-                                                        stroke={isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.35)"}
+                                                        stroke={isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.38)"}
                                                         strokeWidth={Math.max(8, T * 1.4)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraDeepHaze)"
-                                                        className={isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.8s_ease-in-out_infinite]"}
+                                                        className={isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.2s_ease-in-out_infinite]"}
                                                     />
 
                                                     {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
@@ -2889,8 +2900,8 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(6, T * 0.9)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraMidGlow)"
-                                                        opacity={0.65}
-                                                        className={isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.5s_ease-in-out_infinite]"}
+                                                        opacity={isBufferSafe ? 0.65 : 0.82}
+                                                        className={isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.0s_ease-in-out_infinite]"}
                                                     />
 
                                                     {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
@@ -2901,20 +2912,20 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(3.5, T * 0.45)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraInnerGlow)"
-                                                        opacity={0.88}
+                                                        opacity={0.92}
                                                     />
 
                                                     {/* ⚡ Pass 1: Glass Contact Radiant Seam (เส้นกำเนิดแสงที่ผิวโดมแก้ว - วงในสุด เข้ม สว่างชัดเจนดุจเปล่งแสงออกจากเนื้อแก้ว) */}
                                                     <path
                                                         d={p1_d}
                                                         fill="none"
-                                                        stroke={isBufferSafe ? "#ecfdf5" : "#fef08a"}
+                                                        stroke={isBufferSafe ? "#ecfdf5" : "#fff1f2"}
                                                         strokeWidth={Math.max(1.5, T * 0.15)}
                                                         strokeLinecap="round"
                                                         style={{
-                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isBufferSafe ? '#67e8f9' : '#fde047'})`
+                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isBufferSafe ? '#67e8f9' : '#f43f5e'})`
                                                         }}
-                                                        opacity={0.95}
+                                                        opacity={0.98}
                                                     />
                                                 </svg>
                                             );
@@ -3047,15 +3058,15 @@ export default function FarmClient({
                                                         className={`absolute left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full border shadow-lg backdrop-blur-md flex items-center gap-1.5 z-20 pointer-events-none whitespace-nowrap animate-fade-in ${
                                                             isBufferSafe 
                                                                 ? 'bg-[#021810]/95 border-emerald-400 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.9)]' 
-                                                                : 'bg-[#1c0f02]/95 border-amber-400 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.9)]'
+                                                                : 'bg-[#1c0808]/95 border-rose-500 text-rose-300 shadow-[0_0_16px_rgba(244,63,94,0.95)] animate-pulse'
                                                         }`}
                                                         style={{
                                                             top: `-${Math.max(12, boxAuraThickness + 6)}px`
                                                         }}
                                                     >
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${isBufferSafe ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'}`} />
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${isBufferSafe ? 'bg-emerald-400 animate-ping' : 'bg-rose-500 animate-ping'}`} />
                                                         <span className="text-[8px] font-black tracking-wider uppercase font-mono">
-                                                            BUFFER
+                                                            {isBufferSafe ? 'BUFFER' : 'LOW BUFFER'}
                                                         </span>
                                                         <span className="font-mono font-black text-[11px] sm:text-xs">
                                                             {isFallback1Url ? '**.**' : `${capitalBufferPct >= 0 ? '+' : ''}${capitalBufferPct.toFixed(1)}%`}
@@ -4662,6 +4673,9 @@ export default function FarmClient({
                     onSetSimulatedBuffer={setSimulatedBuffer}
                     actualBufferPct={actualBufferPct}
                     recommendedBuffer={recommendedBuffer}
+                    actualRecommendedBuffer={actualRecommendedBuffer}
+                    simulatedThreshold={simulatedThreshold}
+                    onSetSimulatedThreshold={setSimulatedThreshold}
                 />
             )}
         </div>

@@ -30,6 +30,9 @@ export interface OwnerDevFarmControllerProps {
     onSetSimulatedBuffer: (val: number | null) => void;
     actualBufferPct: number;
     recommendedBuffer: number;
+    actualRecommendedBuffer: number;
+    simulatedThreshold: number | null;
+    onSetSimulatedThreshold: (val: number | null) => void;
 }
 
 export default function OwnerDevFarmController({
@@ -45,7 +48,10 @@ export default function OwnerDevFarmController({
     simulatedBuffer,
     onSetSimulatedBuffer,
     actualBufferPct,
-    recommendedBuffer
+    recommendedBuffer,
+    actualRecommendedBuffer,
+    simulatedThreshold,
+    onSetSimulatedThreshold
 }: OwnerDevFarmControllerProps) {
     // 🛡️ STRICT SAFETY GUARD: Never render anything for customers
     if (!isOwnerTestPort) return null;
@@ -337,7 +343,7 @@ export default function OwnerDevFarmController({
                                 </p>
                             </div>
 
-                            {/* 🧪 Section 2: Buffer Aura Testing Slider (บาร์เลื่อนจำลองค่าบัฟเฟอร์ & ปุ่มยกเลิก) */}
+                            {/* 🧪 Section 2: Buffer Aura Testing Slider (บาร์เลื่อนจำลองค่าบัฟเฟอร์ & แก้เกณฑ์ & ปุ่มยกเลิก) */}
                             <div className="pt-2 border-t border-amber-500/20 space-y-2">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
@@ -346,7 +352,7 @@ export default function OwnerDevFarmController({
                                             ทดสอบรัศมีบัฟเฟอร์ (Buffer Aura)
                                         </span>
                                     </div>
-                                    {simulatedBuffer !== null ? (
+                                    {simulatedBuffer !== null || simulatedThreshold !== null ? (
                                         <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-[9px] font-mono font-black text-amber-300 animate-pulse flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                                             SIMULATED
@@ -359,8 +365,45 @@ export default function OwnerDevFarmController({
                                     )}
                                 </div>
 
+                                {/* Quick State Switcher (1-Tap Test Safe vs Low Buffer Alert) */}
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const targetSafe = Math.max(60, recommendedBuffer + 25);
+                                            onSetSimulatedBuffer(targetSafe);
+                                            toast.success(`จำลองสภาวะปลอดภัย: ${targetSafe}% (สูงกว่าเกณฑ์ ${recommendedBuffer}%)`);
+                                        }}
+                                        className={`py-1.5 px-2 rounded-lg font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                                            isCurrentBufferSafe
+                                                ? 'bg-emerald-500/25 border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                                                : 'bg-black/50 border-white/10 text-white/60 hover:text-white hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>🛡️ ทดสอบ: ปลอดภัย</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const targetAlert = Math.max(0, Math.min(8, Math.round(recommendedBuffer * 0.4)));
+                                            onSetSimulatedBuffer(targetAlert);
+                                            toast.warning(`จำลองสภาวะต่ำกว่าเกณฑ์: ${targetAlert}% (ต่ำกว่าเกณฑ์ ${recommendedBuffer}%)`);
+                                        }}
+                                        className={`py-1.5 px-2 rounded-lg font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                                            !isCurrentBufferSafe
+                                                ? 'bg-rose-500/30 border-rose-400/90 text-rose-300 shadow-[0_0_14px_rgba(244,63,94,0.4)] animate-pulse'
+                                                : 'bg-black/50 border-white/10 text-white/60 hover:text-white hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                                        <span>⚠️ ต่ำกว่าเกณฑ์เตือนภัย</span>
+                                    </button>
+                                </div>
+
                                 {/* Slider & Control Box */}
-                                <div className="p-2.5 rounded-xl bg-black/60 border border-amber-500/30 space-y-2">
+                                <div className="p-2.5 rounded-xl bg-black/60 border border-amber-500/30 space-y-2.5">
                                     {/* Value & Status row */}
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -369,7 +412,7 @@ export default function OwnerDevFarmController({
                                             </div>
                                             <div className="flex items-baseline gap-1.5">
                                                 <span className={`text-base font-black font-mono ${
-                                                    isCurrentBufferSafe ? 'text-emerald-400' : 'text-amber-400'
+                                                    isCurrentBufferSafe ? 'text-emerald-400' : 'text-rose-400'
                                                 }`}>
                                                     {currentBufferVal >= 0 ? '+' : ''}{currentBufferVal.toFixed(1)}%
                                                 </span>
@@ -383,7 +426,7 @@ export default function OwnerDevFarmController({
                                         <div className={`px-2 py-1 rounded-lg border text-[9px] font-bold flex items-center gap-1 ${
                                             isCurrentBufferSafe 
                                                 ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' 
-                                                : 'bg-amber-950/60 border-amber-500/50 text-amber-300'
+                                                : 'bg-rose-950/70 border-rose-500/70 text-rose-300 animate-pulse'
                                         }`}>
                                             {isCurrentBufferSafe ? (
                                                 <>
@@ -392,15 +435,19 @@ export default function OwnerDevFarmController({
                                                 </>
                                             ) : (
                                                 <>
-                                                    <ShieldAlert className="w-3 h-3 text-amber-400 shrink-0 animate-pulse" />
+                                                    <ShieldAlert className="w-3 h-3 text-rose-400 shrink-0 animate-bounce" />
                                                     <span>บางเฉียบ เตือนภัย</span>
                                                 </>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Range Slider */}
+                                    {/* Range Slider for Capital Buffer */}
                                     <div className="space-y-1">
+                                        <div className="flex justify-between text-[9px] font-bold text-amber-200/80">
+                                            <span>เลื่อนปรับบัฟเฟอร์ (Capital Buffer %):</span>
+                                            <span className="font-mono text-amber-300">{Math.round(currentBufferVal)}%</span>
+                                        </div>
                                         <input 
                                             type="range"
                                             min="0"
@@ -408,37 +455,37 @@ export default function OwnerDevFarmController({
                                             step="1"
                                             value={Math.round(currentBufferVal)}
                                             onChange={(e) => onSetSimulatedBuffer(Number(e.target.value))}
-                                            className="w-full h-2 bg-gradient-to-r from-amber-600 via-amber-400 to-emerald-400 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300"
+                                            className="w-full h-2 bg-gradient-to-r from-rose-600 via-amber-400 to-emerald-400 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300"
                                         />
                                         <div className="flex justify-between text-[8px] font-mono text-white/40 px-0.5">
-                                            <span>0% (บางสุด)</span>
+                                            <span>0% (เกราะบางสุด)</span>
                                             <span className="text-amber-300/80 font-bold">เกณฑ์ {recommendedBuffer}%</span>
                                             <span>120% (หนาสุด)</span>
                                         </div>
                                     </div>
 
-                                    {/* Quick Presets */}
-                                    <div className="grid grid-cols-4 gap-1 pt-0.5">
+                                    {/* Quick Buffer Presets */}
+                                    <div className="grid grid-cols-4 gap-1">
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(0)}
-                                            className="py-1 px-1 rounded bg-white/5 hover:bg-white/10 text-[9px] font-mono font-bold text-amber-200/80 hover:text-white border border-white/10 text-center transition-colors cursor-pointer"
-                                            title="ทดสอบ 0% (บางสุด)"
+                                            className="py-1 px-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-[9px] font-mono font-bold text-rose-300 border border-rose-500/30 text-center transition-colors cursor-pointer"
+                                            title="ทดสอบ 0% (บางสุด เตือนภัยวิกฤต)"
                                         >
-                                            0%
+                                            0% (วิกฤต)
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => onSetSimulatedBuffer(Math.max(5, recommendedBuffer - 10))}
-                                            className="py-1 px-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-[9px] font-mono font-bold text-amber-400 border border-amber-500/30 text-center transition-colors cursor-pointer"
-                                            title={`ทดสอบ ${Math.max(5, recommendedBuffer - 10)}% (ต่ำกว่าเกณฑ์)`}
+                                            onClick={() => onSetSimulatedBuffer(Math.max(2, Math.round(recommendedBuffer * 0.4)))}
+                                            className="py-1 px-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-[9px] font-mono font-bold text-amber-300 border border-amber-500/30 text-center transition-colors cursor-pointer"
+                                            title={`ทดสอบ ${Math.max(2, Math.round(recommendedBuffer * 0.4))}% (ต่ำกว่าเกณฑ์เตือนภัย)`}
                                         >
-                                            {Math.max(5, recommendedBuffer - 10)}% (เตือน)
+                                            {Math.max(2, Math.round(recommendedBuffer * 0.4))}% (เตือน)
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(recommendedBuffer)}
-                                            className="py-1 px-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-[9px] font-mono font-bold text-emerald-400 border border-emerald-500/30 text-center transition-colors cursor-pointer"
+                                            className="py-1 px-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-[9px] font-mono font-bold text-emerald-300 border border-emerald-500/30 text-center transition-colors cursor-pointer"
                                             title={`ทดสอบ ${recommendedBuffer}% (พอดีเกณฑ์)`}
                                         >
                                             {recommendedBuffer}% (เกณฑ์)
@@ -446,29 +493,90 @@ export default function OwnerDevFarmController({
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(80)}
-                                            className="py-1 px-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-[9px] font-mono font-bold text-cyan-300 border border-cyan-500/30 text-center transition-colors cursor-pointer"
+                                            className="py-1 px-1 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-[9px] font-mono font-bold text-cyan-300 border border-cyan-500/30 text-center transition-colors cursor-pointer"
                                             title="ทดสอบ 80% (หนาฟู ปลอดภัย)"
                                         >
                                             80% (หนาฟู)
                                         </button>
                                     </div>
 
-                                    {/* Cancel Simulation Button (ปุ่มยกเลิกค่าจำลองเพื่อแสดงค่าจริงจากพอร์ต) */}
-                                    {simulatedBuffer !== null ? (
+                                    {/* 🎯 EDITABLE BUFFER THRESHOLD CONTROL (ให้แก้ค่าเกณฑ์ของบัฟเฟอร์ได้ด้วยในแบบจำลอง) */}
+                                    <div className="pt-2 border-t border-white/10 space-y-1.5">
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <div className="flex items-center gap-1.5 text-white/80">
+                                                <span className="font-bold">🎯 เกณฑ์บัฟเฟอร์ (Threshold):</span>
+                                                <span className={`font-mono font-black ${
+                                                    simulatedThreshold !== null ? 'text-amber-300' : 'text-emerald-300'
+                                                }`}>
+                                                    {recommendedBuffer}%
+                                                </span>
+                                                {simulatedThreshold !== null && (
+                                                    <span className="text-[7px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-300 font-mono">
+                                                        CUSTOM
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {simulatedThreshold !== null && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onSetSimulatedThreshold(null);
+                                                        toast.info(`คืนค่าเกณฑ์อัตโนมัติแล้ว (${actualRecommendedBuffer}%)`);
+                                                    }}
+                                                    className="text-[9px] font-mono text-amber-400 hover:text-amber-200 underline cursor-pointer"
+                                                    title="คืนค่าเกณฑ์อัตโนมัติที่คำนวณจาก DD"
+                                                >
+                                                    ↺ อัตโนมัติ ({actualRecommendedBuffer}%)
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <input 
+                                            type="range"
+                                            min="10"
+                                            max="80"
+                                            step="5"
+                                            value={recommendedBuffer}
+                                            onChange={(e) => onSetSimulatedThreshold(Number(e.target.value))}
+                                            className="w-full h-1.5 bg-gradient-to-r from-emerald-600 via-amber-500 to-rose-600 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                                        />
+
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[8px] text-white/40 shrink-0">ลัดเกณฑ์:</span>
+                                            {[15, 20, 30, 40, 50].map((th) => (
+                                                <button
+                                                    key={th}
+                                                    type="button"
+                                                    onClick={() => onSetSimulatedThreshold(th)}
+                                                    className={`flex-1 py-0.5 rounded text-[8px] font-mono font-bold border transition-colors cursor-pointer ${
+                                                        recommendedBuffer === th
+                                                            ? 'bg-amber-500/30 border-amber-400 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.4)]'
+                                                            : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
+                                                    }`}
+                                                >
+                                                    {th}%
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Cancel All Simulations Button (ปุ่มยกเลิกค่าจำลองทั้งหมดเพื่อแสดงค่าจริงจากพอร์ต) */}
+                                    {simulatedBuffer !== null || simulatedThreshold !== null ? (
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 onSetSimulatedBuffer(null);
-                                                toast.info(`ยกเลิกค่าจำลองแล้ว แสดงค่าจริงจากพอร์ต (${actualBufferPct.toFixed(1)}%)`);
+                                                onSetSimulatedThreshold(null);
+                                                toast.info(`ยกเลิกค่าจำลองทั้งหมดแล้ว แสดงค่าจริงจากพอร์ต (${actualBufferPct.toFixed(1)}%, เกณฑ์: ${actualRecommendedBuffer}%)`);
                                             }}
                                             className="w-full py-1.5 px-2 rounded-lg bg-gradient-to-r from-stone-800 to-stone-900 hover:from-amber-950 hover:to-stone-900 border border-amber-400/60 text-amber-300 hover:text-amber-100 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-98 cursor-pointer"
                                         >
                                             <RotateCcw className="w-3 h-3 text-amber-400" />
-                                            <span>ยกเลิกค่าจำลอง (ใช้ค่าจริง: {actualBufferPct.toFixed(1)}%)</span>
+                                            <span>ยกเลิกค่าจำลองทั้งหมด (คืนค่าจริงจากพอร์ต)</span>
                                         </button>
                                     ) : (
                                         <div className="text-[9px] text-center text-emerald-400/80 font-mono py-0.5">
-                                            ✓ กำลังแสดงค่าจริงจากพอร์ต ({actualBufferPct.toFixed(1)}%)
+                                            ✓ กำลังแสดงค่าจริงจากพอร์ต (บัฟเฟอร์: {actualBufferPct.toFixed(1)}% / เกณฑ์: {actualRecommendedBuffer}%)
                                         </div>
                                     )}
                                 </div>
