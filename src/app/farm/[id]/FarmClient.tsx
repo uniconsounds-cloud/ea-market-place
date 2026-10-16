@@ -2808,62 +2808,114 @@ export default function FarmClient({
                                         priority
                                     />
 
-                                    {/* 🍩 SEMI-CIRCULAR DONUT BUFFER AURA (รัศมีเรืองแสงแบบโดนัทครึ่งวงกลมครึ่งบนครอบโดม - ความหนาแปรผันตามขนาดของบัฟเฟอร์) */}
+                                    {/* 🍩 REALISTIC DOME EMISSION CORONA (รัศมีฉายแสงออกจากโดมแก้ว - วงในเข้มสว่างชิดผิวแก้ว แล้วจางฟุ้งออกสู่อากาศด้านนอก) */}
                                     <div className="absolute inset-0 pointer-events-none z-20">
-                                        <svg className="w-full h-full overflow-visible" viewBox="0 0 280 280">
-                                            <defs>
-                                                <linearGradient id="bufferDonutGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                    <stop offset="0%" stopColor={isBufferSafe ? "#10b981" : "#f59e0b"} stopOpacity="0.85" />
-                                                    <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.95" />
-                                                    <stop offset="100%" stopColor={isBufferSafe ? "#06b6d4" : "#f97316"} stopOpacity="0.85" />
-                                                </linearGradient>
-                                                
-                                                {/* Ultra-soft expansive bloom filter */}
-                                                <filter id="bufferDonutDeepBloom" x="-50%" y="-50%" width="200%" height="200%">
-                                                    <feGaussianBlur stdDeviation={Math.max(6, donutThickness * 0.9)} result="wideBlur" />
-                                                    <feComposite in="SourceGraphic" in2="wideBlur" operator="over" />
-                                                </filter>
-                                                
-                                                {/* Medium dreamy aura glow */}
-                                                <filter id="bufferDonutSoftGlow" x="-40%" y="-40%" width="180%" height="180%">
-                                                    <feGaussianBlur stdDeviation={Math.max(3.5, donutThickness * 0.55)} result="blur" />
-                                                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                                                </filter>
-                                            </defs>
+                                        {(() => {
+                                            const T = donutThickness;
+                                            // Pass 1: Core Rim Energy Line (แนบผิวแก้ว 100% สว่างคมเข้มที่สุด เสมือนแสงกำเนิดขึ้นจากโดมแก้ว)
+                                            const p1_rx = 89 + T * 0.04;
+                                            const p1_ry = 77 + T * 0.04;
+                                            const p1_d = `M ${(140 - p1_rx).toFixed(1)} 100 A ${p1_rx.toFixed(1)} ${p1_ry.toFixed(1)} 0 0 1 ${(140 + p1_rx).toFixed(1)} 100`;
 
-                                            {/* 1. Deep Ambient Atmospheric Glow (แผ่ฟุ้งกระจายชั้นนอกสุด กว้างและละมุน) */}
-                                            <path
-                                                d="M 51 100 A 89 77 0 0 1 229 100"
-                                                fill="none"
-                                                stroke={isBufferSafe ? "rgba(16,185,129,0.4)" : "rgba(245,158,11,0.4)"}
-                                                strokeWidth={donutThickness * 2.2}
-                                                strokeLinecap="round"
-                                                filter="url(#bufferDonutDeepBloom)"
-                                                className="animate-pulse"
-                                            />
+                                            // Pass 2: Inner Dense Corona (บอดี้รัศมีชั้นใน เรืองแสงเข้มข้น)
+                                            const p2_rx = 89 + T * 0.22;
+                                            const p2_ry = 77 + T * 0.22;
+                                            const p2_d = `M ${(140 - p2_rx).toFixed(1)} 100 A ${p2_rx.toFixed(1)} ${p2_ry.toFixed(1)} 0 0 1 ${(140 + p2_rx).toFixed(1)} 100`;
 
-                                            {/* 2. Main Radiant Donut Body (บอดี้รัศมีหลัก ฟุ้งสวยงาม ความหนาตามขนาดบัฟเฟอร์) */}
-                                            <path
-                                                d="M 51 100 A 89 77 0 0 1 229 100"
-                                                fill="none"
-                                                stroke="url(#bufferDonutGradient)"
-                                                strokeWidth={donutThickness}
-                                                strokeLinecap="round"
-                                                filter="url(#bufferDonutSoftGlow)"
-                                            />
+                                            // Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล)
+                                            const p3_rx = 89 + T * 0.52;
+                                            const p3_ry = 77 + T * 0.52;
+                                            const p3_d = `M ${(140 - p3_rx).toFixed(1)} 100 A ${p3_rx.toFixed(1)} ${p3_ry.toFixed(1)} 0 0 1 ${(140 + p3_rx).toFixed(1)} 100`;
 
-                                            {/* 3. Luminous Inner Core Stream (แกนแสงละมุนแบบทึบเนียนตา ไม่มีเส้นประ) */}
-                                            <path
-                                                d="M 51 100 A 89 77 0 0 1 229 100"
-                                                fill="none"
-                                                stroke={isBufferSafe ? "rgba(255,255,255,0.75)" : "rgba(254,240,138,0.75)"}
-                                                strokeWidth={Math.max(2, donutThickness * 0.35)}
-                                                strokeLinecap="round"
-                                                style={{
-                                                    filter: `drop-shadow(0 0 ${Math.max(3, donutThickness * 0.4)}px ${isBufferSafe ? '#67e8f9' : '#fde047'})`
-                                                }}
-                                            />
-                                        </svg>
+                                            // Pass 4: Outer Ethereal Atmosphere (ไอเรืองแสงชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ)
+                                            const p4_rx = 89 + T * 0.85;
+                                            const p4_ry = 77 + T * 0.85;
+                                            const p4_d = `M ${(140 - p4_rx).toFixed(1)} 100 A ${p4_rx.toFixed(1)} ${p4_ry.toFixed(1)} 0 0 1 ${(140 + p4_rx).toFixed(1)} 100`;
+
+                                            return (
+                                                <svg className="w-full h-full overflow-visible" viewBox="0 0 280 280">
+                                                    <defs>
+                                                        {/* Linear Gradients for safe (emerald/cyan) vs alert (amber/coral) */}
+                                                        <linearGradient id="bufferAuraCoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                            <stop offset="0%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.95" />
+                                                            <stop offset="50%" stopColor={isBufferSafe ? "#a7f3d0" : "#fef08a"} stopOpacity="1" />
+                                                            <stop offset="100%" stopColor={isBufferSafe ? "#22d3ee" : "#f97316"} stopOpacity="0.95" />
+                                                        </linearGradient>
+
+                                                        <linearGradient id="bufferAuraMidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                            <stop offset="0%" stopColor={isBufferSafe ? "#10b981" : "#f59e0b"} stopOpacity="0.75" />
+                                                            <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.85" />
+                                                            <stop offset="100%" stopColor={isBufferSafe ? "#06b6d4" : "#ea580c"} stopOpacity="0.75" />
+                                                        </linearGradient>
+
+                                                        {/* Filter for Outermost Soft Haze */}
+                                                        <filter id="bufferAuraDeepHaze" x="-60%" y="-60%" width="220%" height="220%">
+                                                            <feGaussianBlur stdDeviation={Math.max(8, T * 0.75)} result="deepBlur" />
+                                                            <feComposite in="SourceGraphic" in2="deepBlur" operator="over" />
+                                                        </filter>
+
+                                                        {/* Filter for Mid Corona Glow */}
+                                                        <filter id="bufferAuraMidGlow" x="-40%" y="-40%" width="180%" height="180%">
+                                                            <feGaussianBlur stdDeviation={Math.max(4, T * 0.45)} result="midBlur" />
+                                                            <feComposite in="SourceGraphic" in2="midBlur" operator="over" />
+                                                        </filter>
+
+                                                        {/* Filter for Inner Dense Glow */}
+                                                        <filter id="bufferAuraInnerGlow" x="-30%" y="-30%" width="160%" height="160%">
+                                                            <feGaussianBlur stdDeviation={Math.max(2, T * 0.2)} result="innerBlur" />
+                                                            <feComposite in="SourceGraphic" in2="innerBlur" operator="over" />
+                                                        </filter>
+                                                    </defs>
+
+                                                    {/* 🌌 Pass 4: Outermost Ethereal Haze (ไอออร่าชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ) */}
+                                                    <path
+                                                        d={p4_d}
+                                                        fill="none"
+                                                        stroke={isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.35)"}
+                                                        strokeWidth={Math.max(8, T * 1.4)}
+                                                        strokeLinecap="round"
+                                                        filter="url(#bufferAuraDeepHaze)"
+                                                        className={isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.8s_ease-in-out_infinite]"}
+                                                    />
+
+                                                    {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
+                                                    <path
+                                                        d={p3_d}
+                                                        fill="none"
+                                                        stroke="url(#bufferAuraMidGrad)"
+                                                        strokeWidth={Math.max(6, T * 0.9)}
+                                                        strokeLinecap="round"
+                                                        filter="url(#bufferAuraMidGlow)"
+                                                        opacity={0.65}
+                                                        className={isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.5s_ease-in-out_infinite]"}
+                                                    />
+
+                                                    {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
+                                                    <path
+                                                        d={p2_d}
+                                                        fill="none"
+                                                        stroke="url(#bufferAuraCoreGrad)"
+                                                        strokeWidth={Math.max(3.5, T * 0.45)}
+                                                        strokeLinecap="round"
+                                                        filter="url(#bufferAuraInnerGlow)"
+                                                        opacity={0.88}
+                                                    />
+
+                                                    {/* ⚡ Pass 1: Glass Contact Radiant Seam (เส้นกำเนิดแสงที่ผิวโดมแก้ว - วงในสุด เข้ม สว่างชัดเจนดุจเปล่งแสงออกจากเนื้อแก้ว) */}
+                                                    <path
+                                                        d={p1_d}
+                                                        fill="none"
+                                                        stroke={isBufferSafe ? "#ecfdf5" : "#fef08a"}
+                                                        strokeWidth={Math.max(1.5, T * 0.15)}
+                                                        strokeLinecap="round"
+                                                        style={{
+                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isBufferSafe ? '#67e8f9' : '#fde047'})`
+                                                        }}
+                                                        opacity={0.95}
+                                                    />
+                                                </svg>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
