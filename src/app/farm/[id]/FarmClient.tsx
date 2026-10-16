@@ -2817,39 +2817,51 @@ export default function FarmClient({
                                                     <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#fbbf24"} stopOpacity="0.95" />
                                                     <stop offset="100%" stopColor={isBufferSafe ? "#06b6d4" : "#f97316"} stopOpacity="0.85" />
                                                 </linearGradient>
-                                                <filter id="bufferDonutGlow" x="-30%" y="-30%" width="160%" height="160%">
-                                                    <feGaussianBlur stdDeviation={Math.max(2, donutThickness * 0.4)} result="blur" />
+                                                
+                                                {/* Ultra-soft expansive bloom filter */}
+                                                <filter id="bufferDonutDeepBloom" x="-50%" y="-50%" width="200%" height="200%">
+                                                    <feGaussianBlur stdDeviation={Math.max(6, donutThickness * 0.9)} result="wideBlur" />
+                                                    <feComposite in="SourceGraphic" in2="wideBlur" operator="over" />
+                                                </filter>
+                                                
+                                                {/* Medium dreamy aura glow */}
+                                                <filter id="bufferDonutSoftGlow" x="-40%" y="-40%" width="180%" height="180%">
+                                                    <feGaussianBlur stdDeviation={Math.max(3.5, donutThickness * 0.55)} result="blur" />
                                                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                                                 </filter>
                                             </defs>
-                                            {/* Outer Soft Diffusion Glow */}
+
+                                            {/* 1. Deep Ambient Atmospheric Glow (แผ่ฟุ้งกระจายชั้นนอกสุด กว้างและละมุน) */}
                                             <path
-                                                d="M 45 205 A 95 95 0 0 1 235 205"
+                                                d="M 51 100 A 89 77 0 0 1 229 100"
                                                 fill="none"
-                                                stroke={isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}
-                                                strokeWidth={donutThickness * 1.8}
+                                                stroke={isBufferSafe ? "rgba(16,185,129,0.4)" : "rgba(245,158,11,0.4)"}
+                                                strokeWidth={donutThickness * 2.2}
                                                 strokeLinecap="round"
+                                                filter="url(#bufferDonutDeepBloom)"
                                                 className="animate-pulse"
                                             />
-                                            {/* Main Solid Glow Donut Arc (ความหนาตามบัฟเฟอร์: บาง=บัฟเฟอร์น้อย, หนา=บัฟเฟอร์มาก) */}
+
+                                            {/* 2. Main Radiant Donut Body (บอดี้รัศมีหลัก ฟุ้งสวยงาม ความหนาตามขนาดบัฟเฟอร์) */}
                                             <path
-                                                d="M 45 205 A 95 95 0 0 1 235 205"
+                                                d="M 51 100 A 89 77 0 0 1 229 100"
                                                 fill="none"
                                                 stroke="url(#bufferDonutGradient)"
                                                 strokeWidth={donutThickness}
                                                 strokeLinecap="round"
-                                                filter="url(#bufferDonutGlow)"
+                                                filter="url(#bufferDonutSoftGlow)"
                                             />
-                                            {/* Specular Core Ring Highlight */}
+
+                                            {/* 3. Luminous Inner Core Stream (แกนแสงละมุนแบบทึบเนียนตา ไม่มีเส้นประ) */}
                                             <path
-                                                d="M 47 205 A 93 93 0 0 1 233 205"
+                                                d="M 51 100 A 89 77 0 0 1 229 100"
                                                 fill="none"
-                                                stroke="#ffffff"
-                                                strokeWidth={Math.max(1.5, donutThickness * 0.18)}
-                                                strokeDasharray="6 10"
+                                                stroke={isBufferSafe ? "rgba(255,255,255,0.75)" : "rgba(254,240,138,0.75)"}
+                                                strokeWidth={Math.max(2, donutThickness * 0.35)}
                                                 strokeLinecap="round"
-                                                className="animate-pulse"
-                                                opacity="0.85"
+                                                style={{
+                                                    filter: `drop-shadow(0 0 ${Math.max(3, donutThickness * 0.4)}px ${isBufferSafe ? '#67e8f9' : '#fde047'})`
+                                                }}
                                             />
                                         </svg>
                                     </div>
