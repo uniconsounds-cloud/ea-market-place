@@ -394,6 +394,8 @@ export default function AdminOrdersPage() {
                 console.log('Match Found for port', port, ':', existingLicense);
                 console.log('Applying Data for', port, ':', { type: commonLicenseType, expiry: commonExpiryDate, product_id: targetProductId });
 
+                const approvalTimestamp = new Date().toISOString();
+
                 if (existingLicense) {
                     // Update existing license
                     console.log('Updating License ID:', existingLicense.id);
@@ -405,6 +407,7 @@ export default function AdminOrdersPage() {
                             type: commonLicenseType,
                             is_active: true,
                             expiry_date: commonExpiryDate,
+                            created_at: approvalTimestamp, // Update approval timestamp so upgrade/renewal is treated as newly approved
                             ...(order.plan_type !== 'upgrade' && order.ib_broker_name && { ib_broker_name: order.ib_broker_name }),
                             is_ib_request: order.is_ib_request // flag it as IB if it is one
                         })
@@ -428,7 +431,8 @@ export default function AdminOrdersPage() {
                             expiry_date: commonExpiryDate,
                             account_number: port,
                             ib_broker_name: order.plan_type === 'upgrade' ? null : (order.ib_broker_name || null),
-                            is_ib_request: order.is_ib_request
+                            is_ib_request: order.is_ib_request,
+                            created_at: approvalTimestamp
                         });
 
                     if (licenseError) {

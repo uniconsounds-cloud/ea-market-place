@@ -178,16 +178,18 @@ export default function DashboardPage() {
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
-            // Fetch Orders that are pending or rejected
-            const { data: ordersData } = await supabase
+            // Fetch Orders: fetch all orders for this user (both pending/rejected for display, and completed for upgrade/approval timestamp tracking)
+            const { data: allUserOrders } = await supabase
                 .from('orders')
                 .select(`
                     id, product_id, plan_type, status, account_number, created_at,
                     products ( id, name, image_url, file_url, product_key )
                 `)
                 .eq('user_id', user.id)
-                .in('status', ['pending', 'rejected'])
                 .order('created_at', { ascending: false });
+
+            const ordersData = (allUserOrders || []).filter((o: any) => o.status === 'pending' || o.status === 'rejected');
+            const completedOrders = (allUserOrders || []).filter((o: any) => o.status === 'completed' || o.status === 'approved');
 
             // Fetch latest telemetry for accounts to display actual last update
             const accountNumbers = (licensesData || [])
@@ -225,7 +227,42 @@ export default function DashboardPage() {
                     const brokerName = l.ib_broker_name || (Array.isArray((matchedIb as any)?.brokers) ? (matchedIb as any)?.brokers[0]?.name : (matchedIb as any)?.brokers?.name);
 
                     const ps = l.account_number ? portStatusMap[String(l.account_number).trim()] : null;
-                    const approvedAtMs = l.created_at ? new Date(l.created_at).getTime() : 0;
+                    let approvedAtMs = l.created_at ? new Date(l.created_at).getTime() : 0;
+
+                    // Match completed orders (such as upgrade orders to EasyM Prime or renewals)
+                    if (l.account_number) {
+                        const targetPort = String(l.account_number).trim();
+                        completedOrders.forEach((o: any) => {
+                            if (!o.account_number) return;
+                            const ports = o.account_number.split(',').map((p: string) => p.trim());
+                            if (ports.includes(targetPort)) {
+                                const oMs = o.created_at ? new Date(o.created_at).getTime() : 0;
+                                if (oMs > approvedAtMs) {
+                                    approvedAtMs = oMs;
+                                }
+                            }
+                        });
+                    }
+
+                    // For EasyM Prime licenses (including existing accounts upgraded to Prime with 60 days validity)
+                    const isPrimeLicense = l.products?.product_key?.toUpperCase().includes('PRIME') ||
+                                           l.products?.name?.toLowerCase().includes('prime') ||
+                                           l.type === 'pro';
+
+                    if (isPrimeLicense && l.expiry_date) {
+                        const expiryMs = new Date(l.expiry_date).getTime();
+                        // Upon approval of Prime upgrade, 60 days validity was granted
+                        const estimatedUpgradeMs = expiryMs - (60 * 24 * 60 * 60 * 1000);
+                        if (estimatedUpgradeMs > approvedAtMs) {
+                            approvedAtMs = estimatedUpgradeMs;
+                        }
+                    }
+
+                    // Opportunistically sync created_at in licenses table if outdated
+                    if (l.id && approvedAtMs > (l.created_at ? new Date(l.created_at).getTime() : 0)) {
+                        supabase.from('licenses').update({ created_at: new Date(approvedAtMs).toISOString() }).eq('id', l.id).then();
+                    }
+
                     const lastUpdateMs = Math.max(
                         ps?.last_ping ? new Date(ps.last_ping).getTime() : 0,
                         ps?.updated_at ? new Date(ps.updated_at).getTime() : 0,
