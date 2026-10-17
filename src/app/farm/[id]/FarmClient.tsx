@@ -2788,7 +2788,7 @@ export default function FarmClient({
                                 style={{
                                     left: `${(1.0 - 5) * TILE_W}px`,
                                     top: `${(1.0 + 5) * TILE_H_OFFSET}px`,
-                                    zIndex: Math.round(1.0 + 5) + 20,
+                                    zIndex: 250,
                                     width: '280px',
                                     height: '280px'
                                 }}
@@ -2937,7 +2937,7 @@ export default function FarmClient({
 
                         {/* 🛡️ QUARANTINE & RESCUE PREVIEW TREES (คลี่ออกมาจากจุดที่โดมอยู่ เรียงเป็นลำดับ 1 -> 2 -> 3 และชิดกัน) */}
                         {isClient && isPrime && isQuarantineExpanded && quarantinePreviewList.map((qTree, idx) => {
-                            const tZIndex = Math.round(qTree.c + qTree.r) + 20;
+                            const tZIndex = 250 + Math.round(qTree.c + qTree.r);
                             return (
                                 <div
                                     key={`tree_${qTree.id}`}
@@ -3010,7 +3010,7 @@ export default function FarmClient({
                                         style={{
                                             left: `${(1.0 - 5) * TILE_W}px`,
                                             top: `${(1.0 + 5) * TILE_H_OFFSET}px`,
-                                            zIndex: 90,
+                                            zIndex: 260,
                                             width: '280px',
                                             height: '280px'
                                         }}
@@ -3215,7 +3215,7 @@ export default function FarmClient({
                                     {/* Individual Mercury Bars (คลี่ออกตามลำดับจากซ้ายไปขวา) */}
                                     {previewList.map((qTree, idx) => {
                                         const isTreeExpanded = expandedTreeId === qTree.id;
-                                        const barZIndex = isTreeExpanded ? 99999 : 90;
+                                        const barZIndex = isTreeExpanded ? 99999 : 260;
                                         const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
 
                                         return (
