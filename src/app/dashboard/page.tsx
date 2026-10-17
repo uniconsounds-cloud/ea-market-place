@@ -31,6 +31,7 @@ interface ProductItem {
     show_farm?: boolean;
     port_name?: string;
     last_update_ms?: number;
+    approved_at_ms?: number;
     is_online?: boolean;
 }
 
@@ -174,7 +175,8 @@ export default function DashboardPage() {
                     id, product_id, type, expiry_date, is_active, account_number, created_at, show_farm, port_name, ib_broker_name, is_ib_request,
                     products ( id, name, image_url, file_url, product_key )
                 `)
-                .eq('user_id', user.id);
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
 
             // Fetch Orders that are pending or rejected
             const { data: ordersData } = await supabase
@@ -184,9 +186,10 @@ export default function DashboardPage() {
                     products ( id, name, image_url, file_url, product_key )
                 `)
                 .eq('user_id', user.id)
-                .in('status', ['pending', 'rejected']);
+                .in('status', ['pending', 'rejected'])
+                .order('created_at', { ascending: false });
 
-            // Fetch latest telemetry for accounts to sort by actual last update
+            // Fetch latest telemetry for accounts to display actual last update
             const accountNumbers = (licensesData || [])
                 .map((l: any) => l.account_number ? String(l.account_number).trim() : null)
                 .filter(Boolean) as string[];
@@ -222,10 +225,11 @@ export default function DashboardPage() {
                     const brokerName = l.ib_broker_name || (Array.isArray((matchedIb as any)?.brokers) ? (matchedIb as any)?.brokers[0]?.name : (matchedIb as any)?.brokers?.name);
 
                     const ps = l.account_number ? portStatusMap[String(l.account_number).trim()] : null;
+                    const approvedAtMs = l.created_at ? new Date(l.created_at).getTime() : 0;
                     const lastUpdateMs = Math.max(
                         ps?.last_ping ? new Date(ps.last_ping).getTime() : 0,
                         ps?.updated_at ? new Date(ps.updated_at).getTime() : 0,
-                        l.created_at ? new Date(l.created_at).getTime() : 0
+                        approvedAtMs
                     );
 
                     allItems.push({
@@ -234,6 +238,7 @@ export default function DashboardPage() {
                         is_ib: isIbLicense || l.is_ib_request || l.type === 'ib',
                         ib_broker_name: brokerName,
                         last_update_ms: lastUpdateMs,
+                        approved_at_ms: approvedAtMs,
                         is_online: ps?.is_online
                     });
                 });
@@ -241,7 +246,7 @@ export default function DashboardPage() {
 
             if (ordersData) {
                 ordersData.forEach((o: any) => {
-                    const lastUpdateMs = o.created_at ? new Date(o.created_at).getTime() : 0;
+                    const approvedAtMs = o.created_at ? new Date(o.created_at).getTime() : 0;
                     allItems.push({
                         id: o.id,
                         product_id: o.product_id,
@@ -252,13 +257,14 @@ export default function DashboardPage() {
                         products: o.products,
                         source: 'order',
                         is_ib: o.is_ib_request,
-                        last_update_ms: lastUpdateMs
+                        last_update_ms: approvedAtMs,
+                        approved_at_ms: approvedAtMs
                     });
                 });
             }
 
-            // Sort all by last_update_ms desc (latest updated at the top)
-            allItems.sort((a, b) => (b.last_update_ms || 0) - (a.last_update_ms || 0));
+            // Sort all by approved_at_ms desc (latest approved at the top)
+            allItems.sort((a, b) => (b.approved_at_ms || 0) - (a.approved_at_ms || 0));
 
             // Group by Product
             const groups: { [key: string]: GroupedProduct } = {};
@@ -277,16 +283,16 @@ export default function DashboardPage() {
                 groups[prodId].items.push(item);
             });
 
-            // Sort product groups so that the group containing the most recently updated item is at the top
+            // Sort product groups so that the group containing the most recently approved item is at the top
             const sortedGroupList = Object.values(groups).sort((a, b) => {
-                const maxA = Math.max(...a.items.map(i => i.last_update_ms || 0), 0);
-                const maxB = Math.max(...b.items.map(i => i.last_update_ms || 0), 0);
+                const maxA = Math.max(...a.items.map(i => i.approved_at_ms || 0), 0);
+                const maxB = Math.max(...b.items.map(i => i.approved_at_ms || 0), 0);
                 return maxB - maxA;
             });
 
-            // Ensure items inside each group are also sorted by last_update_ms desc
+            // Ensure items inside each group are also sorted by approved_at_ms desc (latest approved on top)
             sortedGroupList.forEach(g => {
-                g.items.sort((a, b) => (b.last_update_ms || 0) - (a.last_update_ms || 0));
+                g.items.sort((a, b) => (b.approved_at_ms || 0) - (a.approved_at_ms || 0));
             });
 
             setGroupedProducts(sortedGroupList);
