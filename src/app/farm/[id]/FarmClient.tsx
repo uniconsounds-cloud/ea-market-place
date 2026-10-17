@@ -1985,7 +1985,7 @@ export default function FarmClient({
                 .select('*')
                 .eq('port_number', portNumber)
                 .order('date', { ascending: false })
-                .limit(30);
+                .limit(120);
 
             if (data) {
                 setHistory(data.reverse());
@@ -2027,12 +2027,7 @@ export default function FarmClient({
         if (!history.length) return [];
         
         // Filter out today's active trading date and any future dates (only show past completed days before today)
-        let filteredData = history.filter(item => item.date < brokerDateStr);
-        
-        // Filter out dates before the license creation date
-        if (licenseCreatedDateStr) {
-            filteredData = filteredData.filter(item => item.date >= licenseCreatedDateStr);
-        }
+        const filteredData = history.filter(item => item.date < brokerDateStr);
 
         // Sort ascending by date
         const sorted = [...filteredData].sort((a, b) => a.date.localeCompare(b.date));
@@ -2139,10 +2134,13 @@ export default function FarmClient({
                 isEndOfWeek
             };
         });
-    }, [history, brokerDateStr, licenseCreatedDateStr, portStatus?.account_type]);
+    }, [history, brokerDateStr, portStatus?.account_type]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     const hasInitialScrolled = useRef(false);
+    const isHistoryDragging = useRef(false);
+    const historyDragStartX = useRef(0);
+    const historyScrollStartLeft = useRef(0);
 
     useEffect(() => {
         hasInitialScrolled.current = false;
@@ -2150,10 +2148,40 @@ export default function FarmClient({
 
     useEffect(() => {
         if (historyScrollRef.current && dailyHistory.length > 0 && !hasInitialScrolled.current) {
-            historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth;
+            const el = historyScrollRef.current;
+            el.scrollLeft = el.scrollWidth;
+            const timer = setTimeout(() => {
+                if (el) el.scrollLeft = el.scrollWidth;
+            }, 120);
             hasInitialScrolled.current = true;
+            return () => clearTimeout(timer);
         }
     }, [isClient, dailyHistory]);
+
+    const handleHistoryWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+        if (!historyScrollRef.current) return;
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            historyScrollRef.current.scrollLeft += e.deltaY;
+        }
+    };
+
+    const handleHistoryMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!historyScrollRef.current) return;
+        isHistoryDragging.current = true;
+        historyDragStartX.current = e.clientX;
+        historyScrollStartLeft.current = historyScrollRef.current.scrollLeft;
+    };
+
+    const handleHistoryMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isHistoryDragging.current || !historyScrollRef.current) return;
+        e.preventDefault();
+        const dx = e.clientX - historyDragStartX.current;
+        historyScrollRef.current.scrollLeft = historyScrollStartLeft.current - dx;
+    };
+
+    const handleHistoryMouseUpOrLeave = () => {
+        isHistoryDragging.current = false;
+    };
 
     const handleSecretToggle = () => {
         if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
@@ -3332,15 +3360,21 @@ export default function FarmClient({
                     {/* Crates scroll row (mobile: inline 90D button at END of scroll, desktop: fill remaining space) */}
                     <div
                         ref={historyScrollRef}
-                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar"
+                        onWheel={handleHistoryWheel}
+                        onMouseDown={handleHistoryMouseDown}
+                        onMouseMove={handleHistoryMouseMove}
+                        onMouseUp={handleHistoryMouseUpOrLeave}
+                        onMouseLeave={handleHistoryMouseUpOrLeave}
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar cursor-grab active:cursor-grabbing select-none"
+                        style={{ touchAction: 'pan-x' }}
                     >
                         {dailyHistory.map((item, idx) => (
                             <div key={item.id || idx} className="flex items-center flex-shrink-0">
-                                <div className="flex flex-col items-center group relative">
-                                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
-                                        <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
+                                <div className="flex flex-col items-center group relative pointer-events-none select-none">
+                                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl pointer-events-none select-none">
+                                        <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized draggable={false} />
                                     </div>
-                                    <div className="flex flex-col items-center">
+                                    <div className="flex flex-col items-center pointer-events-none select-none">
                                         <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
                                         {item.isHoliday ? (
                                             <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>

@@ -258,11 +258,6 @@ export default function DashboardPage() {
                         }
                     }
 
-                    // Opportunistically sync created_at in licenses table if outdated
-                    if (l.id && approvedAtMs > (l.created_at ? new Date(l.created_at).getTime() : 0)) {
-                        supabase.from('licenses').update({ created_at: new Date(approvedAtMs).toISOString() }).eq('id', l.id).then();
-                    }
-
                     const lastUpdateMs = Math.max(
                         ps?.last_ping ? new Date(ps.last_ping).getTime() : 0,
                         ps?.updated_at ? new Date(ps.updated_at).getTime() : 0,
