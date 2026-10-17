@@ -1876,8 +1876,8 @@ export default function FarmClient({
     // 🍩 Dynamic Buffer Aura Thickness:
     // Donut thickness over dome: min 4px, max 26px based on capital buffer %
     const donutThickness = Math.min(26, Math.max(4, Math.round(4 + (capitalBufferPct / 100) * 18)));
-    // Rectangular halo thickness around DD box: min 4px, max 20px based on capital buffer %
-    const boxAuraThickness = Math.min(20, Math.max(4, Math.round(4 + (capitalBufferPct / 100) * 14)));
+    // Rectangular halo thickness around DD box: synchronized with dome buffer aura
+    const boxAuraThickness = donutThickness;
 
     // ⚗️ Golden Silo: Liquid fill percentage based on relief budget vs cap
     const siloFillPct = useMemo(() => {
@@ -3031,61 +3031,113 @@ export default function FarmClient({
                                                 }`}
                                                 title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อย่อกลับ" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
-                                                {/* 🌟 RECTANGULAR HALO AURA (รัศมีรอบกรอบสี่เหลี่ยม ความหนาบางตามค่าบัฟเฟอร์) */}
+                                                {/* 🌟 REALISTIC RECTANGULAR CORONA AURA (รัศมีฉายแสงรอบกล่อง DD - ตอบสนองตามค่า buffer เหมือนรัศมีของโดมแก้ว) */}
                                                 {isQuarantineEnlarged && (
-                                                    <div 
-                                                        className={`absolute rounded-2xl pointer-events-none transition-all duration-500 ${
-                                                            isBufferSafe 
-                                                                ? 'border border-emerald-400/80' 
-                                                                : 'border border-amber-400/80'
-                                                        }`}
-                                                        style={{
-                                                            inset: `-${boxAuraThickness}px`,
-                                                            background: isBufferSafe 
-                                                                ? `radial-gradient(ellipse at center, rgba(16,185,129,0.18) 0%, rgba(6,182,212,0.1) 65%, transparent 100%)` 
-                                                                : `radial-gradient(ellipse at center, rgba(245,158,11,0.22) 0%, rgba(239,68,68,0.1) 65%, transparent 100%)`,
-                                                            boxShadow: isBufferSafe
-                                                                ? `0 0 ${boxAuraThickness * 2}px ${boxAuraThickness * 0.6}px rgba(16, 185, 129, 0.5), inset 0 0 ${boxAuraThickness}px rgba(52, 211, 153, 0.25)`
-                                                                : `0 0 ${boxAuraThickness * 2}px ${boxAuraThickness * 0.6}px rgba(245, 158, 11, 0.55), inset 0 0 ${boxAuraThickness}px rgba(251, 191, 36, 0.3)`,
-                                                            zIndex: -1
-                                                        }}
-                                                    />
+                                                    <div className="absolute inset-0 pointer-events-none z-0">
+                                                        {/* 🌌 Pass 4: Outermost Ethereal Atmosphere (ไอออร่าชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ) */}
+                                                        <div 
+                                                            className={`absolute rounded-3xl pointer-events-none transition-all duration-500 ${
+                                                                isBufferSafe ? 'animate-[pulse_4s_ease-in-out_infinite]' : 'animate-[pulse_1.2s_ease-in-out_infinite]'
+                                                            }`}
+                                                            style={{
+                                                                inset: `-${boxAuraThickness * 1.5}px`,
+                                                                background: isBufferSafe 
+                                                                    ? `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)` 
+                                                                    : `radial-gradient(ellipse at center, rgba(244,63,94,0.28) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`,
+                                                                filter: `blur(${Math.max(6, boxAuraThickness * 0.75)}px)`,
+                                                                boxShadow: isBufferSafe
+                                                                    ? `0 0 ${boxAuraThickness * 2.8}px ${boxAuraThickness * 0.8}px rgba(16, 185, 129, 0.45)`
+                                                                    : `0 0 ${boxAuraThickness * 3.0}px ${boxAuraThickness * 0.9}px rgba(244, 63, 94, 0.55)`,
+                                                                opacity: isBufferSafe ? 0.75 : 0.9
+                                                            }}
+                                                        />
+
+                                                        {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
+                                                        <div 
+                                                            className={`absolute rounded-2xl pointer-events-none transition-all duration-500 ${
+                                                                isBufferSafe ? 'animate-[pulse_3s_ease-in-out_infinite]' : 'animate-[pulse_1.0s_ease-in-out_infinite]'
+                                                            }`}
+                                                            style={{
+                                                                inset: `-${boxAuraThickness * 0.85}px`,
+                                                                border: `${Math.max(2, boxAuraThickness * 0.25)}px solid ${isBufferSafe ? 'rgba(52, 211, 153, 0.45)' : 'rgba(249, 115, 22, 0.55)'}`,
+                                                                boxShadow: isBufferSafe
+                                                                    ? `0 0 ${boxAuraThickness * 1.8}px ${boxAuraThickness * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxAuraThickness * 0.8}px rgba(52, 211, 153, 0.3)`
+                                                                    : `0 0 ${boxAuraThickness * 2.0}px ${boxAuraThickness * 0.5}px rgba(244, 63, 94, 0.6), inset 0 0 ${boxAuraThickness * 0.8}px rgba(251, 146, 60, 0.35)`,
+                                                                filter: `blur(${Math.max(3, boxAuraThickness * 0.4)}px)`,
+                                                                opacity: isBufferSafe ? 0.85 : 0.95
+                                                            }}
+                                                        />
+
+                                                        {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
+                                                        <div 
+                                                            className="absolute rounded-xl pointer-events-none transition-all duration-500"
+                                                            style={{
+                                                                inset: `-${boxAuraThickness * 0.35}px`,
+                                                                border: `${Math.max(1.5, boxAuraThickness * 0.15)}px solid ${isBufferSafe ? 'rgba(167, 243, 208, 0.8)' : 'rgba(254, 240, 138, 0.85)'}`,
+                                                                boxShadow: isBufferSafe
+                                                                    ? `0 0 ${boxAuraThickness * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(110, 231, 183, 0.4)`
+                                                                    : `0 0 ${boxAuraThickness * 1.2}px rgba(244, 63, 94, 0.9), inset 0 0 ${boxAuraThickness * 0.5}px rgba(254, 205, 211, 0.4)`,
+                                                                filter: `blur(${Math.max(1, boxAuraThickness * 0.18)}px)`,
+                                                                opacity: 0.95
+                                                            }}
+                                                        />
+
+                                                        {/* ⚡ Pass 1: Core Rim Energy Seam (เส้นกำเนิดแสงที่ขอบกล่อง แนบชิด สว่างคมชัดดุจเปล่งแสงออกจากขอบกล่อง) */}
+                                                        <div 
+                                                            className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-300"
+                                                            style={{
+                                                                boxShadow: isBufferSafe
+                                                                    ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #34d399`
+                                                                    : `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fff1f2, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #f43f5e`,
+                                                                opacity: 0.98
+                                                            }}
+                                                        />
+                                                    </div>
                                                 )}
 
-                                                {/* 🏷️ FLOATING BUFFER READOUT OVER TOP REGION OF AURA (ตัวเลขและเปอร์เซ็นต์บัฟเฟอร์แสดงบริเวณรัศมีด้านบนกรอบทับรัศมี) */}
+                                                {/* 🏷️ FLOATING BUFFER READOUT OVER AURA IN Z-AXIS (ตัวเลขบัฟเฟอร์ตัวใหญ่เท่าค่า DD แสดงทับบนรัศมีโดยไม่มีกรอบรอบตัวอักษร) */}
                                                 {isQuarantineEnlarged && (
                                                     <div 
-                                                        className={`absolute left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full border shadow-lg backdrop-blur-md flex items-center gap-1.5 z-20 pointer-events-none whitespace-nowrap animate-fade-in ${
-                                                            isBufferSafe 
-                                                                ? 'bg-[#021810]/95 border-emerald-400 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.9)]' 
-                                                                : 'bg-[#1c0808]/95 border-rose-500 text-rose-300 shadow-[0_0_16px_rgba(244,63,94,0.95)] animate-pulse'
-                                                        }`}
+                                                        className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none select-none z-30 whitespace-nowrap animate-fade-in"
                                                         style={{
-                                                            top: `-${Math.max(12, boxAuraThickness + 6)}px`
+                                                            top: `-${Math.max(44, boxAuraThickness + 26)}px`
                                                         }}
                                                     >
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${isBufferSafe ? 'bg-emerald-400 animate-ping' : 'bg-rose-500 animate-ping'}`} />
-                                                        <span className="text-[8px] font-black tracking-wider uppercase font-mono">
-                                                            {isBufferSafe ? 'BUFFER' : 'LOW BUFFER'}
-                                                        </span>
-                                                        <span className="font-mono font-black text-[11px] sm:text-xs">
-                                                            {isFallback1Url ? '**.**' : `${capitalBufferPct >= 0 ? '+' : ''}${capitalBufferPct.toFixed(1)}%`}
-                                                        </span>
-                                                        {simulatedBuffer !== null && (
-                                                            <span className="px-1 py-0.2 rounded bg-amber-500/30 border border-amber-400/50 text-[7px] font-mono font-bold text-amber-300">
-                                                                SIM
+                                                        {/* Subtitle Label (ไม่มีกรอบรอบตัวอักษร) */}
+                                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${isBufferSafe ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping'}`} />
+                                                            <span className={`text-[9px] sm:text-[10px] font-black tracking-widest uppercase font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] ${
+                                                                isBufferSafe ? 'text-emerald-300' : 'text-rose-300 animate-pulse'
+                                                            }`}>
+                                                                {isBufferSafe ? 'BUFFER' : 'LOW BUFFER'}
                                                             </span>
-                                                        )}
-                                                        {primeTelemetry?.resMult != null && (
-                                                            <span className="text-[9px] font-mono opacity-80">
-                                                                ({primeTelemetry.resMult.toFixed(1)}x)
+                                                            {simulatedBuffer !== null && (
+                                                                <span className="text-[8px] font-mono font-bold text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                                                                    [SIM]
+                                                                </span>
+                                                            )}
+                                                            {primeTelemetry?.resMult != null && (
+                                                                <span className="text-[9px] font-mono text-white/70 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                                                                    ({primeTelemetry.resMult.toFixed(1)}x)
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Big Buffer Number: EXACT SAME SIZE AS DD VALUE, NO BOX/BORDER, GLOWING OVER AURA IN Z-AXIS */}
+                                                        <div className="flex items-center justify-center">
+                                                            <span className={`font-mono font-black text-2xl sm:text-3xl leading-none tracking-tight whitespace-nowrap transition-all duration-300 ${
+                                                                isBufferSafe 
+                                                                    ? 'text-emerald-300 drop-shadow-[0_0_22px_rgba(52,211,153,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)]' 
+                                                                    : 'text-rose-400 drop-shadow-[0_0_24px_rgba(244,63,94,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] animate-pulse'
+                                                            }`}>
+                                                                {isFallback1Url ? '**.**' : `${capitalBufferPct >= 0 ? '+' : ''}${capitalBufferPct.toFixed(1)}%`}
                                                             </span>
-                                                        )}
+                                                        </div>
                                                     </div>
                                                 )}
 
                                                 {/* Mini Subtitle Tag linking to Quarantined Pairs */}
-                                                <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
+                                                <div className="flex items-center gap-1 mb-0.5 pointer-events-none relative z-10">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
                                                     <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-amber-400 uppercase">
                                                         QUARANTINE
@@ -3093,7 +3145,7 @@ export default function FarmClient({
                                                 </div>
 
                                                 {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 relative z-10">
                                                     <span className={`font-mono font-black ${quarTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
                                                         isQuarantineEnlarged ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
                                                     }`}>
@@ -3107,7 +3159,7 @@ export default function FarmClient({
                                                 </div>
 
                                                 {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
-                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner ${
+                                                <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-amber-500/30 shadow-inner relative z-10 ${
                                                     isQuarantineEnlarged ? 'w-52 sm:w-60 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
                                                 }`}>
                                                     {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
