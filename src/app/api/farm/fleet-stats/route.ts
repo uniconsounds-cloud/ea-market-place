@@ -159,8 +159,8 @@ export async function GET() {
             return dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
         };
 
-        const todayDateLabel = isWeekend ? `วันศุกร์ (${formatThaiShortDate(latestHistoryDate)})` : `วันนี้ (${formatThaiShortDate(marketDate.toISOString().split('T')[0])})`;
-        const yesterdayDateLabel = isWeekend ? `วันพฤหัสบดี (${formatThaiShortDate(prevHistoryDate)})` : `เมื่อวาน (${formatThaiShortDate(effectiveYesterdayDate)})`;
+        const todayDateLabel = isWeekend ? formatThaiShortDate(latestHistoryDate) : formatThaiShortDate(marketDate.toISOString().split('T')[0]);
+        const yesterdayDateLabel = isWeekend ? formatThaiShortDate(prevHistoryDate) : formatThaiShortDate(effectiveYesterdayDate);
 
         // 7. Timeframe Bars Calculation
         // A) Daily Bars (Last 30 trading days from synthetic model)
@@ -317,13 +317,17 @@ export async function GET() {
         const monthlyPeakDD = allMonthlyBars.length > 0 ? Math.max(...allMonthlyBars.map(b => b.dd)) : 0;
 
         // 7.1 Key Return Metrics for HUD Cards (Daily 30-Day & Monthly 3-Month)
-        // Standard base capital for EasyM farm is 50,000 (USC)
-        const baseCapital = 50000;
-        const dailyAvg30D = dailyBars.length > 0 ? (dailyBars.reduce((s, b) => s + b.avg, 0) / dailyBars.length) : 579.24;
+        // Standard benchmark capital: $1,000 = 100,000 cents (USC)
+        const baseCapital = 100000;
+        const dailyAvgRaw = dailyBars.length > 0 ? (dailyBars.reduce((s, b) => s + b.avg, 0) / dailyBars.length) : 579.24;
+        // Scale to 100,000 capital (assuming synthetic model baseline represents a 50k port)
+        const dailyAvg30D = Math.round(dailyAvgRaw < 1000 ? dailyAvgRaw * 2 : dailyAvgRaw);
         const dailyReturnPct = Number(((dailyAvg30D / baseCapital) * 100).toFixed(2));
 
         const last3Months = allMonthlyBars.slice(-3);
-        const monthlyAvg3M = last3Months.length > 0 ? (last3Months.reduce((s, m) => s + m.avg, 0) / last3Months.length) : 18265;
+        const monthlyAvgRaw = last3Months.length > 0 ? (last3Months.reduce((s, m) => s + m.avg, 0) / last3Months.length) : 18265;
+        // Scale to 100,000 capital
+        const monthlyAvg3M = Math.round(monthlyAvgRaw < 30000 ? monthlyAvgRaw * 2 : monthlyAvgRaw);
         const monthlyReturnPct = Number(((monthlyAvg3M / baseCapital) * 100).toFixed(1));
 
         // 8. Longevity
@@ -363,12 +367,12 @@ export async function GET() {
                 survivalRate: '100%'
             },
             daily30D: {
-                avgYield: Math.round(dailyAvg30D),
+                avgYield: dailyAvg30D,
                 capital: baseCapital,
                 returnPct: dailyReturnPct
             },
             monthly3M: {
-                avgYield: Math.round(monthlyAvg3M),
+                avgYield: monthlyAvg3M,
                 capital: baseCapital,
                 returnPct: monthlyReturnPct
             },
@@ -376,6 +380,9 @@ export async function GET() {
                 date: isWeekend ? latestHistoryDate : marketDate.toISOString().split('T')[0],
                 dateLabel: todayDateLabel,
                 profitablePortRatio: todayWinRate,
+                profitableCount: todayProfitable.length,
+                totalCount: activePoolPorts.length || 10,
+                portStatuses: todayProfitsList.map(item => ({ hasProfit: item.profit > 0 })),
                 avgProfit: Number(todayAvgProfit.toFixed(2)),
                 avgDD: Number(todayAvgDD.toFixed(1)),
                 peakProfit: Number(todayPeakProfit.toFixed(2)),
@@ -386,6 +393,8 @@ export async function GET() {
                 date: effectiveYesterdayDate,
                 dateLabel: yesterdayDateLabel,
                 profitablePortRatio: yesterdayWinRate,
+                profitableCount: yesterdayProfitable.length,
+                totalCount: activePoolPorts.length || 10,
                 avgProfit: Number(yesterdayAvgProfit.toFixed(2)),
                 avgDD: Number(yesterdayAvgDD.toFixed(1)),
                 peakProfit: Number(yesterdayPeakProfit.toFixed(2)),

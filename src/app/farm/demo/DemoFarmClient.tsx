@@ -1575,8 +1575,24 @@ export default function DemoFarmClient({
                                             <div className="text-lg sm:text-2xl font-black font-mono text-emerald-400 leading-tight">
                                                 {fleetStatsData?.today?.profitablePortRatio ?? 70}%
                                             </div>
-                                            <div className="text-[8px] sm:text-[9.5px] text-emerald-300/70 mt-0.5 truncate max-w-full">
-                                                เทียบกับฟาร์มที่รันทั้งหมด
+                                            {/* 10 Model Farm Status Dots */}
+                                            <div className="flex items-center justify-center gap-1 mt-1">
+                                                {Array.from({ length: 10 }).map((_, idx) => {
+                                                    const hasProfit = fleetStatsData?.today?.portStatuses?.[idx]
+                                                        ? fleetStatsData.today.portStatuses[idx].hasProfit
+                                                        : idx < (fleetStatsData?.today?.profitableCount ?? 7);
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-[3px] transition-all duration-300 ${
+                                                                hasProfit
+                                                                    ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]'
+                                                                    : 'bg-zinc-700/80 border border-zinc-600/30'
+                                                            }`}
+                                                            title={`ฟาร์ม #${idx + 1}: ${hasProfit ? 'มีผลผลิต' : 'รอผลผลิต'}`}
+                                                        />
+                                                    );
+                                                })}
                                             </div>
                                         </div>
 
@@ -1604,7 +1620,7 @@ export default function DemoFarmClient({
                                                 +{fleetStatsData?.daily30D?.returnPct ?? 1.16}%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-emerald-300/70 mt-0.5 truncate max-w-full font-mono">
-                                                ~{(fleetStatsData?.daily30D?.avgYield ?? 579).toLocaleString()} (ทุน {(fleetStatsData?.daily30D?.capital ?? 50000).toLocaleString()})
+                                                ~{(fleetStatsData?.daily30D?.avgYield ?? 1160).toLocaleString()} (ทุน {(fleetStatsData?.daily30D?.capital ?? 100000).toLocaleString()})
                                             </div>
                                         </div>
 
@@ -1612,13 +1628,13 @@ export default function DemoFarmClient({
                                         <div className="bg-[#180f08]/90 backdrop-blur-md border border-[#ffd700]/40 rounded-xl p-2 sm:p-2.5 text-center shadow-[0_0_15px_rgba(255,215,0,0.15)] flex flex-col items-center justify-center">
                                             <div className="text-[9px] sm:text-xs text-amber-200/80 flex items-center justify-center gap-1 mb-0.5 whitespace-nowrap">
                                                 <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#ffd700]" />
-                                                <span className="font-bold">ผลผลิต/เดือน (3 เดือน)</span>
+                                                <span className="font-bold">ผลผลิตเฉลี่ย/เดือน (3 เดือน)</span>
                                             </div>
                                             <div className="text-lg sm:text-2xl font-black font-mono text-[#ffd700] leading-tight">
                                                 +{fleetStatsData?.monthly3M?.returnPct ?? 36.5}%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-amber-300/70 mt-0.5 truncate max-w-full font-mono">
-                                                ~{(fleetStatsData?.monthly3M?.avgYield ?? 18265).toLocaleString()} (ทุน {(fleetStatsData?.monthly3M?.capital ?? 50000).toLocaleString()})
+                                                ~{(fleetStatsData?.monthly3M?.avgYield ?? 36530).toLocaleString()} (ทุน {(fleetStatsData?.monthly3M?.capital ?? 100000).toLocaleString()})
                                             </div>
                                         </div>
                                     </div>
@@ -1659,6 +1675,12 @@ export default function DemoFarmClient({
                                     return (n >= 0 ? '+' : '') + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                 };
 
+                                const cleanDateText = (raw: string | undefined) => {
+                                    if (!raw) return '';
+                                    const cleaned = raw.replace(/^(เมื่อวาน|วันนี้)\s*/g, '').replace(/^\((.+)\)$/, '$1').trim();
+                                    return cleaned ? `(${cleaned})` : '';
+                                };
+
                                 const medals = ['🥇', '🥈', '🥉', '🏅', '🏅'];
                                 const rankColors = [
                                     'border-[#ffd700]/50 bg-gradient-to-r from-[#ffd700]/15 to-transparent text-[#ffd700]',
@@ -1693,32 +1715,32 @@ export default function DemoFarmClient({
                                             {/* Column 1: เมื่อวาน */}
                                             <div className="bg-[#160e08]/90 border border-amber-500/30 rounded-xl p-2 sm:p-3 space-y-2 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                                 <div>
-                                                    <div className="flex items-center justify-between border-b border-amber-900/40 pb-1.5 flex-wrap gap-0.5">
-                                                        <span className="text-[10px] sm:text-xs font-bold text-amber-200/90 flex items-center gap-1">
-                                                            <span>📅 เมื่อวาน</span>
-                                                            <span className="text-amber-200/50 text-[8px] sm:text-[9px] font-mono">({y.dateLabel || 'เมื่อวาน'})</span>
+                                                    <div className="flex items-center justify-between border-b border-amber-900/40 pb-1.5 flex-nowrap gap-0.5 overflow-hidden">
+                                                        <span className="text-[10px] sm:text-xs font-bold text-amber-200/90 flex items-center gap-1 min-w-0">
+                                                            <span className="whitespace-nowrap">📅 เมื่อวาน</span>
+                                                            <span className="text-amber-200/50 text-[8px] sm:text-[9px] font-mono truncate">{cleanDateText(y.dateLabel)}</span>
                                                         </span>
-                                                        <span className="text-[8px] sm:text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-bold whitespace-nowrap">
+                                                        <span className="text-[8px] sm:text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-bold whitespace-nowrap flex-shrink-0">
                                                             มีผลผลิต {y.profitablePortRatio ?? 70}%
                                                         </span>
                                                     </div>
 
-                                                    {/* Metrics without DD */}
+                                                    {/* Metrics without DD - Fixed uniform height for both columns */}
                                                     <div className="grid grid-cols-2 gap-1 sm:gap-1.5 mt-1.5 sm:mt-2">
-                                                        <div className="bg-black/40 rounded-lg p-1.5 sm:p-2 border border-emerald-500/15 space-y-0.5">
-                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-200/70 font-bold truncate">
+                                                        <div className="bg-black/40 rounded-lg p-1.5 sm:p-2 border border-emerald-500/15 h-[52px] sm:h-[56px] flex flex-col justify-between overflow-hidden">
+                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-200/70 font-bold truncate whitespace-nowrap">
                                                                 ผลผลิตเฉลี่ย
                                                             </div>
-                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-emerald-400 truncate">
+                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-emerald-400 truncate whitespace-nowrap">
                                                                 {fmt(y.avgProfit)}
                                                             </div>
                                                         </div>
 
-                                                        <div className="bg-black/50 rounded-lg p-1.5 sm:p-2 border border-[#ffd700]/25 space-y-0.5">
-                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-300 font-bold truncate">
+                                                        <div className="bg-black/50 rounded-lg p-1.5 sm:p-2 border border-[#ffd700]/25 h-[52px] sm:h-[56px] flex flex-col justify-between overflow-hidden">
+                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-300 font-bold truncate whitespace-nowrap">
                                                                 🏆 สูงสุด
                                                             </div>
-                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-[#ffd700] truncate">
+                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-[#ffd700] truncate whitespace-nowrap">
                                                                 {fmt(y.peakProfit)}
                                                             </div>
                                                         </div>
@@ -1728,7 +1750,7 @@ export default function DemoFarmClient({
                                                 {/* Top 5 เมื่อวาน without DD */}
                                                 <div className="space-y-1 pt-1.5 border-t border-amber-900/30">
                                                     <div className="flex items-center justify-between text-[9px] sm:text-xs font-bold text-amber-200/80 mb-0.5">
-                                                        <span className="flex items-center gap-1 truncate">
+                                                        <span className="flex items-center gap-1 truncate whitespace-nowrap">
                                                             <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 flex-shrink-0" />
                                                             <span>5 อันดับสูงสุด</span>
                                                         </span>
@@ -1739,7 +1761,7 @@ export default function DemoFarmClient({
                                                             return (
                                                                 <div 
                                                                     key={idx}
-                                                                    className={`flex items-center justify-between p-1 sm:p-1.5 rounded-lg border ${rankColors[idx] || rankColors[4]} transition-all relative overflow-hidden`}
+                                                                    className={`flex items-center justify-between p-1 sm:p-1.5 rounded-lg border ${rankColors[idx] || rankColors[4]} h-[34px] sm:h-[36px] transition-all relative overflow-hidden`}
                                                                 >
                                                                     <div 
                                                                         className="absolute left-0 top-0 bottom-0 bg-emerald-500/5 pointer-events-none"
@@ -1747,7 +1769,7 @@ export default function DemoFarmClient({
                                                                     />
                                                                     <div className="flex items-center gap-1 relative z-10 min-w-0">
                                                                         <span className="text-xs sm:text-sm flex-shrink-0">{medals[idx] || '🏅'}</span>
-                                                                        <span className="text-[9.5px] sm:text-xs font-black tracking-tight truncate">
+                                                                        <span className="text-[9.5px] sm:text-xs font-black tracking-tight truncate whitespace-nowrap">
                                                                             อันดับ {item.rank || idx + 1}
                                                                         </span>
                                                                     </div>
@@ -1766,33 +1788,33 @@ export default function DemoFarmClient({
                                             {/* Column 2: วันนี้ (Live Glow) */}
                                             <div className="bg-gradient-to-br from-[#24170d] to-[#160c06] border-2 border-[#ffd700]/50 rounded-xl p-2 sm:p-3 space-y-2 shadow-[0_0_20px_rgba(255,215,0,0.12)] relative overflow-hidden flex flex-col justify-between">
                                                 <div>
-                                                    <div className="flex items-center justify-between border-b border-[#ffd700]/30 pb-1.5 flex-wrap gap-0.5">
-                                                        <span className="text-[10px] sm:text-xs font-bold text-[#ffd700] flex items-center gap-1">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                                                            <span>⚡ วันนี้</span>
-                                                            <span className="text-amber-200/60 text-[8px] sm:text-[9px] font-mono">({t.dateLabel || 'วันนี้'})</span>
+                                                    <div className="flex items-center justify-between border-b border-[#ffd700]/30 pb-1.5 flex-nowrap gap-0.5 overflow-hidden">
+                                                        <span className="text-[10px] sm:text-xs font-bold text-[#ffd700] flex items-center gap-1 min-w-0">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0"></span>
+                                                            <span className="whitespace-nowrap">⚡ วันนี้</span>
+                                                            <span className="text-amber-200/60 text-[8px] sm:text-[9px] font-mono truncate">{cleanDateText(t.dateLabel)}</span>
                                                         </span>
-                                                        <span className="text-[8px] sm:text-[9px] font-mono text-emerald-400 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30 font-bold whitespace-nowrap">
+                                                        <span className="text-[8px] sm:text-[9px] font-mono text-emerald-400 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30 font-bold whitespace-nowrap flex-shrink-0">
                                                             มีผลผลิต {t.profitablePortRatio ?? 70}%
                                                         </span>
                                                     </div>
 
-                                                    {/* Metrics without DD */}
+                                                    {/* Metrics without DD - Fixed uniform height matching Column 1 */}
                                                     <div className="grid grid-cols-2 gap-1 sm:gap-1.5 mt-1.5 sm:mt-2">
-                                                        <div className="bg-black/40 rounded-lg p-1.5 sm:p-2 border border-emerald-500/20 space-y-0.5">
-                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-200/80 font-bold truncate">
+                                                        <div className="bg-black/40 rounded-lg p-1.5 sm:p-2 border border-emerald-500/20 h-[52px] sm:h-[56px] flex flex-col justify-between overflow-hidden">
+                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-200/80 font-bold truncate whitespace-nowrap">
                                                                 ผลผลิตเฉลี่ย
                                                             </div>
-                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-[#4de180] truncate">
+                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-[#4de180] truncate whitespace-nowrap">
                                                                 {fmt(t.avgProfit)}
                                                             </div>
                                                         </div>
 
-                                                        <div className="bg-black/50 rounded-lg p-1.5 sm:p-2 border border-[#ffd700]/35 space-y-0.5">
-                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-300 font-bold truncate">
+                                                        <div className="bg-black/50 rounded-lg p-1.5 sm:p-2 border border-[#ffd700]/35 h-[52px] sm:h-[56px] flex flex-col justify-between overflow-hidden">
+                                                            <div className="text-[8.5px] sm:text-[10px] text-amber-300 font-bold truncate whitespace-nowrap">
                                                                 🏆 สูงสุด
                                                             </div>
-                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-[#ffd700] truncate">
+                                                            <div className="text-[11px] sm:text-sm font-black font-mono text-[#ffd700] truncate whitespace-nowrap">
                                                                 {fmt(t.peakProfit)}
                                                             </div>
                                                         </div>
@@ -1802,7 +1824,7 @@ export default function DemoFarmClient({
                                                 {/* Top 5 วันนี้ without DD */}
                                                 <div className="space-y-1 pt-1.5 border-t border-[#ffd700]/25">
                                                     <div className="flex items-center justify-between text-[9px] sm:text-xs font-bold text-[#ffd700] mb-0.5">
-                                                        <span className="flex items-center gap-1 truncate">
+                                                        <span className="flex items-center gap-1 truncate whitespace-nowrap">
                                                             <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#ffd700] flex-shrink-0" />
                                                             <span>5 อันดับสูงสุด</span>
                                                         </span>
@@ -1813,7 +1835,7 @@ export default function DemoFarmClient({
                                                             return (
                                                                 <div 
                                                                     key={idx}
-                                                                    className={`flex items-center justify-between p-1 sm:p-1.5 rounded-lg border ${rankColors[idx] || rankColors[4]} transition-all relative overflow-hidden`}
+                                                                    className={`flex items-center justify-between p-1 sm:p-1.5 rounded-lg border ${rankColors[idx] || rankColors[4]} h-[34px] sm:h-[36px] transition-all relative overflow-hidden`}
                                                                 >
                                                                     <div 
                                                                         className="absolute left-0 top-0 bottom-0 bg-emerald-500/5 pointer-events-none"
@@ -1821,7 +1843,7 @@ export default function DemoFarmClient({
                                                                     />
                                                                     <div className="flex items-center gap-1 relative z-10 min-w-0">
                                                                         <span className="text-xs sm:text-sm flex-shrink-0">{medals[idx] || '🏅'}</span>
-                                                                        <span className="text-[9.5px] sm:text-xs font-black tracking-tight truncate">
+                                                                        <span className="text-[9.5px] sm:text-xs font-black tracking-tight truncate whitespace-nowrap">
                                                                             อันดับ {item.rank || idx + 1}
                                                                         </span>
                                                                     </div>
@@ -1886,40 +1908,38 @@ export default function DemoFarmClient({
 
                                     return (
                                         <div className="space-y-3">
-                                            {/* Summary Cards: Average vs Peak with Explicit Lookback */}
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                            {/* Summary Cards: Average vs Peak with Explicit Lookback (Strictly Side-by-Side on all screens) */}
+                                            <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
                                                 {/* Card 1: ผลผลิตเฉลี่ย */}
-                                                <div className="bg-[#180e08] border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 space-y-1 shadow-sm">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] gap-1 flex-wrap">
-                                                        <span className="text-amber-200/90 font-bold flex items-center gap-1">
+                                                <div className="bg-[#180e08] border border-emerald-500/30 rounded-xl p-2 sm:p-3 space-y-1 shadow-sm flex flex-col justify-between">
+                                                    <div>
+                                                        <div className="text-[9.5px] sm:text-[11px] text-amber-200/90 font-bold flex items-center gap-1 truncate">
                                                             <span>⚖️ ผลผลิตเฉลี่ย{fleetTimeframe === 'daily' ? 'รายวัน' : fleetTimeframe === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}</span>
-                                                        </span>
+                                                        </div>
+                                                        <div className="text-sm sm:text-xl font-black font-mono text-emerald-400 truncate mt-0.5">
+                                                            {fmt(avgProfit)}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-base sm:text-xl font-black font-mono text-emerald-400">
-                                                        {fmt(avgProfit)}
-                                                    </div>
-                                                    <div className="text-[9px] sm:text-[10px] text-emerald-300/80 font-bold flex items-center gap-1">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                                        <span>{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
-                                                        <span className="text-amber-200/40 font-normal">| ฟาร์มมีผลผลิต</span>
+                                                    <div className="text-[8px] sm:text-[10px] text-emerald-300/80 font-bold flex items-center gap-1 truncate">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                                                        <span className="truncate">{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
                                                     </div>
                                                 </div>
 
                                                 {/* Card 2: ผลผลิตสูงสุด */}
-                                                <div className="bg-[#180e08] border border-[#ffd700]/30 rounded-xl p-2.5 sm:p-3 space-y-1 shadow-sm">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] gap-1 flex-wrap">
-                                                        <span className="text-amber-300 font-bold flex items-center gap-1">
-                                                            <Sparkles className="w-3 h-3 text-[#ffd700]" />
-                                                            <span>ผลผลิตสูงสุด{fleetTimeframe === 'daily' ? 'รายวัน' : fleetTimeframe === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}</span>
-                                                        </span>
+                                                <div className="bg-[#180e08] border border-[#ffd700]/30 rounded-xl p-2 sm:p-3 space-y-1 shadow-sm flex flex-col justify-between">
+                                                    <div>
+                                                        <div className="text-[9.5px] sm:text-[11px] text-amber-300 font-bold flex items-center gap-1 truncate">
+                                                            <Sparkles className="w-3 h-3 text-[#ffd700] flex-shrink-0" />
+                                                            <span className="truncate">ผลผลิตสูงสุด{fleetTimeframe === 'daily' ? 'รายวัน' : fleetTimeframe === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}</span>
+                                                        </div>
+                                                        <div className="text-sm sm:text-xl font-black font-mono text-[#ffd700] truncate mt-0.5">
+                                                            {fmt(peakProfit)}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-base sm:text-xl font-black font-mono text-[#ffd700]">
-                                                        {fmt(peakProfit)}
-                                                    </div>
-                                                    <div className="text-[9px] sm:text-[10px] text-amber-300/80 font-bold flex items-center gap-1">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#ffd700]"></span>
-                                                        <span>{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
-                                                        <span className="text-amber-200/40 font-normal">| ฟาร์มอันดับ 1</span>
+                                                    <div className="text-[8px] sm:text-[10px] text-amber-300/80 font-bold flex items-center gap-1 truncate">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#ffd700] flex-shrink-0"></span>
+                                                        <span className="truncate">{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
                                                     </div>
                                                 </div>
                                             </div>
