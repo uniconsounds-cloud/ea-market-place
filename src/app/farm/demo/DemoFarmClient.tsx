@@ -141,6 +141,7 @@ export default function DemoFarmClient({
     const [top5DateTab, setTop5DateTab] = useState<'today' | 'yesterday'>('today');
     const [showOpenRealAccountModal, setShowOpenRealAccountModal] = useState(false);
     const fleetTimelineScrollRef = useRef<HTMLDivElement>(null);
+    const barChartScrollRef = useRef<HTMLDivElement>(null);
 
     const getFleetFarmBoxAsset = (centsOrProfit: number) => {
         if (centsOrProfit < 0) return '/farm/base_farmbox_lose.png';
@@ -153,6 +154,9 @@ export default function DemoFarmClient({
     useEffect(() => {
         if (fleetTimelineScrollRef.current) {
             fleetTimelineScrollRef.current.scrollLeft = fleetTimelineScrollRef.current.scrollWidth;
+        }
+        if (barChartScrollRef.current) {
+            barChartScrollRef.current.scrollLeft = barChartScrollRef.current.scrollWidth;
         }
     }, [fleetTimeframe, showFleetStats, fleetStatsData]);
 
@@ -1877,7 +1881,7 @@ export default function DemoFarmClient({
                                     };
 
                                     const maxBarValue = bars.length > 0
-                                        ? Math.max(...bars.map(b => Math.max(b.peakProfit || 0, b.avgProfit || 0)), 1)
+                                        ? Math.max(...bars.map(b => Math.max(Number(b.peakProfit ?? b.peak ?? 0), Number(b.avgProfit ?? b.avg ?? 0))), 1)
                                         : 1;
 
                                     return (
@@ -1928,9 +1932,9 @@ export default function DemoFarmClient({
                                                 <div className="flex items-center justify-between flex-wrap gap-1 text-[9px] sm:text-[10px]">
                                                     <span className="font-bold text-amber-200/80 flex items-center gap-1">
                                                         <BarChart3 className="w-3.5 h-3.5 text-[#ffd700]" />
-                                                        <span>กราฟเปรียบเทียบกำไรสูงสุดและกำไรเฉลี่ย</span>
+                                                        <span>กราฟกำไรสูงสุด & กำไรเฉลี่ย (เลื่อนดูอดีต ⬅️ ➡️)</span>
                                                     </span>
-                                                    <div className="flex items-center gap-3 font-mono">
+                                                    <div className="flex items-center gap-2.5 font-mono">
                                                         <div className="flex items-center gap-1">
                                                             <span className="w-2.5 h-2.5 rounded-sm bg-[#ffd700]"></span>
                                                             <span className="text-amber-300">สูงสุด (Peak)</span>
@@ -1942,48 +1946,55 @@ export default function DemoFarmClient({
                                                     </div>
                                                 </div>
 
-                                                {/* Bar Chart Bars */}
-                                                <div className="pt-4 pb-1">
-                                                    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 items-end min-h-[140px] sm:min-h-[170px] border-b border-amber-900/40 pb-2">
+                                                {/* Bar Chart Bars (Single Horizontal Scrollable Row) */}
+                                                <div className="pt-3 pb-1">
+                                                    <div 
+                                                        ref={barChartScrollRef}
+                                                        className="overflow-x-auto no-scrollbar flex items-end gap-2.5 sm:gap-4 min-h-[160px] sm:min-h-[190px] border-b border-amber-900/40 pb-2 px-1"
+                                                    >
                                                         {bars.map((bar, idx) => {
-                                                            const peakH = Math.min(100, Math.max(10, Math.round(((bar.peakProfit || 0) / maxBarValue) * 100)));
-                                                            const avgH = Math.min(100, Math.max(8, Math.round(((bar.avgProfit || 0) / maxBarValue) * 100)));
+                                                            const peakVal = Number(bar.peakProfit ?? bar.peak ?? 0);
+                                                            const avgVal = Number(bar.avgProfit ?? bar.avg ?? 0);
+                                                            const ddVal = Number(bar.peakDD ?? bar.avgDD ?? bar.dd ?? 0);
+
+                                                            const peakH = Math.min(100, Math.max(10, Math.round((peakVal / maxBarValue) * 100)));
+                                                            const avgH = Math.min(100, Math.max(8, Math.round((avgVal / maxBarValue) * 100)));
 
                                                             return (
-                                                                <div key={idx} className="flex flex-col items-center justify-end h-full gap-1 group">
+                                                                <div key={idx} className="flex flex-col items-center justify-end h-full gap-1 group flex-shrink-0 min-w-[56px] sm:min-w-[68px]">
                                                                     {/* Dual Bars side-by-side */}
-                                                                    <div className="flex items-end justify-center gap-1 w-full h-full max-h-[110px] sm:max-h-[130px]">
+                                                                    <div className="flex items-end justify-center gap-1 w-full h-[105px] sm:h-[125px]">
                                                                         {/* Peak Bar */}
                                                                         <div className="w-1/2 max-w-[18px] sm:max-w-[24px] flex flex-col items-center justify-end h-full">
-                                                                            <span className="text-[7px] sm:text-[8px] font-mono text-[#ffd700] opacity-0 group-hover:opacity-100 transition-opacity mb-0.5 whitespace-nowrap">
-                                                                                {Math.round(bar.peakProfit || 0)}
+                                                                            <span className="text-[7.5px] sm:text-[9px] font-mono text-[#ffd700] mb-0.5 whitespace-nowrap leading-none font-bold">
+                                                                                {Math.round(peakVal)}
                                                                             </span>
                                                                             <div 
-                                                                                className="w-full bg-gradient-to-t from-amber-600 via-[#ffd700] to-yellow-200 rounded-t-sm shadow-[0_0_8px_rgba(255,215,0,0.3)] transition-all duration-300 hover:brightness-125"
+                                                                                className="w-full bg-gradient-to-t from-amber-600 via-[#ffd700] to-yellow-200 rounded-t-sm shadow-[0_0_8px_rgba(255,215,0,0.3)] transition-all duration-300 group-hover:brightness-125"
                                                                                 style={{ height: `${peakH}%` }}
                                                                             />
                                                                         </div>
 
                                                                         {/* Avg Bar */}
                                                                         <div className="w-1/2 max-w-[18px] sm:max-w-[24px] flex flex-col items-center justify-end h-full">
-                                                                            <span className="text-[7px] sm:text-[8px] font-mono text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity mb-0.5 whitespace-nowrap">
-                                                                                {Math.round(bar.avgProfit || 0)}
+                                                                            <span className="text-[7.5px] sm:text-[9px] font-mono text-emerald-400 mb-0.5 whitespace-nowrap leading-none font-bold">
+                                                                                {Math.round(avgVal)}
                                                                             </span>
                                                                             <div 
-                                                                                className="w-full bg-gradient-to-t from-emerald-700 via-emerald-400 to-teal-300 rounded-t-sm shadow-[0_0_8px_rgba(52,211,153,0.3)] transition-all duration-300 hover:brightness-125"
+                                                                                className="w-full bg-gradient-to-t from-emerald-700 via-emerald-400 to-teal-300 rounded-t-sm shadow-[0_0_8px_rgba(52,211,153,0.3)] transition-all duration-300 group-hover:brightness-125"
                                                                                 style={{ height: `${avgH}%` }}
                                                                             />
                                                                         </div>
                                                                     </div>
 
                                                                     {/* Period Label */}
-                                                                    <div className="text-[8px] sm:text-[10px] font-mono text-amber-200/80 text-center truncate w-full mt-1">
+                                                                    <div className="text-[8px] sm:text-[10px] font-mono text-amber-200/90 text-center truncate w-full mt-1 font-bold">
                                                                         {bar.label}
                                                                     </div>
 
                                                                     {/* Small DD badge */}
-                                                                    <span className="text-[7px] sm:text-[8px] font-mono text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 whitespace-nowrap">
-                                                                        DD {bar.peakDD ?? bar.avgDD ?? 0}%
+                                                                    <span className="text-[7px] sm:text-[8px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 whitespace-nowrap">
+                                                                        DD {ddVal}%
                                                                     </span>
                                                                 </div>
                                                             );

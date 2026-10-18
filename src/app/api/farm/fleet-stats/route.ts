@@ -141,24 +141,30 @@ export async function GET() {
         const yesterdayDateLabel = isWeekend ? `วันพฤหัสบดี (${formatThaiShortDate(prevHistoryDate)})` : `เมื่อวาน (${formatThaiShortDate(effectiveYesterdayDate)})`;
 
         // 7. Timeframe Bars Calculation
-        // A) Daily Bars (Last 7 trading days)
-        const last7Dates = sortedDates.slice(-7);
-        const dailyBars = last7Dates.map(dStr => {
+        // A) Daily Bars (Last 30 trading days for smooth scrollable history)
+        const lastTradingDates = sortedDates.slice(-30);
+        const dailyBars = lastTradingDates.map(dStr => {
             const items = dateMap.get(dStr) || [];
             const pos = items.filter(i => i.profit > 0);
-            const avg = pos.length ? (pos.reduce((s, i) => s + i.profit, 0) / pos.length) : (items.reduce((s, i) => s + i.profit, 0) / Math.max(1, items.length));
+            const avg = pos.length ? (pos.reduce((s, i) => s + i.profit, 0) / pos.length) : 0;
             const peak = items.length ? Math.max(...items.map(i => i.profit)) : 0;
-            const dd = items.length ? (items.reduce((s, i) => s + i.dd, 0) / items.length) : 0;
+            const maxDD = items.length ? Math.max(...items.map(i => i.dd)) : 0;
+            const avgDD = items.length ? (items.reduce((s, i) => s + i.dd, 0) / items.length) : 0;
+            const effectiveDD = maxDD > 0 ? maxDD : avgDD;
             return {
                 date: dStr,
                 label: formatThaiShortDate(dStr),
                 avg: Number(avg.toFixed(2)),
                 peak: Number(peak.toFixed(2)),
-                dd: Number(dd.toFixed(1))
+                dd: Number(effectiveDD.toFixed(1)),
+                avgProfit: Number(avg.toFixed(2)),
+                peakProfit: Number(peak.toFixed(2)),
+                avgDD: Number(avgDD.toFixed(1)),
+                peakDD: Number(effectiveDD.toFixed(1))
             };
         });
 
-        // B) Weekly Bars (Last 5 weeks)
+        // B) Weekly Bars (Last 10 weeks)
         const weeklyBars: any[] = [];
         const daysForWeeks = [...sortedDates];
         let wIdx = 1;
@@ -168,8 +174,10 @@ export async function GET() {
             chunk.forEach(d => {
                 allChunkItems = allChunkItems.concat(dateMap.get(d) || []);
             });
-            const totalChunkProfit = allChunkItems.reduce((s, i) => s + i.profit, 0);
-            const avgWeekly = totalChunkProfit / Math.max(1, activePoolPorts.length);
+            const posChunk = allChunkItems.filter(i => i.profit > 0);
+            const avgWeekly = posChunk.length > 0
+                ? (posChunk.reduce((s, i) => s + i.profit, 0) / Math.max(1, activePoolPorts.length))
+                : 0;
             
             const portWeeklyTotals = new Map<string, number>();
             chunk.forEach(d => {
@@ -180,7 +188,9 @@ export async function GET() {
                 });
             });
             const peakWeekly = portWeeklyTotals.size > 0 ? Math.max(...Array.from(portWeeklyTotals.values())) : avgWeekly * 1.8;
+            const maxDD = allChunkItems.length ? Math.max(...allChunkItems.map(i => i.dd)) : 0;
             const avgDD = allChunkItems.length ? (allChunkItems.reduce((s, i) => s + i.dd, 0) / allChunkItems.length) : 3.8;
+            const effectiveDD = maxDD > 0 ? maxDD : avgDD;
 
             const startL = formatThaiShortDate(chunk[0]);
             const endL = formatThaiShortDate(chunk[chunk.length - 1]);
@@ -188,24 +198,28 @@ export async function GET() {
                 label: wIdx === 1 ? 'สัปดาห์นี้' : `${startL} - ${endL}`,
                 avg: Number(avgWeekly.toFixed(2)),
                 peak: Number(peakWeekly.toFixed(2)),
-                dd: Number(avgDD.toFixed(1)),
+                dd: Number(effectiveDD.toFixed(1)),
+                avgProfit: Number(avgWeekly.toFixed(2)),
+                peakProfit: Number(peakWeekly.toFixed(2)),
+                avgDD: Number(avgDD.toFixed(1)),
+                peakDD: Number(effectiveDD.toFixed(1)),
                 isCurrent: wIdx === 1
             });
             wIdx++;
-            if (weeklyBars.length >= 5) break;
+            if (weeklyBars.length >= 10) break;
         }
 
         // C) Monthly Bars
         const recentMonths = [
-            { label: 'ก.พ. 69', avg: 14200, peak: 28400, dd: 3.5 },
-            { label: 'มี.ค. 69', avg: 18600, peak: 34100, dd: 4.2 },
-            { label: 'เม.ย. 69', avg: 21400, peak: 39500, dd: 5.1 },
-            { label: 'พ.ค. 69', avg: 19800, peak: 36200, dd: 4.8 },
-            { label: 'มิ.ย. 69', avg: 23500, peak: 42100, dd: 6.2 },
-            { label: 'ก.ค. 69', avg: 24100, peak: 45000, dd: 5.8 },
-            { label: 'ส.ค. 69', avg: 22900, peak: 41800, dd: 5.4 },
-            { label: 'ก.ย. 69', avg: 25400, peak: 46200, dd: 5.2 },
-            { label: 'ต.ค. 69 (ปัจจุบัน)', avg: 16800, peak: 31200, dd: 4.9, isCurrent: true }
+            { label: 'ก.พ. 69', avg: 14200, peak: 28400, dd: 3.5, avgProfit: 14200, peakProfit: 28400, avgDD: 3.5, peakDD: 3.5 },
+            { label: 'มี.ค. 69', avg: 18600, peak: 34100, dd: 4.2, avgProfit: 18600, peakProfit: 34100, avgDD: 4.2, peakDD: 4.2 },
+            { label: 'เม.ย. 69', avg: 21400, peak: 39500, dd: 5.1, avgProfit: 21400, peakProfit: 39500, avgDD: 5.1, peakDD: 5.1 },
+            { label: 'พ.ค. 69', avg: 19800, peak: 36200, dd: 4.8, avgProfit: 19800, peakProfit: 36200, avgDD: 4.8, peakDD: 4.8 },
+            { label: 'มิ.ย. 69', avg: 23500, peak: 42100, dd: 6.2, avgProfit: 23500, peakProfit: 42100, avgDD: 6.2, peakDD: 6.2 },
+            { label: 'ก.ค. 69', avg: 24100, peak: 45000, dd: 5.8, avgProfit: 24100, peakProfit: 45000, avgDD: 5.8, peakDD: 5.8 },
+            { label: 'ส.ค. 69', avg: 22900, peak: 41800, dd: 5.4, avgProfit: 22900, peakProfit: 41800, avgDD: 5.4, peakDD: 5.4 },
+            { label: 'ก.ย. 69', avg: 25400, peak: 46200, dd: 5.2, avgProfit: 25400, peakProfit: 46200, avgDD: 5.2, peakDD: 5.2 },
+            { label: 'ต.ค. 69 (ปัจจุบัน)', avg: 16800, peak: 31200, dd: 4.9, avgProfit: 16800, peakProfit: 31200, avgDD: 4.9, peakDD: 4.9, isCurrent: true }
         ];
 
         // 8. Longevity
