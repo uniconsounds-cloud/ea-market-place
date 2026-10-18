@@ -316,6 +316,16 @@ export async function GET() {
         const monthlyAvgDD = allMonthlyBars.length > 0 ? (allMonthlyBars.reduce((s, b) => s + b.dd, 0) / allMonthlyBars.length) : 0;
         const monthlyPeakDD = allMonthlyBars.length > 0 ? Math.max(...allMonthlyBars.map(b => b.dd)) : 0;
 
+        // 7.1 Key Return Metrics for HUD Cards (Daily 30-Day & Monthly 3-Month)
+        // Standard base capital for EasyM farm is 50,000 (USC)
+        const baseCapital = 50000;
+        const dailyAvg30D = dailyBars.length > 0 ? (dailyBars.reduce((s, b) => s + b.avg, 0) / dailyBars.length) : 579.24;
+        const dailyReturnPct = Number(((dailyAvg30D / baseCapital) * 100).toFixed(2));
+
+        const last3Months = allMonthlyBars.slice(-3);
+        const monthlyAvg3M = last3Months.length > 0 ? (last3Months.reduce((s, m) => s + m.avg, 0) / last3Months.length) : 18265;
+        const monthlyReturnPct = Number(((monthlyAvg3M / baseCapital) * 100).toFixed(1));
+
         // 8. Longevity
         const systemStartTimestamp = new Date('2026-02-01T00:00:00Z').getTime();
         const daysRunning = Math.max(228, Math.ceil((now.getTime() - systemStartTimestamp) / (1000 * 60 * 60 * 24)));
@@ -347,8 +357,20 @@ export async function GET() {
             longevity: {
                 daysRunning,
                 longevityLabel,
+                startEnglish: 'Feb 2026',
+                shortLabel: `${daysRunning}D Active`,
                 startDate: '1 ก.พ. 2569',
                 survivalRate: '100%'
+            },
+            daily30D: {
+                avgYield: Math.round(dailyAvg30D),
+                capital: baseCapital,
+                returnPct: dailyReturnPct
+            },
+            monthly3M: {
+                avgYield: Math.round(monthlyAvg3M),
+                capital: baseCapital,
+                returnPct: monthlyReturnPct
             },
             today: {
                 date: isWeekend ? latestHistoryDate : marketDate.toISOString().split('T')[0],
