@@ -138,7 +138,6 @@ export default function DemoFarmClient({
     const [loadingFleetStats, setLoadingFleetStats] = useState(false);
     const [fleetTimeframe, setFleetTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
     const [statsCurrency, setStatsCurrency] = useState<'USC' | 'USD'>('USC');
-    const [top5DateTab, setTop5DateTab] = useState<'today' | 'yesterday'>('today');
     const [showOpenRealAccountModal, setShowOpenRealAccountModal] = useState(false);
     const fleetTimelineScrollRef = useRef<HTMLDivElement>(null);
     const barChartScrollRef = useRef<HTMLDivElement>(null);
@@ -1518,7 +1517,7 @@ export default function DemoFarmClient({
                                         </span>
                                     </div>
                                     <p className="text-[10px] sm:text-xs text-amber-200/60 truncate mt-0.5">
-                                        สถิติความโปร่งใสและผลตอบแทนระยะยาวจากพอร์ตจริงระดับ Farm ทั่วประเทศ
+                                        สถิติความโปร่งใสและผลผลิตระยะยาวจากฟาร์มจริงระดับ Farm ทั่วประเทศ
                                     </p>
                                 </div>
                             </div>
@@ -1533,7 +1532,7 @@ export default function DemoFarmClient({
                         {/* Modal Body with Smooth Scroll */}
                         <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 sm:space-y-4">
                             {/* ========================================================================= */}
-                            {/* 1. ส่วนบน: ฟาร์มต้นไม้ & HUD อัตรากำไร + อัตราอยู่รอด 100% */}
+                            {/* 1. ส่วนบน: ฟาร์มต้นไม้ & HUD อัตราผลผลิต + อัตราอยู่รอด 100% */}
                             {/* ========================================================================= */}
                             <div className="relative overflow-hidden rounded-2xl border-2 border-[#cfa545]/40 bg-gradient-to-b from-[#180e07] via-[#100703] to-[#0a0502] p-3 sm:p-4 shadow-[0_0_35px_rgba(207,165,69,0.18)]">
                                 {/* Grove of Trees Backdrop */}
@@ -1564,20 +1563,20 @@ export default function DemoFarmClient({
 
                                 {/* HUD Overlay Layer */}
                                 <div className="relative z-10 space-y-2.5">
-                                    {/* 2 HUD Badges: Profitable Port Ratio & 100% Survival Rate */}
+                                    {/* 2 HUD Badges: Profitable Farm Ratio & 100% Survival Rate */}
                                     <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                                        {/* Card 1: Today's Profitable Port Ratio */}
+                                        {/* Card 1: Today's Profitable Farm Ratio */}
                                         <div className="bg-[#180f08]/90 backdrop-blur-md border border-emerald-500/40 rounded-xl p-2.5 sm:p-3 text-center shadow-[0_0_15px_rgba(16,185,129,0.15)] flex flex-col items-center justify-center">
                                             <div className="text-[10px] sm:text-xs text-emerald-200/80 flex items-center justify-center gap-1 mb-0.5 whitespace-nowrap">
                                                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                                                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                                                <span className="font-bold">อัตราพอร์ตกำไรวันนี้</span>
+                                                <span className="font-bold">อัตราฟาร์มผลผลิตวันนี้</span>
                                             </div>
                                             <div className="text-xl sm:text-3xl font-black font-mono text-emerald-400 leading-tight">
                                                 {fleetStatsData?.today?.profitablePortRatio ?? 70}%
                                             </div>
                                             <div className="text-[9px] sm:text-[10px] text-emerald-300/70 mt-0.5 truncate max-w-full">
-                                                เทียบกับพอร์ตที่รันทั้งหมด
+                                                เทียบกับฟาร์มที่รันทั้งหมด
                                             </div>
                                         </div>
 
@@ -1585,13 +1584,13 @@ export default function DemoFarmClient({
                                         <div className="bg-[#180f08]/90 backdrop-blur-md border border-[#ffd700]/40 rounded-xl p-2.5 sm:p-3 text-center shadow-[0_0_15px_rgba(255,215,0,0.15)] flex flex-col items-center justify-center">
                                             <div className="text-[10px] sm:text-xs text-amber-200/80 flex items-center justify-center gap-1 mb-0.5 whitespace-nowrap">
                                                 <Award className="w-3.5 h-3.5 text-[#ffd700]" />
-                                                <span className="font-bold">อัตราการอยู่รอด</span>
+                                                <span className="font-bold">อัตราการอยู่รอดของฟาร์ม</span>
                                             </div>
                                             <div className="text-xl sm:text-3xl font-black font-mono text-[#ffd700] leading-tight">
                                                 100%
                                             </div>
                                             <div className="text-[9px] sm:text-[10px] text-emerald-400 font-bold mt-0.5 truncate max-w-full">
-                                                ปลอดภัย ไม่เคยล้างพอร์ต
+                                                ปลอดภัย ไม่เคยล้างฟาร์ม
                                             </div>
                                         </div>
                                     </div>
@@ -1618,130 +1617,14 @@ export default function DemoFarmClient({
                             </div>
 
                             {/* ========================================================================= */}
-                            {/* 2. เปรียบเทียบผลงาน วันนี้ vs เมื่อวาน (Today vs Yesterday) */}
+                            {/* ========================================================================= */}
+                            {/* 2. เปรียบเทียบผลผลิต วันนี้ vs เมื่อวาน & 5 อันดับสูงสุด (Side by Side) */}
                             {/* ========================================================================= */}
                             {fleetStatsData && (() => {
                                 const y = fleetStatsData.yesterday || {};
                                 const t = fleetStatsData.today || {};
-
-                                const fmt = (n: number | undefined) => {
-                                    if (n === undefined || n === null || isNaN(n)) return '0.00';
-                                    return (n >= 0 ? '+' : '') + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                };
-
-                                return (
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center justify-between px-1">
-                                            <div className="flex items-center gap-1.5">
-                                                <Sparkles className="w-3.5 h-3.5 text-[#ffd700]" />
-                                                <h3 className="text-xs sm:text-sm font-extrabold text-white tracking-wide">
-                                                    เปรียบเทียบผลงาน วันนี้ vs เมื่อวาน
-                                                </h3>
-                                            </div>
-                                            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                                กำไรคิดเฉพาะพอร์ตที่บวก
-                                            </span>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                                            {/* เมื่อวาน */}
-                                            <div className="bg-[#160e08]/90 border border-amber-500/30 rounded-xl p-3 sm:p-3.5 space-y-2 shadow-sm relative overflow-hidden">
-                                                <div className="flex items-center justify-between border-b border-amber-900/40 pb-1.5">
-                                                    <span className="text-xs font-bold text-amber-200/80 flex items-center gap-1">
-                                                        <span>📅 เมื่อวาน</span>
-                                                        <span className="text-amber-200/50 text-[10px] font-mono">({y.dateLabel || 'เมื่อวาน'})</span>
-                                                    </span>
-                                                    <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                                        พอร์ตกำไร {y.profitablePortRatio ?? 70}%
-                                                    </span>
-                                                </div>
-
-                                                {/* กำไรเฉลี่ย (พอร์ตกำไร) */}
-                                                <div className="bg-black/35 rounded-lg p-2 border border-emerald-500/15 space-y-0.5">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
-                                                        <span className="text-amber-200/70 font-bold">
-                                                            กำไรเฉลี่ยพอร์ตที่บวก
-                                                        </span>
-                                                        <span className="text-[9px] font-mono text-amber-400/90">
-                                                            DD {y.avgDD ?? 0}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm sm:text-base font-black font-mono text-emerald-400">
-                                                        {fmt(y.avgProfit)}
-                                                    </div>
-                                                </div>
-
-                                                {/* กำไรสูงสุด (Top 1) */}
-                                                <div className="bg-black/45 rounded-lg p-2 border border-[#ffd700]/25 space-y-0.5">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
-                                                        <span className="text-amber-300 font-bold flex items-center gap-1">
-                                                            <span>🏆 กำไรสูงสุด (Top 1)</span>
-                                                        </span>
-                                                        <span className="text-[9px] font-mono text-amber-400">
-                                                            DD {y.peakDD ?? 0}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm sm:text-base font-black font-mono text-[#ffd700]">
-                                                        {fmt(y.peakProfit)}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* วันนี้ (Live Glow) */}
-                                            <div className="bg-gradient-to-br from-[#24170d] to-[#160c06] border-2 border-[#ffd700]/50 rounded-xl p-3 sm:p-3.5 space-y-2 shadow-[0_0_20px_rgba(255,215,0,0.12)] relative overflow-hidden">
-                                                <div className="flex items-center justify-between border-b border-[#ffd700]/30 pb-1.5">
-                                                    <span className="text-xs font-bold text-[#ffd700] flex items-center gap-1.5">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                                                        <span>⚡ วันนี้</span>
-                                                        <span className="text-amber-200/60 text-[10px] font-mono">({t.dateLabel || 'วันนี้'})</span>
-                                                    </span>
-                                                    <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold">
-                                                        พอร์ตกำไร {t.profitablePortRatio ?? 70}%
-                                                    </span>
-                                                </div>
-
-                                                {/* กำไรเฉลี่ย (พอร์ตกำไร) */}
-                                                <div className="bg-black/35 rounded-lg p-2 border border-emerald-500/20 space-y-0.5">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
-                                                        <span className="text-amber-200/80 font-bold">
-                                                            กำไรเฉลี่ยพอร์ตที่บวก
-                                                        </span>
-                                                        <span className="text-[9px] font-mono text-emerald-400">
-                                                            DD {t.avgDD ?? 0}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm sm:text-base font-black font-mono text-[#4de180]">
-                                                        {fmt(t.avgProfit)}
-                                                    </div>
-                                                </div>
-
-                                                {/* กำไรสูงสุด (Top 1) */}
-                                                <div className="bg-black/45 rounded-lg p-2 border border-[#ffd700]/35 space-y-0.5">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
-                                                        <span className="text-amber-300 font-bold flex items-center gap-1">
-                                                            <span>🏆 กำไรสูงสุด (Top 1)</span>
-                                                        </span>
-                                                        <span className="text-[9px] font-mono text-amber-400">
-                                                            DD {t.peakDD ?? 0}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm sm:text-base font-black font-mono text-[#ffd700]">
-                                                        {fmt(t.peakProfit)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ========================================================================= */}
-                            {/* 3. 5 อันดับพอร์ตกำไรสูงสุด (Top 5 Performers - NO PORT NUMBERS) */}
-                            {/* ========================================================================= */}
-                            {fleetStatsData && (() => {
-                                const selectedList: any[] = top5DateTab === 'today'
-                                    ? (fleetStatsData.today?.top5 || [])
-                                    : (fleetStatsData.yesterday?.top5 || []);
+                                const yTop5: any[] = y.top5 || [];
+                                const tTop5: any[] = t.top5 || [];
 
                                 const fmt = (n: number | undefined) => {
                                     if (n === undefined || n === null || isNaN(n)) return '0.00';
@@ -1757,85 +1640,184 @@ export default function DemoFarmClient({
                                     'border-amber-500/20 bg-black/40 text-amber-200/90'
                                 ];
 
-                                const maxP = selectedList.length > 0 ? Math.max(...selectedList.map(s => s.profit || 0), 1) : 1;
+                                const maxP = Math.max(
+                                    ...yTop5.map((s: any) => s.profit || 0),
+                                    ...tTop5.map((s: any) => s.profit || 0),
+                                    1
+                                );
 
                                 return (
-                                    <div className="bg-[#150d08] border border-[#cfa545]/30 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-[0_0_20px_rgba(207,165,69,0.06)]">
-                                        <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between px-1">
                                             <div className="flex items-center gap-1.5">
-                                                <Trophy className="w-4 h-4 text-[#ffd700]" />
-                                                <h3 className="text-xs sm:text-sm font-extrabold text-[#ffd700] tracking-wide">
-                                                    5 อันดับพอร์ตกำไรสูงสุด (Top 5)
+                                                <Sparkles className="w-3.5 h-3.5 text-[#ffd700]" />
+                                                <h3 className="text-xs sm:text-sm font-extrabold text-white tracking-wide">
+                                                    เปรียบเทียบผลงาน วันนี้ vs เมื่อวาน
                                                 </h3>
                                             </div>
-
-                                            {/* Date Toggle: วันนี้ vs เมื่อวาน */}
-                                            <div className="flex items-center gap-1 bg-black/50 p-0.5 rounded-lg border border-amber-500/30">
-                                                <button
-                                                    onClick={() => setTop5DateTab('today')}
-                                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-                                                        top5DateTab === 'today'
-                                                            ? 'bg-[#cfa545] text-black shadow-sm'
-                                                            : 'text-amber-200/60 hover:text-white'
-                                                    }`}
-                                                >
-                                                    ⚡ วันนี้
-                                                </button>
-                                                <button
-                                                    onClick={() => setTop5DateTab('yesterday')}
-                                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-                                                        top5DateTab === 'yesterday'
-                                                            ? 'bg-[#cfa545] text-black shadow-sm'
-                                                            : 'text-amber-200/60 hover:text-white'
-                                                    }`}
-                                                >
-                                                    📅 เมื่อวาน
-                                                </button>
-                                            </div>
+                                            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                ผลผลิตคิดเฉพาะฟาร์มที่มีผลผลิต
+                                            </span>
                                         </div>
 
-                                        {/* Rank Items */}
-                                        <div className="space-y-1.5">
-                                            {selectedList.slice(0, 5).map((item, idx) => {
-                                                const pct = Math.min(100, Math.max(12, Math.round(((item.profit || 0) / maxP) * 100)));
-                                                return (
-                                                    <div 
-                                                        key={idx}
-                                                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-xl border ${rankColors[idx] || rankColors[4]} transition-all relative overflow-hidden`}
-                                                    >
-                                                        {/* Subtle progress fill */}
-                                                        <div 
-                                                            className="absolute left-0 top-0 bottom-0 bg-emerald-500/5 pointer-events-none"
-                                                            style={{ width: `${pct}%` }}
-                                                        />
+                                        {/* Side by Side Columns: Left = เมื่อวาน, Right = วันนี้ */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
+                                            {/* Column 1: เมื่อวาน */}
+                                            <div className="bg-[#160e08]/90 border border-amber-500/30 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex items-center justify-between border-b border-amber-900/40 pb-2">
+                                                        <span className="text-xs sm:text-sm font-bold text-amber-200/90 flex items-center gap-1.5">
+                                                            <span>📅 เมื่อวาน</span>
+                                                            <span className="text-amber-200/50 text-[10px] font-mono">({y.dateLabel || 'เมื่อวาน'})</span>
+                                                        </span>
+                                                        <span className="text-[9px] sm:text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">
+                                                            ฟาร์มมีผลผลิต {y.profitablePortRatio ?? 70}%
+                                                        </span>
+                                                    </div>
 
-                                                        {/* Left: Rank Badge */}
-                                                        <div className="flex items-center gap-2 relative z-10">
-                                                            <span className="text-base sm:text-lg flex-shrink-0">{medals[idx] || '🏅'}</span>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-xs sm:text-sm font-black tracking-tight">
-                                                                    อันดับ {item.rank || idx + 1}
-                                                                </span>
-                                                                {idx === 0 && (
-                                                                    <span className="text-[8px] font-extrabold uppercase bg-[#ffd700]/20 text-[#ffd700] px-1.5 py-0.2 rounded border border-[#ffd700]/40">
-                                                                        Top Performer
-                                                                    </span>
-                                                                )}
+                                                    {/* Metrics */}
+                                                    <div className="grid grid-cols-2 gap-2 mt-2.5">
+                                                        <div className="bg-black/40 rounded-lg p-2 border border-emerald-500/15 space-y-0.5">
+                                                            <div className="flex items-center justify-between text-[10px]">
+                                                                <span className="text-amber-200/70 font-bold truncate">ผลผลิตเฉลี่ย</span>
+                                                                <span className="text-[8.5px] font-mono text-amber-400/90 whitespace-nowrap">DD {y.avgDD ?? 0}%</span>
+                                                            </div>
+                                                            <div className="text-xs sm:text-sm font-black font-mono text-emerald-400 truncate">
+                                                                {fmt(y.avgProfit)}
                                                             </div>
                                                         </div>
 
-                                                        {/* Right: Drawdown & Profit */}
-                                                        <div className="flex items-center gap-2.5 sm:gap-4 relative z-10">
-                                                            <span className="text-[9px] sm:text-[10px] font-mono text-amber-400 bg-black/60 px-1.5 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
-                                                                DD {item.dd}%
-                                                            </span>
-                                                            <span className="text-xs sm:text-base font-black font-mono text-[#4de180] whitespace-nowrap min-w-[70px] sm:min-w-[90px] text-right">
-                                                                {fmt(item.profit)}
-                                                            </span>
+                                                        <div className="bg-black/50 rounded-lg p-2 border border-[#ffd700]/25 space-y-0.5">
+                                                            <div className="flex items-center justify-between text-[10px]">
+                                                                <span className="text-amber-300 font-bold truncate">🏆 สูงสุด (Top 1)</span>
+                                                                <span className="text-[8.5px] font-mono text-amber-400 whitespace-nowrap">DD {y.peakDD ?? 0}%</span>
+                                                            </div>
+                                                            <div className="text-xs sm:text-sm font-black font-mono text-[#ffd700] truncate">
+                                                                {fmt(y.peakProfit)}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                );
-                                            })}
+                                                </div>
+
+                                                {/* Top 5 เมื่อวาน */}
+                                                <div className="space-y-1.5 pt-2 border-t border-amber-900/30">
+                                                    <div className="flex items-center justify-between text-[10px] sm:text-xs font-bold text-amber-200/80 mb-1">
+                                                        <span className="flex items-center gap-1">
+                                                            <Trophy className="w-3 h-3 text-amber-400" />
+                                                            <span>5 อันดับผลผลิตสูงสุดเมื่อวาน</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {yTop5.slice(0, 5).map((item: any, idx: number) => {
+                                                            const pct = Math.min(100, Math.max(12, Math.round(((item.profit || 0) / maxP) * 100)));
+                                                            return (
+                                                                <div 
+                                                                    key={idx}
+                                                                    className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg border ${rankColors[idx] || rankColors[4]} transition-all relative overflow-hidden`}
+                                                                >
+                                                                    <div 
+                                                                        className="absolute left-0 top-0 bottom-0 bg-emerald-500/5 pointer-events-none"
+                                                                        style={{ width: `${pct}%` }}
+                                                                    />
+                                                                    <div className="flex items-center gap-1.5 relative z-10">
+                                                                        <span className="text-sm flex-shrink-0">{medals[idx] || '🏅'}</span>
+                                                                        <span className="text-[11px] sm:text-xs font-black tracking-tight">
+                                                                            อันดับ {item.rank || idx + 1}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 sm:gap-3 relative z-10">
+                                                                        <span className="text-[8.5px] sm:text-[9px] font-mono text-amber-400 bg-black/60 px-1 py-0.2 rounded border border-amber-500/20 whitespace-nowrap">
+                                                                            DD {item.dd}%
+                                                                        </span>
+                                                                        <span className="text-[11px] sm:text-xs font-black font-mono text-[#4de180] whitespace-nowrap text-right">
+                                                                            {fmt(item.profit)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Column 2: วันนี้ (Live Glow) */}
+                                            <div className="bg-gradient-to-br from-[#24170d] to-[#160c06] border-2 border-[#ffd700]/50 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-[0_0_20px_rgba(255,215,0,0.12)] relative overflow-hidden flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex items-center justify-between border-b border-[#ffd700]/30 pb-2">
+                                                        <span className="text-xs sm:text-sm font-bold text-[#ffd700] flex items-center gap-1.5">
+                                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                                            <span>⚡ วันนี้</span>
+                                                            <span className="text-amber-200/60 text-[10px] font-mono">({t.dateLabel || 'วันนี้'})</span>
+                                                        </span>
+                                                        <span className="text-[9px] sm:text-[10px] font-mono text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">
+                                                            ฟาร์มมีผลผลิต {t.profitablePortRatio ?? 70}%
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Metrics */}
+                                                    <div className="grid grid-cols-2 gap-2 mt-2.5">
+                                                        <div className="bg-black/40 rounded-lg p-2 border border-emerald-500/20 space-y-0.5">
+                                                            <div className="flex items-center justify-between text-[10px]">
+                                                                <span className="text-amber-200/80 font-bold truncate">ผลผลิตเฉลี่ย</span>
+                                                                <span className="text-[8.5px] font-mono text-emerald-400 whitespace-nowrap">DD {t.avgDD ?? 0}%</span>
+                                                            </div>
+                                                            <div className="text-xs sm:text-sm font-black font-mono text-[#4de180] truncate">
+                                                                {fmt(t.avgProfit)}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-black/50 rounded-lg p-2 border border-[#ffd700]/35 space-y-0.5">
+                                                            <div className="flex items-center justify-between text-[10px]">
+                                                                <span className="text-amber-300 font-bold truncate">🏆 สูงสุด (Top 1)</span>
+                                                                <span className="text-[8.5px] font-mono text-amber-400 whitespace-nowrap">DD {t.peakDD ?? 0}%</span>
+                                                            </div>
+                                                            <div className="text-xs sm:text-sm font-black font-mono text-[#ffd700] truncate">
+                                                                {fmt(t.peakProfit)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Top 5 วันนี้ */}
+                                                <div className="space-y-1.5 pt-2 border-t border-[#ffd700]/25">
+                                                    <div className="flex items-center justify-between text-[10px] sm:text-xs font-bold text-[#ffd700] mb-1">
+                                                        <span className="flex items-center gap-1">
+                                                            <Trophy className="w-3 h-3 text-[#ffd700]" />
+                                                            <span>5 อันดับผลผลิตสูงสุดวันนี้</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {tTop5.slice(0, 5).map((item: any, idx: number) => {
+                                                            const pct = Math.min(100, Math.max(12, Math.round(((item.profit || 0) / maxP) * 100)));
+                                                            return (
+                                                                <div 
+                                                                    key={idx}
+                                                                    className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg border ${rankColors[idx] || rankColors[4]} transition-all relative overflow-hidden`}
+                                                                >
+                                                                    <div 
+                                                                        className="absolute left-0 top-0 bottom-0 bg-emerald-500/5 pointer-events-none"
+                                                                        style={{ width: `${pct}%` }}
+                                                                    />
+                                                                    <div className="flex items-center gap-1.5 relative z-10">
+                                                                        <span className="text-sm flex-shrink-0">{medals[idx] || '🏅'}</span>
+                                                                        <span className="text-[11px] sm:text-xs font-black tracking-tight">
+                                                                            อันดับ {item.rank || idx + 1}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 sm:gap-3 relative z-10">
+                                                                        <span className="text-[8.5px] sm:text-[9px] font-mono text-amber-400 bg-black/60 px-1 py-0.2 rounded border border-amber-500/20 whitespace-nowrap">
+                                                                            DD {item.dd}%
+                                                                        </span>
+                                                                        <span className="text-[11px] sm:text-xs font-black font-mono text-[#4de180] whitespace-nowrap text-right">
+                                                                            {fmt(item.profit)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -1863,7 +1845,7 @@ export default function DemoFarmClient({
                                         ))}
                                     </div>
                                     <div className="text-[9px] sm:text-[10px] text-amber-200/60 font-mono hidden sm:block">
-                                        สถิติจริงจากโมเดลจำลองและพอร์ตจริง
+                                        สถิติจริงจากโมเดลจำลองและฟาร์มจริง
                                     </div>
                                 </div>
 
@@ -1886,42 +1868,46 @@ export default function DemoFarmClient({
 
                                     return (
                                         <div className="space-y-3">
-                                            {/* Summary Cards: Average vs Peak */}
-                                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                                                {/* Card 1: ค่าเฉลี่ย */}
+                                            {/* Summary Cards: Average vs Peak with Explicit Lookback */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                                {/* Card 1: ผลผลิตเฉลี่ย */}
                                                 <div className="bg-[#180e08] border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 space-y-1 shadow-sm">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
-                                                        <span className="text-amber-200/80 font-bold flex items-center gap-1">
-                                                            <span>⚖️ กำไรเฉลี่ย</span>
+                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] gap-1 flex-wrap">
+                                                        <span className="text-amber-200/90 font-bold flex items-center gap-1">
+                                                            <span>⚖️ ผลผลิตเฉลี่ย{fleetTimeframe === 'daily' ? 'รายวัน' : fleetTimeframe === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}</span>
                                                         </span>
-                                                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                                                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-bold">
                                                             DD {avgDD}%
                                                         </span>
                                                     </div>
-                                                    <div className="text-sm sm:text-lg font-black font-mono text-emerald-400">
+                                                    <div className="text-base sm:text-xl font-black font-mono text-emerald-400">
                                                         {fmt(avgProfit)}
                                                     </div>
-                                                    <div className="text-[8px] sm:text-[9px] text-amber-200/50">
-                                                        คำนวณจากพอร์ตที่ทำกำไร
+                                                    <div className="text-[9px] sm:text-[10px] text-emerald-300/80 font-bold flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                        <span>{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
+                                                        <span className="text-amber-200/40 font-normal">| ฟาร์มมีผลผลิต</span>
                                                     </div>
                                                 </div>
 
-                                                {/* Card 2: ค่าสูงสุด */}
+                                                {/* Card 2: ผลผลิตสูงสุด */}
                                                 <div className="bg-[#180e08] border border-[#ffd700]/30 rounded-xl p-2.5 sm:p-3 space-y-1 shadow-sm">
-                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+                                                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] gap-1 flex-wrap">
                                                         <span className="text-amber-300 font-bold flex items-center gap-1">
                                                             <Sparkles className="w-3 h-3 text-[#ffd700]" />
-                                                            <span>กำไรสูงสุด</span>
+                                                            <span>ผลผลิตสูงสุด{fleetTimeframe === 'daily' ? 'รายวัน' : fleetTimeframe === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}</span>
                                                         </span>
-                                                        <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                                                        <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 font-bold">
                                                             DD {peakDD}%
                                                         </span>
                                                     </div>
-                                                    <div className="text-sm sm:text-lg font-black font-mono text-[#ffd700]">
+                                                    <div className="text-base sm:text-xl font-black font-mono text-[#ffd700]">
                                                         {fmt(peakProfit)}
                                                     </div>
-                                                    <div className="text-[8px] sm:text-[9px] text-amber-200/50">
-                                                        พอร์ตอันดับ 1 ในช่วงเวลานี้
+                                                    <div className="text-[9px] sm:text-[10px] text-amber-300/80 font-bold flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#ffd700]"></span>
+                                                        <span>{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
+                                                        <span className="text-amber-200/40 font-normal">| ฟาร์มอันดับ 1</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1932,7 +1918,7 @@ export default function DemoFarmClient({
                                                 <div className="flex items-center justify-between flex-wrap gap-1 text-[9px] sm:text-[10px]">
                                                     <span className="font-bold text-amber-200/80 flex items-center gap-1">
                                                         <BarChart3 className="w-3.5 h-3.5 text-[#ffd700]" />
-                                                        <span>กราฟกำไรสูงสุด & กำไรเฉลี่ย (เลื่อนดูอดีต ⬅️ ➡️)</span>
+                                                        <span>กราฟผลผลิตสูงสุด & ผลผลิตเฉลี่ย (เลื่อนดูอดีต ⬅️ ➡️)</span>
                                                     </span>
                                                     <div className="flex items-center gap-2.5 font-mono">
                                                         <div className="flex items-center gap-1">
@@ -2007,7 +1993,7 @@ export default function DemoFarmClient({
                                             {/* 3.3 ส่วนล่างของส่วนล่าง: แถบลังไม้เลื่อนดูได้ (Scrollable Timeline Track) */}
                                             <div className="bg-[#0e0704] border border-amber-900/40 rounded-xl p-2 sm:p-2.5 relative overflow-hidden">
                                                 <div className="flex items-center justify-between text-[8px] sm:text-[9px] text-amber-200/50 mb-1 px-1">
-                                                    <span>ประวัติผลตอบแทนย้อนหลัง (เลื่อนดูได้ ⬅️ ➡️)</span>
+                                                    <span>ประวัติผลผลิตย้อนหลัง (เลื่อนดูได้ ⬅️ ➡️)</span>
                                                     <span className="font-mono text-amber-400/60">คลิกหรือลากเพื่อดูประวัติ</span>
                                                 </div>
 

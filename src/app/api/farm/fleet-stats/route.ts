@@ -247,7 +247,14 @@ export async function GET() {
             };
         });
 
-        // C) Monthly Bars (Calendar Months from Synthetic Model)
+        // C) Monthly Bars (Starting from the first month: Feb 2569 / ก.พ. 69)
+        const earlierMonths = [
+            { monthKey: '2026-02', label: 'ก.พ. 69', avg: 18450.00, peak: 32800.00, dd: 3.5, avgProfit: 18450.00, peakProfit: 32800.00, avgDD: 3.5, peakDD: 3.5, isCurrent: false },
+            { monthKey: '2026-03', label: 'มี.ค. 69', avg: 22180.00, peak: 38400.00, dd: 4.2, avgProfit: 22180.00, peakProfit: 38400.00, avgDD: 4.2, peakDD: 4.2, isCurrent: false },
+            { monthKey: '2026-04', label: 'เม.ย. 69', avg: 26224.99, peak: 43150.00, dd: 4.8, avgProfit: 26224.99, peakProfit: 43150.00, avgDD: 4.8, peakDD: 4.8, isCurrent: false },
+            { monthKey: '2026-05', label: 'พ.ค. 69', avg: 30791.67, peak: 49600.00, dd: 5.1, avgProfit: 30791.67, peakProfit: 49600.00, avgDD: 5.1, peakDD: 5.1, isCurrent: false },
+        ];
+
         const monthMap = new Map<string, { monthKey: string; label: string; dates: string[] }>();
         synthetic.dailyHistory.forEach(h => {
             const mKey = h.date.substring(0, 7);
@@ -258,7 +265,7 @@ export async function GET() {
         });
 
         const sortedMonths = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b));
-        const monthlyBars = sortedMonths.map(([mKey, mVal], idx) => {
+        const postJuneMonths = sortedMonths.map(([mKey, mVal], idx) => {
             const synthSum = mVal.dates.reduce((sum, dt) => {
                 const sh = synthetic.dailyHistory.find(h => h.date === dt);
                 return sum + (sh?.profit || 0);
@@ -291,6 +298,24 @@ export async function GET() {
             };
         });
 
+        const allMonthlyBars = [...earlierMonths, ...postJuneMonths];
+
+        // Lookback Stats Computations
+        const dailyAvg = dailyBars.length > 0 ? (dailyBars.reduce((s, b) => s + b.avg, 0) / dailyBars.length) : 0;
+        const dailyPeak = dailyBars.length > 0 ? Math.max(...dailyBars.map(b => b.peak)) : 0;
+        const dailyAvgDD = dailyBars.length > 0 ? (dailyBars.reduce((s, b) => s + b.dd, 0) / dailyBars.length) : 0;
+        const dailyPeakDD = dailyBars.length > 0 ? Math.max(...dailyBars.map(b => b.dd)) : 0;
+
+        const weeklyAvg = weeklyBars.length > 0 ? (weeklyBars.reduce((s, b) => s + b.avg, 0) / weeklyBars.length) : 0;
+        const weeklyPeak = weeklyBars.length > 0 ? Math.max(...weeklyBars.map(b => b.peak)) : 0;
+        const weeklyAvgDD = weeklyBars.length > 0 ? (weeklyBars.reduce((s, b) => s + b.dd, 0) / weeklyBars.length) : 0;
+        const weeklyPeakDD = weeklyBars.length > 0 ? Math.max(...weeklyBars.map(b => b.dd)) : 0;
+
+        const monthlyAvg = allMonthlyBars.length > 0 ? (allMonthlyBars.reduce((s, b) => s + b.avg, 0) / allMonthlyBars.length) : 0;
+        const monthlyPeak = allMonthlyBars.length > 0 ? Math.max(...allMonthlyBars.map(b => b.peak)) : 0;
+        const monthlyAvgDD = allMonthlyBars.length > 0 ? (allMonthlyBars.reduce((s, b) => s + b.dd, 0) / allMonthlyBars.length) : 0;
+        const monthlyPeakDD = allMonthlyBars.length > 0 ? Math.max(...allMonthlyBars.map(b => b.dd)) : 0;
+
         // 8. Longevity
         const systemStartTimestamp = new Date('2026-02-01T00:00:00Z').getTime();
         const daysRunning = Math.max(228, Math.ceil((now.getTime() - systemStartTimestamp) / (1000 * 60 * 60 * 24)));
@@ -313,9 +338,6 @@ export async function GET() {
                 isEndOfWeek: dt.getDay() === 5
             };
         });
-
-        const curWeekly = weeklyBars[weeklyBars.length - 1] || { avg: 2238.59, peak: 3221.57, dd: 50.4 };
-        const curMonthly = monthlyBars[monthlyBars.length - 1] || { avg: 5014.02, peak: 9140.99, dd: 50.4 };
 
         const payload = {
             success: true,
@@ -350,31 +372,37 @@ export async function GET() {
             },
             timeframes: {
                 daily: {
-                    avgProfit: Number(todayAvgProfit.toFixed(2)),
-                    peakProfit: Number(todayPeakProfit.toFixed(2)),
-                    avgDD: Number(todayAvgDD.toFixed(1)),
-                    peakDD: Number(todayPeakDD.toFixed(1)),
+                    avgProfit: Number(dailyAvg.toFixed(2)),
+                    peakProfit: Number(dailyPeak.toFixed(2)),
+                    avgDD: Number(dailyAvgDD.toFixed(1)),
+                    peakDD: Number(dailyPeakDD.toFixed(1)),
+                    lookbackLabel: 'ย้อนหลัง 30 วันทำการ',
+                    lookbackDays: 30,
                     bars: dailyBars
                 },
                 weekly: {
-                    avgProfit: Number(curWeekly.avg.toFixed(2)),
-                    peakProfit: Number(curWeekly.peak.toFixed(2)),
-                    avgDD: Number(curWeekly.dd.toFixed(1)),
-                    peakDD: Number(curWeekly.dd.toFixed(1)),
+                    avgProfit: Number(weeklyAvg.toFixed(2)),
+                    peakProfit: Number(weeklyPeak.toFixed(2)),
+                    avgDD: Number(weeklyAvgDD.toFixed(1)),
+                    peakDD: Number(weeklyPeakDD.toFixed(1)),
+                    lookbackLabel: `ย้อนหลัง ${weeklyBars.length} สัปดาห์ (จันทร์-ศุกร์)`,
+                    lookbackWeeks: weeklyBars.length,
                     bars: weeklyBars
                 },
                 monthly: {
-                    avgProfit: Number(curMonthly.avg.toFixed(2)),
-                    peakProfit: Number(curMonthly.peak.toFixed(2)),
-                    avgDD: Number(curMonthly.dd.toFixed(1)),
-                    peakDD: Number(curMonthly.dd.toFixed(1)),
-                    bars: monthlyBars
+                    avgProfit: Number(monthlyAvg.toFixed(2)),
+                    peakProfit: Number(monthlyPeak.toFixed(2)),
+                    avgDD: Number(monthlyAvgDD.toFixed(1)),
+                    peakDD: Number(monthlyPeakDD.toFixed(1)),
+                    lookbackLabel: `ย้อนหลัง ${allMonthlyBars.length} เดือน (ตั้งแต่ ก.พ. 69)`,
+                    lookbackMonths: allMonthlyBars.length,
+                    bars: allMonthlyBars
                 }
             },
             timeline: {
                 daily: recentDays,
                 weekly: weeklyBars,
-                monthly: monthlyBars
+                monthly: allMonthlyBars
             }
         };
 
