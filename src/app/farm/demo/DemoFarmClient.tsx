@@ -1956,18 +1956,19 @@ export default function DemoFarmClient({
                                                             const peakVal = Number(bar.peakProfit ?? bar.peak ?? 0);
                                                             const avgVal = Number(bar.avgProfit ?? bar.avg ?? 0);
                                                             const ddVal = Number(bar.peakDD ?? bar.avgDD ?? bar.dd ?? 0);
-
                                                             const peakH = Math.min(100, Math.max(10, Math.round((peakVal / maxBarValue) * 100)));
                                                             const avgH = Math.min(100, Math.max(8, Math.round((avgVal / maxBarValue) * 100)));
+                                                            const isWeekly = fleetTimeframe === 'weekly';
+                                                            const colWidthClass = isWeekly ? 'min-w-[78px] sm:min-w-[94px]' : 'min-w-[56px] sm:min-w-[68px]';
 
                                                             return (
-                                                                <div key={idx} className="flex flex-col items-center justify-end h-full gap-1 group flex-shrink-0 min-w-[56px] sm:min-w-[68px]">
+                                                                <div key={idx} className={`flex flex-col items-center justify-end h-full gap-1 group flex-shrink-0 ${colWidthClass}`}>
                                                                     {/* Dual Bars side-by-side */}
                                                                     <div className="flex items-end justify-center gap-1 w-full h-[105px] sm:h-[125px]">
                                                                         {/* Peak Bar */}
                                                                         <div className="w-1/2 max-w-[18px] sm:max-w-[24px] flex flex-col items-center justify-end h-full">
                                                                             <span className="text-[7.5px] sm:text-[9px] font-mono text-[#ffd700] mb-0.5 whitespace-nowrap leading-none font-bold">
-                                                                                {Math.round(peakVal)}
+                                                                                {Math.round(peakVal).toLocaleString()}
                                                                             </span>
                                                                             <div 
                                                                                 className="w-full bg-gradient-to-t from-amber-600 via-[#ffd700] to-yellow-200 rounded-t-sm shadow-[0_0_8px_rgba(255,215,0,0.3)] transition-all duration-300 group-hover:brightness-125"
@@ -1978,7 +1979,7 @@ export default function DemoFarmClient({
                                                                         {/* Avg Bar */}
                                                                         <div className="w-1/2 max-w-[18px] sm:max-w-[24px] flex flex-col items-center justify-end h-full">
                                                                             <span className="text-[7.5px] sm:text-[9px] font-mono text-emerald-400 mb-0.5 whitespace-nowrap leading-none font-bold">
-                                                                                {Math.round(avgVal)}
+                                                                                {Math.round(avgVal).toLocaleString()}
                                                                             </span>
                                                                             <div 
                                                                                 className="w-full bg-gradient-to-t from-emerald-700 via-emerald-400 to-teal-300 rounded-t-sm shadow-[0_0_8px_rgba(52,211,153,0.3)] transition-all duration-300 group-hover:brightness-125"
