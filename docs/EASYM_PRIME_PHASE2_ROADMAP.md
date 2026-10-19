@@ -11,9 +11,14 @@
 
 ใน EasyM Prime เฟสแรก เราได้ทำการวางโครงสร้างหน้าฟาร์มแบบใหม่ (กระดาน 20 คู่เงิน, โดมกักขังและฟื้นฟู, ปรอทวัด Drawdown, และระบบ Telemetry ถ่ายทอดสด) ซึ่งแสดงผลแบบ Read-Only และควบคุมการเผยแพร่ด้วยระบบ Release Gate ให้ลูกค้าเรียบร้อยแล้ว
 
-ใน **เฟสที่ 2** จะเป็นการยกระดับตัว EA (ฝั่ง MQL5) และระบบคลาวด์หลังบ้าน (Next.js / Supabase API) ให้ทำงานสอดประสานกันอย่างสมบูรณ์แบบ โดยมี **2 เสาหลักสำคัญ** ได้แก่:
-1. **ระบบการสื่อสารสองทาง (Two-Way Interactive Remote Control):** สั่งเปิด-ปิดคู่เงิน (Active vs Close-Only) หรือสั่งหยุดฉุกเฉินได้โดยตรงจากหน้าเว็บฟาร์ม
+ใน **เฟสที่ 2** จะมุ่งเน้นไปที่ **การยกระดับตัว EA (ฝั่ง MQL5 Prime Engine) เป็นแกนหลักสำคัญ 5 ด้าน (5 Core EA Pillars)**:
+1. **ระบบการสื่อสารสองทาง (Two-Way Remote Command Execution):** รับและประมวลผลคำสั่งเปิด-ปิดคู่เงิน (Active vs Close-Only) หรือหยุดฉุกเฉินจาก Cloud
 2. **ระบบป้องกันข่าวกล่องแดงและการปรับลด Leverage ของโบรกเกอร์ (News Filter & Leverage Drop Shield):** ป้องกันความเสี่ยงจากการที่โบรกเกอร์ (เช่น FISG) ปรับลด Leverage เหลือ 1:100 ช่วงข่าวแรง จนส่งผลให้มาร์จิ้นไม่พอออกไม้แก้ (`Order Rejected`) หรือโดน Stop Out
+3. **การปรับแต่งแดชบอร์ดบนกราฟ MT5 (MT5 On-Chart HUD Polish):** ปรับชื่อตัด Universal, เพิ่ม Table F แสดงข้อความแจ้งเตือนเต็มแถวเดี่ยว, ตรวจจับ Manual Trades และคู่เงินตกค้าง
+4. **สถาปัตยกรรมกู้ภัยระดับสูง (Tier-3 State-Driven Rescue Slicing):** สลับมาตัดไม้กู้ภัยชุด 1 ที่ติดดอยทิ้งก่อน เมื่อเริ่มงัด Tier 3 มาใช้งาน
+5. **ระบบส่งสถิติจังหวะปิดรวบราคาแยกรายคู่เงิน (Pair Basket Closure Telemetry):** ยิง Event ส่งชื่อคู่เงิน, จำนวนไม้, Lots, และกำไรทันทีที่ปิดตะกร้าสำเร็จ
+
+*(หมายเหตุ: ส่วนการพัฒนาหน้าเว็บ Farm UI จะดำเนินการแยกต่างหาก โดยมีข้อกำหนดความสอดคล้องระบุไว้ในหมวด "ข้อกำหนดการปรับปรุงหน้าเว็บฟาร์ม")*
 
 ---
 
@@ -94,35 +99,25 @@ flowchart TD
 
 ---
 
-## 🖥️ เสาหลักที่ 3: การแสดงผลบน Web Dashboard & Farm HUD
-
-### 3.1 การแสดงผลบนกระดาน 20 คู่เงิน (Orb 2 Matrix)
-* **ป้ายสถานะข่าว (News Badge):** หากคู่เงินใดกำลังอยู่ในช่วง News Shield จะแสดงป้ายกะพริบสีส้ม `📰 NEWS (1:100)` และมีเวลานับถอยหลัง (Countdown Timer) เช่น `RESUME IN 07:42`
-* **ปุ่มควบคุม 2 ทิศทาง:** เมื่อสลับโหมดเป็นเวอร์ชัน 2 ปุ่ม `ACTIVE` และ `CLOSE-ONLY` จะสามารถกดเพื่อส่งคำสั่งได้จริง พร้อมแสดงสถานะ `Syncing...` และ `Confirmed`
-
-### 3.2 การรักษาความปลอดภัยด้านการพัฒนา (Development Guard)
-* **Feature Gating (`isOwnerDevUser`):** ในระหว่างที่เขียนโค้ดเฟส 2 ฟังก์ชันส่งคำสั่งและตัวกรองข่าวจะเปิดให้ทดสอบเฉพาะใน **โหมดพัฒนา (Dev)** ของเจ้าของระบบเท่านั้น
-* **Customer Protection:** ลูกค้าทั่วไปจะยังคงมองเห็นหน้าฟาร์มเป็นเวอร์ชันนิ่งที่เสถียร (Display-Only) จนกว่าเจ้าของระบบจะทดสอบจนสมบูรณ์และกดปุ่ม **"อัปเดตปล่อยหน้าฟาร์มนี้ให้ลูกค้า"** ผ่านระบบ Release Gate อีกครั้ง
-
 ---
 
-## 📊 เสาหลักที่ 4: การปรับแต่งแดชบอร์ดบนกราฟ MT5 (MT5 On-Chart HUD Upgrade)
+## 📊 เสาหลักที่ 3: การปรับแต่งแดชบอร์ดบนกราฟ MT5 (MT5 On-Chart HUD Upgrade)
 
-### 4.1 ปรับมาตรฐานชื่อ EA บน Table C (Unified Branding)
+### 3.1 ปรับมาตรฐานชื่อ EA บน Table C (Unified Branding)
 * **ปัญหาเดิม:** บนแถบสถานะพอร์ต Table C ยังมีคำว่า `Universal` ปรากฏอยู่ เช่น `=== EasyM Prime Universal v2.00 1014 [B261014.1] ===` ซึ่งไม่ตรงกับชื่อเรียกอย่างเป็นทางการบนหน้าเว็บฟาร์มและระบบไลเซนส์
 * **ข้อกำหนดใหม่:**
   * **ตัดคำว่า `Universal` ออกทั้งหมด** เพื่อให้ชื่อผลิตภัณฑ์เป็นเอกภาพ (Unified Name) ทั่วทั้งระบบ
   * รูปแบบมาตรฐานที่กำหนด: `EasyM Prime v2.00 [BuildID]` (เช่น `EasyM Prime v2.00 [B261014.1]` หรือ `EasyM Prime v2.00 1014 [B261014.1]`)
   * ปรับค่าคงที่ `#define EA_DASH_TITLE` และ `#property description` ในไฟล์โค้ด MQL5 ให้ตรงตามมาตรฐานนี้
 
-### 4.2 เพิ่ม Table F: แถบแจ้งเตือนสถานะแยกเดี่ยวเต็มแถว (Dedicated Full-Width Alert Row)
+### 3.2 เพิ่ม Table F: แถบแจ้งเตือนสถานะแยกเดี่ยวเต็มแถว (Dedicated Full-Width Alert Row)
 * **ปัญหาเดิม:** ข้อมูลแจ้งเตือน (Alert / Quarantine Status / Rescue Info / `lock withdraws` / `system healthy`) ถูกยัดรวมไว้ใน Table E ช่องที่ 3 (`Col 2`) ร่วมกับค่า Buffer และ Relief Fund ทำให้พื้นที่จำกัด ข้อความยาวถูกตัดทอน หรือเบียดเสียดจนมองไม่เห็น
 * **การปรับโครงสร้าง Table E & Table F:**
   * **Table E (Financial Metrics):** ปรับเหลือเฉพาะข้อมูลทางการเงินหลัก 2 ช่อง ได้แก่ Buffer (`BUF: +X.X% (X.Xx)`) และ Relief Fund (`FUND: ... (C:... | U:...)`) ทำให้ตัวเลขขยายกว้าง ชัดเจน อ่านง่าย ไม่แออัด
   * **Table F (Dedicated Alert Row):** ย้ายข้อความแจ้งเตือนทั้งหมดออกจาก Table E มาแสดงผลใน Table F แบบเต็มแถว 100% (`dW`) ความสูง 1 แถวมาตรฐาน (`rowH`)
   * **ลักษณะกรอบ:** สไตล์แถบ Sci-Fi HUD แบบกล่องข้อความเต็มแถวเดี่ยว ไม่มีเส้นคอลัมน์กั้นกลาง เพื่อให้อ่านข้อความยาวได้ต่อเนื่อง
 
-### 4.3 การตรวจจับและแสดงสถานะคู่เงินค้างเก่าของ EasyM (Legacy Basket Monitoring)
+### 3.3 การตรวจจับและแสดงสถานะคู่เงินค้างเก่าของ EasyM (Legacy Basket Monitoring)
 * **ที่มา:** ลูกค้าที่อัปเกรดมาจาก EasyM MAX หรือเวอร์ชันก่อนหน้า อาจมีออเดอร์ของคู่เงินเก่าที่ไม่ได้อยู่ในกระดาน 20 คู่ปัจจุบัน (เช่น `GBPCHF` Magic 2012) ค้างอยู่ในพอร์ต แม้ระบบภายในจะคอยจัดการปิดรวบ Close-Only ให้อัตโนมัติ แต่ลูกค้ามองไม่เห็นบนแดชบอร์ด ทำให้เกิดความกังวล
 * **ข้อกำหนด:**
   * เพิ่มฟังก์ชันสแกนหาตระกร้าออเดอร์ของ EasyM รุ่นเก่าที่ยังเปิดค้างอยู่ (`ScanLegacyBaskets()`)
@@ -130,7 +125,7 @@ flowchart TD
     $$\text{[LEGACY BASKET: GBPCHF (3 Orders, P/L: -45.20) AWAITING CLOSE-ONLY TP]}$$
   * ทำให้ผู้ใช้มั่นใจได้ทันทีว่า Prime รับรู้และกำลังเฝ้ารอปิดรวบคู่นั้นให้อยู่จริง
 
-### 4.4 การตรวจจับออเดอร์นอกระบบ / เทรดมือ / Magic Number อื่น (External & Manual Trades Detection)
+### 3.4 การตรวจจับออเดอร์นอกระบบ / เทรดมือ / Magic Number อื่น (External & Manual Trades Detection)
 * **ที่มา:** บ่อยครั้งที่ลูกค้าเปิดออเดอร์ด้วยมือเอง (Manual Trading) หรือใส่ EA ตัวอื่นเข้ามาช่วยเทรดในพอร์ตเดียวกัน ซึ่งออเดอร์เหล่านี้กิน Margin และส่งผลกระทบโดยตรงต่อ Equity/Drawdown ของระบบ Prime
 * **ข้อกำหนด:**
   * เพิ่มฟังก์ชันสแกนพอร์ตหาออเดอร์ที่ไม่ใช่ของ Prime (`ScanExternalTrades()`):
@@ -142,7 +137,7 @@ flowchart TD
     $$\text{[ALERT: EXTERNAL EA DETECTED (MAGIC: 88888, 3 ORDERS) - MARGIN IMPACT]}$$
   * ช่วยให้เจ้าของพอร์ตหรือแอดมินตรวจพบความผิดปกติได้ทันที ก่อนที่จะส่งผลให้พอร์ตติด Margin Call
 
-### 4.5 ระบบจัดลำดับความสำคัญของข้อความแจ้งเตือน (Table F Alert Message Hierarchy)
+### 3.5 ระบบจัดลำดับความสำคัญของข้อความแจ้งเตือน (Table F Alert Message Hierarchy)
 ข้อความใน Table F จะแสดงผลตามลำดับความสำคัญสูงสุด (Priority Queue Engine):
 1. 🚨 **ระดับวิกฤต (Critical - สีแดง):** มาร์จิ้นต่ำกว่าเกณฑ์ หรือเสี่ยง Stop Out เช่น `[CRITICAL: MARGIN LEVEL < 150% - SUSPENDING ENTRIES]`
 2. ⚠️ **ระดับออเดอร์นอกระบบ / เทรดมือ (External Trades - สีส้ม):** `[ALERT: EXTERNAL ORDERS DETECTED (2 MANUAL) - RISK UNMANAGED]`
@@ -154,14 +149,14 @@ flowchart TD
 
 ---
 
-## 🎯 เสาหลักที่ 5: สถาปัตยกรรมกู้ภัยระดับสูง (Tier-3 Triggered Rescue Slicing & Hierarchical Trimming)
+## 🎯 เสาหลักที่ 4: สถาปัตยกรรมกู้ภัยระดับสูง (Tier-3 Triggered Rescue Slicing & Hierarchical Trimming)
 
-### 5.1 ปัญหาและข้อจำกัดของระบบเดิม
+### 4.1 ปัญหาและข้อจำกัดของระบบเดิม
 * ใน Prime v2.00 เดิม เมื่อไม้สไนเปอร์กู้ชีพสะสมกำไรครบ 3 รอบ (`rescueScalpCycles >= 3`) ฟังก์ชัน `TrimOneToxicTicket()` จะมุ่งเป้าไปตัดเฉพาะ **"ไม้ Regular Grid ปกติ"** ที่ขาดทุนหนักสุดเสมอ
 * หากตลาดเกิดสภาวะ Super-Trend ลากยาวลงไปจนระบบต้องเปิดไม้กู้ภัยชุดถัดไป (Tier 2 หรือ Tier 3) ไม้กู้ภัยชุดแรกๆ (Tier 1) ที่เปิดไว้สูงจะกลายเป็น **"ไม้กู้ภัยติดดอย"** ทำให้พอร์ตต้องแบกรับล็อตสะสม (Accumulated Exposure)
 * หากไม่ตัดไม้กู้ภัยชุดบนออกก่อน เมื่อเกิดสภาวะลากต่อ จะทำให้คู่เงินนั้นเสี่ยงวิ่งไปชนเกณฑ์ **Auto-Hedge รายคู่ที่ 40% (`InpHedgeTriggerPct = 40.0%`)**
 
-### 5.2 กลยุทธ์การตัดไม้ตามระดับชุดกู้ภัย (State-Driven / Tier-Based Rescue Slicing)
+### 4.2 กลยุทธ์การตัดไม้ตามระดับชุดกู้ภัย (State-Driven / Tier-Based Rescue Slicing)
 ยกเลิกการใช้เกณฑ์ตัวเลข % DD แบบตายตัว (เพราะการเข้าห้องขังมีทั้งแบบ 10% เมื่อพอร์ตตึง และ 14% เมื่อเป็นเดี่ยว) แล้วเปลี่ยนมาใช้ **"สถานะของชุดกู้ภัย (Rescue Tier)"** เป็นเกณฑ์ชี้ขาด:
 
 ```mermaid
@@ -187,50 +182,56 @@ flowchart TD
 
 ---
 
-## 🌾 เสาหลักที่ 6: ระบบบันทึกประวัติการเก็บเกี่ยวและสถิติปิดรวบราคาแยกรายคู่เงิน (Pair Harvest Feed & Basket Closure Telemetry)
+## 🌾 เสาหลักที่ 5: ระบบส่งสถิติจังหวะปิดรวบราคาแยกรายคู่เงิน (Pair Basket Closure Telemetry)
 
-### 6.1 วัตถุประสงค์และประโยชน์
-* **ปัญหาเดิม:** ฐานข้อมูลบันทึกเฉพาะยอดกำไรสุทธิรวมรายวัน (Daily Profit) และจำนวน Lot รวม แต่ไม่ทราบว่า **"คู่เงินไหนปิดรวบราคา (Take Profit) ไปกี่รอบ, ปิดไปกี่ไม้, เวลาไหน และคู่ใดทำผลงานได้ดีที่สุด"**
-* **เป้าหมายของฟีเจอร์:**
-  1. บันทึกสถิติจังหวะปิดรวบราคาสำเร็จของแต่ละคู่เงินแบบ Event-driven (บันทึกเฉพาะตอนปิดตะกร้า ไม่บันทึกไม้ย่อย ทำให้ประหยัดฐานข้อมูลอย่างมหาศาล)
-  2. แสดงผลเป็น **ไทม์ไลน์การเก็บเกี่ยวผลผลิตสด (Real-time Harvest Feed)** บนหน้าฟาร์ม (เช่น 🌾 *15:30 น. - GBPCAD เก็บเกี่ยวสำเร็จ +$42.50 (4 ไม้)*)
-  3. สรุปจัดอันดับ **Top 5 Pairs Leaderboard** แสดงคู่เงินที่เคลียร์รอบทำกำไรให้พอร์ตได้มากที่สุดประจำสัปดาห์/เดือน
+### 5.1 วัตถุประสงค์และประโยชน์ฝั่ง EA
+* **ปัญหาเดิม:** EA ส่งเฉพาะยอดกำไรสุทธิรวมรายวัน (Daily Profit) และจำนวน Lot รวม ทำให้ไม่มีข้อมูลว่า **"คู่เงินไหนปิดรวบราคา (Take Profit) ไปกี่รอบ, ปิดไปกี่ไม้, เวลาไหน และคู่ใดทำผลงานได้ดีที่สุด"**
+* **ข้อกำหนดในตัว EA:**
+  * ในฟังก์ชันที่สั่งปิดรวบตะกร้ากำไรสำเร็จ (Basket Close / Cycle TP) ของแต่ละคู่เงิน ให้เรียกคำสั่งยิง Event:
+    ```cpp
+    EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, orders_count, total_lots, realized_pnl);
+    ```
+  * การยิงแบบ Event-driven นี้จะเกิดขึ้นเฉพาะตอนที่ปิดรวบสำเร็จเท่านั้น ไม่ได้ยิงทุกวินาที จึงเบาเครื่องและไม่รบกวนจังหวะเทรดของ EA
+  * ส่งข้อมูลครบถ้วน: ชื่อคู่เงิน (`sym`), จำนวนไม้ที่ปิด (`orders_count`), Lot รวม (`total_lots`), และกำไรที่ปิดได้ (`realized_pnl`)
 
-### 6.2 สถาปัตยกรรมฐานข้อมูลและการประหยัดทรัพยากร (Database Architecture)
+---
+
+## 🌐 ข้อกำหนดการปรับปรุงหน้าเว็บฟาร์มเพื่อรองรับและสอดคล้องกับ EA เวอร์ชันใหม่ (Website & Farm UI Alignment Specification)
+
+> **หมายเหตุ:** ส่วนนี้เป็นแผนการพัฒนาฝั่ง **Web Dashboard (Next.js / Supabase)** ซึ่งดำเนินการแยกต่างหากจากตัว EA แต่ต้องออกแบบให้สอดคล้องและเชื่อมโยงกับฟังก์ชันใหม่ของ EA ดังนี้:
+
+### 1. การส่งคำสั่งสองทิศทาง (Two-Way Remote Command UI)
+* **Orb 2 Control Matrix:** ปรับปุ่ม `ACTIVE` และ `CLOSE-ONLY` ให้สามารถคลิกเพื่อส่งคำสั่งไปยังตาราง `farm_remote_commands` บน Supabase
+* **Dialog ยืนยันคำสั่ง:** มีหน้าต่างยืนยันความปลอดภัยก่อนส่งคำสั่ง เพื่อป้องกันการกดพลาด
+* **สถานะสะท้อนกลับ (Live Feedback):** แสดงสถานะ `Syncing...` และเปลี่ยนสีปุ่มเมื่อ EA ตอบรับคำสั่งแล้ว
+
+### 2. ป้ายเตือนข่าวและ Leverage Shield (News Badges on Farm HUD)
+* **การ์ด 20 คู่เงิน:** หากคู่เงินใดติดเงื่อนไข News Shield ให้แสดงป้ายกะพริบสีส้ม `📰 NEWS (1:100)`
+* **เวลานับถอยหลัง (Countdown Timer):** แสดงเวลาก่อนข่าวเข้า และเวลารอปลดล็อค เช่น `RESUME IN 07:42`
+
+### 3. แถบแจ้งเตือนสถานะจาก Table F (Mirroring Alert Row)
+* **การตรวจจับออเดอร์ผิดปกติ:** หาก EA ส่งข้อความเตือนใน Table F เช่น ตรวจพบออเดอร์เทรดมือ (`Manual Orders`) หรือ EA แปลกปลอม ให้หน้าเว็บแสดง Banner เตือนสีส้มเด่นชัดที่หัวฟาร์ม เพื่อให้ผู้ใช้ทราบทันทีว่าพอร์ตกำลังมี Margin เสี่ยง
+
+### 4. ไทม์ไลน์การเก็บเกี่ยวผลผลิตสด (Real-time Harvest Feed & Pair Rankings)
 * **ตาราง `farm_batch_events` (เพิ่มคอลัมน์ `symbol`):**
   ```sql
   ALTER TABLE public.farm_batch_events ADD COLUMN IF NOT EXISTS symbol TEXT;
   CREATE INDEX IF NOT EXISTS idx_batch_events_port_sym ON public.farm_batch_events(port_number, symbol);
   ```
-* **ขนาดข้อมูลและภาระการจัดเก็บ:**
-  * ขนาดต่อ Event: ~150-200 Bytes
-  * ปริมาณเฉลี่ยต่อพอร์ต 20 คู่เงิน: ~5-15 ครั้ง/วัน
-  * พอร์ต 100 พอร์ต สะสม 90 วัน = ~18 MB (ใช้พื้นที่เพียง 3.6% ของ Supabase Free Tier)
-  * ใช้ฟังก์ชันหมุนเวียนลบอัตโนมัติ 90 วัน (`cleanup_old_farm_data()`) ฐานข้อมูลจึงไม่บวมอย่างแน่นอน
+* **Realtime Harvest Feed:** แสดงไทม์ไลน์ประวัติการเก็บเกี่ยวผลผลิตสด เช่น:
+  - 🌾 *15:30 น. - GBPCAD เก็บเกี่ยวสำเร็จ +$42.50 (4 ไม้)*
+  - 🌾 *11:15 น. - AUDNZD เก็บเกี่ยวสำเร็จ +$18.20 (2 ไม้)*
+* **Top 5 Pairs Leaderboard:** แสดงสรุปจัดอันดับคู่เงินที่สร้างกำไรสูงสุดประจำสัปดาห์/เดือน
 
-### 6.3 การเชื่อมต่อฝั่ง MQL5 EA (Prime Engine)
-* ในฟังก์ชันที่สั่งปิดรวบตะกร้ากำไรสำเร็จ (Basket Close / Cycle TP):
-  ```cpp
-  EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, orders_count, total_lots, realized_pnl);
-  ```
-* ส่ง Payload เข้า API `/api/sync-dashboard` หรือ `/api/mt5/sync` ทันทีที่มีการปิดรวบ
-
-### 6.4 การแสดงผลบน Frontend Farm HUD
-* แสดงเป็นไทม์ไลน์ป๊อปอัปหรือแท็บย่อยใต้โซนประวัติเก็บเกี่ยว 90 วัน
-* มีตัวกรองดูสถิติแยกตามคู่เงิน หรือดูภาพรวมทั้ง 20 คู่เงิน
+### 5. เชื่อมต่อไซโลเสบียงแก้วและเขื่อนพลังงาน (Golden Silo & Bio-Shield Integration)
+* นำค่า `buf_pct` (Buffer %), `relief_budget`, และ `relief_cap` จาก Telemetry ของ EA มาผูกเข้ากับกราฟิก **ไซโลเสบียงแก้วทองคำ (Golden Silo)** และ **เขื่อนพลังงานกั้นพายุ (Bio-Shield Gauge)** บนหน้าฟาร์ม
 
 ---
 
 ## 📋 แผนงานและขั้นตอนการลงมือพัฒนา (Implementation Checklist)
 
-- [ ] **ขั้นตอนที่ 1: ฝั่ง Database & API**
-  - [ ] สร้างตาราง `farm_remote_commands` ใน Supabase (รองรับ `port_number`, `command_type`, `payload`, `status`, `created_at`, `executed_at`)
-  - [ ] เพิ่มคอลัมน์ `symbol TEXT` ในตาราง `farm_batch_events` พร้อม Index `(port_number, symbol)`
-  - [ ] ตรวจสอบฟังก์ชัน Auto-cleanup 90 วัน `cleanup_old_farm_data()` ให้พร้อมทำงานตามกำหนด
-  - [ ] สร้าง API Route `/api/farm/command/send` สำหรับรับคำสั่งจากเว็บ
-  - [ ] สร้าง API Route `/api/farm/command/poll` สำหรับให้ EA ดึงคำสั่งไปรัน
-  - [ ] ปรับปรุง `/api/sync-dashboard` ให้บันทึก `symbol` ลงใน `farm_batch_events`
-- [ ] **ขั้นตอนที่ 2: ฝั่ง EA (MQL5 Prime Codebase)**
+### 🛠️ หมวดที่ 1: การพัฒนาตัว EA MQL5 (Core EA Engine)
+- [ ] **ปรับแต่ง Branding & แดชบอร์ดบนกราฟ (HUD)**
   - [ ] ปรับชื่อใน `#define EA_DASH_TITLE` และ `#property description` เป็น `EasyM Prime v2.00 [BuildID]` (ตัดคำว่า Universal ออก)
   - [ ] ปรับแก้ **Table E**: ตัดช่อง Col 2 เดิมออก ขยายพื้นที่แสดงเฉพาะ Buffer % และ Relief Fund ให้คมชัดสวยงาม
   - [ ] เพิ่มโครงสร้าง **Table F** ในฟังก์ชัน `DashboardBuild()` (สร้าง Rect กรอบเดี่ยวเต็มความกว้าง `dW` และ Text Object `F_MSG`)
@@ -238,28 +239,37 @@ flowchart TD
   - [ ] พัฒนาฟังก์ชัน `ScanLegacyBaskets()` ตรวจจับคู่เงินเก่าของ EasyM ที่อยู่นอกกระดาน 20 คู่ เพื่อรายงานสถานะรอปิดรวบขึ้น Table F
   - [ ] พัฒนาฟังก์ชัน `ScanExternalTrades()` ตรวจจับออเดอร์เทรดมือ (`Magic == 0`) หรือ EA อื่น และรายงานเตือนขึ้น Table F
   - [ ] สร้างระบบ Priority Message Queue ใน `DashboardUpdate()` เพื่อเลือกข้อความสำคัญที่สุดขึ้นแสดงใน Table F พร้อมสลับสีตามระดับความสำคัญ
-  - [ ] **พัฒนาระบบ Tier-3 Triggered Rescue Slicing ในฟังก์ชัน `TrimOneToxicTicket()`:**
-    - [ ] ตรวจสอบ `st.rescueTier >= 3` หากมีไม้กู้ภัยชุด 1 ติดลบค้างอยู่ ให้ตัดไม้กู้ภัย (`Magic + 2000`) ก่อน
-    - [ ] หาก `st.rescueTier < 3` หรือไม่มีไม้กู้ภัยค้าง ให้ตัดไม้ Regular Grid ปกติ (`Magic`)
-  - [ ] เพิ่มฟังก์ชันประมวลผลคำสั่งระยะไกล `ProcessRemoteWebCommands()`
-  - [ ] เพิ่มโมดูลตรวจสอบข่าว `NewsFilterModule.mqh` (อ่านค่าข่าวและสกุลเงินที่ได้รับผลกระทบ)
+- [ ] **ระบบ News & Leverage Drop Shield**
+  - [ ] เพิ่มโมดูลตรวจสอบข่าว `NewsFilterModule.mqh` (อ่านค่าข่าวระดับ High Impact และจับคู่ Currency)
   - [ ] ตรวจสอบ Leverage และ Margin ก่อนส่ง OrderSend ทุกครั้ง หากพบว่า Leverage ถูกลดเหลือ 1:100 และเงินไม่พอ ให้เข้าโหมด Safe Delay
-  - [ ] **เชื่อมต่อ Trigger การปิดรวบราคาแยกรายคู่เงิน:** เรียก `EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, ...)` เมื่อปิดตะกร้าของแต่ละคู่เงินสำเร็จ
-- [ ] **ขั้นตอนที่ 3: ฝั่ง Frontend (Farm Client & Dev Dock)**
-  - [ ] เปิดสวิตช์ปุ่ม interactive ใน Orb 2 ให้ส่งคำสั่งเข้า API เมื่ออยู่ในโหมด Dev
+- [ ] **ระบบ Tier-3 Triggered Rescue Slicing**
+  - [ ] ปรับปรุงฟังก์ชัน `TrimOneToxicTicket()`:
+    - [ ] ตรวจสอบ `st.rescueTier >= 3` หากมีไม้กู้ภัยชุด 1 ติดลบค้างอยู่ ให้ตัดไม้กู้ภัย (`Magic + 2000`) ก่อนเพื่อลดล็อต
+    - [ ] หาก `st.rescueTier < 3` หรือไม่มีไม้กู้ภัยค้าง ให้ตัดไม้ Regular Grid ปกติ (`Magic`)
+- [ ] **ระบบ Two-Way Remote Command & Harvest Telemetry**
+  - [ ] เพิ่มฟังก์ชันรับและประมวลผลคำสั่งระยะไกล `ProcessRemoteWebCommands()`
+  - [ ] เชื่อมต่อ Trigger ในฟังก์ชันปิดตะกร้า: เรียก `EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, orders_count, total_lots, realized_pnl)`
+
+---
+
+### 💻 หมวดที่ 2: การพัฒนาหน้าเว็บและระบบคลาวด์ (Web UI & Cloud Sync - พัฒนาคู่ขนาน)
+- [ ] **Database & API Routes**
+  - [ ] สร้างตาราง `farm_remote_commands` ใน Supabase
+  - [ ] เพิ่มคอลัมน์ `symbol TEXT` ในตาราง `farm_batch_events` พร้อม Index `(port_number, symbol)`
+  - [ ] ตรวจสอบฟังก์ชัน Auto-cleanup 90 วัน `cleanup_old_farm_data()`
+  - [ ] สร้าง API Route `/api/farm/command/send` และ `/api/farm/command/poll`
+  - [ ] ปรับปรุง `/api/sync-dashboard` ให้รับฟิลด์ `symbol` ลงใน `farm_batch_events`
+- [ ] **Farm Frontend UI Components**
+  - [ ] เปิดสวิตช์ปุ่ม interactive ใน Orb 2 ให้ส่งคำสั่งเข้า API
   - [ ] เพิ่ม News Indicator แสดงไอคอนข่าวกล่องแดงบนคู่เงินในหน้าฟาร์ม
-  - [ ] เพิ่มการแสดงผล Legacy Baskets & External Orders Warning ใน Telemetry Payload ของหน้าฟาร์ม
-  - [ ] พัฒนา **ไซโลเสบียงแก้วทองคำ (Golden Silo / Relief Fund)** และ **เขื่อนพลังงานกั้นพายุ (Bio-Shield Gauge / Buffer Data Group)** บนหน้าฟาร์ม
-  - [ ] พัฒนา **ไทม์ไลน์การเก็บเกี่ยวผลผลิตสด (Real-time Harvest Feed & Pair Rankings)** จากตาราง `farm_batch_events`
-  - [ ] ทดสอบการทำงาน End-to-End บนพอร์ตทดสอบของเจ้าของระบบ
-- [ ] **ขั้นตอนที่ 4: ปล่อยใช้งานจริง (Production Deployment)**
-  - [ ] ตรวจสอบความถูกต้องของแดชบอร์ดบนกราฟ MT5 (Table C ชื่อตรง, Table E สะอาด, Table F รายงานข้อความแจ้งเตือนครบถ้วน)
-  - [ ] ประกาศอัปเดต EasyM Prime v2.10 ให้ลูกค้าดาวน์โหลดไฟล์ `.ex5` ใหม่
-  - [ ] ปลดล็อคระบบ Two-Way สู่โหมดสาธารณะผ่าน Dev Controller
+  - [ ] เพิ่มการแสดงผลเตือน Legacy Baskets & External Orders Warning จาก Table F
+  - [ ] พัฒนาคอมโพเนนต์ **Real-time Harvest Feed & Top Pairs Leaderboard**
+  - [ ] เชื่อมต่อกราฟิก Golden Silo (Relief Fund) และ Bio-Shield Gauge (Buffer)
 
 ---
 *บันทึกโดย: Antigravity AI Pair Programmer & System Architect*  
 *ไฟล์อ้างอิงหลัก: `docs/EASYM_PRIME_PHASE2_ROADMAP.md`*
+
 
 
 
