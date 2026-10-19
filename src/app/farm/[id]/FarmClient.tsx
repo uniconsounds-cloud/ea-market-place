@@ -1873,18 +1873,13 @@ export default function FarmClient({
         return capitalBufferPct >= recommendedBuffer;
     }, [capitalBufferPct, recommendedBuffer]);
 
-    // 🚨 Dome & DD Box Alert Level: วิกฤต (Critical: Rescue Grid / High DD) vs เตือน (Warning: Quarantine / Low Buffer)
+    // 🚨 Dome & DD Box Alert Level: วิกฤต (Critical: Rescue Grid active / rescue orders > 0)
     const isQuarantineCritical = useMemo(() => {
         return Boolean(
             quarantinePreviewList.some(t => t.isRescue || (t.rescueOrders && t.rescueOrders > 0)) ||
-            totalQuarantineDD >= 15 ||
             (primeTelemetry?.rescueOrdersCount && primeTelemetry.rescueOrdersCount > 0)
         );
-    }, [quarantinePreviewList, totalQuarantineDD, primeTelemetry?.rescueOrdersCount]);
-
-    const isQuarantineWarning = useMemo(() => {
-        return !isQuarantineCritical && (totalQuarantineDD > 0 || !isBufferSafe || quarantinePreviewList.length > 0);
-    }, [isQuarantineCritical, totalQuarantineDD, isBufferSafe, quarantinePreviewList.length]);
+    }, [quarantinePreviewList, primeTelemetry?.rescueOrdersCount]);
 
     // 🍩 Dynamic Buffer Aura Thickness:
     // Donut thickness over dome: min 4px, max 26px based on capital buffer %
@@ -2835,21 +2830,21 @@ export default function FarmClient({
                                 }}
                                 title="โรงเรือนกระจกฟื้นฟูพืช (แตะเพื่อขยายดูคู่เงินที่ถูกกักขัง)"
                             >
-                                {/* Subtle breathing magical aura under the dome: red-black when critical, amber/orange when warning, emerald/cyan when safe */}
+                                {/* Subtle breathing magical aura under the dome: red-black when critical, alert rose/amber when low buffer, emerald/cyan when safe */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className={`w-40 h-40 rounded-full blur-2xl transition-all ${
                                         isQuarantineCritical
-                                            ? 'bg-red-950/75 group-hover:bg-red-900/85 animate-[pulse_1.0s_ease-in-out_infinite]'
-                                            : (isQuarantineWarning
-                                                ? 'bg-amber-600/30 group-hover:bg-amber-500/40 animate-[pulse_1.6s_ease-in-out_infinite]'
-                                                : 'bg-emerald-500/15 group-hover:bg-emerald-400/25 animate-pulse')
+                                            ? 'bg-black/90 group-hover:bg-black/95 animate-[pulse_0.9s_ease-in-out_infinite]'
+                                            : (isBufferSafe 
+                                                ? 'bg-emerald-500/15 group-hover:bg-emerald-400/25 animate-pulse' 
+                                                : 'bg-rose-500/25 group-hover:bg-rose-400/35 animate-[pulse_1.2s_ease-in-out_infinite]')
                                     }`} />
                                     <div className={`w-28 h-28 rounded-full blur-xl transition-all ${
                                         isQuarantineCritical
-                                            ? 'bg-rose-600/50 group-hover:bg-rose-500/60 animate-[pulse_1.0s_ease-in-out_infinite] delay-150'
-                                            : (isQuarantineWarning
-                                                ? 'bg-orange-500/25 group-hover:bg-orange-400/35 animate-[pulse_1.6s_ease-in-out_infinite] delay-300'
-                                                : 'bg-cyan-400/15 group-hover:bg-cyan-300/25 animate-pulse delay-700')
+                                            ? 'bg-rose-700/60 group-hover:bg-rose-600/70 animate-[pulse_0.9s_ease-in-out_infinite] delay-150'
+                                            : (isBufferSafe 
+                                                ? 'bg-cyan-400/15 group-hover:bg-cyan-300/25 animate-pulse delay-700' 
+                                                : 'bg-amber-500/25 group-hover:bg-amber-400/35 animate-[pulse_1.2s_ease-in-out_infinite] delay-300')
                                     }`} />
                                 </div>
 
@@ -2894,17 +2889,17 @@ export default function FarmClient({
                                             return (
                                                 <svg className="w-full h-full overflow-visible" viewBox="0 0 280 280">
                                                     <defs>
-                                                        {/* Linear Gradients: Safe (emerald/cyan) vs Warning (amber/orange) vs Critical (deep red-black) */}
+                                                        {/* Linear Gradients: Safe (emerald/cyan) vs Alert (crimson/amber flare) vs Critical (deep black-red) */}
                                                         <linearGradient id="bufferAuraCoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#dc2626" : (isQuarantineWarning ? "#f59e0b" : "#34d399")} stopOpacity="0.95" />
-                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#f43f5e" : (isQuarantineWarning ? "#fbbf24" : "#a7f3d0")} stopOpacity="1" />
-                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#380608" : (isQuarantineWarning ? "#ea580c" : "#22d3ee")} stopOpacity="0.95" />
+                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#b91c1c" : (isBufferSafe ? "#34d399" : "#f43f5e")} stopOpacity="0.95" />
+                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#ef4444" : (isBufferSafe ? "#a7f3d0" : "#fef08a")} stopOpacity="1" />
+                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#050001" : (isBufferSafe ? "#22d3ee" : "#ea580c")} stopOpacity="0.95" />
                                                         </linearGradient>
 
                                                         <linearGradient id="bufferAuraMidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#991b1b" : (isQuarantineWarning ? "#d97706" : "#10b981")} stopOpacity="0.85" />
-                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#e11d48" : (isQuarantineWarning ? "#f97316" : "#34d399")} stopOpacity="0.9" />
-                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#1a0204" : (isQuarantineWarning ? "#c2410c" : "#06b6d4")} stopOpacity="0.85" />
+                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#7f1d1d" : (isBufferSafe ? "#10b981" : "#e11d48")} stopOpacity="0.8" />
+                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#dc2626" : (isBufferSafe ? "#34d399" : "#f97316")} stopOpacity="0.85" />
+                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#000000" : (isBufferSafe ? "#06b6d4" : "#c2410c")} stopOpacity="0.8" />
                                                         </linearGradient>
 
                                                         {/* Filter for Outermost Soft Haze */}
@@ -2930,11 +2925,11 @@ export default function FarmClient({
                                                     <path
                                                         d={p4_d}
                                                         fill="none"
-                                                        stroke={isQuarantineCritical ? "rgba(185, 28, 28, 0.45)" : (isQuarantineWarning ? "rgba(245, 158, 11, 0.35)" : "rgba(16, 185, 129, 0.3)")}
+                                                        stroke={isQuarantineCritical ? "rgba(185, 28, 28, 0.5)" : (isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.38)")}
                                                         strokeWidth={Math.max(8, T * 1.4)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraDeepHaze)"
-                                                        className={isQuarantineCritical ? "animate-[pulse_1.0s_ease-in-out_infinite]" : (isQuarantineWarning ? "animate-[pulse_1.6s_ease-in-out_infinite]" : "animate-[pulse_4s_ease-in-out_infinite]")}
+                                                        className={isQuarantineCritical ? "animate-[pulse_0.9s_ease-in-out_infinite]" : (isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.2s_ease-in-out_infinite]")}
                                                     />
 
                                                     {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
@@ -2945,8 +2940,8 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(6, T * 0.9)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraMidGlow)"
-                                                        opacity={isQuarantineCritical ? 0.92 : (isQuarantineWarning ? 0.8 : 0.65)}
-                                                        className={isQuarantineCritical ? "animate-[pulse_0.9s_ease-in-out_infinite]" : (isQuarantineWarning ? "animate-[pulse_1.4s_ease-in-out_infinite]" : "animate-[pulse_3s_ease-in-out_infinite]")}
+                                                        opacity={isQuarantineCritical ? 0.95 : (isBufferSafe ? 0.65 : 0.82)}
+                                                        className={isQuarantineCritical ? "animate-[pulse_0.8s_ease-in-out_infinite]" : (isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.0s_ease-in-out_infinite]")}
                                                     />
 
                                                     {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
@@ -2957,18 +2952,18 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(3.5, T * 0.45)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraInnerGlow)"
-                                                        opacity={0.95}
+                                                        opacity={0.92}
                                                     />
 
                                                     {/* ⚡ Pass 1: Glass Contact Radiant Seam (เส้นกำเนิดแสงที่ผิวโดมแก้ว - วงในสุด เข้ม สว่างชัดเจนดุจเปล่งแสงออกจากเนื้อแก้ว) */}
                                                     <path
                                                         d={p1_d}
                                                         fill="none"
-                                                        stroke={isQuarantineCritical ? "#ffe4e6" : (isQuarantineWarning ? "#fffbeb" : "#ecfdf5")}
+                                                        stroke={isQuarantineCritical ? "#fecdd3" : (isBufferSafe ? "#ecfdf5" : "#fff1f2")}
                                                         strokeWidth={Math.max(1.5, T * 0.15)}
                                                         strokeLinecap="round"
                                                         style={{
-                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isQuarantineCritical ? '#dc2626' : (isQuarantineWarning ? '#f59e0b' : '#67e8f9')})`
+                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isQuarantineCritical ? '#dc2626' : (isBufferSafe ? '#67e8f9' : '#f43f5e')})`
                                                         }}
                                                         opacity={0.98}
                                                     />
@@ -3080,32 +3075,32 @@ export default function FarmClient({
                                                 }`}
                                                 title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อย่อกลับ" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
-                                                {/* 🌟 REALISTIC RECTANGULAR CORONA AURA (รัศมีฉายแสงรอบกล่อง DD - วิกฤตแดงดำ / เตือนส้ม / ปลอดภัยเขียวฟ้า) */}
+                                                {/* 🌟 REALISTIC RECTANGULAR CORONA AURA (รัศมีฉายแสงรอบกล่อง DD - วิกฤตดำแดง / เตือนส้มแดงแบบเดิม / ปลอดภัยเขียวฟ้าแบบเดิม) */}
                                                 {isQuarantineEnlarged && (
                                                     <div className="absolute inset-0 pointer-events-none z-0">
                                                         {/* 🌌 Pass 4: Outermost Ethereal Atmosphere (ไอออร่าชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ) */}
                                                         <div 
                                                             className={`absolute rounded-3xl pointer-events-none transition-all duration-500 ${
                                                                 isQuarantineCritical 
-                                                                    ? 'animate-[pulse_1.0s_ease-in-out_infinite]' 
-                                                                    : (isQuarantineWarning 
-                                                                        ? 'animate-[pulse_1.6s_ease-in-out_infinite]' 
-                                                                        : 'animate-[pulse_4s_ease-in-out_infinite]')
+                                                                    ? 'animate-[pulse_0.9s_ease-in-out_infinite]' 
+                                                                    : (isBufferSafe 
+                                                                        ? 'animate-[pulse_4s_ease-in-out_infinite]' 
+                                                                        : 'animate-[pulse_1.2s_ease-in-out_infinite]')
                                                             }`}
                                                             style={{
                                                                 inset: `-${boxAuraThickness * 1.5}px`,
                                                                 background: isQuarantineCritical
-                                                                    ? `radial-gradient(ellipse at center, rgba(225,29,72,0.35) 0%, rgba(69,10,10,0.3) 65%, transparent 100%)`
-                                                                    : (isQuarantineWarning
-                                                                        ? `radial-gradient(ellipse at center, rgba(245,158,11,0.25) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`
-                                                                        : `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)`),
+                                                                    ? `radial-gradient(ellipse at center, rgba(220,38,38,0.4) 0%, rgba(40,0,5,0.4) 65%, rgba(0,0,0,0.85) 100%)`
+                                                                    : (isBufferSafe
+                                                                        ? `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)`
+                                                                        : `radial-gradient(ellipse at center, rgba(244,63,94,0.28) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`),
                                                                 filter: `blur(${Math.max(6, boxAuraThickness * 0.75)}px)`,
                                                                 boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${boxAuraThickness * 3.2}px ${boxAuraThickness * 1.0}px rgba(185, 28, 28, 0.7)`
-                                                                    : (isQuarantineWarning
-                                                                        ? `0 0 ${boxAuraThickness * 3.0}px ${boxAuraThickness * 0.9}px rgba(245, 158, 11, 0.55)`
-                                                                        : `0 0 ${boxAuraThickness * 2.8}px ${boxAuraThickness * 0.8}px rgba(16, 185, 129, 0.45)`),
-                                                                opacity: isQuarantineCritical ? 0.95 : (isQuarantineWarning ? 0.9 : 0.75)
+                                                                    ? `0 0 ${boxAuraThickness * 3.5}px ${boxAuraThickness * 1.0}px rgba(185, 28, 28, 0.75)`
+                                                                    : (isBufferSafe
+                                                                        ? `0 0 ${boxAuraThickness * 2.8}px ${boxAuraThickness * 0.8}px rgba(16, 185, 129, 0.45)`
+                                                                        : `0 0 ${boxAuraThickness * 3.0}px ${boxAuraThickness * 0.9}px rgba(244, 63, 94, 0.55)`),
+                                                                opacity: isQuarantineCritical ? 0.95 : (isBufferSafe ? 0.75 : 0.9)
                                                             }}
                                                         />
 
@@ -3113,25 +3108,25 @@ export default function FarmClient({
                                                         <div 
                                                             className={`absolute rounded-2xl pointer-events-none transition-all duration-500 ${
                                                                 isQuarantineCritical 
-                                                                    ? 'animate-[pulse_0.9s_ease-in-out_infinite]' 
-                                                                    : (isQuarantineWarning 
-                                                                        ? 'animate-[pulse_1.4s_ease-in-out_infinite]' 
-                                                                        : 'animate-[pulse_3s_ease-in-out_infinite]')
+                                                                    ? 'animate-[pulse_0.8s_ease-in-out_infinite]' 
+                                                                    : (isBufferSafe 
+                                                                        ? 'animate-[pulse_3s_ease-in-out_infinite]' 
+                                                                        : 'animate-[pulse_1.0s_ease-in-out_infinite]')
                                                             }`}
                                                             style={{
                                                                 inset: `-${boxAuraThickness * 0.85}px`,
                                                                 border: `${Math.max(2, boxAuraThickness * 0.25)}px solid ${
                                                                     isQuarantineCritical 
-                                                                        ? 'rgba(225, 29, 72, 0.65)' 
-                                                                        : (isQuarantineWarning ? 'rgba(245, 158, 11, 0.55)' : 'rgba(52, 211, 153, 0.45)')
+                                                                        ? 'rgba(220, 38, 38, 0.75)' 
+                                                                        : (isBufferSafe ? 'rgba(52, 211, 153, 0.45)' : 'rgba(249, 115, 22, 0.55)')
                                                                 }`,
                                                                 boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${boxAuraThickness * 2.2}px ${boxAuraThickness * 0.6}px rgba(185, 28, 28, 0.7), inset 0 0 ${boxAuraThickness * 1.0}px rgba(69, 10, 10, 0.6)`
-                                                                    : (isQuarantineWarning
-                                                                        ? `0 0 ${boxAuraThickness * 2.0}px ${boxAuraThickness * 0.5}px rgba(245, 158, 11, 0.6), inset 0 0 ${boxAuraThickness * 0.8}px rgba(251, 146, 60, 0.35)`
-                                                                        : `0 0 ${boxAuraThickness * 1.8}px ${boxAuraThickness * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxAuraThickness * 0.8}px rgba(52, 211, 153, 0.3)`),
+                                                                    ? `0 0 ${boxAuraThickness * 2.2}px ${boxAuraThickness * 0.6}px rgba(153, 27, 27, 0.8), inset 0 0 ${boxAuraThickness * 1.0}px rgba(0, 0, 0, 0.85)`
+                                                                    : (isBufferSafe
+                                                                        ? `0 0 ${boxAuraThickness * 1.8}px ${boxAuraThickness * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxAuraThickness * 0.8}px rgba(52, 211, 153, 0.3)`
+                                                                        : `0 0 ${boxAuraThickness * 2.0}px ${boxAuraThickness * 0.5}px rgba(244, 63, 94, 0.6), inset 0 0 ${boxAuraThickness * 0.8}px rgba(251, 146, 60, 0.35)`),
                                                                 filter: `blur(${Math.max(3, boxAuraThickness * 0.4)}px)`,
-                                                                opacity: isQuarantineCritical ? 0.98 : (isQuarantineWarning ? 0.92 : 0.85)
+                                                                opacity: isQuarantineCritical ? 0.98 : (isBufferSafe ? 0.85 : 0.95)
                                                             }}
                                                         />
 
@@ -3142,14 +3137,14 @@ export default function FarmClient({
                                                                 inset: `-${boxAuraThickness * 0.35}px`,
                                                                 border: `${Math.max(1.5, boxAuraThickness * 0.15)}px solid ${
                                                                     isQuarantineCritical 
-                                                                        ? 'rgba(244, 63, 94, 0.9)' 
-                                                                        : (isQuarantineWarning ? 'rgba(254, 240, 138, 0.85)' : 'rgba(167, 243, 208, 0.8)')
+                                                                        ? 'rgba(239, 68, 68, 0.9)' 
+                                                                        : (isBufferSafe ? 'rgba(167, 243, 208, 0.8)' : 'rgba(254, 240, 138, 0.85)')
                                                                 }`,
                                                                 boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${boxAuraThickness * 1.4}px rgba(225, 29, 72, 0.95), inset 0 0 ${boxAuraThickness * 0.6}px rgba(69, 10, 10, 0.5)`
-                                                                    : (isQuarantineWarning
-                                                                        ? `0 0 ${boxAuraThickness * 1.2}px rgba(245, 158, 11, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(254, 205, 211, 0.4)`
-                                                                        : `0 0 ${boxAuraThickness * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(110, 231, 183, 0.4)`),
+                                                                    ? `0 0 ${boxAuraThickness * 1.4}px rgba(220, 38, 38, 0.95), inset 0 0 ${boxAuraThickness * 0.6}px rgba(40, 0, 5, 0.7)`
+                                                                    : (isBufferSafe
+                                                                        ? `0 0 ${boxAuraThickness * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(110, 231, 183, 0.4)`
+                                                                        : `0 0 ${boxAuraThickness * 1.2}px rgba(244, 63, 94, 0.9), inset 0 0 ${boxAuraThickness * 0.5}px rgba(254, 205, 211, 0.4)`),
                                                                 filter: `blur(${Math.max(1, boxAuraThickness * 0.18)}px)`,
                                                                 opacity: 0.95
                                                             }}
@@ -3160,10 +3155,10 @@ export default function FarmClient({
                                                             className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-300"
                                                             style={{
                                                                 boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ffe4e6, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #dc2626`
-                                                                    : (isQuarantineWarning
-                                                                        ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fef3c7, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #f59e0b`
-                                                                        : `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #34d399`),
+                                                                    ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fecdd3, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #dc2626`
+                                                                    : (isBufferSafe
+                                                                        ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #34d399`
+                                                                        : `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fff1f2, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #f43f5e`),
                                                                 opacity: 0.98
                                                             }}
                                                         />
