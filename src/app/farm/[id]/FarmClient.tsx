@@ -413,7 +413,8 @@ export default function FarmClient({
     // 👑 Owner Developer Sandbox & Customer Release Gate:
     // 1. Only Port 97053088 has access to the Draggable Floating Controller Dock.
     // 2. Port 21692434 and customer ports act as standard client ports to observe the true released experience.
-    const isOwnerTestPort = String(portNumber) === '97053088';
+    const isDevPort3088 = String(portNumber) === '97053088' || String(portNumber).endsWith('3088') || String(portNumber) === '3088';
+    const isOwnerTestPort = isDevPort3088;
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem('owner_prime_release_gate');
@@ -434,7 +435,8 @@ export default function FarmClient({
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
 
-    // 🧭 Interactive Farm Guide & System Specs Tour (เมนูลูกแก้วที่สี่)
+    // 🧭 Interactive Farm Guide & System Specs Tour (เมนูลูกแก้วที่สี่ - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088)
+    const isOrb4Unlocked = isDevPort3088 && isOwnerDevUser;
     const [isFarmGuideActive, setIsFarmGuideActive] = useState<boolean>(false);
 
     const fullEaName = useMemo(() => {
@@ -3656,30 +3658,45 @@ export default function FarmClient({
                             )}
                         </button>
 
-                        {/* Orb 4: Info & Interactive Guide Mode (เมนูแสดงข้อมูลและคำแนะนำการใช้งาน) */}
-                        <button
-                            onClick={() => setIsFarmGuideActive(prev => !prev)}
-                            className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
-                                isFarmGuideActive
-                                    ? 'border-amber-400 ring-2 ring-amber-400/90 shadow-[0_0_35px_rgba(245,158,11,0.85)] scale-110 bg-amber-950/50 z-[150]'
-                                    : 'border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.75)] hover:scale-110 active:scale-95'
-                            }`}
-                            title="คำแนะนำและข้อมูลระบบ (Interactive Guide & System Overview)"
-                        >
-                            <HelpCircle className={`h-5 w-5 sm:h-6 sm:w-6 transition-all duration-300 ${
-                                isFarmGuideActive ? 'text-amber-300 scale-110 rotate-12' : 'text-amber-400 group-hover:scale-125'
-                            }`} />
-                            {!isFarmGuideActive && (
-                                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border border-slate-900 shadow"></span>
+                        {/* Orb 4: Info & Interactive Guide Mode (เมนูแสดงข้อมูลและคำแนะนำการใช้งาน - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088) */}
+                        {isOrb4Unlocked ? (
+                            <button
+                                onClick={() => setIsFarmGuideActive(prev => !prev)}
+                                className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
+                                    isFarmGuideActive
+                                        ? 'border-amber-400 ring-2 ring-amber-400/90 shadow-[0_0_35px_rgba(245,158,11,0.85)] scale-110 bg-amber-950/50 z-[150]'
+                                        : 'border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.75)] hover:scale-110 active:scale-95'
+                                }`}
+                                title="คำแนะนำและข้อมูลระบบ (Interactive Guide & System Overview)"
+                            >
+                                <HelpCircle className={`h-5 w-5 sm:h-6 sm:w-6 transition-all duration-300 ${
+                                    isFarmGuideActive ? 'text-amber-300 scale-110 rotate-12' : 'text-amber-400 group-hover:scale-125'
+                                }`} />
+                                {!isFarmGuideActive && (
+                                    <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border border-slate-900 shadow"></span>
+                                    </span>
+                                )}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    toast.info('🔒 ฟังก์ชันคำแนะนำและข้อมูลระบบ อยู่ในระหว่างการทดสอบในพอร์ตพัฒนา (3088) จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
+                                }}
+                                className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] hover:scale-105 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer opacity-80 hover:opacity-100"
+                                title="🔒 คำแนะนำและข้อมูลระบบ (เปิดให้ทดสอบเฉพาะพอร์ตพัฒนา 3088 - เร็วๆ นี้)"
+                            >
+                                <HelpCircle className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400/50 group-hover:text-amber-300 transition-colors" />
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-amber-500/40 text-[9px] shadow" title="เร็วๆ นี้">
+                                    🔒
                                 </span>
-                            )}
-                        </button>
+                            </button>
+                        )}
                     </div>
 
                     {/* 🧭 INTERACTIVE FARM GUIDE & SYSTEM SPECS OVERLAY (เมนูลูกแก้วที่สี่) */}
-                    {isClient && isPrime && isFarmGuideActive && (
+                    {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
                         <div 
                             className="fixed inset-0 z-[130] pointer-events-auto animate-fade-in"
                             onClick={() => setIsFarmGuideActive(false)}
