@@ -3325,83 +3325,46 @@ export default function FarmClient({
                                                         </div>
                                                     </div>
 
-                                                    {/* 🌸 9 Rescue Flowers (3 sets of 3) when clicked to expand */}
+                                                    {/* 🌸 9 Rescue Flowers (Full width, Translucent background, No text) when clicked to expand */}
                                                     {isTreeExpanded && (
-                                                        <div className="w-full px-1.5 py-1.5 rounded-b-lg bg-[#0c0702]/98 backdrop-blur-md border-b border-x border-amber-500/70 shadow-2xl flex flex-col items-center gap-1 animate-fade-in">
-                                                            {/* Flowers Header */}
-                                                            <div className="flex items-center justify-between w-full px-0.5 text-[7px] font-bold text-amber-300/90 border-b border-amber-500/20 pb-0.5">
-                                                                <span className="tracking-wide">ไม้แก้ 3 ชุด (9 ไม้)</span>
-                                                                <span className="font-mono text-cyan-300">
-                                                                    เปิด {Math.min(qTree.rescueOrders || 0, 9)}/9
-                                                                </span>
-                                                            </div>
+                                                        <div className="w-full px-1.5 py-1.5 rounded-b-lg bg-black/40 backdrop-blur-md border-b border-x border-amber-500/50 shadow-2xl flex items-center justify-between gap-0.5 animate-fade-in">
+                                                            {Array.from({ length: 9 }).map((_, fIdx) => {
+                                                                const isActive = fIdx < (qTree.rescueOrders || 0);
 
-                                                            {/* 3 Sets of 3 Flowers Grid */}
-                                                            <div className="grid grid-cols-3 gap-1 w-full">
-                                                                {[0, 1, 2].map((setIdx) => {
-                                                                    const setNumber = setIdx + 1;
-                                                                    const setStart = setIdx * 3;
-                                                                    const setOrders = [setStart, setStart + 1, setStart + 2];
-                                                                    const activeInSet = setOrders.filter(oIdx => oIdx < (qTree.rescueOrders || 0)).length;
-
-                                                                    return (
-                                                                        <div 
-                                                                            key={`rescue_set_${qTree.id}_${setIdx}`}
-                                                                            className={`flex flex-col items-center py-0.5 px-0.5 rounded bg-black/50 border transition-colors ${
-                                                                                activeInSet > 0 
-                                                                                    ? 'border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]' 
-                                                                                    : 'border-white/10'
-                                                                            }`}
-                                                                        >
-                                                                            <div className="flex items-center justify-between w-full px-0.5 mb-1">
-                                                                                <span className="text-[6.5px] font-bold text-amber-300/90">
-                                                                                    ชุด {setNumber}
-                                                                                </span>
-                                                                                <span className={`text-[6px] font-mono ${activeInSet > 0 ? 'text-emerald-400 font-bold' : 'text-stone-500'}`}>
-                                                                                    {activeInSet}/3
-                                                                                </span>
+                                                                return (
+                                                                    <div
+                                                                        key={`rescue_flower_slot_${qTree.id}_${fIdx}`}
+                                                                        className="relative flex-1 flex items-center justify-center aspect-square"
+                                                                    >
+                                                                        {isActive ? (
+                                                                            <div className="relative w-full h-full max-w-[18px] max-h-[18px] flex items-center justify-center">
+                                                                                <div className="absolute inset-0 rounded-full bg-emerald-400/30 blur-[2px] animate-pulse pointer-events-none"></div>
+                                                                                <div className="relative w-full h-full drop-shadow-[0_0_8px_rgba(52,211,153,0.95)] animate-pulse">
+                                                                                    <Image
+                                                                                        src={theme.open}
+                                                                                        alt="Active Flower"
+                                                                                        fill
+                                                                                        className="object-contain"
+                                                                                        unoptimized
+                                                                                    />
+                                                                                </div>
                                                                             </div>
-
-                                                                            {/* 3 flowers in this set */}
-                                                                            <div className="flex items-center justify-center gap-1 w-full">
-                                                                                {setOrders.map((oIdx) => {
-                                                                                    const orderNum = oIdx + 1;
-                                                                                    const isActive = oIdx < (qTree.rescueOrders || 0);
-
-                                                                                    return (
-                                                                                        <div
-                                                                                            key={`flower_slot_${orderNum}`}
-                                                                                            className="relative flex items-center justify-center"
-                                                                                            title={`ไม้แก้ที่ ${orderNum} (ชุดที่ ${setNumber}) - ${isActive ? 'เปิดไม้แล้ว (Active)' : 'รอเปิดไม้ (Standby)'}`}
-                                                                                        >
-                                                                                            {isActive ? (
-                                                                                                <div className="relative w-3.5 h-3.5 flex items-center justify-center">
-                                                                                                    <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping opacity-60 pointer-events-none"></div>
-                                                                                                    <div className="relative w-full h-full drop-shadow-[0_0_6px_rgba(52,211,153,0.95)]">
-                                                                                                        <Image src={theme.open} alt={`R${orderNum}`} fill className="object-contain animate-pulse" unoptimized />
-                                                                                                    </div>
-                                                                                                    <span className="absolute -bottom-1 -right-1 px-0.5 rounded bg-emerald-950/95 border border-emerald-400 text-[5.5px] font-mono font-black text-emerald-300 leading-none shadow-[0_0_4px_rgba(16,185,129,0.8)]">
-                                                                                                        R{orderNum}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            ) : (
-                                                                                                <div className="relative w-3.5 h-3.5 flex items-center justify-center rounded-full bg-white/[0.04] border border-white/10 opacity-35 hover:opacity-60 transition-opacity">
-                                                                                                    <div className="relative w-2.5 h-2.5 grayscale opacity-50">
-                                                                                                        <Image src={theme.open} alt={`R${orderNum}`} fill className="object-contain" unoptimized />
-                                                                                                    </div>
-                                                                                                    <span className="absolute -bottom-1 -right-1 px-0.5 rounded bg-black/80 border border-white/10 text-[5px] font-mono font-semibold text-stone-400 leading-none">
-                                                                                                        R{orderNum}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
+                                                                        ) : (
+                                                                            <div className="relative w-full h-full max-w-[18px] max-h-[18px] flex items-center justify-center rounded-full bg-white/[0.04] border border-white/20 opacity-35 hover:opacity-60 transition-opacity">
+                                                                                <div className="relative w-[75%] h-[75%] grayscale opacity-55 contrast-75">
+                                                                                    <Image
+                                                                                        src={theme.open}
+                                                                                        alt="Standby Flower"
+                                                                                        fill
+                                                                                        className="object-contain"
+                                                                                        unoptimized
+                                                                                    />
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
 
