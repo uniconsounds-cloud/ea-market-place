@@ -1873,6 +1873,19 @@ export default function FarmClient({
         return capitalBufferPct >= recommendedBuffer;
     }, [capitalBufferPct, recommendedBuffer]);
 
+    // 🚨 Dome & DD Box Alert Level: วิกฤต (Critical: Rescue Grid / High DD) vs เตือน (Warning: Quarantine / Low Buffer)
+    const isQuarantineCritical = useMemo(() => {
+        return Boolean(
+            quarantinePreviewList.some(t => t.isRescue || (t.rescueOrders && t.rescueOrders > 0)) ||
+            totalQuarantineDD >= 15 ||
+            (primeTelemetry?.rescueOrdersCount && primeTelemetry.rescueOrdersCount > 0)
+        );
+    }, [quarantinePreviewList, totalQuarantineDD, primeTelemetry?.rescueOrdersCount]);
+
+    const isQuarantineWarning = useMemo(() => {
+        return !isQuarantineCritical && (totalQuarantineDD > 0 || !isBufferSafe || quarantinePreviewList.length > 0);
+    }, [isQuarantineCritical, totalQuarantineDD, isBufferSafe, quarantinePreviewList.length]);
+
     // 🍩 Dynamic Buffer Aura Thickness:
     // Donut thickness over dome: min 4px, max 26px based on capital buffer %
     const donutThickness = Math.min(26, Math.max(4, Math.round(4 + (capitalBufferPct / 100) * 18)));
@@ -2822,17 +2835,21 @@ export default function FarmClient({
                                 }}
                                 title="โรงเรือนกระจกฟื้นฟูพืช (แตะเพื่อขยายดูคู่เงินที่ถูกกักขัง)"
                             >
-                                {/* Subtle breathing magical aura under the dome: emerald/cyan when safe, alert rose/amber when low buffer */}
+                                {/* Subtle breathing magical aura under the dome: red-black when critical, amber/orange when warning, emerald/cyan when safe */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className={`w-40 h-40 rounded-full blur-2xl transition-all ${
-                                        isBufferSafe 
-                                            ? 'bg-emerald-500/15 group-hover:bg-emerald-400/25 animate-pulse' 
-                                            : 'bg-rose-500/25 group-hover:bg-rose-400/35 animate-[pulse_1.2s_ease-in-out_infinite]'
+                                        isQuarantineCritical
+                                            ? 'bg-red-950/75 group-hover:bg-red-900/85 animate-[pulse_1.0s_ease-in-out_infinite]'
+                                            : (isQuarantineWarning
+                                                ? 'bg-amber-600/30 group-hover:bg-amber-500/40 animate-[pulse_1.6s_ease-in-out_infinite]'
+                                                : 'bg-emerald-500/15 group-hover:bg-emerald-400/25 animate-pulse')
                                     }`} />
                                     <div className={`w-28 h-28 rounded-full blur-xl transition-all ${
-                                        isBufferSafe 
-                                            ? 'bg-cyan-400/15 group-hover:bg-cyan-300/25 animate-pulse delay-700' 
-                                            : 'bg-amber-500/25 group-hover:bg-amber-400/35 animate-[pulse_1.2s_ease-in-out_infinite] delay-300'
+                                        isQuarantineCritical
+                                            ? 'bg-rose-600/50 group-hover:bg-rose-500/60 animate-[pulse_1.0s_ease-in-out_infinite] delay-150'
+                                            : (isQuarantineWarning
+                                                ? 'bg-orange-500/25 group-hover:bg-orange-400/35 animate-[pulse_1.6s_ease-in-out_infinite] delay-300'
+                                                : 'bg-cyan-400/15 group-hover:bg-cyan-300/25 animate-pulse delay-700')
                                     }`} />
                                 </div>
 
@@ -2877,17 +2894,17 @@ export default function FarmClient({
                                             return (
                                                 <svg className="w-full h-full overflow-visible" viewBox="0 0 280 280">
                                                     <defs>
-                                                        {/* Linear Gradients for safe (emerald/cyan) vs alert (crimson/amber flare) */}
+                                                        {/* Linear Gradients: Safe (emerald/cyan) vs Warning (amber/orange) vs Critical (deep red-black) */}
                                                         <linearGradient id="bufferAuraCoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isBufferSafe ? "#34d399" : "#f43f5e"} stopOpacity="0.95" />
-                                                            <stop offset="50%" stopColor={isBufferSafe ? "#a7f3d0" : "#fef08a"} stopOpacity="1" />
-                                                            <stop offset="100%" stopColor={isBufferSafe ? "#22d3ee" : "#ea580c"} stopOpacity="0.95" />
+                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#dc2626" : (isQuarantineWarning ? "#f59e0b" : "#34d399")} stopOpacity="0.95" />
+                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#f43f5e" : (isQuarantineWarning ? "#fbbf24" : "#a7f3d0")} stopOpacity="1" />
+                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#380608" : (isQuarantineWarning ? "#ea580c" : "#22d3ee")} stopOpacity="0.95" />
                                                         </linearGradient>
 
                                                         <linearGradient id="bufferAuraMidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isBufferSafe ? "#10b981" : "#e11d48"} stopOpacity="0.8" />
-                                                            <stop offset="50%" stopColor={isBufferSafe ? "#34d399" : "#f97316"} stopOpacity="0.85" />
-                                                            <stop offset="100%" stopColor={isBufferSafe ? "#06b6d4" : "#c2410c"} stopOpacity="0.8" />
+                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#991b1b" : (isQuarantineWarning ? "#d97706" : "#10b981")} stopOpacity="0.85" />
+                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#e11d48" : (isQuarantineWarning ? "#f97316" : "#34d399")} stopOpacity="0.9" />
+                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#1a0204" : (isQuarantineWarning ? "#c2410c" : "#06b6d4")} stopOpacity="0.85" />
                                                         </linearGradient>
 
                                                         {/* Filter for Outermost Soft Haze */}
@@ -2913,11 +2930,11 @@ export default function FarmClient({
                                                     <path
                                                         d={p4_d}
                                                         fill="none"
-                                                        stroke={isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.38)"}
+                                                        stroke={isQuarantineCritical ? "rgba(185, 28, 28, 0.45)" : (isQuarantineWarning ? "rgba(245, 158, 11, 0.35)" : "rgba(16, 185, 129, 0.3)")}
                                                         strokeWidth={Math.max(8, T * 1.4)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraDeepHaze)"
-                                                        className={isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.2s_ease-in-out_infinite]"}
+                                                        className={isQuarantineCritical ? "animate-[pulse_1.0s_ease-in-out_infinite]" : (isQuarantineWarning ? "animate-[pulse_1.6s_ease-in-out_infinite]" : "animate-[pulse_4s_ease-in-out_infinite]")}
                                                     />
 
                                                     {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
@@ -2928,8 +2945,8 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(6, T * 0.9)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraMidGlow)"
-                                                        opacity={isBufferSafe ? 0.65 : 0.82}
-                                                        className={isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.0s_ease-in-out_infinite]"}
+                                                        opacity={isQuarantineCritical ? 0.92 : (isQuarantineWarning ? 0.8 : 0.65)}
+                                                        className={isQuarantineCritical ? "animate-[pulse_0.9s_ease-in-out_infinite]" : (isQuarantineWarning ? "animate-[pulse_1.4s_ease-in-out_infinite]" : "animate-[pulse_3s_ease-in-out_infinite]")}
                                                     />
 
                                                     {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
@@ -2940,18 +2957,18 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(3.5, T * 0.45)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraInnerGlow)"
-                                                        opacity={0.92}
+                                                        opacity={0.95}
                                                     />
 
                                                     {/* ⚡ Pass 1: Glass Contact Radiant Seam (เส้นกำเนิดแสงที่ผิวโดมแก้ว - วงในสุด เข้ม สว่างชัดเจนดุจเปล่งแสงออกจากเนื้อแก้ว) */}
                                                     <path
                                                         d={p1_d}
                                                         fill="none"
-                                                        stroke={isBufferSafe ? "#ecfdf5" : "#fff1f2"}
+                                                        stroke={isQuarantineCritical ? "#ffe4e6" : (isQuarantineWarning ? "#fffbeb" : "#ecfdf5")}
                                                         strokeWidth={Math.max(1.5, T * 0.15)}
                                                         strokeLinecap="round"
                                                         style={{
-                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isBufferSafe ? '#67e8f9' : '#f43f5e'})`
+                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isQuarantineCritical ? '#dc2626' : (isQuarantineWarning ? '#f59e0b' : '#67e8f9')})`
                                                         }}
                                                         opacity={0.98}
                                                     />
@@ -3048,51 +3065,73 @@ export default function FarmClient({
                                         >
                                             <div 
                                                 onClick={handleQuarantineBoxClick}
-                                                className={`relative bg-[#1c1204]/95 hover:bg-[#2a1b06]/95 border sm:border-2 border-amber-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                className={`relative rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                    isQuarantineCritical
+                                                        ? 'border sm:border-2 border-red-600/90 shadow-[0_0_30px_rgba(225,29,72,0.85)] bg-[#140204]/98 hover:bg-[#1f0307]/98'
+                                                        : 'border sm:border-2 border-amber-500/90 shadow-[0_0_15px_rgba(245,158,11,0.55)] bg-[#1c1204]/95 hover:bg-[#2a1b06]/95'
+                                                } ${
                                                     highlightTarget === 'QUARANTINE'
-                                                        ? 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110'
+                                                        ? (isQuarantineCritical ? 'ring-2 ring-red-500 border-red-500 shadow-[0_0_35px_rgba(225,29,72,0.95)] scale-110' : 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110')
                                                         : ''
                                                 } ${
                                                     isQuarantineEnlarged
-                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(245,158,11,0.85)] scale-100'
-                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.55)] animate-fade-in'
+                                                        ? 'w-64 sm:w-72 py-3 px-4 sm:py-3.5 sm:px-5 scale-100'
+                                                        : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 animate-fade-in'
                                                 }`}
                                                 title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อย่อกลับ" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
-                                                {/* 🌟 REALISTIC RECTANGULAR CORONA AURA (รัศมีฉายแสงรอบกล่อง DD - ตอบสนองตามค่า buffer เหมือนรัศมีของโดมแก้ว) */}
+                                                {/* 🌟 REALISTIC RECTANGULAR CORONA AURA (รัศมีฉายแสงรอบกล่อง DD - วิกฤตแดงดำ / เตือนส้ม / ปลอดภัยเขียวฟ้า) */}
                                                 {isQuarantineEnlarged && (
                                                     <div className="absolute inset-0 pointer-events-none z-0">
                                                         {/* 🌌 Pass 4: Outermost Ethereal Atmosphere (ไอออร่าชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ) */}
                                                         <div 
                                                             className={`absolute rounded-3xl pointer-events-none transition-all duration-500 ${
-                                                                isBufferSafe ? 'animate-[pulse_4s_ease-in-out_infinite]' : 'animate-[pulse_1.2s_ease-in-out_infinite]'
+                                                                isQuarantineCritical 
+                                                                    ? 'animate-[pulse_1.0s_ease-in-out_infinite]' 
+                                                                    : (isQuarantineWarning 
+                                                                        ? 'animate-[pulse_1.6s_ease-in-out_infinite]' 
+                                                                        : 'animate-[pulse_4s_ease-in-out_infinite]')
                                                             }`}
                                                             style={{
                                                                 inset: `-${boxAuraThickness * 1.5}px`,
-                                                                background: isBufferSafe 
-                                                                    ? `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)` 
-                                                                    : `radial-gradient(ellipse at center, rgba(244,63,94,0.28) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`,
+                                                                background: isQuarantineCritical
+                                                                    ? `radial-gradient(ellipse at center, rgba(225,29,72,0.35) 0%, rgba(69,10,10,0.3) 65%, transparent 100%)`
+                                                                    : (isQuarantineWarning
+                                                                        ? `radial-gradient(ellipse at center, rgba(245,158,11,0.25) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`
+                                                                        : `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)`),
                                                                 filter: `blur(${Math.max(6, boxAuraThickness * 0.75)}px)`,
-                                                                boxShadow: isBufferSafe
-                                                                    ? `0 0 ${boxAuraThickness * 2.8}px ${boxAuraThickness * 0.8}px rgba(16, 185, 129, 0.45)`
-                                                                    : `0 0 ${boxAuraThickness * 3.0}px ${boxAuraThickness * 0.9}px rgba(244, 63, 94, 0.55)`,
-                                                                opacity: isBufferSafe ? 0.75 : 0.9
+                                                                boxShadow: isQuarantineCritical
+                                                                    ? `0 0 ${boxAuraThickness * 3.2}px ${boxAuraThickness * 1.0}px rgba(185, 28, 28, 0.7)`
+                                                                    : (isQuarantineWarning
+                                                                        ? `0 0 ${boxAuraThickness * 3.0}px ${boxAuraThickness * 0.9}px rgba(245, 158, 11, 0.55)`
+                                                                        : `0 0 ${boxAuraThickness * 2.8}px ${boxAuraThickness * 0.8}px rgba(16, 185, 129, 0.45)`),
+                                                                opacity: isQuarantineCritical ? 0.95 : (isQuarantineWarning ? 0.9 : 0.75)
                                                             }}
                                                         />
 
                                                         {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
                                                         <div 
                                                             className={`absolute rounded-2xl pointer-events-none transition-all duration-500 ${
-                                                                isBufferSafe ? 'animate-[pulse_3s_ease-in-out_infinite]' : 'animate-[pulse_1.0s_ease-in-out_infinite]'
+                                                                isQuarantineCritical 
+                                                                    ? 'animate-[pulse_0.9s_ease-in-out_infinite]' 
+                                                                    : (isQuarantineWarning 
+                                                                        ? 'animate-[pulse_1.4s_ease-in-out_infinite]' 
+                                                                        : 'animate-[pulse_3s_ease-in-out_infinite]')
                                                             }`}
                                                             style={{
                                                                 inset: `-${boxAuraThickness * 0.85}px`,
-                                                                border: `${Math.max(2, boxAuraThickness * 0.25)}px solid ${isBufferSafe ? 'rgba(52, 211, 153, 0.45)' : 'rgba(249, 115, 22, 0.55)'}`,
-                                                                boxShadow: isBufferSafe
-                                                                    ? `0 0 ${boxAuraThickness * 1.8}px ${boxAuraThickness * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxAuraThickness * 0.8}px rgba(52, 211, 153, 0.3)`
-                                                                    : `0 0 ${boxAuraThickness * 2.0}px ${boxAuraThickness * 0.5}px rgba(244, 63, 94, 0.6), inset 0 0 ${boxAuraThickness * 0.8}px rgba(251, 146, 60, 0.35)`,
+                                                                border: `${Math.max(2, boxAuraThickness * 0.25)}px solid ${
+                                                                    isQuarantineCritical 
+                                                                        ? 'rgba(225, 29, 72, 0.65)' 
+                                                                        : (isQuarantineWarning ? 'rgba(245, 158, 11, 0.55)' : 'rgba(52, 211, 153, 0.45)')
+                                                                }`,
+                                                                boxShadow: isQuarantineCritical
+                                                                    ? `0 0 ${boxAuraThickness * 2.2}px ${boxAuraThickness * 0.6}px rgba(185, 28, 28, 0.7), inset 0 0 ${boxAuraThickness * 1.0}px rgba(69, 10, 10, 0.6)`
+                                                                    : (isQuarantineWarning
+                                                                        ? `0 0 ${boxAuraThickness * 2.0}px ${boxAuraThickness * 0.5}px rgba(245, 158, 11, 0.6), inset 0 0 ${boxAuraThickness * 0.8}px rgba(251, 146, 60, 0.35)`
+                                                                        : `0 0 ${boxAuraThickness * 1.8}px ${boxAuraThickness * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxAuraThickness * 0.8}px rgba(52, 211, 153, 0.3)`),
                                                                 filter: `blur(${Math.max(3, boxAuraThickness * 0.4)}px)`,
-                                                                opacity: isBufferSafe ? 0.85 : 0.95
+                                                                opacity: isQuarantineCritical ? 0.98 : (isQuarantineWarning ? 0.92 : 0.85)
                                                             }}
                                                         />
 
@@ -3101,10 +3140,16 @@ export default function FarmClient({
                                                             className="absolute rounded-xl pointer-events-none transition-all duration-500"
                                                             style={{
                                                                 inset: `-${boxAuraThickness * 0.35}px`,
-                                                                border: `${Math.max(1.5, boxAuraThickness * 0.15)}px solid ${isBufferSafe ? 'rgba(167, 243, 208, 0.8)' : 'rgba(254, 240, 138, 0.85)'}`,
-                                                                boxShadow: isBufferSafe
-                                                                    ? `0 0 ${boxAuraThickness * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(110, 231, 183, 0.4)`
-                                                                    : `0 0 ${boxAuraThickness * 1.2}px rgba(244, 63, 94, 0.9), inset 0 0 ${boxAuraThickness * 0.5}px rgba(254, 205, 211, 0.4)`,
+                                                                border: `${Math.max(1.5, boxAuraThickness * 0.15)}px solid ${
+                                                                    isQuarantineCritical 
+                                                                        ? 'rgba(244, 63, 94, 0.9)' 
+                                                                        : (isQuarantineWarning ? 'rgba(254, 240, 138, 0.85)' : 'rgba(167, 243, 208, 0.8)')
+                                                                }`,
+                                                                boxShadow: isQuarantineCritical
+                                                                    ? `0 0 ${boxAuraThickness * 1.4}px rgba(225, 29, 72, 0.95), inset 0 0 ${boxAuraThickness * 0.6}px rgba(69, 10, 10, 0.5)`
+                                                                    : (isQuarantineWarning
+                                                                        ? `0 0 ${boxAuraThickness * 1.2}px rgba(245, 158, 11, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(254, 205, 211, 0.4)`
+                                                                        : `0 0 ${boxAuraThickness * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(110, 231, 183, 0.4)`),
                                                                 filter: `blur(${Math.max(1, boxAuraThickness * 0.18)}px)`,
                                                                 opacity: 0.95
                                                             }}
@@ -3114,9 +3159,11 @@ export default function FarmClient({
                                                         <div 
                                                             className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-300"
                                                             style={{
-                                                                boxShadow: isBufferSafe
-                                                                    ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #34d399`
-                                                                    : `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fff1f2, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #f43f5e`,
+                                                                boxShadow: isQuarantineCritical
+                                                                    ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ffe4e6, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #dc2626`
+                                                                    : (isQuarantineWarning
+                                                                        ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fef3c7, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #f59e0b`
+                                                                        : `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #34d399`),
                                                                 opacity: 0.98
                                                             }}
                                                         />
@@ -3166,9 +3213,9 @@ export default function FarmClient({
 
                                                 {/* Mini Subtitle Tag linking to Quarantined Pairs */}
                                                 <div className="flex items-center gap-1 mb-0.5 pointer-events-none relative z-10">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                                                    <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-amber-400 uppercase">
-                                                        QUARANTINE
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${isQuarantineCritical ? 'bg-rose-500 animate-ping' : 'bg-amber-400 animate-pulse'}`}></span>
+                                                    <span className={`text-[7px] sm:text-[8px] font-black tracking-widest uppercase ${isQuarantineCritical ? 'text-rose-400' : 'text-amber-400'}`}>
+                                                        {isQuarantineCritical ? 'CRITICAL RESCUE' : 'QUARANTINE'}
                                                     </span>
                                                 </div>
 
@@ -3243,6 +3290,7 @@ export default function FarmClient({
                                     {/* Individual Mercury Bars (คลี่ออกตามลำดับจากซ้ายไปขวา) */}
                                     {previewList.map((qTree, idx) => {
                                         const isTreeExpanded = expandedTreeId === qTree.id;
+                                        const isTreeCritical = Boolean(qTree.isRescue || (qTree.rescueOrders && qTree.rescueOrders > 0) || qTree.ddPct >= 15);
                                         const barZIndex = isTreeExpanded ? 99999 : 260;
                                         const fillWidth = Math.min(100, Math.max(12, (qTree.ddPct / 25) * 100));
 
@@ -3259,7 +3307,7 @@ export default function FarmClient({
                                                     animationDelay: `${qTree.delayMs || idx * 150}ms`
                                                 }}
                                             >
-                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ตรงตำแหน่งต้นไม้พอดี ไม่เบี้ยวข้าง พร้อมก้านปรอทชี้ลงไปยังต้นไม้) */}
+                                                {/* 🌡️ หลอดปรอทแนวนอนเหนือต้นไม้ (ตรงตำแหน่งต้นไม้พอดี พร้อมก้านปรอทชี้ลง) */}
                                                 <div 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -3267,7 +3315,11 @@ export default function FarmClient({
                                                     }}
                                                     className={`absolute top-4 sm:top-5 flex flex-col items-center pointer-events-auto select-none cursor-pointer transition-all duration-300 ease-out ${
                                                         isTreeExpanded 
-                                                            ? 'left-1/2 -translate-x-1/2 scale-[1.7] sm:scale-[1.8] -translate-y-10 origin-bottom shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]' 
+                                                            ? `left-1/2 -translate-x-1/2 scale-[1.7] sm:scale-[1.8] -translate-y-10 origin-bottom ${
+                                                                isTreeCritical 
+                                                                    ? 'shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(225,29,72,0.7)]' 
+                                                                    : 'shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.6)]'
+                                                            }` 
                                                             : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
                                                     }`}
                                                     style={{
@@ -3275,27 +3327,39 @@ export default function FarmClient({
                                                     }}
                                                     title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                                 >
-                                                    {/* Status Header Badge */}
-                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg bg-[#160e03]/95 backdrop-blur-md border-t border-x border-amber-500/70 shadow-lg text-[10px] font-mono font-bold transition-colors`}>
-                                                        <span className="tracking-wider text-amber-300">
+                                                    {/* Status Header Badge: แดงดำเมื่อวิกฤต (Rescue Grid) / ส้มเมื่อเตือน (Quarantine) */}
+                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg backdrop-blur-md border-t border-x text-[10px] font-mono font-bold transition-colors ${
+                                                        isTreeCritical
+                                                            ? 'bg-[#150204]/98 border-rose-600/80 shadow-[0_0_15px_rgba(225,29,72,0.5)]'
+                                                            : 'bg-[#160e03]/95 border-amber-500/70 shadow-lg'
+                                                    }`}>
+                                                        <span className={`tracking-wider ${isTreeCritical ? 'text-rose-300' : 'text-amber-300'}`}>
                                                             {qTree.sym}
                                                         </span>
                                                         <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
-                                                            qTree.isRescue 
-                                                                ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50' 
-                                                                : 'bg-orange-500/25 text-orange-300 border border-orange-500/50'
+                                                            isTreeCritical 
+                                                                ? 'bg-rose-950/80 text-rose-300 border border-rose-500/70' 
+                                                                : 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
                                                         }`}>
                                                             {qTree.label}
                                                         </span>
-                                                        <span className="font-black text-amber-400">
+                                                        <span className={`font-black ${isTreeCritical ? 'text-rose-400' : 'text-amber-400'}`}>
                                                             -{qTree.ddPct.toFixed(1)}%
                                                         </span>
                                                     </div>
 
                                                     {/* Mercury Tube Assembly */}
-                                                    <div className={`flex items-center w-full px-1.5 py-1 ${isTreeExpanded ? 'border-b border-amber-500/30' : 'rounded-b-lg border-b'} border-x border-amber-500/70 bg-[#0e0802]/95 backdrop-blur-md shadow-xl transition-colors`}>
-                                                        {/* Mercury Bulb */}
-                                                        <div className="relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border border-amber-300 bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_8px_rgba(245,158,11,0.9)]">
+                                                    <div className={`flex items-center w-full px-1.5 py-1 backdrop-blur-md transition-colors ${
+                                                        isTreeCritical
+                                                            ? `border-x border-rose-600/80 bg-[#0e0203]/98 shadow-[0_0_12px_rgba(225,29,72,0.4)] ${isTreeExpanded ? 'border-b border-rose-600/30' : 'rounded-b-lg border-b'}`
+                                                            : `border-x border-amber-500/70 bg-[#0e0802]/95 shadow-xl ${isTreeExpanded ? 'border-b border-amber-500/30' : 'rounded-b-lg border-b'}`
+                                                    }`}>
+                                                        {/* Mercury Bulb: แดงดำเมื่อวิกฤต / ส้มเมื่อเตือน */}
+                                                        <div className={`relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                                                            isTreeCritical
+                                                                ? 'border-rose-400 bg-gradient-to-br from-rose-500 via-red-800 to-black shadow-[0_0_10px_rgba(244,63,94,0.95)]'
+                                                                : 'border-amber-300 bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_8px_rgba(245,158,11,0.9)]'
+                                                        }`}>
                                                             <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
                                                         </div>
 
@@ -3312,9 +3376,9 @@ export default function FarmClient({
 
                                                             <div 
                                                                 className={`h-full rounded-r-full transition-all duration-700 relative ${
-                                                                    qTree.isRescue
-                                                                        ? 'bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-                                                                        : 'bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+                                                                    isTreeCritical
+                                                                        ? 'bg-gradient-to-r from-red-950 via-rose-700 to-red-500 shadow-[0_0_12px_rgba(244,63,94,0.95)]'
+                                                                        : 'bg-gradient-to-r from-amber-600 via-orange-500 to-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
                                                                 }`}
                                                                 style={{
                                                                     width: `${fillWidth}%`
@@ -3327,7 +3391,11 @@ export default function FarmClient({
 
                                                     {/* 🌸 9 Rescue Flowers (Full width, Translucent background, No text) when clicked to expand */}
                                                     {isTreeExpanded && (
-                                                        <div className="w-full px-1.5 py-1.5 rounded-b-lg bg-black/40 backdrop-blur-md border-b border-x border-amber-500/50 shadow-2xl flex items-center justify-between gap-0.5 animate-fade-in">
+                                                        <div className={`w-full px-1.5 py-1.5 rounded-b-lg backdrop-blur-md border-b border-x shadow-2xl flex items-center justify-between gap-0.5 animate-fade-in ${
+                                                            isTreeCritical
+                                                                ? 'bg-black/50 border-rose-600/70 shadow-[0_0_20px_rgba(225,29,72,0.6)]'
+                                                                : 'bg-black/40 border-amber-500/50'
+                                                        }`}>
                                                             {Array.from({ length: 9 }).map((_, fIdx) => {
                                                                 const isActive = fIdx < (qTree.rescueOrders || 0);
 
@@ -3369,7 +3437,11 @@ export default function FarmClient({
                                                     )}
 
                                                     {/* Vertical stem connecting mercury bar directly down to tree below */}
-                                                    <div className="w-0.5 sm:w-1 h-3 sm:h-5 bg-gradient-to-b from-amber-500 via-amber-500/60 to-transparent"></div>
+                                                    <div className={`w-0.5 sm:w-1 h-3 sm:h-5 bg-gradient-to-b ${
+                                                        isTreeCritical 
+                                                            ? 'from-rose-600 via-rose-700/60 to-transparent' 
+                                                            : 'from-amber-500 via-amber-500/60 to-transparent'
+                                                    }`}></div>
                                                 </div>
                                             </div>
                                         );
