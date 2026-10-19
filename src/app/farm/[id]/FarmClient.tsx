@@ -1873,13 +1873,13 @@ export default function FarmClient({
         return capitalBufferPct >= recommendedBuffer;
     }, [capitalBufferPct, recommendedBuffer]);
 
-    // 🚨 Dome & DD Box Alert Level: วิกฤต (Critical: Rescue Grid active / rescue orders > 0)
-    const isQuarantineCritical = useMemo(() => {
-        return Boolean(
-            quarantinePreviewList.some(t => t.isRescue || (t.rescueOrders && t.rescueOrders > 0)) ||
-            (primeTelemetry?.rescueOrdersCount && primeTelemetry.rescueOrdersCount > 0)
-        );
-    }, [quarantinePreviewList, primeTelemetry?.rescueOrdersCount]);
+    // 🚨 Buffer Aura Alert Levels (แสดงสีตามค่าบัฟเฟอร์ สามารถจำลองทดสอบได้จาก Dev controller):
+    // 1. เกณฑ์ & หนาฟู: capitalBufferPct >= recommendedBuffer (เขียวกับฟ้าแบบเดิม)
+    // 2. ต่ำกว่าเกณฑ์เตือนภัย: 0 < capitalBufferPct < recommendedBuffer (ส้มแดงแบบเดิม)
+    // 3. วิกฤต: capitalBufferPct <= 0 (ดำแดง)
+    const isBufferCritical = useMemo(() => {
+        return capitalBufferPct <= 0;
+    }, [capitalBufferPct]);
 
     // 🍩 Dynamic Buffer Aura Thickness:
     // Donut thickness over dome: min 4px, max 26px based on capital buffer %
@@ -2833,15 +2833,15 @@ export default function FarmClient({
                                 {/* Subtle breathing magical aura under the dome: red-black when critical, alert rose/amber when low buffer, emerald/cyan when safe */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className={`w-40 h-40 rounded-full blur-2xl transition-all ${
-                                        isQuarantineCritical
-                                            ? 'bg-black/90 group-hover:bg-black/95 animate-[pulse_0.9s_ease-in-out_infinite]'
+                                        isBufferCritical
+                                            ? 'bg-black/95 group-hover:bg-black animate-[pulse_0.8s_ease-in-out_infinite]'
                                             : (isBufferSafe 
                                                 ? 'bg-emerald-500/15 group-hover:bg-emerald-400/25 animate-pulse' 
                                                 : 'bg-rose-500/25 group-hover:bg-rose-400/35 animate-[pulse_1.2s_ease-in-out_infinite]')
                                     }`} />
                                     <div className={`w-28 h-28 rounded-full blur-xl transition-all ${
-                                        isQuarantineCritical
-                                            ? 'bg-rose-700/60 group-hover:bg-rose-600/70 animate-[pulse_0.9s_ease-in-out_infinite] delay-150'
+                                        isBufferCritical
+                                            ? 'bg-rose-900/80 group-hover:bg-red-800/90 animate-[pulse_0.8s_ease-in-out_infinite] delay-150'
                                             : (isBufferSafe 
                                                 ? 'bg-cyan-400/15 group-hover:bg-cyan-300/25 animate-pulse delay-700' 
                                                 : 'bg-amber-500/25 group-hover:bg-amber-400/35 animate-[pulse_1.2s_ease-in-out_infinite] delay-300')
@@ -2865,7 +2865,7 @@ export default function FarmClient({
                                     {/* 🍩 REALISTIC DOME EMISSION CORONA (รัศมีฉายแสงออกจากโดมแก้ว - วงในเข้มสว่างชิดผิวแก้ว แล้วจางฟุ้งออกสู่อากาศด้านนอก) */}
                                     <div className="absolute inset-0 pointer-events-none z-20">
                                         {(() => {
-                                            const T = donutThickness;
+                                            const T = isBufferCritical ? Math.max(16, donutThickness) : donutThickness;
                                             // Pass 1: Core Rim Energy Line (แนบผิวแก้ว 100% สว่างคมเข้มที่สุด เสมือนแสงกำเนิดขึ้นจากโดมแก้ว)
                                             const p1_rx = 89 + T * 0.04;
                                             const p1_ry = 77 + T * 0.04;
@@ -2891,15 +2891,15 @@ export default function FarmClient({
                                                     <defs>
                                                         {/* Linear Gradients: Safe (emerald/cyan) vs Alert (crimson/amber flare) vs Critical (deep black-red) */}
                                                         <linearGradient id="bufferAuraCoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#b91c1c" : (isBufferSafe ? "#34d399" : "#f43f5e")} stopOpacity="0.95" />
-                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#ef4444" : (isBufferSafe ? "#a7f3d0" : "#fef08a")} stopOpacity="1" />
-                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#050001" : (isBufferSafe ? "#22d3ee" : "#ea580c")} stopOpacity="0.95" />
+                                                            <stop offset="0%" stopColor={isBufferCritical ? "#b91c1c" : (isBufferSafe ? "#34d399" : "#f43f5e")} stopOpacity="0.95" />
+                                                            <stop offset="50%" stopColor={isBufferCritical ? "#ef4444" : (isBufferSafe ? "#a7f3d0" : "#fef08a")} stopOpacity="1" />
+                                                            <stop offset="100%" stopColor={isBufferCritical ? "#050001" : (isBufferSafe ? "#22d3ee" : "#ea580c")} stopOpacity="0.95" />
                                                         </linearGradient>
 
                                                         <linearGradient id="bufferAuraMidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" stopColor={isQuarantineCritical ? "#7f1d1d" : (isBufferSafe ? "#10b981" : "#e11d48")} stopOpacity="0.8" />
-                                                            <stop offset="50%" stopColor={isQuarantineCritical ? "#dc2626" : (isBufferSafe ? "#34d399" : "#f97316")} stopOpacity="0.85" />
-                                                            <stop offset="100%" stopColor={isQuarantineCritical ? "#000000" : (isBufferSafe ? "#06b6d4" : "#c2410c")} stopOpacity="0.8" />
+                                                            <stop offset="0%" stopColor={isBufferCritical ? "#7f1d1d" : (isBufferSafe ? "#10b981" : "#e11d48")} stopOpacity="0.8" />
+                                                            <stop offset="50%" stopColor={isBufferCritical ? "#dc2626" : (isBufferSafe ? "#34d399" : "#f97316")} stopOpacity="0.85" />
+                                                            <stop offset="100%" stopColor={isBufferCritical ? "#000000" : (isBufferSafe ? "#06b6d4" : "#c2410c")} stopOpacity="0.8" />
                                                         </linearGradient>
 
                                                         {/* Filter for Outermost Soft Haze */}
@@ -2925,11 +2925,11 @@ export default function FarmClient({
                                                     <path
                                                         d={p4_d}
                                                         fill="none"
-                                                        stroke={isQuarantineCritical ? "rgba(185, 28, 28, 0.5)" : (isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.38)")}
+                                                        stroke={isBufferCritical ? "rgba(185, 28, 28, 0.65)" : (isBufferSafe ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.38)")}
                                                         strokeWidth={Math.max(8, T * 1.4)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraDeepHaze)"
-                                                        className={isQuarantineCritical ? "animate-[pulse_0.9s_ease-in-out_infinite]" : (isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.2s_ease-in-out_infinite]")}
+                                                        className={isBufferCritical ? "animate-[pulse_0.8s_ease-in-out_infinite]" : (isBufferSafe ? "animate-[pulse_4s_ease-in-out_infinite]" : "animate-[pulse_1.2s_ease-in-out_infinite]")}
                                                     />
 
                                                     {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
@@ -2940,8 +2940,8 @@ export default function FarmClient({
                                                         strokeWidth={Math.max(6, T * 0.9)}
                                                         strokeLinecap="round"
                                                         filter="url(#bufferAuraMidGlow)"
-                                                        opacity={isQuarantineCritical ? 0.95 : (isBufferSafe ? 0.65 : 0.82)}
-                                                        className={isQuarantineCritical ? "animate-[pulse_0.8s_ease-in-out_infinite]" : (isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.0s_ease-in-out_infinite]")}
+                                                        opacity={isBufferCritical ? 0.95 : (isBufferSafe ? 0.65 : 0.82)}
+                                                        className={isBufferCritical ? "animate-[pulse_0.8s_ease-in-out_infinite]" : (isBufferSafe ? "animate-[pulse_3s_ease-in-out_infinite]" : "animate-[pulse_1.0s_ease-in-out_infinite]")}
                                                     />
 
                                                     {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
@@ -2959,11 +2959,11 @@ export default function FarmClient({
                                                     <path
                                                         d={p1_d}
                                                         fill="none"
-                                                        stroke={isQuarantineCritical ? "#fecdd3" : (isBufferSafe ? "#ecfdf5" : "#fff1f2")}
+                                                        stroke={isBufferCritical ? "#fecdd3" : (isBufferSafe ? "#ecfdf5" : "#fff1f2")}
                                                         strokeWidth={Math.max(1.5, T * 0.15)}
                                                         strokeLinecap="round"
                                                         style={{
-                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isQuarantineCritical ? '#dc2626' : (isBufferSafe ? '#67e8f9' : '#f43f5e')})`
+                                                            filter: `drop-shadow(0 0 ${Math.max(2, T * 0.25)}px ${isBufferCritical ? '#dc2626' : (isBufferSafe ? '#67e8f9' : '#f43f5e')})`
                                                         }}
                                                         opacity={0.98}
                                                     />
@@ -3061,12 +3061,14 @@ export default function FarmClient({
                                             <div 
                                                 onClick={handleQuarantineBoxClick}
                                                 className={`relative rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
-                                                    isQuarantineCritical
-                                                        ? 'border sm:border-2 border-red-600/90 shadow-[0_0_30px_rgba(225,29,72,0.85)] bg-[#140204]/98 hover:bg-[#1f0307]/98'
-                                                        : 'border sm:border-2 border-amber-500/90 shadow-[0_0_15px_rgba(245,158,11,0.55)] bg-[#1c1204]/95 hover:bg-[#2a1b06]/95'
+                                                    isBufferCritical
+                                                        ? 'border sm:border-2 border-red-600/90 shadow-[0_0_30px_rgba(220,38,38,0.85)] bg-[#140204]/98 hover:bg-[#1f0307]/98'
+                                                        : (isBufferSafe
+                                                            ? 'border sm:border-2 border-emerald-500/80 shadow-[0_0_15px_rgba(16,185,129,0.45)] bg-[#041a12]/95 hover:bg-[#062419]/95'
+                                                            : 'border sm:border-2 border-amber-500/90 shadow-[0_0_15px_rgba(245,158,11,0.55)] bg-[#1c1204]/95 hover:bg-[#2a1b06]/95')
                                                 } ${
                                                     highlightTarget === 'QUARANTINE'
-                                                        ? (isQuarantineCritical ? 'ring-2 ring-red-500 border-red-500 shadow-[0_0_35px_rgba(225,29,72,0.95)] scale-110' : 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110')
+                                                        ? (isBufferCritical ? 'ring-2 ring-red-500 border-red-500 shadow-[0_0_35px_rgba(225,29,72,0.95)] scale-110' : 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110')
                                                         : ''
                                                 } ${
                                                     isQuarantineEnlarged
@@ -3076,94 +3078,97 @@ export default function FarmClient({
                                                 title={isQuarantineEnlarged ? "คลิกอีกครั้งเพื่อย่อกลับ" : "คลิกเพื่อขยายดูรายละเอียด"}
                                             >
                                                 {/* 🌟 REALISTIC RECTANGULAR CORONA AURA (รัศมีฉายแสงรอบกล่อง DD - วิกฤตดำแดง / เตือนส้มแดงแบบเดิม / ปลอดภัยเขียวฟ้าแบบเดิม) */}
-                                                {isQuarantineEnlarged && (
-                                                    <div className="absolute inset-0 pointer-events-none z-0">
-                                                        {/* 🌌 Pass 4: Outermost Ethereal Atmosphere (ไอออร่าชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ) */}
-                                                        <div 
-                                                            className={`absolute rounded-3xl pointer-events-none transition-all duration-500 ${
-                                                                isQuarantineCritical 
-                                                                    ? 'animate-[pulse_0.9s_ease-in-out_infinite]' 
-                                                                    : (isBufferSafe 
-                                                                        ? 'animate-[pulse_4s_ease-in-out_infinite]' 
-                                                                        : 'animate-[pulse_1.2s_ease-in-out_infinite]')
-                                                            }`}
-                                                            style={{
-                                                                inset: `-${boxAuraThickness * 1.5}px`,
-                                                                background: isQuarantineCritical
-                                                                    ? `radial-gradient(ellipse at center, rgba(220,38,38,0.4) 0%, rgba(40,0,5,0.4) 65%, rgba(0,0,0,0.85) 100%)`
-                                                                    : (isBufferSafe
-                                                                        ? `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)`
-                                                                        : `radial-gradient(ellipse at center, rgba(244,63,94,0.28) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`),
-                                                                filter: `blur(${Math.max(6, boxAuraThickness * 0.75)}px)`,
-                                                                boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${boxAuraThickness * 3.5}px ${boxAuraThickness * 1.0}px rgba(185, 28, 28, 0.75)`
-                                                                    : (isBufferSafe
-                                                                        ? `0 0 ${boxAuraThickness * 2.8}px ${boxAuraThickness * 0.8}px rgba(16, 185, 129, 0.45)`
-                                                                        : `0 0 ${boxAuraThickness * 3.0}px ${boxAuraThickness * 0.9}px rgba(244, 63, 94, 0.55)`),
-                                                                opacity: isQuarantineCritical ? 0.95 : (isBufferSafe ? 0.75 : 0.9)
-                                                            }}
-                                                        />
+                                                {(() => {
+                                                    const boxT = isBufferCritical ? Math.max(16, boxAuraThickness) : (isQuarantineEnlarged ? boxAuraThickness : Math.max(4, boxAuraThickness * 0.7));
+                                                    return (
+                                                        <div className="absolute inset-0 pointer-events-none z-0">
+                                                            {/* 🌌 Pass 4: Outermost Ethereal Atmosphere (ไอออร่าชั้นนอกสุด แผ่กว้างโปร่งแสง จางหายไปในอากาศ) */}
+                                                            <div 
+                                                                className={`absolute rounded-3xl pointer-events-none transition-all duration-500 ${
+                                                                    isBufferCritical 
+                                                                        ? 'animate-[pulse_0.8s_ease-in-out_infinite]' 
+                                                                        : (isBufferSafe 
+                                                                            ? 'animate-[pulse_4s_ease-in-out_infinite]' 
+                                                                            : 'animate-[pulse_1.2s_ease-in-out_infinite]')
+                                                                }`}
+                                                                style={{
+                                                                    inset: `-${boxT * 1.5}px`,
+                                                                    background: isBufferCritical
+                                                                        ? `radial-gradient(ellipse at center, rgba(220,38,38,0.5) 0%, rgba(30,0,5,0.7) 65%, rgba(0,0,0,0.95) 100%)`
+                                                                        : (isBufferSafe
+                                                                            ? `radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(6,182,212,0.12) 65%, transparent 100%)`
+                                                                            : `radial-gradient(ellipse at center, rgba(244,63,94,0.28) 0%, rgba(234,88,12,0.15) 65%, transparent 100%)`),
+                                                                    filter: `blur(${Math.max(6, boxT * 0.75)}px)`,
+                                                                    boxShadow: isBufferCritical
+                                                                        ? `0 0 ${boxT * 3.5}px ${boxT * 1.0}px rgba(185, 28, 28, 0.85)`
+                                                                        : (isBufferSafe
+                                                                            ? `0 0 ${boxT * 2.8}px ${boxT * 0.8}px rgba(16, 185, 129, 0.45)`
+                                                                            : `0 0 ${boxT * 3.0}px ${boxT * 0.9}px rgba(244, 63, 94, 0.55)`),
+                                                                    opacity: isBufferCritical ? 0.98 : (isBufferSafe ? 0.75 : 0.9)
+                                                                }}
+                                                            />
 
-                                                        {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
-                                                        <div 
-                                                            className={`absolute rounded-2xl pointer-events-none transition-all duration-500 ${
-                                                                isQuarantineCritical 
-                                                                    ? 'animate-[pulse_0.8s_ease-in-out_infinite]' 
-                                                                    : (isBufferSafe 
-                                                                        ? 'animate-[pulse_3s_ease-in-out_infinite]' 
-                                                                        : 'animate-[pulse_1.0s_ease-in-out_infinite]')
-                                                            }`}
-                                                            style={{
-                                                                inset: `-${boxAuraThickness * 0.85}px`,
-                                                                border: `${Math.max(2, boxAuraThickness * 0.25)}px solid ${
-                                                                    isQuarantineCritical 
-                                                                        ? 'rgba(220, 38, 38, 0.75)' 
-                                                                        : (isBufferSafe ? 'rgba(52, 211, 153, 0.45)' : 'rgba(249, 115, 22, 0.55)')
-                                                                }`,
-                                                                boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${boxAuraThickness * 2.2}px ${boxAuraThickness * 0.6}px rgba(153, 27, 27, 0.8), inset 0 0 ${boxAuraThickness * 1.0}px rgba(0, 0, 0, 0.85)`
-                                                                    : (isBufferSafe
-                                                                        ? `0 0 ${boxAuraThickness * 1.8}px ${boxAuraThickness * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxAuraThickness * 0.8}px rgba(52, 211, 153, 0.3)`
-                                                                        : `0 0 ${boxAuraThickness * 2.0}px ${boxAuraThickness * 0.5}px rgba(244, 63, 94, 0.6), inset 0 0 ${boxAuraThickness * 0.8}px rgba(251, 146, 60, 0.35)`),
-                                                                filter: `blur(${Math.max(3, boxAuraThickness * 0.4)}px)`,
-                                                                opacity: isQuarantineCritical ? 0.98 : (isBufferSafe ? 0.85 : 0.95)
-                                                            }}
-                                                        />
+                                                            {/* 💫 Pass 3: Mid Radiant Bloom (รัศมีชั้นกลาง ฟุ้งกระจายไล่ระดับนุ่มนวล) */}
+                                                            <div 
+                                                                className={`absolute rounded-2xl pointer-events-none transition-all duration-500 ${
+                                                                    isBufferCritical 
+                                                                        ? 'animate-[pulse_0.8s_ease-in-out_infinite]' 
+                                                                        : (isBufferSafe 
+                                                                            ? 'animate-[pulse_3s_ease-in-out_infinite]' 
+                                                                            : 'animate-[pulse_1.0s_ease-in-out_infinite]')
+                                                                }`}
+                                                                style={{
+                                                                    inset: `-${boxT * 0.85}px`,
+                                                                    border: `${Math.max(2, boxT * 0.25)}px solid ${
+                                                                        isBufferCritical 
+                                                                            ? 'rgba(220, 38, 38, 0.85)' 
+                                                                            : (isBufferSafe ? 'rgba(52, 211, 153, 0.45)' : 'rgba(249, 115, 22, 0.55)')
+                                                                    }`,
+                                                                    boxShadow: isBufferCritical
+                                                                        ? `0 0 ${boxT * 2.2}px ${boxT * 0.6}px rgba(153, 27, 27, 0.9), inset 0 0 ${boxT * 1.0}px rgba(0, 0, 0, 0.95)`
+                                                                        : (isBufferSafe
+                                                                            ? `0 0 ${boxT * 1.8}px ${boxT * 0.45}px rgba(34, 211, 238, 0.5), inset 0 0 ${boxT * 0.8}px rgba(52, 211, 153, 0.3)`
+                                                                            : `0 0 ${boxT * 2.0}px ${boxT * 0.5}px rgba(244, 63, 94, 0.6), inset 0 0 ${boxT * 0.8}px rgba(251, 146, 60, 0.35)`),
+                                                                    filter: `blur(${Math.max(3, boxT * 0.4)}px)`,
+                                                                    opacity: isBufferCritical ? 0.98 : (isBufferSafe ? 0.85 : 0.95)
+                                                                }}
+                                                            />
 
-                                                        {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
-                                                        <div 
-                                                            className="absolute rounded-xl pointer-events-none transition-all duration-500"
-                                                            style={{
-                                                                inset: `-${boxAuraThickness * 0.35}px`,
-                                                                border: `${Math.max(1.5, boxAuraThickness * 0.15)}px solid ${
-                                                                    isQuarantineCritical 
-                                                                        ? 'rgba(239, 68, 68, 0.9)' 
-                                                                        : (isBufferSafe ? 'rgba(167, 243, 208, 0.8)' : 'rgba(254, 240, 138, 0.85)')
-                                                                }`,
-                                                                boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${boxAuraThickness * 1.4}px rgba(220, 38, 38, 0.95), inset 0 0 ${boxAuraThickness * 0.6}px rgba(40, 0, 5, 0.7)`
-                                                                    : (isBufferSafe
-                                                                        ? `0 0 ${boxAuraThickness * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxAuraThickness * 0.5}px rgba(110, 231, 183, 0.4)`
-                                                                        : `0 0 ${boxAuraThickness * 1.2}px rgba(244, 63, 94, 0.9), inset 0 0 ${boxAuraThickness * 0.5}px rgba(254, 205, 211, 0.4)`),
-                                                                filter: `blur(${Math.max(1, boxAuraThickness * 0.18)}px)`,
-                                                                opacity: 0.95
-                                                            }}
-                                                        />
+                                                            {/* ✨ Pass 2: Inner Dense Corona (รัศมีเนื้อแน่นชั้นใน เรืองแสงสว่างสดใส) */}
+                                                            <div 
+                                                                className="absolute rounded-xl pointer-events-none transition-all duration-500"
+                                                                style={{
+                                                                    inset: `-${boxT * 0.35}px`,
+                                                                    border: `${Math.max(1.5, boxT * 0.15)}px solid ${
+                                                                        isBufferCritical 
+                                                                            ? 'rgba(239, 68, 68, 0.95)' 
+                                                                            : (isBufferSafe ? 'rgba(167, 243, 208, 0.8)' : 'rgba(254, 240, 138, 0.85)')
+                                                                    }`,
+                                                                    boxShadow: isBufferCritical
+                                                                        ? `0 0 ${boxT * 1.4}px rgba(220, 38, 38, 0.95), inset 0 0 ${boxT * 0.6}px rgba(30, 0, 5, 0.8)`
+                                                                        : (isBufferSafe
+                                                                            ? `0 0 ${boxT * 1.0}px rgba(52, 211, 153, 0.85), inset 0 0 ${boxT * 0.5}px rgba(110, 231, 183, 0.4)`
+                                                                            : `0 0 ${boxT * 1.2}px rgba(244, 63, 94, 0.9), inset 0 0 ${boxT * 0.5}px rgba(254, 205, 211, 0.4)`),
+                                                                    filter: `blur(${Math.max(1, boxT * 0.18)}px)`,
+                                                                    opacity: 0.95
+                                                                }}
+                                                            />
 
-                                                        {/* ⚡ Pass 1: Core Rim Energy Seam (เส้นกำเนิดแสงที่ขอบกล่อง แนบชิด สว่างคมชัดดุจเปล่งแสงออกจากขอบกล่อง) */}
-                                                        <div 
-                                                            className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-300"
-                                                            style={{
-                                                                boxShadow: isQuarantineCritical
-                                                                    ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fecdd3, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #dc2626`
-                                                                    : (isBufferSafe
-                                                                        ? `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #34d399`
-                                                                        : `0 0 ${Math.max(4, boxAuraThickness * 0.35)}px 1px #fff1f2, 0 0 ${Math.max(8, boxAuraThickness * 0.6)}px 2px #f43f5e`),
-                                                                opacity: 0.98
-                                                            }}
-                                                        />
-                                                    </div>
-                                                )}
+                                                            {/* ⚡ Pass 1: Core Rim Energy Seam (เส้นกำเนิดแสงที่ขอบกล่อง แนบชิด สว่างคมชัดดุจเปล่งแสงออกจากขอบกล่อง) */}
+                                                            <div 
+                                                                className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-300"
+                                                                style={{
+                                                                    boxShadow: isBufferCritical
+                                                                        ? `0 0 ${Math.max(4, boxT * 0.35)}px 1px #fecdd3, 0 0 ${Math.max(8, boxT * 0.6)}px 2px #dc2626`
+                                                                        : (isBufferSafe
+                                                                            ? `0 0 ${Math.max(4, boxT * 0.35)}px 1px #ecfdf5, 0 0 ${Math.max(8, boxT * 0.6)}px 2px #34d399`
+                                                                            : `0 0 ${Math.max(4, boxT * 0.35)}px 1px #fff1f2, 0 0 ${Math.max(8, boxT * 0.6)}px 2px #f43f5e`),
+                                                                    opacity: 0.98
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {/* 🏷️ FLOATING BUFFER READOUT OVER AURA IN Z-AXIS (ตัวเลขบัฟเฟอร์ตัวใหญ่เท่าค่า DD แสดงทับบนรัศมีโดยไม่มีกรอบรอบตัวอักษร) */}
                                                 {isQuarantineEnlarged && (
@@ -3175,11 +3180,11 @@ export default function FarmClient({
                                                     >
                                                         {/* Subtitle Label (ไม่มีกรอบรอบตัวอักษร) */}
                                                         <div className="flex items-center gap-1.5 mb-0.5">
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${isBufferSafe ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping'}`} />
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${isBufferCritical ? 'bg-red-500 animate-ping' : (isBufferSafe ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping')}`} />
                                                             <span className={`text-[9px] sm:text-[10px] font-black tracking-widest uppercase font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] ${
-                                                                isBufferSafe ? 'text-emerald-300' : 'text-rose-300 animate-pulse'
+                                                                isBufferCritical ? 'text-red-400 animate-pulse' : (isBufferSafe ? 'text-emerald-300' : 'text-rose-300 animate-pulse')
                                                             }`}>
-                                                                {isBufferSafe ? 'BUFFER' : 'LOW BUFFER'}
+                                                                {isBufferCritical ? 'CRITICAL BUFFER' : (isBufferSafe ? 'BUFFER' : 'LOW BUFFER')}
                                                             </span>
                                                             {simulatedBuffer !== null && (
                                                                 <span className="text-[8px] font-mono font-bold text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
@@ -3196,9 +3201,11 @@ export default function FarmClient({
                                                         {/* Big Buffer Number: EXACT SAME SIZE AS DD VALUE, NO BOX/BORDER, GLOWING OVER AURA IN Z-AXIS */}
                                                         <div className="flex items-center justify-center">
                                                             <span className={`font-mono font-black text-2xl sm:text-3xl leading-none tracking-tight whitespace-nowrap transition-all duration-300 ${
-                                                                isBufferSafe 
-                                                                    ? 'text-emerald-300 drop-shadow-[0_0_22px_rgba(52,211,153,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)]' 
-                                                                    : 'text-rose-400 drop-shadow-[0_0_24px_rgba(244,63,94,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] animate-pulse'
+                                                                isBufferCritical
+                                                                    ? 'text-red-500 drop-shadow-[0_0_24px_rgba(220,38,38,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] animate-pulse'
+                                                                    : (isBufferSafe 
+                                                                        ? 'text-emerald-300 drop-shadow-[0_0_22px_rgba(52,211,153,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)]' 
+                                                                        : 'text-rose-400 drop-shadow-[0_0_24px_rgba(244,63,94,0.95)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] animate-pulse')
                                                             }`}>
                                                                 {isFallback1Url ? '**.**' : `${capitalBufferPct >= 0 ? '+' : ''}${capitalBufferPct.toFixed(1)}%`}
                                                             </span>
@@ -3208,9 +3215,9 @@ export default function FarmClient({
 
                                                 {/* Mini Subtitle Tag linking to Quarantined Pairs */}
                                                 <div className="flex items-center gap-1 mb-0.5 pointer-events-none relative z-10">
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${isQuarantineCritical ? 'bg-rose-500 animate-ping' : 'bg-amber-400 animate-pulse'}`}></span>
-                                                    <span className={`text-[7px] sm:text-[8px] font-black tracking-widest uppercase ${isQuarantineCritical ? 'text-rose-400' : 'text-amber-400'}`}>
-                                                        {isQuarantineCritical ? 'CRITICAL RESCUE' : 'QUARANTINE'}
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${isBufferCritical ? 'bg-red-500 animate-ping' : (isBufferSafe ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-pulse')}`}></span>
+                                                    <span className={`text-[7px] sm:text-[8px] font-black tracking-widest uppercase ${isBufferCritical ? 'text-red-400' : (isBufferSafe ? 'text-emerald-300' : 'text-amber-400')}`}>
+                                                        {isBufferCritical ? 'CRITICAL BUFFER' : (isBufferSafe ? 'SAFE BUFFER' : 'QUARANTINE')}
                                                     </span>
                                                 </div>
 

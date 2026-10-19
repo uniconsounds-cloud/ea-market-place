@@ -426,7 +426,9 @@ export default function OwnerDevFarmController({
                                         <div className={`px-2 py-1 rounded-lg border text-[9px] font-bold flex items-center gap-1 ${
                                             isCurrentBufferSafe 
                                                 ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' 
-                                                : 'bg-rose-950/70 border-rose-500/70 text-rose-300 animate-pulse'
+                                                : (currentBufferVal <= 0
+                                                    ? 'bg-black/95 border-red-600/90 text-red-400 shadow-[0_0_12px_rgba(220,38,38,0.5)] animate-pulse'
+                                                    : 'bg-rose-950/70 border-rose-500/70 text-rose-300 animate-pulse')
                                         }`}>
                                             {isCurrentBufferSafe ? (
                                                 <>
@@ -435,8 +437,8 @@ export default function OwnerDevFarmController({
                                                 </>
                                             ) : (
                                                 <>
-                                                    <ShieldAlert className="w-3 h-3 text-rose-400 shrink-0 animate-bounce" />
-                                                    <span>บางเฉียบ เตือนภัย</span>
+                                                    <ShieldAlert className={`w-3 h-3 shrink-0 ${currentBufferVal <= 0 ? 'text-red-500 animate-ping' : 'text-rose-400 animate-bounce'}`} />
+                                                    <span>{currentBufferVal <= 0 ? 'หมดเกราะ วิกฤต' : 'บางเฉียบ เตือนภัย'}</span>
                                                 </>
                                             )}
                                         </div>
@@ -469,7 +471,11 @@ export default function OwnerDevFarmController({
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(0)}
-                                            className="py-1 px-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-[9px] font-mono font-bold text-rose-300 border border-rose-500/30 text-center transition-colors cursor-pointer"
+                                            className={`py-1 px-1 rounded text-[9px] font-mono font-bold text-center transition-all cursor-pointer ${
+                                                currentBufferVal <= 0
+                                                    ? 'bg-red-950/90 text-red-300 border-2 border-red-500 shadow-[0_0_12px_rgba(220,38,38,0.6)] ring-1 ring-red-400'
+                                                    : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30'
+                                            }`}
                                             title="ทดสอบ 0% (บางสุด เตือนภัยวิกฤต)"
                                         >
                                             0% (วิกฤต)
@@ -477,7 +483,11 @@ export default function OwnerDevFarmController({
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(Math.max(2, Math.round(recommendedBuffer * 0.4)))}
-                                            className="py-1 px-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-[9px] font-mono font-bold text-amber-300 border border-amber-500/30 text-center transition-colors cursor-pointer"
+                                            className={`py-1 px-1 rounded text-[9px] font-mono font-bold text-center transition-all cursor-pointer ${
+                                                currentBufferVal > 0 && currentBufferVal < recommendedBuffer
+                                                    ? 'bg-amber-500/30 text-amber-200 border-2 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.6)] ring-1 ring-amber-300'
+                                                    : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+                                            }`}
                                             title={`ทดสอบ ${Math.max(2, Math.round(recommendedBuffer * 0.4))}% (ต่ำกว่าเกณฑ์เตือนภัย)`}
                                         >
                                             {Math.max(2, Math.round(recommendedBuffer * 0.4))}% (เตือน)
@@ -485,7 +495,11 @@ export default function OwnerDevFarmController({
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(recommendedBuffer)}
-                                            className="py-1 px-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-[9px] font-mono font-bold text-emerald-300 border border-emerald-500/30 text-center transition-colors cursor-pointer"
+                                            className={`py-1 px-1 rounded text-[9px] font-mono font-bold text-center transition-all cursor-pointer ${
+                                                Math.round(currentBufferVal) === recommendedBuffer
+                                                    ? 'bg-emerald-500/30 text-emerald-200 border-2 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.6)] ring-1 ring-emerald-300'
+                                                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
+                                            }`}
                                             title={`ทดสอบ ${recommendedBuffer}% (พอดีเกณฑ์)`}
                                         >
                                             {recommendedBuffer}% (เกณฑ์)
@@ -493,7 +507,11 @@ export default function OwnerDevFarmController({
                                         <button
                                             type="button"
                                             onClick={() => onSetSimulatedBuffer(80)}
-                                            className="py-1 px-1 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-[9px] font-mono font-bold text-cyan-300 border border-cyan-500/30 text-center transition-colors cursor-pointer"
+                                            className={`py-1 px-1 rounded text-[9px] font-mono font-bold text-center transition-all cursor-pointer ${
+                                                currentBufferVal >= 80
+                                                    ? 'bg-cyan-500/30 text-cyan-200 border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)] ring-1 ring-cyan-300'
+                                                    : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30'
+                                            }`}
                                             title="ทดสอบ 80% (หนาฟู ปลอดภัย)"
                                         >
                                             80% (หนาฟู)
