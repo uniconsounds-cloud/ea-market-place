@@ -12,7 +12,8 @@ import {
     Shield, Layers, Zap, Crosshair, X, 
     Gauge, Activity, AlertTriangle, CheckCircle2, 
     Lock, Unlock, Power, RefreshCw, TrendingDown, ArrowUpRight,
-    Coins, Sparkles, ShieldAlert, ShieldCheck
+    Coins, Sparkles, ShieldAlert, ShieldCheck,
+    HelpCircle, Info
 } from 'lucide-react';
 
 // --- Utilities ---
@@ -432,6 +433,21 @@ export default function FarmClient({
     // 🧪 Simulated Buffer & Threshold for testing dome buffer aura (Dev testing)
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
+
+    // 🧭 Interactive Farm Guide & System Specs Tour (เมนูลูกแก้วที่สี่)
+    const [isFarmGuideActive, setIsFarmGuideActive] = useState<boolean>(false);
+
+    const fullEaName = useMemo(() => {
+        if (cleanSysCode) return cleanSysCode;
+        if (licenseInfo?.productName) return licenseInfo.productName;
+        return 'EasyM Prime 20-Pairs Portfolio Engine';
+    }, [cleanSysCode, licenseInfo?.productName]);
+
+    const fullEaVersion = useMemo(() => {
+        const raw = portStatus?.ea_version || initialPortStatus?.ea_version;
+        if (raw) return `v${String(raw).replace(/^v/i, '')}`;
+        return 'v2.4.0 Prime Edition';
+    }, [portStatus?.ea_version, initialPortStatus?.ea_version]);
 
     useEffect(() => {
         const fetchReleaseState = async () => {
@@ -3640,26 +3656,217 @@ export default function FarmClient({
                             )}
                         </button>
 
-                        {/* Orb 4: Amber/Orange Glow (Defense & Offset Fund) */}
+                        {/* Orb 4: Info & Interactive Guide Mode (เมนูแสดงข้อมูลและคำแนะนำการใช้งาน) */}
                         <button
-                            onClick={() => {
-                                if (isOwnerDevUser) {
-                                    setPrimeActiveOrb(4);
-                                } else {
-                                    toast.info('🔮 ระบบ Defense & Offset Fund อยู่ในระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
-                                }
-                            }}
-                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title={isOwnerDevUser ? "Prime menu 4: Defense & Offset Fund" : "🔒 Defense & Offset Fund (กำลังพัฒนา - เร็วๆ นี้)"}
+                            onClick={() => setIsFarmGuideActive(prev => !prev)}
+                            className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
+                                isFarmGuideActive
+                                    ? 'border-amber-400 ring-2 ring-amber-400/90 shadow-[0_0_35px_rgba(245,158,11,0.85)] scale-110 bg-amber-950/50 z-[150]'
+                                    : 'border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.75)] hover:scale-110 active:scale-95'
+                            }`}
+                            title="คำแนะนำและข้อมูลระบบ (Interactive Guide & System Overview)"
                         >
-                            <Crosshair className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400 group-hover:rotate-90 transition-transform" />
-                            {!isOwnerDevUser && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-amber-500/40 text-[9px] shadow" title="เร็วๆ นี้">
-                                    🔒
+                            <HelpCircle className={`h-5 w-5 sm:h-6 sm:w-6 transition-all duration-300 ${
+                                isFarmGuideActive ? 'text-amber-300 scale-110 rotate-12' : 'text-amber-400 group-hover:scale-125'
+                            }`} />
+                            {!isFarmGuideActive && (
+                                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border border-slate-900 shadow"></span>
                                 </span>
                             )}
                         </button>
                     </div>
+
+                    {/* 🧭 INTERACTIVE FARM GUIDE & SYSTEM SPECS OVERLAY (เมนูลูกแก้วที่สี่) */}
+                    {isClient && isPrime && isFarmGuideActive && (
+                        <div 
+                            className="fixed inset-0 z-[130] pointer-events-auto animate-fade-in"
+                            onClick={() => setIsFarmGuideActive(false)}
+                        >
+                            {/* Soft Ambient Backdrop */}
+                            <div className="absolute inset-0 bg-black/45 backdrop-blur-[2.5px] transition-all" />
+
+                            {/* 🗺️ SVG Dynamic Connector Lines with Glowing Beacons */}
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
+                                <defs>
+                                    <linearGradient id="guideGoldLineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.9" />
+                                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.3" />
+                                    </linearGradient>
+                                    <filter id="guideGoldLineGlow" x="-20%" y="-20%" width="140%" height="140%">
+                                        <feGaussianBlur stdDeviation="2.5" result="glow" />
+                                        <feComposite in="SourceGraphic" in2="glow" operator="over" />
+                                    </filter>
+                                </defs>
+
+                                {/* Beacon 1 (Top-Right Orbs) */}
+                                <circle cx="calc(100% - 32px)" cy="50%" r="5" fill="#38bdf8" className="animate-ping opacity-75" />
+                                <circle cx="calc(100% - 32px)" cy="50%" r="3.5" fill="#0284c7" />
+
+                                {/* Beacon 2 (Active Farm DD Badge) */}
+                                <circle cx="50%" cy="22%" r="5" fill="#34d399" className="animate-ping opacity-75" />
+                                <circle cx="50%" cy="22%" r="3.5" fill="#10b981" />
+
+                                {/* Beacon 3 (Quarantine Greenhouse Dome) */}
+                                <circle cx="36%" cy="66%" r="5" fill="#f43f5e" className="animate-ping opacity-75" />
+                                <circle cx="36%" cy="66%" r="3.5" fill="#e11d48" />
+
+                                {/* Beacon 4 (Daily Harvest Crates) */}
+                                <circle cx="72%" cy="88%" r="5" fill="#fbbf24" className="animate-ping opacity-75" />
+                                <circle cx="72%" cy="88%" r="3.5" fill="#d97706" />
+                            </svg>
+
+                            {/* 🏷️ FLOATING CALLOUT TOOLTIPS AROUND THE SCREEN */}
+                            {/* 1. Top-Right: Port DD Orbs */}
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-16 sm:right-24 top-[38%] -translate-y-1/2 max-w-[200px] sm:max-w-[230px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#0b121e]/85 backdrop-blur-xl border border-cyan-400/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(6,182,212,0.2)] z-20 select-none animate-fade-in"
+                            >
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider">
+                                        ลูกแก้ว DD รวมพอร์ต
+                                    </span>
+                                </div>
+                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
+                                    แสดงค่า Drawdown รวมของพอร์ตสด แตะเพื่อคลี่ลูกแก้วย่อยดู DD ของฟาร์ม และ DD คู่เงินที่ถูกขัง
+                                </p>
+                            </div>
+
+                            {/* 2. Top-Center: Active Farm DD Badge */}
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-1/2 -translate-x-1/2 top-[13%] sm:top-[14%] max-w-[230px] sm:max-w-[260px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#061510]/85 backdrop-blur-xl border border-emerald-400/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(16,185,129,0.2)] z-20 select-none animate-fade-in"
+                            >
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-emerald-300 uppercase tracking-wider">
+                                        DD ฟาร์มปัจจุบัน (ACTIVE)
+                                    </span>
+                                </div>
+                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
+                                    Drawdown ของคู่เงินที่กำลังทำงานอยู่ในแปลง แตะเพื่อคลี่ดูหลอดปรอทของ 4 คู่เงินหลักที่เผชิญ DD สูงสุด
+                                </p>
+                            </div>
+
+                            {/* 3. Bottom-Left: Quarantine Dome & Buffer Aura */}
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-3 sm:left-10 bottom-[23%] sm:bottom-[25%] max-w-[210px] sm:max-w-[245px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#12080a]/85 backdrop-blur-xl border border-rose-500/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(244,63,94,0.2)] z-20 select-none animate-fade-in"
+                            >
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0" />
+                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-rose-300 uppercase tracking-wider">
+                                        โดมกักกัน & เกราะบัฟเฟอร์
+                                    </span>
+                                </div>
+                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
+                                    แยกขังคู่เงินที่มี DD สูงเพื่อฟื้นฟู ลำแสงรัศมีฉายบอกความหนาของเกราะบัฟเฟอร์ (เขียวฟ้า/ส้ม/แดงดำ)
+                                </p>
+                            </div>
+
+                            {/* 4. Center-Left: Farm Trees & Orders (Hidden on very narrow mobile to maintain balance) */}
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="hidden sm:block absolute left-6 sm:left-12 top-[34%] max-w-[220px] sm:max-w-[245px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#0f1712]/85 backdrop-blur-xl border border-amber-400/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(245,158,11,0.2)] z-20 select-none animate-fade-in"
+                            >
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                                        แปลงสุขภาพ 20 คู่เงิน
+                                    </span>
+                                </div>
+                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
+                                    ต้นไม้ผลิดอกบัวแทนออเดอร์ที่เปิดทำงานอยู่ และผลิดอกผลไม้สีทองเมื่อปิดทำกำไรสำเร็จ
+                                </p>
+                            </div>
+
+                            {/* 5. Bottom-Right: Daily Harvest Crates */}
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-3 sm:right-24 bottom-[15%] sm:bottom-[17%] max-w-[210px] sm:max-w-[240px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#140e06]/85 backdrop-blur-xl border border-amber-500/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(245,158,11,0.2)] z-20 select-none animate-fade-in"
+                            >
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                                        ประวัติผลผลิตรายวัน (90D)
+                                    </span>
+                                </div>
+                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
+                                    เก็บบันทึกประวัติกำไรในแต่ละวัน เลื่อนเพื่อย้อนดูสถิติสูงสุด 90 วัน พร้อมปุ่มส่งออกรายงาน (.CSV)
+                                </p>
+                            </div>
+
+                            {/* 💎 6. CENTER OF FARM: FLOATING TRANSLUCENT PREMIUM EA SPECS CARD */}
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 w-[88vw] max-w-xs sm:max-w-sm rounded-2xl sm:rounded-3xl p-4 sm:p-5 bg-[#070e18]/85 backdrop-blur-2xl border border-amber-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_35px_rgba(245,158,11,0.25)] select-none animate-fade-in"
+                            >
+                                {/* Header row */}
+                                <div className="flex items-start justify-between pb-2.5 border-b border-white/10 mb-2.5">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400/25 to-amber-600/25 border border-amber-400/50 flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.3)] shrink-0">
+                                            <Sparkles className="w-4 h-4 text-amber-300" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest">
+                                                    EASYM PORTFOLIO
+                                                </span>
+                                                <span className="px-1.5 py-0.2 rounded-full text-[8px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+                                                    {fullEaVersion}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-xs sm:text-sm font-black text-white tracking-wide">
+                                                {fullEaName}
+                                            </h3>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setIsFarmGuideActive(false)}
+                                        className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+                                        title="ปิดคำแนะนำ"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* General Specs / Info (ไม่เยอะ พรีเมี่ยม พอดีสวยงาม) */}
+                                <div className="grid grid-cols-2 gap-1.5 text-[9px] sm:text-[10px] mb-3">
+                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+                                        <span className="text-[8px] text-white/40 font-mono uppercase">สถาปัตยกรรมระบบ</span>
+                                        <span className="font-bold text-white/90 mt-0.5">20-Pair Multi-Grid</span>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+                                        <span className="text-[8px] text-white/40 font-mono uppercase">ระบบคุ้มครองพอร์ต</span>
+                                        <span className="font-bold text-emerald-300 mt-0.5">Capital Buffer & Relief</span>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+                                        <span className="text-[8px] text-white/40 font-mono uppercase">การแยกคู่เงินเสี่ยง</span>
+                                        <span className="font-bold text-amber-300 mt-0.5">Auto-Quarantine</span>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+                                        <span className="text-[8px] text-white/40 font-mono uppercase">สถานะข้อมูลสด</span>
+                                        <span className="font-bold text-cyan-300 mt-0.5 flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                            Live Stream
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Bottom guide footer tip */}
+                                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-white/50">
+                                    <span className="flex items-center gap-1 text-amber-300/80">
+                                        <Info className="w-3 h-3 text-amber-400 shrink-0" />
+                                        โหมดแสดงข้อมูลและคำแนะนำ
+                                    </span>
+                                    <span className="text-white/40">แตะที่ใดก็ได้เพื่อปิด</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
                     {primeActiveOrb !== null && (isOwnerDevUser || primeActiveOrb === 1 || primeActiveOrb === 2) && (
