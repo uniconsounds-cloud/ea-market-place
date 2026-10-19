@@ -1570,7 +1570,7 @@ export default function DemoFarmClient({
                                             <div className="text-[9px] sm:text-xs text-emerald-200/80 flex items-center justify-center gap-1 mb-0.5 whitespace-nowrap">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                                                 <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
-                                                <span className="font-bold">อัตราฟาร์มผลผลิตวันนี้</span>
+                                                <span className="font-bold">อัตราฟาร์มผลผลิต{fleetStatsData?.today?.label || 'วันนี้'}</span>
                                             </div>
                                             <div className="text-lg sm:text-2xl font-black font-mono text-emerald-400 leading-tight">
                                                 {fleetStatsData?.today?.profitablePortRatio ?? 70}%
@@ -1717,8 +1717,13 @@ export default function DemoFarmClient({
                                                 <div>
                                                     <div className="flex items-center justify-between border-b border-amber-900/40 pb-1.5 flex-nowrap gap-0.5 overflow-hidden">
                                                         <span className="text-[10px] sm:text-xs font-bold text-amber-200/90 flex items-center gap-1 min-w-0">
-                                                            <span className="whitespace-nowrap">📅 เมื่อวาน</span>
-                                                            <span className="text-amber-200/50 text-[8px] sm:text-[9px] font-mono truncate">{cleanDateText(y.dateLabel)}</span>
+                                                            <span className="whitespace-nowrap">📅 {y.label || 'เมื่อวาน'}</span>
+                                                            <span className="text-amber-200/50 text-[8px] sm:text-[9px] font-mono truncate">({y.shortDate || cleanDateText(y.dateLabel)})</span>
+                                                            {fleetStatsData?.isWeekend && (
+                                                                <span className="text-[7.5px] font-mono text-amber-300 bg-amber-500/20 px-1 py-0.2 rounded border border-amber-500/30 whitespace-nowrap">
+                                                                    วันทำการก่อนหน้า
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         <span className="text-[8px] sm:text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-bold whitespace-nowrap flex-shrink-0">
                                                             มีผลผลิต {y.profitablePortRatio ?? 70}%
@@ -1791,8 +1796,13 @@ export default function DemoFarmClient({
                                                     <div className="flex items-center justify-between border-b border-[#ffd700]/30 pb-1.5 flex-nowrap gap-0.5 overflow-hidden">
                                                         <span className="text-[10px] sm:text-xs font-bold text-[#ffd700] flex items-center gap-1 min-w-0">
                                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0"></span>
-                                                            <span className="whitespace-nowrap">⚡ วันนี้</span>
-                                                            <span className="text-amber-200/60 text-[8px] sm:text-[9px] font-mono truncate">{cleanDateText(t.dateLabel)}</span>
+                                                            <span className="whitespace-nowrap">⚡ {t.label || 'วันนี้'}</span>
+                                                            <span className="text-amber-200/60 text-[8px] sm:text-[9px] font-mono truncate">({t.shortDate || cleanDateText(t.dateLabel)})</span>
+                                                            {fleetStatsData?.isWeekend && (
+                                                                <span className="text-[7.5px] font-mono text-emerald-400 bg-emerald-500/20 px-1 py-0.2 rounded border border-emerald-500/30 whitespace-nowrap">
+                                                                    วันทำการล่าสุด
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         <span className="text-[8px] sm:text-[9px] font-mono text-emerald-400 bg-emerald-500/15 px-1.5 py-0.2 rounded border border-emerald-500/30 font-bold whitespace-nowrap flex-shrink-0">
                                                             มีผลผลิต {t.profitablePortRatio ?? 70}%
@@ -1920,9 +1930,15 @@ export default function DemoFarmClient({
                                                             {fmt(avgProfit)}
                                                         </div>
                                                     </div>
-                                                    <div className="text-[8px] sm:text-[10px] text-emerald-300/80 font-bold flex items-center gap-1 truncate">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                                                        <span className="truncate">{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
+                                                    <div className="space-y-0.5">
+                                                        <div className="text-[8px] sm:text-[9.5px] text-emerald-300/80 font-bold flex items-center gap-1 truncate">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                                                            <span className="truncate">{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
+                                                        </div>
+                                                        <div className="text-[7px] sm:text-[8.5px] text-emerald-400/70 font-mono truncate flex items-center gap-0.5">
+                                                            <span>🛡️ เฉพาะรอบปิดยอด</span>
+                                                            <span className="text-amber-200/50">({tfData.ongoingNote || `ไม่รวม${fleetTimeframe === 'daily' ? 'วันนี้' : fleetTimeframe === 'weekly' ? 'สัปดาห์นี้' : 'เดือนนี้'}`})</span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -1937,9 +1953,14 @@ export default function DemoFarmClient({
                                                             {fmt(peakProfit)}
                                                         </div>
                                                     </div>
-                                                    <div className="text-[8px] sm:text-[10px] text-amber-300/80 font-bold flex items-center gap-1 truncate">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#ffd700] flex-shrink-0"></span>
-                                                        <span className="truncate">{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
+                                                    <div className="space-y-0.5">
+                                                        <div className="text-[8px] sm:text-[9.5px] text-amber-300/80 font-bold flex items-center gap-1 truncate">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-[#ffd700] flex-shrink-0"></span>
+                                                            <span className="truncate">{tfData.lookbackLabel || 'ย้อนหลัง'}</span>
+                                                        </div>
+                                                        <div className="text-[7px] sm:text-[8.5px] text-amber-400/60 font-mono truncate">
+                                                            🏆 ฟาร์มทำผลงานสูงสุด
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2007,8 +2028,11 @@ export default function DemoFarmClient({
                                                                     </div>
 
                                                                     {/* Period Label */}
-                                                                    <div className="text-[8px] sm:text-[10px] font-mono text-amber-200/90 text-center truncate w-full mt-1 font-bold">
-                                                                        {bar.label}
+                                                                    <div className="text-[8px] sm:text-[10px] font-mono text-amber-200/90 text-center truncate w-full mt-1 font-bold flex items-center justify-center gap-0.5">
+                                                                        {bar.isCurrent && (
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block flex-shrink-0" title="รอบปัจจุบัน (ยังไม่ปิดยอด)" />
+                                                                        )}
+                                                                        <span className="truncate">{bar.label}</span>
                                                                     </div>
                                                                 </div>
                                                             );
