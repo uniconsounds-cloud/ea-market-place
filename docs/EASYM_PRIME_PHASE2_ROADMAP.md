@@ -187,12 +187,49 @@ flowchart TD
 
 ---
 
+## 🌾 เสาหลักที่ 6: ระบบบันทึกประวัติการเก็บเกี่ยวและสถิติปิดรวบราคาแยกรายคู่เงิน (Pair Harvest Feed & Basket Closure Telemetry)
+
+### 6.1 วัตถุประสงค์และประโยชน์
+* **ปัญหาเดิม:** ฐานข้อมูลบันทึกเฉพาะยอดกำไรสุทธิรวมรายวัน (Daily Profit) และจำนวน Lot รวม แต่ไม่ทราบว่า **"คู่เงินไหนปิดรวบราคา (Take Profit) ไปกี่รอบ, ปิดไปกี่ไม้, เวลาไหน และคู่ใดทำผลงานได้ดีที่สุด"**
+* **เป้าหมายของฟีเจอร์:**
+  1. บันทึกสถิติจังหวะปิดรวบราคาสำเร็จของแต่ละคู่เงินแบบ Event-driven (บันทึกเฉพาะตอนปิดตะกร้า ไม่บันทึกไม้ย่อย ทำให้ประหยัดฐานข้อมูลอย่างมหาศาล)
+  2. แสดงผลเป็น **ไทม์ไลน์การเก็บเกี่ยวผลผลิตสด (Real-time Harvest Feed)** บนหน้าฟาร์ม (เช่น 🌾 *15:30 น. - GBPCAD เก็บเกี่ยวสำเร็จ +$42.50 (4 ไม้)*)
+  3. สรุปจัดอันดับ **Top 5 Pairs Leaderboard** แสดงคู่เงินที่เคลียร์รอบทำกำไรให้พอร์ตได้มากที่สุดประจำสัปดาห์/เดือน
+
+### 6.2 สถาปัตยกรรมฐานข้อมูลและการประหยัดทรัพยากร (Database Architecture)
+* **ตาราง `farm_batch_events` (เพิ่มคอลัมน์ `symbol`):**
+  ```sql
+  ALTER TABLE public.farm_batch_events ADD COLUMN IF NOT EXISTS symbol TEXT;
+  CREATE INDEX IF NOT EXISTS idx_batch_events_port_sym ON public.farm_batch_events(port_number, symbol);
+  ```
+* **ขนาดข้อมูลและภาระการจัดเก็บ:**
+  * ขนาดต่อ Event: ~150-200 Bytes
+  * ปริมาณเฉลี่ยต่อพอร์ต 20 คู่เงิน: ~5-15 ครั้ง/วัน
+  * พอร์ต 100 พอร์ต สะสม 90 วัน = ~18 MB (ใช้พื้นที่เพียง 3.6% ของ Supabase Free Tier)
+  * ใช้ฟังก์ชันหมุนเวียนลบอัตโนมัติ 90 วัน (`cleanup_old_farm_data()`) ฐานข้อมูลจึงไม่บวมอย่างแน่นอน
+
+### 6.3 การเชื่อมต่อฝั่ง MQL5 EA (Prime Engine)
+* ในฟังก์ชันที่สั่งปิดรวบตะกร้ากำไรสำเร็จ (Basket Close / Cycle TP):
+  ```cpp
+  EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, orders_count, total_lots, realized_pnl);
+  ```
+* ส่ง Payload เข้า API `/api/sync-dashboard` หรือ `/api/mt5/sync` ทันทีที่มีการปิดรวบ
+
+### 6.4 การแสดงผลบน Frontend Farm HUD
+* แสดงเป็นไทม์ไลน์ป๊อปอัปหรือแท็บย่อยใต้โซนประวัติเก็บเกี่ยว 90 วัน
+* มีตัวกรองดูสถิติแยกตามคู่เงิน หรือดูภาพรวมทั้ง 20 คู่เงิน
+
+---
+
 ## 📋 แผนงานและขั้นตอนการลงมือพัฒนา (Implementation Checklist)
 
 - [ ] **ขั้นตอนที่ 1: ฝั่ง Database & API**
   - [ ] สร้างตาราง `farm_remote_commands` ใน Supabase (รองรับ `port_number`, `command_type`, `payload`, `status`, `created_at`, `executed_at`)
+  - [ ] เพิ่มคอลัมน์ `symbol TEXT` ในตาราง `farm_batch_events` พร้อม Index `(port_number, symbol)`
+  - [ ] ตรวจสอบฟังก์ชัน Auto-cleanup 90 วัน `cleanup_old_farm_data()` ให้พร้อมทำงานตามกำหนด
   - [ ] สร้าง API Route `/api/farm/command/send` สำหรับรับคำสั่งจากเว็บ
   - [ ] สร้าง API Route `/api/farm/command/poll` สำหรับให้ EA ดึงคำสั่งไปรัน
+  - [ ] ปรับปรุง `/api/sync-dashboard` ให้บันทึก `symbol` ลงใน `farm_batch_events`
 - [ ] **ขั้นตอนที่ 2: ฝั่ง EA (MQL5 Prime Codebase)**
   - [ ] ปรับชื่อใน `#define EA_DASH_TITLE` และ `#property description` เป็น `EasyM Prime v2.00 [BuildID]` (ตัดคำว่า Universal ออก)
   - [ ] ปรับแก้ **Table E**: ตัดช่อง Col 2 เดิมออก ขยายพื้นที่แสดงเฉพาะ Buffer % และ Relief Fund ให้คมชัดสวยงาม
@@ -207,11 +244,13 @@ flowchart TD
   - [ ] เพิ่มฟังก์ชันประมวลผลคำสั่งระยะไกล `ProcessRemoteWebCommands()`
   - [ ] เพิ่มโมดูลตรวจสอบข่าว `NewsFilterModule.mqh` (อ่านค่าข่าวและสกุลเงินที่ได้รับผลกระทบ)
   - [ ] ตรวจสอบ Leverage และ Margin ก่อนส่ง OrderSend ทุกครั้ง หากพบว่า Leverage ถูกลดเหลือ 1:100 และเงินไม่พอ ให้เข้าโหมด Safe Delay
+  - [ ] **เชื่อมต่อ Trigger การปิดรวบราคาแยกรายคู่เงิน:** เรียก `EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, ...)` เมื่อปิดตะกร้าของแต่ละคู่เงินสำเร็จ
 - [ ] **ขั้นตอนที่ 3: ฝั่ง Frontend (Farm Client & Dev Dock)**
   - [ ] เปิดสวิตช์ปุ่ม interactive ใน Orb 2 ให้ส่งคำสั่งเข้า API เมื่ออยู่ในโหมด Dev
   - [ ] เพิ่ม News Indicator แสดงไอคอนข่าวกล่องแดงบนคู่เงินในหน้าฟาร์ม
   - [ ] เพิ่มการแสดงผล Legacy Baskets & External Orders Warning ใน Telemetry Payload ของหน้าฟาร์ม
   - [ ] พัฒนา **ไซโลเสบียงแก้วทองคำ (Golden Silo / Relief Fund)** และ **เขื่อนพลังงานกั้นพายุ (Bio-Shield Gauge / Buffer Data Group)** บนหน้าฟาร์ม
+  - [ ] พัฒนา **ไทม์ไลน์การเก็บเกี่ยวผลผลิตสด (Real-time Harvest Feed & Pair Rankings)** จากตาราง `farm_batch_events`
   - [ ] ทดสอบการทำงาน End-to-End บนพอร์ตทดสอบของเจ้าของระบบ
 - [ ] **ขั้นตอนที่ 4: ปล่อยใช้งานจริง (Production Deployment)**
   - [ ] ตรวจสอบความถูกต้องของแดชบอร์ดบนกราฟ MT5 (Table C ชื่อตรง, Table E สะอาด, Table F รายงานข้อความแจ้งเตือนครบถ้วน)
@@ -221,5 +260,6 @@ flowchart TD
 ---
 *บันทึกโดย: Antigravity AI Pair Programmer & System Architect*  
 *ไฟล์อ้างอิงหลัก: `docs/EASYM_PRIME_PHASE2_ROADMAP.md`*
+
 
 
