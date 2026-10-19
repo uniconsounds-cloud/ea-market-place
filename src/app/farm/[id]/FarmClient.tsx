@@ -2993,7 +2993,7 @@ export default function FarmClient({
                                         {/* 🌸 Flower Badges for Rescue Orders on Quarantined / Hedged Tree */}
                                         {qTree.isRescue && qTree.rescueOrders > 0 && (
                                             <>
-                                                {Array.from({ length: Math.min(qTree.rescueOrders, 5) }).map((_, fIdx) => {
+                                                {Array.from({ length: Math.min(qTree.rescueOrders, 9) }).map((_, fIdx) => {
                                                     const slotIdx = fIdx === 0 ? 7 : (fIdx === 1 ? 4 : (fIdx === 2 ? 10 : (fIdx * 2) % 15));
                                                     const slot = TREE_SLOTS[slotIdx];
                                                     return (
@@ -3271,7 +3271,7 @@ export default function FarmClient({
                                                             : 'left-1/2 -translate-x-1/2 w-44 sm:w-48 hover:scale-105'
                                                     }`}
                                                     style={{
-                                                        width: isTreeExpanded ? '170px' : undefined
+                                                        width: isTreeExpanded ? '184px' : undefined
                                                     }}
                                                     title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                                 >
@@ -3293,7 +3293,7 @@ export default function FarmClient({
                                                     </div>
 
                                                     {/* Mercury Tube Assembly */}
-                                                    <div className="flex items-center w-full px-1.5 py-1 rounded-b-lg bg-[#0e0802]/95 backdrop-blur-md border-b border-x border-amber-500/70 shadow-xl transition-colors">
+                                                    <div className={`flex items-center w-full px-1.5 py-1 ${isTreeExpanded ? 'border-b border-amber-500/30' : 'rounded-b-lg border-b'} border-x border-amber-500/70 bg-[#0e0802]/95 backdrop-blur-md shadow-xl transition-colors`}>
                                                         {/* Mercury Bulb */}
                                                         <div className="relative w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center border border-amber-300 bg-gradient-to-br from-amber-400 via-orange-600 to-amber-800 shadow-[0_0_8px_rgba(245,158,11,0.9)]">
                                                             <div className="w-1 h-1 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
@@ -3324,6 +3324,86 @@ export default function FarmClient({
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* 🌸 9 Rescue Flowers (3 sets of 3) when clicked to expand */}
+                                                    {isTreeExpanded && (
+                                                        <div className="w-full px-1.5 py-1.5 rounded-b-lg bg-[#0c0702]/98 backdrop-blur-md border-b border-x border-amber-500/70 shadow-2xl flex flex-col items-center gap-1 animate-fade-in">
+                                                            {/* Flowers Header */}
+                                                            <div className="flex items-center justify-between w-full px-0.5 text-[7px] font-bold text-amber-300/90 border-b border-amber-500/20 pb-0.5">
+                                                                <span className="tracking-wide">ไม้แก้ 3 ชุด (9 ไม้)</span>
+                                                                <span className="font-mono text-cyan-300">
+                                                                    เปิด {Math.min(qTree.rescueOrders || 0, 9)}/9
+                                                                </span>
+                                                            </div>
+
+                                                            {/* 3 Sets of 3 Flowers Grid */}
+                                                            <div className="grid grid-cols-3 gap-1 w-full">
+                                                                {[0, 1, 2].map((setIdx) => {
+                                                                    const setNumber = setIdx + 1;
+                                                                    const setStart = setIdx * 3;
+                                                                    const setOrders = [setStart, setStart + 1, setStart + 2];
+                                                                    const activeInSet = setOrders.filter(oIdx => oIdx < (qTree.rescueOrders || 0)).length;
+
+                                                                    return (
+                                                                        <div 
+                                                                            key={`rescue_set_${qTree.id}_${setIdx}`}
+                                                                            className={`flex flex-col items-center py-0.5 px-0.5 rounded bg-black/50 border transition-colors ${
+                                                                                activeInSet > 0 
+                                                                                    ? 'border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]' 
+                                                                                    : 'border-white/10'
+                                                                            }`}
+                                                                        >
+                                                                            <div className="flex items-center justify-between w-full px-0.5 mb-1">
+                                                                                <span className="text-[6.5px] font-bold text-amber-300/90">
+                                                                                    ชุด {setNumber}
+                                                                                </span>
+                                                                                <span className={`text-[6px] font-mono ${activeInSet > 0 ? 'text-emerald-400 font-bold' : 'text-stone-500'}`}>
+                                                                                    {activeInSet}/3
+                                                                                </span>
+                                                                            </div>
+
+                                                                            {/* 3 flowers in this set */}
+                                                                            <div className="flex items-center justify-center gap-1 w-full">
+                                                                                {setOrders.map((oIdx) => {
+                                                                                    const orderNum = oIdx + 1;
+                                                                                    const isActive = oIdx < (qTree.rescueOrders || 0);
+
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={`flower_slot_${orderNum}`}
+                                                                                            className="relative flex items-center justify-center"
+                                                                                            title={`ไม้แก้ที่ ${orderNum} (ชุดที่ ${setNumber}) - ${isActive ? 'เปิดไม้แล้ว (Active)' : 'รอเปิดไม้ (Standby)'}`}
+                                                                                        >
+                                                                                            {isActive ? (
+                                                                                                <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+                                                                                                    <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping opacity-60 pointer-events-none"></div>
+                                                                                                    <div className="relative w-full h-full drop-shadow-[0_0_6px_rgba(52,211,153,0.95)]">
+                                                                                                        <Image src={theme.open} alt={`R${orderNum}`} fill className="object-contain animate-pulse" unoptimized />
+                                                                                                    </div>
+                                                                                                    <span className="absolute -bottom-1 -right-1 px-0.5 rounded bg-emerald-950/95 border border-emerald-400 text-[5.5px] font-mono font-black text-emerald-300 leading-none shadow-[0_0_4px_rgba(16,185,129,0.8)]">
+                                                                                                        R{orderNum}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            ) : (
+                                                                                                <div className="relative w-3.5 h-3.5 flex items-center justify-center rounded-full bg-white/[0.04] border border-white/10 opacity-35 hover:opacity-60 transition-opacity">
+                                                                                                    <div className="relative w-2.5 h-2.5 grayscale opacity-50">
+                                                                                                        <Image src={theme.open} alt={`R${orderNum}`} fill className="object-contain" unoptimized />
+                                                                                                    </div>
+                                                                                                    <span className="absolute -bottom-1 -right-1 px-0.5 rounded bg-black/80 border border-white/10 text-[5px] font-mono font-semibold text-stone-400 leading-none">
+                                                                                                        R{orderNum}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
 
                                                     {/* Vertical stem connecting mercury bar directly down to tree below */}
                                                     <div className="w-0.5 sm:w-1 h-3 sm:h-5 bg-gradient-to-b from-amber-500 via-amber-500/60 to-transparent"></div>
