@@ -2831,6 +2831,56 @@ export default function FarmClient({
                                 </div>
                             );
                         })()}
+
+                        {/* 🎬 CENTER FARM CREDITS PLAQUE (แปะติดกึ่งกลางฟาร์ม ขยับขึ้นลงพร้อมฟาร์ม สไตล์ไตเติ้ลท้ายหนัง สีเดียวสะอาดตา) */}
+                        {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
+                            <div
+                                className="absolute pointer-events-none select-none animate-fade-in"
+                                style={{
+                                    left: `${(2 - 2) * TILE_W}px`,
+                                    top: `${(2 + 2) * TILE_H_OFFSET}px`,
+                                    zIndex: 120,
+                                    width: '280px',
+                                    height: '280px'
+                                }}
+                            >
+                                <div 
+                                    className="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 w-[195px] px-3 py-2 rounded-sm bg-black/55 border border-white/15 shadow-[0_6px_20px_rgba(0,0,0,0.85)] flex flex-col items-center text-center"
+                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                >
+                                    <span className="text-[6px] font-mono tracking-[0.3em] text-white/60 uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                        PORTFOLIO SYSTEM
+                                    </span>
+                                    <h3 className="text-[12px] font-black tracking-[0.18em] text-white uppercase mt-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
+                                        {fullEaName}
+                                    </h3>
+                                    <span className="text-[7px] font-mono tracking-[0.25em] text-white/75 uppercase mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                        VERSION {fullEaVersion}
+                                    </span>
+
+                                    <div className="w-10 h-[1px] bg-white/25 my-1.5" />
+
+                                    <div className="w-full space-y-0.5 text-[7.5px] font-mono leading-snug drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <span className="text-right text-white/60">สถาปัตยกรรม</span>
+                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">20-Pair Grid</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <span className="text-right text-white/60">ระบบคุ้มครอง</span>
+                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">Capital Buffer</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <span className="text-right text-white/60">การกักกัน</span>
+                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">Auto-Quarantine</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <span className="text-right text-white/60">การเชื่อมต่อ</span>
+                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">MT5 Live 24/5</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         </div> {/* 🌾 End of animate-float-farm */}
 
                         {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกที่แปลงที่ 2: c: 1.0, r: 5 พร้อมรัศมีโดนัทครึ่งวงกลมแสดงขนาดบัฟเฟอร์) */}
@@ -3807,65 +3857,6 @@ export default function FarmClient({
                                 <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
                                     เก็บบันทึกกำไรรายวัน เลื่อนดูย้อนหลัง 90 วันและโหลด CSV
                                 </p>
-                            </div>
-
-                            {/* 💎 6. CENTER OF FARM: แผ่นรายงานแปะกึ่งกลางฟาร์ม ขนาดประมาณ 20% ของฟาร์ม เกาะติดฟาร์ม ไม่บังส่วนอื่น */}
-                            <div 
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute left-1/2 top-[50%] -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto w-[220px] sm:w-[250px] rounded-2xl p-3 sm:p-3.5 bg-[#080f1d]/95 border border-amber-400/45 shadow-[0_15px_35px_rgba(0,0,0,0.85),0_0_20px_rgba(245,158,11,0.2)] select-none animate-fade-in"
-                            >
-                                {/* Plaque Header */}
-                                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20 mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-amber-400/20 border border-amber-400/40 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.3)] shrink-0">
-                                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-[7.5px] font-mono font-black text-amber-400 uppercase tracking-widest">
-                                                    EASYM PRIME
-                                                </span>
-                                                <span className="px-1 py-0.2 rounded-full text-[7.5px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
-                                                    {fullEaVersion}
-                                                </span>
-                                            </div>
-                                            <h3 className="text-[11px] sm:text-xs font-black text-white tracking-wide truncate max-w-[140px]">
-                                                {fullEaName}
-                                            </h3>
-                                        </div>
-                                    </div>
-
-                                    <button 
-                                        onClick={() => setIsFarmGuideActive(false)}
-                                        className="p-1 rounded-md hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
-                                        title="ปิดคำแนะนำ"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-
-                                {/* Compact Specs Rows */}
-                                <div className="space-y-1.5 text-[8.5px] sm:text-[9px]">
-                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
-                                        <span className="text-white/50 font-mono">สถาปัตยกรรม</span>
-                                        <span className="font-bold text-white/90">20-Pair Multi-Grid</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
-                                        <span className="text-white/50 font-mono">ระบบคุ้มครอง</span>
-                                        <span className="font-bold text-emerald-300">Capital Buffer & Relief</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
-                                        <span className="text-white/50 font-mono">การกักกัน</span>
-                                        <span className="font-bold text-amber-300">Auto-Quarantine Dome</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
-                                        <span className="text-white/50 font-mono">สถานะข้อมูล</span>
-                                        <span className="font-bold text-cyan-300 flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                            Live Stream 24/5
-                                        </span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}
