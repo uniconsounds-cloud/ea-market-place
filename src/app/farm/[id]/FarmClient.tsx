@@ -2893,7 +2893,7 @@ export default function FarmClient({
                             );
                         })()}
 
-                        {/* 🎬 CENTER FARM CREDITS PLAQUE (รวมคำอธิบายแปลงสุขภาพไว้ตอนบน ต่อด้วยชื่อ EA และข้อมูลอื่นๆ ขนาดตัวอักษรเท่ากับกรอบอธิบาย ขยับพร้อมฟาร์ม) */}
+                        {/* 🎬 CENTER FARM CREDITS PLAQUE (รวมคำอธิบายแปลงสุขภาพไว้ตอนบน ต่อด้วยชื่อ EA และเลข Build กระชับตัวอักษรพอดี ขยับพร้อมฟาร์ม) */}
                         {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
                             <div
                                 className="absolute pointer-events-none select-none animate-fade-in"
@@ -2916,53 +2916,32 @@ export default function FarmClient({
                                         transform: `translate(-50%, -50%) scale(${(scale > 0 ? 1 / scale : 1) * (expandedGuideBox === 4 ? 1.25 : 1)})`,
                                         transformOrigin: 'center center'
                                     }}
-                                    className={`absolute left-1/2 top-[54%] w-[195px] sm:w-[215px] px-2.5 py-2 rounded-sm bg-black/65 border transition-all duration-300 flex flex-col items-center text-center pointer-events-auto cursor-pointer ${
+                                    className={`absolute left-1/2 top-[54%] w-max px-2.5 py-1.5 rounded-md bg-black/65 border transition-all duration-300 flex flex-col items-center text-center pointer-events-auto cursor-pointer ${
                                         expandedGuideBox === 4
                                             ? 'border-white/45 shadow-[0_12px_32px_rgba(0,0,0,0.95)] z-[99999]'
                                             : 'border-white/20 shadow-[0_8px_28px_rgba(0,0,0,0.9)]'
                                     }`}
                                 >
                                     {/* ตอนบน: คำอธิบายแปลงสุขภาพ 20 คู่เงิน (ขนาดตัวอักษรเท่ากับกรอบอธิบาย) */}
-                                    <div className="text-[8.5px] sm:text-[9.5px] font-bold tracking-[0.04em] text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                    <div className="text-[8.5px] sm:text-[9.5px] font-bold tracking-[0.04em] text-white leading-tight whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                                         แปลงสุขภาพ 20 คู่เงิน
                                     </div>
-                                    <p className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-snug mt-0.5 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
+                                    <p className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-snug mt-0.5 whitespace-nowrap drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
                                         แสดงสุขภาพฟาร์ม, ต้นไม้แห้งแทนค่า DD,<br />ดอกไม้แสดงจำนวนออเดอร์ปัจจุบัน
                                     </p>
 
-                                    <div className="w-14 h-[1px] bg-white/25 my-1.5" />
+                                    <div className="w-12 h-[1px] bg-white/25 my-1" />
 
-                                    {/* ตอนล่าง: ชื่อ EA และข้อมูลระบบ (ขนาดตัวอักษรเท่ากับกรอบอธิบาย) */}
-                                    <span className="text-[7.5px] sm:text-[8.5px] font-mono tracking-[0.2em] text-white/60 uppercase leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                    {/* ตอนล่าง: ชื่อ EA และเลข Build (ขนาดตัวอักษรเท่ากับกรอบอธิบาย) */}
+                                    <span className="text-[7.5px] sm:text-[8.5px] font-mono tracking-[0.18em] text-white/60 uppercase leading-tight whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                                         PORTFOLIO SYSTEM
                                     </span>
-                                    <h3 className="text-[8.5px] sm:text-[9.5px] font-black tracking-[0.12em] text-white uppercase mt-0.5 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
+                                    <h3 className="text-[8.5px] sm:text-[9.5px] font-black tracking-[0.12em] text-white uppercase mt-0.5 leading-tight whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                                         {fullEaName}
                                     </h3>
-                                    <span className="text-[7.5px] sm:text-[8.5px] font-mono tracking-[0.18em] text-white/75 uppercase mt-0.5 leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                    <span className="text-[7.5px] sm:text-[8.5px] font-mono tracking-[0.16em] text-white/75 uppercase mt-0.5 leading-tight whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                                         VERSION {fullEaVersion}
                                     </span>
-
-                                    <div className="w-10 h-[1px] bg-white/20 my-1.5" />
-
-                                    <div className="w-full space-y-0.5 text-[7.5px] sm:text-[8.5px] font-mono leading-snug drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <span className="text-right text-white/60">สถาปัตยกรรม</span>
-                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">20-Pair Grid</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <span className="text-right text-white/60">ระบบคุ้มครอง</span>
-                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">Capital Buffer</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <span className="text-right text-white/60">การกักกัน</span>
-                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">Auto-Quarantine</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <span className="text-right text-white/60">การเชื่อมต่อ</span>
-                                            <span className="text-left font-bold text-white/95 whitespace-nowrap">MT5 Live 24/5</span>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         )}
