@@ -1617,10 +1617,10 @@ export default function DemoFarmClient({
                                                 <span className="font-bold">ผลผลิตเฉลี่ย/วัน (30 วัน)</span>
                                             </div>
                                             <div className="text-lg sm:text-2xl font-black font-mono text-emerald-400 leading-tight">
-                                                +{fleetStatsData?.daily30D?.returnPct ?? 1.16}%
+                                                +{fleetStatsData?.daily30D?.returnPct ?? 0.58}%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-emerald-300/70 mt-0.5 truncate max-w-full font-mono">
-                                                ~{(fleetStatsData?.daily30D?.avgYield ?? 1160).toLocaleString()} (ทุน {(fleetStatsData?.daily30D?.capital ?? 100000).toLocaleString()})
+                                                ~{(fleetStatsData?.daily30D?.avgYield ?? 580).toLocaleString()} (ทุน {(fleetStatsData?.daily30D?.capital ?? 100000).toLocaleString()})
                                             </div>
                                         </div>
 
@@ -1631,10 +1631,10 @@ export default function DemoFarmClient({
                                                 <span className="font-bold">ผลผลิตเฉลี่ย/เดือน (3 เดือน)</span>
                                             </div>
                                             <div className="text-lg sm:text-2xl font-black font-mono text-[#ffd700] leading-tight">
-                                                +{fleetStatsData?.monthly3M?.returnPct ?? 36.5}%
+                                                +{fleetStatsData?.monthly3M?.returnPct ?? 18.5}%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-amber-300/70 mt-0.5 truncate max-w-full font-mono">
-                                                ~{(fleetStatsData?.monthly3M?.avgYield ?? 36530).toLocaleString()} (ทุน {(fleetStatsData?.monthly3M?.capital ?? 100000).toLocaleString()})
+                                                ~{(fleetStatsData?.monthly3M?.avgYield ?? 18450).toLocaleString()} (ทุน {(fleetStatsData?.monthly3M?.capital ?? 100000).toLocaleString()})
                                             </div>
                                         </div>
                                     </div>

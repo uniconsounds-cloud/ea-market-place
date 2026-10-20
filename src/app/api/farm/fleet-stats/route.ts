@@ -419,15 +419,16 @@ export async function GET() {
 
         // 7.1 Key Return Metrics for HUD Cards (Daily 30-Day & Monthly 3-Month)
         // Standard benchmark capital: $1,000 = 100,000 cents (USC)
+        // Values strictly match the actual 30-day daily bars and crates average (~576 USC = +0.58%/day)
         const baseCapital = 100000;
         const dailyAvgRaw = dailyAvg > 0 ? dailyAvg : 579.24;
-        const dailyAvg30D = Math.round(dailyAvgRaw < 1000 ? dailyAvgRaw * 2 : dailyAvgRaw);
+        const dailyAvg30D = Math.round(dailyAvgRaw);
         const dailyReturnPct = Number(((dailyAvg30D / baseCapital) * 100).toFixed(2));
 
-        // Monthly average strictly from last 3 COMPLETED full months
+        // Monthly average strictly from last 3 COMPLETED full months (~18,450 USC = +18.5%/month)
         const last3CompletedMonths = completedMonthlyBars.slice(-3);
         const monthlyAvgRaw = last3CompletedMonths.length > 0 ? (last3CompletedMonths.reduce((s, m) => s + m.avg, 0) / last3CompletedMonths.length) : 18265;
-        const monthlyAvg3M = Math.round(monthlyAvgRaw < 30000 ? monthlyAvgRaw * 2 : monthlyAvgRaw);
+        const monthlyAvg3M = Math.round(monthlyAvgRaw);
         const monthlyReturnPct = Number(((monthlyAvg3M / baseCapital) * 100).toFixed(1));
 
         // 8. Longevity
