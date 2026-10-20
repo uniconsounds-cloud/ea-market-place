@@ -3697,145 +3697,139 @@ export default function FarmClient({
 
                     {/* 🧭 INTERACTIVE FARM GUIDE & SYSTEM SPECS OVERLAY (เมนูลูกแก้วที่สี่) */}
                     {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
-                        <div 
-                            className="fixed inset-0 z-[130] pointer-events-auto animate-fade-in"
-                            onClick={() => setIsFarmGuideActive(false)}
-                        >
-                            {/* Soft Ambient Backdrop */}
-                            <div className="absolute inset-0 bg-black/45 backdrop-blur-[2.5px] transition-all" />
+                        <div className="fixed inset-0 z-[130] pointer-events-none animate-fade-in">
+                            {/* Transparent click catcher - NO background blur, NO darkening (หน้าฟาร์มคมชัด 100%) */}
+                            <div 
+                                className="absolute inset-0 bg-transparent pointer-events-auto cursor-default" 
+                                onClick={() => setIsFarmGuideActive(false)} 
+                            />
 
-                            {/* 🗺️ SVG Dynamic Connector Lines with Glowing Beacons */}
+                            {/* 🗺️ SVG Glowing Beacons at target features */}
                             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
-                                <defs>
-                                    <linearGradient id="guideGoldLineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.9" />
-                                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.3" />
-                                    </linearGradient>
-                                    <filter id="guideGoldLineGlow" x="-20%" y="-20%" width="140%" height="140%">
-                                        <feGaussianBlur stdDeviation="2.5" result="glow" />
-                                        <feComposite in="SourceGraphic" in2="glow" operator="over" />
-                                    </filter>
-                                </defs>
-
                                 {/* Beacon 1 (Top-Right Orbs) */}
-                                <circle cx="calc(100% - 32px)" cy="50%" r="5" fill="#38bdf8" className="animate-ping opacity-75" />
-                                <circle cx="calc(100% - 32px)" cy="50%" r="3.5" fill="#0284c7" />
+                                <circle cx="calc(100% - 32px)" cy="115px" r="5" fill="#fbbf24" className="animate-ping opacity-75" />
+                                <circle cx="calc(100% - 32px)" cy="115px" r="3" fill="#f59e0b" />
 
                                 {/* Beacon 2 (Active Farm DD Badge) */}
-                                <circle cx="50%" cy="22%" r="5" fill="#34d399" className="animate-ping opacity-75" />
-                                <circle cx="50%" cy="22%" r="3.5" fill="#10b981" />
+                                <circle cx="50%" cy="17%" r="5" fill="#34d399" className="animate-ping opacity-75" />
+                                <circle cx="50%" cy="17%" r="3" fill="#10b981" />
 
                                 {/* Beacon 3 (Quarantine Greenhouse Dome) */}
-                                <circle cx="36%" cy="66%" r="5" fill="#f43f5e" className="animate-ping opacity-75" />
-                                <circle cx="36%" cy="66%" r="3.5" fill="#e11d48" />
+                                <circle cx="33%" cy="66%" r="5" fill="#f43f5e" className="animate-ping opacity-75" />
+                                <circle cx="33%" cy="66%" r="3" fill="#e11d48" />
 
-                                {/* Beacon 4 (Daily Harvest Crates) */}
-                                <circle cx="72%" cy="88%" r="5" fill="#fbbf24" className="animate-ping opacity-75" />
-                                <circle cx="72%" cy="88%" r="3.5" fill="#d97706" />
+                                {/* Beacon 4 (20-Pair Trees Plantation) */}
+                                <circle cx="65%" cy="50%" r="5" fill="#38bdf8" className="animate-ping opacity-75" />
+                                <circle cx="65%" cy="50%" r="3" fill="#0284c7" />
+
+                                {/* Beacon 5 (Daily Harvest Crates) */}
+                                <circle cx="75%" cy="92%" r="5" fill="#fbbf24" className="animate-ping opacity-75" />
+                                <circle cx="75%" cy="92%" r="3" fill="#d97706" />
                             </svg>
 
-                            {/* 🏷️ FLOATING CALLOUT TOOLTIPS AROUND THE SCREEN */}
-                            {/* 1. Top-Right: Port DD Orbs */}
+                            {/* 🏷️ UNIFIED SLEEK TOOLTIPS - Compact, Consistent, Non-overlapping */}
+                            
+                            {/* 1. Top-Right: Port DD Orbs (ลอยเยื้องซ้ายของลูกแก้ว ไม่บังลูกแก้ว) */}
                             <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute right-16 sm:right-24 top-[38%] -translate-y-1/2 max-w-[200px] sm:max-w-[230px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#0b121e]/85 backdrop-blur-xl border border-cyan-400/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(6,182,212,0.2)] z-20 select-none animate-fade-in"
+                                className="absolute right-16 sm:right-28 top-16 sm:top-24 w-[175px] sm:w-[200px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
                             >
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
-                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-cyan-300 uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0 shadow-[0_0_6px_#fbbf24]" />
+                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-amber-300 tracking-wide uppercase">
                                         ลูกแก้ว DD รวมพอร์ต
                                     </span>
                                 </div>
-                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
-                                    แสดงค่า Drawdown รวมของพอร์ตสด แตะเพื่อคลี่ลูกแก้วย่อยดู DD ของฟาร์ม และ DD คู่เงินที่ถูกขัง
+                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
+                                    แตะเพื่อคลี่ลูกแก้วย่อยดู DD ของฟาร์ม และ DD คู่เงินที่ถูกขัง
                                 </p>
                             </div>
 
-                            {/* 2. Top-Center: Active Farm DD Badge */}
+                            {/* 2. Top-Center-Left: Active Farm DD Badge (ลอยเยื้องซ้ายบน ไม่ทับ badge และไม่ทับกล่องกลาง) */}
                             <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute left-1/2 -translate-x-1/2 top-[13%] sm:top-[14%] max-w-[230px] sm:max-w-[260px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#061510]/85 backdrop-blur-xl border border-emerald-400/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(16,185,129,0.2)] z-20 select-none animate-fade-in"
+                                className="absolute left-3 sm:left-[20%] top-14 sm:top-[14%] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
                             >
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-emerald-300 uppercase tracking-wider">
-                                        DD ฟาร์มปัจจุบัน (ACTIVE)
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_6px_#34d399]" />
+                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-emerald-300 tracking-wide uppercase">
+                                        DD ฟาร์มปัจจุบัน
                                     </span>
                                 </div>
-                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
-                                    Drawdown ของคู่เงินที่กำลังทำงานอยู่ในแปลง แตะเพื่อคลี่ดูหลอดปรอทของ 4 คู่เงินหลักที่เผชิญ DD สูงสุด
+                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
+                                    Drawdown สดของคู่เงินที่กำลังทำงาน แตะเพื่อดูหลอดปรอท
                                 </p>
                             </div>
 
-                            {/* 3. Bottom-Left: Quarantine Dome & Buffer Aura */}
+                            {/* 3. Mid-Left: Quarantine Dome & Buffer Aura (ลอยอยู่ขอบซ้ายข้างโดม ไม่บังโดม) */}
                             <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute left-3 sm:left-10 bottom-[23%] sm:bottom-[25%] max-w-[210px] sm:max-w-[245px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#12080a]/85 backdrop-blur-xl border border-rose-500/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(244,63,94,0.2)] z-20 select-none animate-fade-in"
+                                className="absolute left-3 sm:left-6 top-[60%] sm:top-[58%] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
                             >
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0" />
-                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-rose-300 uppercase tracking-wider">
-                                        โดมกักกัน & เกราะบัฟเฟอร์
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0 shadow-[0_0_6px_#f43f5e]" />
+                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-rose-300 tracking-wide uppercase">
+                                        โดมกักกัน & บัฟเฟอร์
                                     </span>
                                 </div>
-                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
-                                    แยกขังคู่เงินที่มี DD สูงเพื่อฟื้นฟู ลำแสงรัศมีฉายบอกความหนาของเกราะบัฟเฟอร์ (เขียวฟ้า/ส้ม/แดงดำ)
+                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
+                                    แยกฟื้นฟูคู่เงินที่มี DD สูง รัศมีแสงบอกความหนาเกราะบัฟเฟอร์
                                 </p>
                             </div>
 
-                            {/* 4. Center-Left: Farm Trees & Orders (Hidden on very narrow mobile to maintain balance) */}
+                            {/* 4. Mid-Right: 20-Pair Plantation (ลอยอยู่ขอบขวาข้างแปลง ไม่บังแปลงและไม่ทับกล่องกลาง) */}
                             <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="hidden sm:block absolute left-6 sm:left-12 top-[34%] max-w-[220px] sm:max-w-[245px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#0f1712]/85 backdrop-blur-xl border border-amber-400/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(245,158,11,0.2)] z-20 select-none animate-fade-in"
+                                className="absolute right-3 sm:right-6 top-[52%] sm:top-[48%] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
                             >
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_6px_#38bdf8]" />
+                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-cyan-300 tracking-wide uppercase">
                                         แปลงสุขภาพ 20 คู่เงิน
                                     </span>
                                 </div>
-                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
-                                    ต้นไม้ผลิดอกบัวแทนออเดอร์ที่เปิดทำงานอยู่ และผลิดอกผลไม้สีทองเมื่อปิดทำกำไรสำเร็จ
+                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
+                                    ดอกบัวแทนออเดอร์ที่เปิดอยู่ และผลไม้ทองเมื่อปิดทำกำไร
                                 </p>
                             </div>
 
-                            {/* 5. Bottom-Right: Daily Harvest Crates */}
+                            {/* 5. Bottom-Right: Daily Harvest Crates (ลอยอยู่เหนือลังไม้ด้านขวาล่าง ไม่บังลังไม้) */}
                             <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute right-3 sm:right-24 bottom-[15%] sm:bottom-[17%] max-w-[210px] sm:max-w-[240px] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-[#140e06]/85 backdrop-blur-xl border border-amber-500/40 shadow-[0_10px_30px_rgba(0,0,0,0.85),0_0_20px_rgba(245,158,11,0.2)] z-20 select-none animate-fade-in"
+                                className="absolute right-3 sm:right-16 bottom-[115px] sm:bottom-[165px] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
                             >
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider">
-                                        ประวัติผลผลิตรายวัน (90D)
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0 shadow-[0_0_6px_#fbbf24]" />
+                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-amber-300 tracking-wide uppercase">
+                                        ประวัติผลผลิต (90D)
                                     </span>
                                 </div>
-                                <p className="text-[9px] sm:text-[10px] text-white/70 leading-relaxed font-sans">
-                                    เก็บบันทึกประวัติกำไรในแต่ละวัน เลื่อนเพื่อย้อนดูสถิติสูงสุด 90 วัน พร้อมปุ่มส่งออกรายงาน (.CSV)
+                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
+                                    เก็บบันทึกกำไรรายวัน เลื่อนดูย้อนหลัง 90 วันและโหลด CSV
                                 </p>
                             </div>
 
-                            {/* 💎 6. CENTER OF FARM: FLOATING TRANSLUCENT PREMIUM EA SPECS CARD */}
+                            {/* 💎 6. CENTER OF FARM: แผ่นรายงานแปะกึ่งกลางฟาร์ม ขนาดประมาณ 20% ของฟาร์ม เกาะติดฟาร์ม ไม่บังส่วนอื่น */}
                             <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 w-[88vw] max-w-xs sm:max-w-sm rounded-2xl sm:rounded-3xl p-4 sm:p-5 bg-[#070e18]/85 backdrop-blur-2xl border border-amber-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_35px_rgba(245,158,11,0.25)] select-none animate-fade-in"
+                                className="absolute left-1/2 top-[50%] -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto w-[220px] sm:w-[250px] rounded-2xl p-3 sm:p-3.5 bg-[#080f1d]/95 border border-amber-400/45 shadow-[0_15px_35px_rgba(0,0,0,0.85),0_0_20px_rgba(245,158,11,0.2)] select-none animate-fade-in"
                             >
-                                {/* Header row */}
-                                <div className="flex items-start justify-between pb-2.5 border-b border-white/10 mb-2.5">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400/25 to-amber-600/25 border border-amber-400/50 flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.3)] shrink-0">
-                                            <Sparkles className="w-4 h-4 text-amber-300" />
+                                {/* Plaque Header */}
+                                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20 mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-amber-400/20 border border-amber-400/40 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.3)] shrink-0">
+                                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest">
-                                                    EASYM PORTFOLIO
+                                                <span className="text-[7.5px] font-mono font-black text-amber-400 uppercase tracking-widest">
+                                                    EASYM PRIME
                                                 </span>
-                                                <span className="px-1.5 py-0.2 rounded-full text-[8px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+                                                <span className="px-1 py-0.2 rounded-full text-[7.5px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
                                                     {fullEaVersion}
                                                 </span>
                                             </div>
-                                            <h3 className="text-xs sm:text-sm font-black text-white tracking-wide">
+                                            <h3 className="text-[11px] sm:text-xs font-black text-white tracking-wide truncate max-w-[140px]">
                                                 {fullEaName}
                                             </h3>
                                         </div>
@@ -3843,43 +3837,34 @@ export default function FarmClient({
 
                                     <button 
                                         onClick={() => setIsFarmGuideActive(false)}
-                                        className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+                                        className="p-1 rounded-md hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
                                         title="ปิดคำแนะนำ"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
 
-                                {/* General Specs / Info (ไม่เยอะ พรีเมี่ยม พอดีสวยงาม) */}
-                                <div className="grid grid-cols-2 gap-1.5 text-[9px] sm:text-[10px] mb-3">
-                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                                        <span className="text-[8px] text-white/40 font-mono uppercase">สถาปัตยกรรมระบบ</span>
-                                        <span className="font-bold text-white/90 mt-0.5">20-Pair Multi-Grid</span>
+                                {/* Compact Specs Rows */}
+                                <div className="space-y-1.5 text-[8.5px] sm:text-[9px]">
+                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
+                                        <span className="text-white/50 font-mono">สถาปัตยกรรม</span>
+                                        <span className="font-bold text-white/90">20-Pair Multi-Grid</span>
                                     </div>
-                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                                        <span className="text-[8px] text-white/40 font-mono uppercase">ระบบคุ้มครองพอร์ต</span>
-                                        <span className="font-bold text-emerald-300 mt-0.5">Capital Buffer & Relief</span>
+                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
+                                        <span className="text-white/50 font-mono">ระบบคุ้มครอง</span>
+                                        <span className="font-bold text-emerald-300">Capital Buffer & Relief</span>
                                     </div>
-                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                                        <span className="text-[8px] text-white/40 font-mono uppercase">การแยกคู่เงินเสี่ยง</span>
-                                        <span className="font-bold text-amber-300 mt-0.5">Auto-Quarantine</span>
+                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
+                                        <span className="text-white/50 font-mono">การกักกัน</span>
+                                        <span className="font-bold text-amber-300">Auto-Quarantine Dome</span>
                                     </div>
-                                    <div className="p-2 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                                        <span className="text-[8px] text-white/40 font-mono uppercase">สถานะข้อมูลสด</span>
-                                        <span className="font-bold text-cyan-300 mt-0.5 flex items-center gap-1">
+                                    <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.04] border border-white/5">
+                                        <span className="text-white/50 font-mono">สถานะข้อมูล</span>
+                                        <span className="font-bold text-cyan-300 flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                            Live Stream
+                                            Live Stream 24/5
                                         </span>
                                     </div>
-                                </div>
-
-                                {/* Bottom guide footer tip */}
-                                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-white/50">
-                                    <span className="flex items-center gap-1 text-amber-300/80">
-                                        <Info className="w-3 h-3 text-amber-400 shrink-0" />
-                                        โหมดแสดงข้อมูลและคำแนะนำ
-                                    </span>
-                                    <span className="text-white/40">แตะที่ใดก็ได้เพื่อปิด</span>
                                 </div>
                             </div>
                         </div>
