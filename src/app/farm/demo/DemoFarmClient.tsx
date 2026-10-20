@@ -1646,8 +1646,8 @@ export default function DemoFarmClient({
                                                 <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#cfa545] flex-shrink-0" />
                                                 <span>Start: {fleetStatsData?.longevity?.startEnglish || 'Feb 2026'}</span>
                                             </span>
-                                            <span className="font-extrabold text-[#ffd700] font-mono">
-                                                {fleetStatsData?.longevity?.shortLabel || `${fleetStatsData?.longevity?.daysRunning || 228}D Active`}
+                                            <span className="font-extrabold text-[#ffd700] font-mono tracking-tight">
+                                                {fleetStatsData?.longevity?.shortLabel || '8M 19D (261d)'}
                                             </span>
                                             <span className="text-emerald-400 font-mono font-bold flex items-center gap-1">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>

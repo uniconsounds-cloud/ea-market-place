@@ -432,10 +432,19 @@ export async function GET() {
         const monthlyReturnPct = Number(((monthlyAvg3M / baseCapital) * 100).toFixed(1));
 
         // 8. Longevity
-        const systemStartTimestamp = new Date('2026-02-01T00:00:00Z').getTime();
+        const systemStartDate = new Date('2026-02-01T00:00:00Z');
+        const systemStartTimestamp = systemStartDate.getTime();
         const daysRunning = Math.max(228, Math.ceil((now.getTime() - systemStartTimestamp) / (1000 * 60 * 60 * 24)));
-        const diffMonths = Math.max(8, (now.getFullYear() - 2026) * 12 + now.getMonth() - 1);
-        const diffDays = Math.max(16, now.getDate());
+        
+        let diffMonths = (now.getUTCFullYear() - 2026) * 12 + (now.getUTCMonth() - 1); // Feb is 1
+        let anchorDate = new Date(Date.UTC(2026, 1 + diffMonths, 1));
+        if (anchorDate > now) {
+            diffMonths--;
+            anchorDate = new Date(Date.UTC(2026, 1 + diffMonths, 1));
+        }
+        const diffDays = Math.max(0, Math.floor((now.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24)));
+        
+        const shortLabel = `${diffMonths}M ${diffDays}D (${daysRunning}d)`;
         const longevityLabel = `${diffMonths} เดือน ${diffDays} วัน (${daysRunning} วัน)`;
 
         // 9. Legacy timeline for bottom crates scroll track (matches synthetic history)
@@ -463,7 +472,7 @@ export async function GET() {
                 daysRunning,
                 longevityLabel,
                 startEnglish: 'Feb 2026',
-                shortLabel: `${daysRunning}D Active`,
+                shortLabel,
                 startDate: '1 ก.พ. 2569',
                 survivalRate: '100%'
             },
