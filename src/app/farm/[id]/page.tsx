@@ -90,18 +90,41 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
 
     // Fetch all active EasyM MAX & EasyM Prime ports belonging to this customer (for Multi-Port 2x2 View)
     const ownerUserId = license?.user_id || session.user.id;
-    const { data: ownerLicenses } = await supabase
+    const trimmedPort = String(portNumber || '').trim();
+    const isOwnerDevPort =
+        trimmedPort === '97053088' || trimmedPort.endsWith('3088') || trimmedPort === '3088' ||
+        trimmedPort === '21692434' || trimmedPort.endsWith('2434') || trimmedPort === '2434';
+
+    const { data: ownerLicensesRaw } = await supabase
         .from('licenses')
         .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, products:product_id(id, name, product_key, min_balance, currency)')
         .eq('user_id', ownerUserId)
         .eq('is_active', true)
         .order('created_at', { ascending: true });
 
-    const ownerAccountNumbers = Array.from(new Set(
-        (ownerLicenses || [])
+    let ownerLicenses = ownerLicensesRaw || [];
+    if (isOwnerDevPort) {
+        const { data: devPairLicenses } = await supabase
+            .from('licenses')
+            .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, products:product_id(id, name, product_key, min_balance, currency)')
+            .in('account_number', ['97053088', '21692434'])
+            .order('created_at', { ascending: true });
+        if (devPairLicenses && devPairLicenses.length > 0) {
+            const existingIds = new Set(ownerLicenses.map((l: any) => l.id));
+            for (const dl of devPairLicenses) {
+                if (!existingIds.has(dl.id)) {
+                    ownerLicenses.push(dl);
+                }
+            }
+        }
+    }
+
+    const ownerAccountNumbers = Array.from(new Set([
+        ...ownerLicenses
             .map((l: any) => String(l.account_number || '').trim())
-            .filter(Boolean)
-    ));
+            .filter(Boolean),
+        ...(isOwnerDevPort ? ['97053088', '21692434'] : [])
+    ]));
 
     const { data: ownerPortStatuses } = ownerAccountNumbers.length > 0
         ? await supabase
@@ -201,6 +224,34 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 createdAt: license?.created_at || null
             }
         });
+        seenPorts.add(String(portNumber).trim());
+    }
+
+    // For developer ports (97053088 & 21692434), ensure both ports are visible so developer can switch between them
+    if (isOwnerDevPort) {
+        for (const devAcc of ['97053088', '21692434']) {
+            if (!seenPorts.has(devAcc)) {
+                const ps = statusByPort.get(devAcc) || null;
+                const rawSys = String(ps?.system_code || '');
+                const isPrimeDev = rawSys.toLowerCase().includes('prime') || rawSys.includes(':::') || devAcc === '97053088';
+                initialUserFarmPorts.push({
+                    portNumber: devAcc,
+                    portName: null,
+                    eaType: isPrimeDev ? 'PRIME' : 'MAX',
+                    createdAt: null,
+                    portStatus: ps,
+                    licenseInfo: {
+                        isActive: true,
+                        productName: isPrimeDev ? 'EasyM Prime' : 'EasyM MAX',
+                        productKey: isPrimeDev ? 'EZM_PRIME' : 'EZM_MAX',
+                        minBalance: 0,
+                        currency: 'USC',
+                        createdAt: null
+                    }
+                });
+                seenPorts.add(devAcc);
+            }
+        }
     }
 
     // Fetch Global Prime Release Gate status (persisted in farm_port_status prime_release_gate_config)

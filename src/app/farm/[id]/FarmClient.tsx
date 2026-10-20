@@ -435,12 +435,18 @@ export default function FarmClient({
 
     // 👑 Owner Developer Sandbox & Customer Release Gate:
     // 1. Only Port 97053088 has access to the Draggable Floating Controller Dock.
-    // 2. Port 21692434 and customer ports act as standard client ports to observe the true released experience.
-    const activePortStr = String(portNumber || initialPortNumber || '');
+    // 2. Port 97053088 (3088) and Port 21692434 (2434) are unlocked for Menu 3 (Multi-Farm 2.5D) and Menu 4 (Interactive Guide).
+    // 3. All other ports lock Menu 3 and Menu 4.
+    const activePortStr = String(portNumber || initialPortNumber || '').trim();
     const isDevPort3088 =
         activePortStr === '97053088' ||
         activePortStr.endsWith('3088') ||
         activePortStr === '3088';
+    const isDevPort2434 =
+        activePortStr === '21692434' ||
+        activePortStr.endsWith('2434') ||
+        activePortStr === '2434';
+    const isAllowedDevMenuPort = isDevPort3088 || isDevPort2434;
     const isOwnerTestPort = isDevPort3088;
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
@@ -457,13 +463,13 @@ export default function FarmClient({
         return initialIsPhase2Released || false;
     });
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
-    const isOwnerDevUser = (isOwnerTestPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
+    const isOwnerDevUser = (isAllowedDevMenuPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
     // 🧪 Simulated Buffer & Threshold for testing dome buffer aura (Dev testing)
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
 
-    // 🧭 Interactive Farm Guide & System Specs Tour (เมนูลูกแก้วที่สี่ - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088)
-    const isOrb4Unlocked = isDevPort3088 && isOwnerDevUser;
+    // 🧭 Interactive Farm Guide & Multi-Port Farm View (ปลดล็อกเฉพาะพอร์ตพัฒนา 3088 และ 2434 เท่านั้น)
+    const isOrb4Unlocked = isAllowedDevMenuPort && isOwnerDevUser;
     const [isFarmGuideActive, setIsFarmGuideActive] = useState<boolean>(false);
     const [expandedGuideBox, setExpandedGuideBox] = useState<number | null>(null);
 
@@ -474,18 +480,36 @@ export default function FarmClient({
 
         const refreshUserFarmPorts = async () => {
             try {
-                const { data: ownerLicenses } = await supabase
+                const { data: ownerLicensesRaw } = await supabase
                     .from('licenses')
                     .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
                     .eq('user_id', ownerUserId)
                     .eq('is_active', true)
                     .order('created_at', { ascending: true });
 
-                if (!ownerLicenses || !isMounted) return;
+                if (!isMounted) return;
 
-                const accNums = Array.from(new Set(
-                    ownerLicenses.map((l: any) => String(l.account_number || '').trim()).filter(Boolean)
-                ));
+                let ownerLicenses = ownerLicensesRaw || [];
+                if (isAllowedDevMenuPort) {
+                    const { data: devPairLicenses } = await supabase
+                        .from('licenses')
+                        .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
+                        .in('account_number', ['97053088', '21692434'])
+                        .order('created_at', { ascending: true });
+                    if (devPairLicenses && devPairLicenses.length > 0) {
+                        const existingIds = new Set(ownerLicenses.map((l: any) => l.id));
+                        for (const dl of devPairLicenses) {
+                            if (!existingIds.has(dl.id)) {
+                                ownerLicenses.push(dl);
+                            }
+                        }
+                    }
+                }
+
+                const accNums = Array.from(new Set([
+                    ...ownerLicenses.map((l: any) => String(l.account_number || '').trim()).filter(Boolean),
+                    ...(isAllowedDevMenuPort ? ['97053088', '21692434'] : [])
+                ]));
 
                 const { data: statuses } = accNums.length > 0
                     ? await supabase.from('farm_port_status').select('*').in('port_number', accNums)
@@ -508,10 +532,10 @@ export default function FarmClient({
                 for (const lic of ownerLicenses) {
                     const accNum = String(lic.account_number || '').trim();
                     if (!accNum || seen.has(accNum)) continue;
-                    if (lic.is_active === false) continue;
+                    if (lic.is_active === false && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
                     if (lic.type !== 'lifetime' && lic.expiry_date) {
                         const expMs = new Date(lic.expiry_date).getTime();
-                        if (expMs <= nowMs && accNum !== String(portNumber).trim()) continue;
+                        if (expMs <= nowMs && accNum !== String(portNumber).trim() && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
                     }
 
                     const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
@@ -564,6 +588,32 @@ export default function FarmClient({
                     });
                 }
 
+                if (isAllowedDevMenuPort) {
+                    for (const devAcc of ['97053088', '21692434']) {
+                        if (!seen.has(devAcc)) {
+                            const ps = statusMap.get(devAcc) || (devAcc === String(portNumber).trim() ? portStatus : null);
+                            const rawSys = String(ps?.system_code || '');
+                            const isPrimeDev = rawSys.toLowerCase().includes('prime') || rawSys.includes(':::') || devAcc === '97053088';
+                            nextPorts.push({
+                                portNumber: devAcc,
+                                portName: null,
+                                eaType: isPrimeDev ? 'PRIME' : 'MAX',
+                                createdAt: null,
+                                portStatus: ps || null,
+                                licenseInfo: {
+                                    isActive: true,
+                                    productName: isPrimeDev ? 'EasyM Prime' : 'EasyM MAX',
+                                    productKey: isPrimeDev ? 'EZM_PRIME' : 'EZM_MAX',
+                                    minBalance: 0,
+                                    currency: 'USC',
+                                    createdAt: null
+                                }
+                            });
+                            seen.add(devAcc);
+                        }
+                    }
+                }
+
                 if (nextPorts.length > 0 && isMounted) {
                     setUserFarmPorts(nextPorts);
                 }
@@ -574,7 +624,7 @@ export default function FarmClient({
 
         refreshUserFarmPorts();
         return () => { isMounted = false; };
-    }, [isMultiFarmView, ownerUserId, portNumber, portStatus]);
+    }, [isMultiFarmView, ownerUserId, portNumber, portStatus, isAllowedDevMenuPort]);
 
     const handleSelectMultiFarmPort = async (target: {
         portNumber: string;
@@ -2703,16 +2753,26 @@ export default function FarmClient({
                     className="relative transition-all duration-500 ease-out origin-center"
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
                 >
-                    {isMultiFarmView ? (
+                    {isMultiFarmView && isOrb4Unlocked ? (
                         /* ═══════════════════════════════════════════════════════════════════ */
-                        /* 🌐 ORB 3: MULTI-PORT 2x2 FARM VIEW (แสดงฟาร์มหลายพอร์ต 4 ฟาร์มแบบ 2x2) */
+                        /* 🌐 ORB 3: MULTI-PORT 2.5D DIAMOND FARM VIEW (เรียงรูปข้าวหลามตัด 4 ฟาร์ม) */
+                        /*   Slot 0: ตรงกลางบน   (fc=0, fr=0) -> offsetX = 0,          offsetY = -FARM_STEP_Y */
+                        /*   Slot 1: เยื้องมาทางซ้าย (fc=0, fr=1) -> offsetX = -FARM_STEP_X, offsetY = 0          */
+                        /*   Slot 2: เยื้องมาทางขวา (fc=1, fr=0) -> offsetX = +FARM_STEP_X, offsetY = 0          */
+                        /*   Slot 3: ข้างล่างตรงกลาง (fc=1, fr=1) -> offsetX = 0,          offsetY = +FARM_STEP_Y */
                         /* ═══════════════════════════════════════════════════════════════════ */
                         <div className="absolute left-1/2 top-1/2">
                             {Array.from({ length: 4 }).map((_, slotIdx) => {
-                                const col = slotIdx % 2;
-                                const row = Math.floor(slotIdx / 2);
-                                const offsetX = col === 0 ? -268 : 268;
-                                const offsetY = row === 0 ? -176 : 176;
+                                // 2.5D Isometric Diamond Grid (2:1 isometric ratio matching TILE_W=104, TILE_H_OFFSET=52)
+                                const FARM_STEP_X = 224;
+                                const FARM_STEP_Y = 112;
+                                const diamondCoords = [
+                                    { fc: 0, fr: 0, offsetX: 0,            offsetY: -FARM_STEP_Y, baseZ: 30 }, // ฟาร์มที่ 1: ตรงกลางบน
+                                    { fc: 0, fr: 1, offsetX: -FARM_STEP_X, offsetY: 0,            baseZ: 40 }, // ฟาร์มที่ 2: เยื้องมาทางซ้าย
+                                    { fc: 1, fr: 0, offsetX: FARM_STEP_X,  offsetY: 0,            baseZ: 40 }, // ฟาร์มที่ 3: เยื้องมาทางขวา
+                                    { fc: 1, fr: 1, offsetX: 0,            offsetY: FARM_STEP_Y,  baseZ: 50 }, // ฟาร์มที่ 4: ข้างล่างตรงกลาง
+                                ][slotIdx];
+
                                 const activePort = userFarmPorts[slotIdx] || null;
                                 const isActive = Boolean(activePort);
                                 const isCurrentPort = isActive && String(activePort?.portNumber) === String(portNumber);
@@ -2721,105 +2781,125 @@ export default function FarmClient({
                                     <div
                                         key={`multi_farm_slot_${slotIdx}`}
                                         style={{
-                                            left: `${offsetX}px`,
-                                            top: `${offsetY}px`,
-                                            zIndex: 30 + row * 10 + col
+                                            left: `${diamondCoords.offsetX}px`,
+                                            top: `${diamondCoords.offsetY}px`,
+                                            zIndex: diamondCoords.baseZ
                                         }}
-                                        className="absolute"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (activePort) {
+                                                handleSelectMultiFarmPort(activePort);
+                                            }
+                                        }}
+                                        className={`absolute select-none ${
+                                            isActive
+                                                ? 'cursor-pointer group hover:z-[90]'
+                                                : 'pointer-events-none'
+                                        }`}
+                                        title={isActive ? `คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${activePort?.portNumber}` : 'พอร์ตยังไม่ได้เปิดใช้งาน (Inactive)'}
                                     >
-                                        <div
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (activePort) {
-                                                    handleSelectMultiFarmPort(activePort);
-                                                }
-                                            }}
-                                            style={{ transform: 'scale(0.40)', transformOrigin: 'center center' }}
-                                            className={`relative transition-all duration-300 select-none ${
-                                                isActive
-                                                    ? 'cursor-pointer group hover:scale-[0.425]'
-                                                    : 'pointer-events-none'
-                                            }`}
-                                            title={isActive ? `คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${activePort?.portNumber}` : 'พอร์ตยังไม่ได้เปิดใช้งาน (Inactive)'}
-                                        >
-                                            <div className={`absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px] ${
-                                                isActive ? 'animate-float-farm' : 'grayscale contrast-75 brightness-75 opacity-35'
-                                            }`}>
-                                                {/* 25 Isometric Trees of this Mini-Farm */}
-                                                {Array.from({ length: 25 }).map((__, i) => {
-                                                    const c = i % 5;
-                                                    const r = Math.floor(i / 5);
-                                                    const tZIndex = (c + r) + 20;
-                                                    return (
-                                                        <div
-                                                            key={`mini_tile_${slotIdx}_${i}`}
-                                                            className="absolute"
-                                                            style={{
-                                                                left: `${(c - r) * TILE_W}px`,
-                                                                top: `${(c + r) * TILE_H_OFFSET}px`,
-                                                                zIndex: tZIndex,
-                                                                width: '280px',
-                                                                height: '280px'
-                                                            }}
-                                                        >
-                                                            {isClient && (
-                                                                <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
-                                                                    <Image
-                                                                        src="/farm/base_tree_new.png"
-                                                                        alt="Farm Tree"
-                                                                        fill
-                                                                        className="object-contain object-bottom drop-shadow-2xl"
-                                                                        unoptimized
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
+                                        {/* Stationary isometric hit-area so hovering anywhere on the farm lifts smoothly without edge-jitter */}
+                                        {isActive && (
+                                            <div
+                                                style={{
+                                                    width: '250px',
+                                                    height: '250px',
+                                                    transform: 'translate(-50%, -50%) scaleY(0.5) rotate(45deg)'
+                                                }}
+                                                className="absolute left-0 top-0 z-[200] bg-transparent"
+                                            />
+                                        )}
 
-                                                {/* 🏷️ Center Port Number Plaque on each of the 4 Farms */}
-                                                <div
-                                                    style={{
-                                                        left: `${(2 - 2) * TILE_W}px`,
-                                                        top: `${(2 + 2) * TILE_H_OFFSET}px`,
-                                                        zIndex: 150,
-                                                        width: '280px',
-                                                        height: '280px'
-                                                    }}
-                                                    className="absolute pointer-events-none"
-                                                >
-                                                    {isActive && activePort ? (
-                                                        <div
-                                                            style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                            className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-3 rounded-2xl bg-[#051811]/92 backdrop-blur-md border-2 transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
-                                                                isCurrentPort
-                                                                    ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white'
-                                                                    : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-300 group-hover:shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)]'
-                                                            }`}
-                                                        >
-                                                            <div className="flex items-center gap-2 mb-0.5">
-                                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                                                                <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
-                                                                    {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
+                                        {/* Hover-lift wrapper: ยกพื้นที่ฟาร์มขึ้นมานิดหน่อยเมื่อเอาเมาส์วาง */}
+                                        <div
+                                            className={`relative transition-all duration-300 ease-out ${
+                                                isActive
+                                                    ? 'group-hover:-translate-y-4 group-hover:scale-[1.05] group-active:translate-y-0 group-active:scale-[0.99]'
+                                                    : ''
+                                            }`}
+                                        >
+                                            <div style={{ transform: 'scale(0.34)', transformOrigin: 'center center' }} className="relative">
+                                                <div className={`relative transition-all duration-300 ${
+                                                    isActive
+                                                        ? 'animate-float-farm group-hover:drop-shadow-[0_26px_32px_rgba(16,185,129,0.55)]'
+                                                        : 'grayscale contrast-75 brightness-75 opacity-35'
+                                                }`}>
+                                                    {/* 25 Isometric Trees of this Mini-Farm centered around (c=2, r=2) */}
+                                                    {Array.from({ length: 25 }).map((__, i) => {
+                                                        const c = i % 5;
+                                                        const r = Math.floor(i / 5);
+                                                        const tZIndex = (c + r) + 20;
+                                                        return (
+                                                            <div
+                                                                key={`mini_tile_${slotIdx}_${i}`}
+                                                                className="absolute"
+                                                                style={{
+                                                                    left: `${(c - r) * TILE_W - 140}px`,
+                                                                    top: `${(c + r - 4) * TILE_H_OFFSET - 185}px`,
+                                                                    zIndex: tZIndex,
+                                                                    width: '280px',
+                                                                    height: '280px'
+                                                                }}
+                                                            >
+                                                                {isClient && (
+                                                                    <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                                                        <Image
+                                                                            src="/farm/base_tree_new.png"
+                                                                            alt="Farm Tree"
+                                                                            fill
+                                                                            className="object-contain object-bottom drop-shadow-2xl"
+                                                                            unoptimized
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+
+                                                    {/* 🏷️ Center Port Number Plaque on each of the 4 Farms */}
+                                                    <div
+                                                        style={{
+                                                            left: '-140px',
+                                                            top: '-185px',
+                                                            zIndex: 150,
+                                                            width: '280px',
+                                                            height: '280px'
+                                                        }}
+                                                        className="absolute pointer-events-none"
+                                                    >
+                                                        {isActive && activePort ? (
+                                                            <div
+                                                                style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                                className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-3 rounded-2xl bg-[#051811]/92 backdrop-blur-md border-2 transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
+                                                                    isCurrentPort
+                                                                        ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white group-hover:scale-105'
+                                                                        : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-200 group-hover:scale-105 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.95),0_0_32px_rgba(16,185,129,0.85)]'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2 mb-0.5">
+                                                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                                                                    <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
+                                                                        {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
+                                                                    {activePort.portNumber}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                                className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-2.5 rounded-2xl bg-slate-950/85 border border-slate-500/40 shadow-[0_10px_25px_rgba(0,0,0,0.85)] flex flex-col items-center justify-center text-center whitespace-nowrap"
+                                                            >
+                                                                <span className="text-[14px] font-mono font-bold tracking-[0.22em] text-slate-300/75 uppercase">
+                                                                    INACTIVE
+                                                                </span>
+                                                                <span className="text-[12px] text-slate-400/70 mt-0.5">
+                                                                    ยังไม่ได้เปิดใช้งาน
                                                                 </span>
                                                             </div>
-                                                            <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                                                                {activePort.portNumber}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div
-                                                            style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                            className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-2.5 rounded-2xl bg-slate-950/85 border border-slate-500/40 shadow-[0_10px_25px_rgba(0,0,0,0.85)] flex flex-col items-center justify-center text-center whitespace-nowrap"
-                                                        >
-                                                            <span className="text-[14px] font-mono font-bold tracking-[0.22em] text-slate-300/75 uppercase">
-                                                                INACTIVE
-                                                            </span>
-                                                            <span className="text-[12px] text-slate-400/70 mt-0.5">
-                                                                ยังไม่ได้เปิดใช้งาน
-                                                            </span>
-                                                        </div>
-                                                    )}
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
