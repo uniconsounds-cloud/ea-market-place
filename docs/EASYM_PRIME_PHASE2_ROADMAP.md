@@ -17,6 +17,7 @@
 3. **การปรับแต่งแดชบอร์ดบนกราฟ MT5 (MT5 On-Chart HUD Polish):** ปรับชื่อตัด Universal, เพิ่ม Table F แสดงข้อความแจ้งเตือนเต็มแถวเดี่ยว, ตรวจจับ Manual Trades และคู่เงินตกค้าง
 4. **สถาปัตยกรรมกู้ภัยระดับสูง (Tier-3 State-Driven Rescue Slicing):** สลับมาตัดไม้กู้ภัยชุด 1 ที่ติดดอยทิ้งก่อน เมื่อเริ่มงัด Tier 3 มาใช้งาน
 5. **ระบบส่งสถิติจังหวะปิดรวบราคาแยกรายคู่เงิน (Pair Basket Closure Telemetry):** ยิง Event ส่งชื่อคู่เงิน, จำนวนไม้, Lots, และกำไรทันทีที่ปิดตะกร้าสำเร็จ
+6. **ระบบถ่ายทอดสดออเดอร์รายไม้แบบ On-Demand (On-Demand Live Trade Streaming):** สตรีมตารางออเดอร์สดเหมือนแท็บ Trade ใน MT5 (ทำงานเฉพาะตอนลูกค้าเปิดหน้าฟาร์มดูสด ไม่เปลือง Bandwidth/Database)
 
 *(หมายเหตุ: ส่วนการพัฒนาหน้าเว็บ Farm UI จะดำเนินการแยกต่างหาก โดยมีข้อกำหนดความสอดคล้องระบุไว้ในหมวด "ข้อกำหนดการปรับปรุงหน้าเว็บฟาร์ม")*
 
@@ -196,6 +197,23 @@ flowchart TD
 
 ---
 
+## ⚡ เสาหลักที่ 6: ระบบถ่ายทอดสดออเดอร์รายไม้แบบ On-Demand (On-Demand Live Trade Streaming Engine)
+
+### 6.1 วัตถุประสงค์และประโยชน์ฝั่ง EA
+* **ปัญหาเดิม:** ลูกค้าต้องการตรวจสอบสถานะออเดอร์ที่เปิดอยู่จริงแบบรายตั๋ว (Ticket) เหมือนหน้าต่าง Trade ของ MT5 บนมือถือหรือหน้าเว็บ แต่หากให้ EA ส่งข้อมูลไม้ย่อยตลอดเวลาจะเปลือง CPU, Bandwidth และ Database Write IOPS
+* **ข้อกำหนดในตัว EA:**
+  * **สภาวะ On-Demand (Presence-Based Trigger):** EA จะตรวจสอบค่า `viewer_active` จากผลตอบกลับของ Heartbeat
+    - หาก `viewer_active == true` (มีลูกค้าเปิดหน้าฟาร์มดูสดอยู่):
+      - EA จะวนลูปอ่าน `PositionsTotal()` และ `PositionGetTicket()`
+      - ดึงข้อมูล: Ticket, Open Time, Symbol, Type (Buy/Sell), Lots, Open Price, Current Price, S/L, T/P, Swap, P/L
+      - แพ็กรวมเป็น JSON Snapshot ก้อนเดียว `live_orders: [...]` (ขนาดเพียง ~4-6 KB)
+      - แนบส่งไปกับ Payload ทุกๆ 10-15 วินาที
+    - หาก `viewer_active == false` (ลูกค้าปิดหน้าเว็บหรือสลับแท็บเกิน 2 นาที):
+      - EA จะ **ตัดการอ่านและหยุดส่งข้อมูลไม้ย่อยสดทันที**
+      - สลับกลับสู่โหมดจำศีล (Sleep Standby 180s) ประหยัดทรัพยากรเครื่อง VPS 100%
+
+---
+
 ## 🌐 ข้อกำหนดการปรับปรุงหน้าเว็บฟาร์มเพื่อรองรับและสอดคล้องกับ EA เวอร์ชันใหม่ (Website & Farm UI Alignment Specification)
 
 > **หมายเหตุ:** ส่วนนี้เป็นแผนการพัฒนาฝั่ง **Web Dashboard (Next.js / Supabase)** ซึ่งดำเนินการแยกต่างหากจากตัว EA แต่ต้องออกแบบให้สอดคล้องและเชื่อมโยงกับฟังก์ชันใหม่ของ EA ดังนี้:
@@ -226,6 +244,13 @@ flowchart TD
 ### 5. เชื่อมต่อไซโลเสบียงแก้วและเขื่อนพลังงาน (Golden Silo & Bio-Shield Integration)
 * นำค่า `buf_pct` (Buffer %), `relief_budget`, และ `relief_cap` จาก Telemetry ของ EA มาผูกเข้ากับกราฟิก **ไซโลเสบียงแก้วทองคำ (Golden Silo)** และ **เขื่อนพลังงานกั้นพายุ (Bio-Shield Gauge)** บนหน้าฟาร์ม
 
+### 6. คอมโพเนนต์ Live Terminal (MT5 Trade Tab Emulator & Pair Positions Drill-down)
+* **หน้าต่าง Live Terminal:**
+  - เมื่อคลิกดู *"ไม้สด (Live Trades)"* จะเปิด Modal แสดงตารางเหมือนหน้าต่าง Trade ของ MT5:
+    `Ticket #` | `Time` | `Pair` | `Type (Buy/Sell)` | `Lots` | `Open Price` | `Current Price` | `S/L` | `T/P` | `Swap` | `Profit (USD/USC)`
+  - รองรับการกรองดูเฉพาะคู่เงินที่สนใจ หรือดูภาพรวมทั้งพอร์ต
+* **การบันทึกในฐานข้อมูล:** จัดเก็บเป็น JSONB ก้อนเดียวในฟิลด์ `farm_port_status.live_orders` (1 DB Write ต่อรอบ ป้องกัน Database บวม)
+
 ---
 
 ## 📋 แผนงานและขั้นตอนการลงมือพัฒนา (Implementation Checklist)
@@ -249,6 +274,8 @@ flowchart TD
 - [ ] **ระบบ Two-Way Remote Command & Harvest Telemetry**
   - [ ] เพิ่มฟังก์ชันรับและประมวลผลคำสั่งระยะไกล `ProcessRemoteWebCommands()`
   - [ ] เชื่อมต่อ Trigger ในฟังก์ชันปิดตะกร้า: เรียก `EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, orders_count, total_lots, realized_pnl)`
+- [ ] **ระบบ On-Demand Live Trade Streaming (MT5 Trade Tab)**
+  - [ ] เพิ่มฟังก์ชัน `BuildLiveOrdersJsonSnapshot()` รวบรวมไม้ย่อยสดส่งขึ้น Cloud (ทำงานเฉพาะเมื่อ `viewer_active == true`)
 
 ---
 
@@ -256,15 +283,18 @@ flowchart TD
 - [ ] **Database & API Routes**
   - [ ] สร้างตาราง `farm_remote_commands` ใน Supabase
   - [ ] เพิ่มคอลัมน์ `symbol TEXT` ในตาราง `farm_batch_events` พร้อม Index `(port_number, symbol)`
+  - [ ] เพิ่มคอลัมน์ `live_orders JSONB` ในตาราง `farm_port_status`
   - [ ] ตรวจสอบฟังก์ชัน Auto-cleanup 90 วัน `cleanup_old_farm_data()`
   - [ ] สร้าง API Route `/api/farm/command/send` และ `/api/farm/command/poll`
   - [ ] ปรับปรุง `/api/sync-dashboard` ให้รับฟิลด์ `symbol` ลงใน `farm_batch_events`
+  - [ ] ปรับปรุง `/api/sync-dashboard` ให้รับฟิลด์ `live_orders` (เฉพาะเมื่อ `viewer_active == true`)
 - [ ] **Farm Frontend UI Components**
   - [ ] เปิดสวิตช์ปุ่ม interactive ใน Orb 2 ให้ส่งคำสั่งเข้า API
   - [ ] เพิ่ม News Indicator แสดงไอคอนข่าวกล่องแดงบนคู่เงินในหน้าฟาร์ม
   - [ ] เพิ่มการแสดงผลเตือน Legacy Baskets & External Orders Warning จาก Table F
   - [ ] พัฒนาคอมโพเนนต์ **Real-time Harvest Feed & Top Pairs Leaderboard**
   - [ ] เชื่อมต่อกราฟิก Golden Silo (Relief Fund) และ Bio-Shield Gauge (Buffer)
+  - [ ] พัฒนาหน้าต่าง **Live Terminal Modal (MT5 Trade Tab Emulator)** แสดงออเดอร์สดจากฟิลด์ `live_orders`
 
 ---
 *บันทึกโดย: Antigravity AI Pair Programmer & System Architect*  

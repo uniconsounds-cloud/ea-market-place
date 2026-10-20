@@ -22,7 +22,7 @@
 
 ใน **Prime Phase 1** เราประสบความสำเร็จในการสร้างระบบแสดงผลฟาร์ม 20 คู่เงินแบบเรียลไทม์ (2.5D Farm HUD, โดมกักกัน, ลูกแก้ว DD Dial, ปรอทวัดความเสี่ยง, และระบบ Realtime Telemetry) ควบคุมผ่าน Release Gate ได้อย่างเสถียร
 
-ใน **Prime Phase 2 (OCT26)** เราจะยกระดับความสามารถของระบบขึ้นอีกขั้น โดยมุ่งเน้นไปที่ **การปกป้องพอร์ตเชิงรุก (Proactive Defense)**, **การสื่อสารสองทิศทาง (Two-Way Remote Control)**, และ **การเก็บสถิติการปิดรวบราคาแยกรายคู่เงิน (Granular Harvest Analytics)** เพื่อให้ทั้งฝั่ง EA บนเครื่อง MT5 และหน้าเว็บฟาร์มทำงานสอดประสานกัน 100%
+ใน **Prime Phase 2 (OCT26)** เราจะยกระดับความสามารถของระบบขึ้นอีกขั้น โดยมุ่งเน้นไปที่ **การปกป้องพอร์ตเชิงรุก (Proactive Defense)**, **การสื่อสารสองทิศทาง (Two-Way Remote Control)**, **การเก็บสถิติการปิดรวบราคาแยกรายคู่เงิน (Granular Harvest Analytics)**, และ **การถ่ายทอดสดออเดอร์รายไม้แบบ On-Demand (Live Trade Terminal)** เพื่อให้ทั้งฝั่ง EA บนเครื่อง MT5 และหน้าเว็บฟาร์มทำงานสอดประสานกัน 100%
 
 ```mermaid
 graph TD
@@ -32,12 +32,13 @@ graph TD
         EA_HUD["3. On-Chart HUD Upgrade (Table F & Unified Name)"]
         EA_Rescue["4. Tier-3 Triggered Rescue Slicing"]
         EA_Harvest["5. Pair Batch Close Telemetry (TP Event)"]
+        EA_LiveTrade["6. On-Demand Live Trade Stream (Presence-Based)"]
     end
 
     subgraph CLOUD_API["☁️ 2. Cloud Data Broker & Database"]
         DB_Queue[("farm_remote_commands<br/>(Command Queue)")]
         DB_Batch[("farm_batch_events<br/>(90-Day Harvest History)")]
-        DB_Status[("farm_port_status<br/>(Live Telemetry & Settings)")]
+        DB_Status[("farm_port_status<br/>(Live Telemetry & live_orders JSON)")]
     end
 
     subgraph WEB_UI["💻 3. Web Dashboard & Farm Cockpit (Alignment)"]
@@ -46,6 +47,7 @@ graph TD
         WEB_Alert["3. Table F Alert Banner Mirroring"]
         WEB_Rescue["4. Dynamic Dome & Rescue Tier State"]
         WEB_Harvest["5. Realtime Harvest Feed & Top 5 Rankings"]
+        WEB_LiveTrade["6. Live Terminal Modal (MT5 Trade View)"]
     end
 
     EA_Command <-->|Polling / Execution| DB_Queue
@@ -62,6 +64,10 @@ graph TD
 
     EA_Harvest -->|Instant BATCH_CLOSE Event| DB_Batch
     DB_Batch -->|Realtime Stream| WEB_Harvest
+
+    EA_LiveTrade -->|Snapshot JSON (viewer_active only)| DB_Status
+    DB_Status -->|Realtime Table Stream| WEB_LiveTrade
+```
 ```
 
 ---
@@ -128,6 +134,21 @@ graph TD
 
 ---
 
+### ⚡ เสาหลักที่ 6: ระบบถ่ายทอดสดออเดอร์รายไม้แบบ On-Demand (On-Demand Live Trade Streaming Engine)
+* **ปัญหาและที่มา:** ลูกค้าต้องการตรวจสอบสถานะออเดอร์ที่เปิดอยู่จริงแบบรายตั๋ว (Ticket) เหมือนหน้าต่าง Trade ของ MT5 บนมือถือหรือหน้าเว็บ แต่หากให้ EA ส่งข้อมูลไม้ย่อยตลอดเวลาจะเปลือง CPU, Bandwidth และ Database Write IOPS
+* **กลไกการทำงานของ EA:**
+  1. **สภาวะ On-Demand (Presence-Based Trigger):** EA จะตรวจสอบค่า `viewer_active` จากผลตอบกลับของ Heartbeat
+     - หาก `viewer_active == true` (มีลูกค้าเปิดหน้าฟาร์มดูสดอยู่):
+       - EA จะวนลูปอ่าน `PositionsTotal()` และ `PositionGetTicket()`
+       - ดึงข้อมูล: Ticket, Open Time, Symbol, Type (Buy/Sell), Lots, Open Price, Current Price, S/L, T/P, Swap, P/L
+       - แพ็กรวมเป็น JSON Snapshot ก้อนเดียว เช่น `live_orders: [...]` (ขนาดเพียง ~4-6 KB)
+       - แนบส่งไปกับ Payload ทุกๆ 10-15 วินาที
+     - หาก `viewer_active == false` (ลูกค้าปิดหน้าเว็บหรือสลับแท็บเกิน 2 นาที):
+       - EA จะ **ตัดการอ่านและหยุดส่งข้อมูลไม้ย่อยสดทันที**
+       - สลับกลับสู่โหมดจำศีล (Sleep Standby 180s) ประหยัดทรัพยากรเครื่อง VPS 100%
+
+---
+
 ## 3. ตารางความสอดคล้องฝั่งหน้าเว็บ (Web Alignment Matrix by EA Feature)
 
 ตารางนี้เป็นเกณฑ์กำหนดให้ทีมพัฒนาหน้าเว็บสร้างคอมโพเนนต์และตรรกะให้สอดรับกับแต่ละฟังก์ชันของ EA โดยตรง:
@@ -139,6 +160,7 @@ graph TD
 | **3** | **On-Chart Table F Alert** | ส่งสตริงข้อความแจ้งเตือน Table F และระดับความรุนแรง (Severity) | นำข้อความแจ้งเตือนมาแสดงเป็น Top Farm Banner สไตล์ Sci-Fi HUD | แจ้งเตือนทันทีหากมีคนเทรดมือ หรือมีคู่เงินเก่าค้างพอร์ต |
 | **4** | **Tier-3 Rescue Slicing** | ส่งสถานะ `rescue_tier` (1, 2, 3) และจำนวนไม้กู้ภัยที่ถูกตัดทอน | ปรับกราฟิกรัศมีของโดมกักกัน (Energy Dome) และไอคอนไม้สไนเปอร์ตาม Tier | เห็นชัดเจนว่าระบบกำลังกู้ภัยระดับไหน และกำลังตัดไม้ดอยตัวใด |
 | **5** | **Pair Basket Telemetry** | ยิง Event `BATCH_CLOSE` ระบุ `sym`, `orders`, `lots`, `profit` | ดึงข้อมูลจาก `farm_batch_events` มาแสดง **Realtime Harvest Feed** และ **Top 5 Pairs Ranking** | ผู้ใช้เห็นฟีดการเก็บเกี่ยวสดตลอดวัน และรู้ว่าคู่ไหนทำเงินสูงสุด |
+| **6** | **On-Demand Live Trades** | ส่ง Snapshot JSON `live_orders: [...]` ทุก 10-15s (เฉพาะตอนมีคนดู) | พัฒนาหน้าต่าง **Live Terminal Modal (MT5 Trade Tab Emulator)** และคลี่ดูรายคู่ | ผู้ใช้เห็นราคาเปิด กำไร และทุกล็อตสดๆ แบบเดียวกับหน้าจอ MT5 |
 
 ---
 
@@ -177,6 +199,15 @@ graph TD
 * นำข้อมูล Telemetry ที่ EA ส่งขึ้นมา (Buffer %, Relief Budget, Relief Cap) มาผูกเข้ากับกราฟิก:
   - **ไซโลเสบียงแก้วทองคำ (Golden Silo):** แสดงหลอดระดับกองทุนที่สะสมไว้ช่วยเหลือพอร์ต
   - **เขื่อนพลังงานกั้นพายุ (Bio-Shield Gauge):** แสดงเกราะบัฟเฟอร์พลังงานแบบเรียลไทม์
+
+### 4.6 คอมโพเนนต์ Live Terminal & Pair Position Drill-down (MT5 Trade Tab Emulator)
+* **หน้าต่าง Live Terminal:**
+  - เมื่อคลิกดู *"ไม้สด (Live Trades)"* จะเปิด Modal แสดงตารางเหมือนหน้าต่าง Trade ของ MT5:
+    `Ticket #` | `Time` | `Pair` | `Type (Buy/Sell)` | `Lots` | `Open Price` | `Current Price` | `S/L` | `T/P` | `Swap` | `Profit (USD/USC)`
+  - มีตัวกรอง (Filter) สลับดูเฉพาะคู่เงินที่สนใจ หรือดูภาพรวมทั้งพอร์ต
+* **การคลี่ดูไม้ย่อยในตารางการ์ดคู่เงิน:**
+  - คลิกที่การ์ดคู่เงินเพื่อคลี่ดูไม้ที่กำลังเปิดอยู่ของคู่นั้น พร้อมเส้นแสดงจุดเข้าเฉลี่ย (Break-even TP)
+* **การบันทึกในฐานข้อมูล:** จัดเก็บเป็น JSONB ก้อนเดียวในฟิลด์ `farm_port_status.live_orders` (1 DB Write ต่อรอบ ป้องกัน Database บวม)
 
 ---
 
@@ -227,6 +258,32 @@ BEGIN
     WHERE event_timestamp < NOW() - INTERVAL '90 days';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- เพิ่มคอลัมน์ live_orders แบบ JSONB ใน farm_port_status (เก็บออเดอร์สดก้อนเดียว ไม่เปลือง Table แยก)
+ALTER TABLE public.farm_port_status ADD COLUMN IF NOT EXISTS live_orders JSONB DEFAULT '[]'::jsonb;
+```
+
+### 5.3 สัญญาณ Live Orders Snapshot (On-Demand เท่านั้น)
+* **เงื่อนไข:** แนบส่งมาใน Payload เฉพาะเมื่อ `viewer_active == true`
+* **JSON Schema:**
+```json
+{
+  "live_orders": [
+    {
+      "ticket": 110823456,
+      "time": "2026-10-19 14:20:00",
+      "symbol": "GBPJPY",
+      "type": "BUY",
+      "lot": 0.20,
+      "open_price": 194.250,
+      "current_price": 193.850,
+      "sl": 0.0,
+      "tp": 194.650,
+      "swap": -1.20,
+      "pnl": -80.00
+    }
+  ]
+}
 ```
 
 ---
@@ -243,8 +300,9 @@ flowchart LR
 
 ### 🔹 Stage 1: เตรียมฐานข้อมูลและ API (Database & API Preparation)
 - [ ] รันคำสั่ง SQL เพิ่มคอลัมน์ `symbol TEXT` ในตาราง `farm_batch_events`
+- [ ] เพิ่มคอลัมน์ `live_orders JSONB` ในตาราง `farm_port_status`
 - [ ] สร้างตาราง `farm_remote_commands` สำหรับรองรับคำสั่ง 2 ทิศทาง
-- [ ] ปรับปรุง `/api/sync-dashboard` ให้รับค่า `symbol` และบันทึกลงฐานข้อมูล
+- [ ] ปรับปรุง `/api/sync-dashboard` ให้รับค่า `symbol` และรับ `live_orders` (เฉพาะเมื่อ `viewer_active == true`)
 - [ ] สร้าง Endpoint `/api/farm/command/send` และ `/api/farm/command/poll`
 
 ### 🔹 Stage 2: พัฒนาโค้ดฝั่งตัว EA (EA Core Engine Coding - MQL5)
@@ -256,6 +314,7 @@ flowchart LR
 - [ ] ปรับปรุงฟังก์ชัน `TrimOneToxicTicket()` เพิ่มตรรกะสลับตัดไม้กู้ภัยชุดที่ 1 เมื่อเข้าสู่ Tier 3
 - [ ] เพิ่มคำสั่ง `EAE_WebSyncTriggerEvent("BATCH_CLOSE", sym, ...)` ในจังหวะ Take Profit แต่ละคู่เงิน
 - [ ] เพิ่มฟังก์ชัน `ProcessRemoteWebCommands()` ดึงคำสั่งจาก Cloud ไปปฏิบัติการ
+- [ ] เพิ่มฟังก์ชัน `BuildLiveOrdersJsonSnapshot()` รวบรวมไม้ย่อยสดส่งขึ้น Cloud (ทำงานเฉพาะเมื่อ `viewer_active == true`)
 
 ### 🔹 Stage 3: พัฒนาหน้าเว็บฟาร์มให้สอดรับ (Farm Web UI Alignment)
 - [ ] เชื่อมต่อปุ่มใน Orb 2 ส่งคำสั่งเข้า Database พร้อม Modal กดยืนยัน
@@ -263,12 +322,15 @@ flowchart LR
 - [ ] ดึงข้อความจาก Table F มาแสดงเป็น Banner แจ้งเตือนที่หัวฟาร์ม
 - [ ] พัฒนาคอมโพเนนต์ **Realtime Harvest Feed** และ **Top 5 Pairs Ranking**
 - [ ] ผูกข้อมูล Telemetry เข้ากับไซโลเสบียง (Golden Silo) และเกราะพลังงาน (Bio-Shield)
+- [ ] พัฒนาหน้าต่าง **Live Terminal Modal (MT5 Trade Tab Emulator)** แสดงออเดอร์สดจากฟิลด์ `live_orders`
 
 ### 🔹 Stage 4: การทดสอบบนพอร์ตพัฒนา (Verification on Port 3088)
 - [ ] รัน EA ตัวทดสอบบนพอร์ตพัฒนา **97053088**
 - [ ] ทดสอบคลิกเปลี่ยนโหมดคู่เงินจากหน้าเว็บ แล้วดูผลตอบรับบน MT5
 - [ ] ทดสอบจำลองสถานะข่าวกล่องแดงและการหยุดออกไม้
 - [ ] ทดสอบปิดรวบราคา แล้วตรวจดูการเด้งขึ้นของ Harvest Feed บนหน้าเว็บ
+- [ ] ทดสอบเปิดหน้าเว็บฟาร์ม แล้วตรวจดูว่าตาราง Live Terminal สตรีมไม้ย่อยสดจาก MT5 ตรงกันแบบ Real-time
+- [ ] ทดสอบปิดแท็บหน้าเว็บ แล้วตรวจดูว่า EA สลับตัดการส่งไม้ย่อยสดกลับสู่ Sleep Standby ภายใน 2 นาทีจริง
 - [ ] ตรวจเช็กการแสดงผล Table F บนหน้าจอ MT5
 
 ### 🔹 Stage 5: ปล่อยใช้งานจริงผ่าน Release Gate (Production Deployment)
