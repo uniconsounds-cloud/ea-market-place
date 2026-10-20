@@ -2668,32 +2668,39 @@ export default function FarmClient({
                                             transformOrigin: 'bottom center'
                                         }}
                                     >
-                                        {/* 🏷️ กล่องอธิบายที่ 2: ชี้ไปที่กรอบแสดง Active DD */}
+                                        {/* 🏷️ กล่องอธิบายที่ 2: ชี้เยื้องไปที่กรอบแสดง Active DD (เยื้องขึ้นทางขวาบน + เส้นทแยงชี้ลงซ้าย ↙) */}
                                         {isOrb4Unlocked && isFarmGuideActive && (
                                             <div 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setExpandedGuideBox(prev => prev === 2 ? null : 2);
                                                 }}
-                                                className={`absolute left-full top-[26px] -translate-y-1/2 flex items-center pl-1 cursor-pointer select-none transition-all duration-300 origin-left ${
-                                                    expandedGuideBox === 2 ? 'scale-[1.35] z-[99999]' : 'scale-100 hover:scale-105 z-[9999]'
+                                                style={{
+                                                    transform: `scale(${(scale > 0 ? 1 / (scale * badgeCounterScale) : 1) * (expandedGuideBox === 2 ? 1.3 : 1)})`,
+                                                    transformOrigin: 'bottom left'
+                                                }}
+                                                className={`absolute left-[88%] bottom-[82%] cursor-pointer select-none transition-all duration-300 ${
+                                                    expandedGuideBox === 2 ? 'z-[99999]' : 'hover:brightness-110 z-[9999]'
                                                 }`}
                                             >
-                                                <div className="flex items-center pointer-events-none">
-                                                    <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
-                                                    <div className="w-5 sm:w-7 h-[1.5px] bg-gradient-to-r from-amber-300 to-amber-400/70 shadow-[0_0_4px_#fbbf24]" />
-                                                </div>
-                                                <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
-                                                    expandedGuideBox === 2
-                                                        ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
-                                                        : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
-                                                }`}>
-                                                    <div className="text-[10px] font-bold text-amber-300 leading-tight whitespace-nowrap">
-                                                        Active DD : แสดง DD ของพอร์ตที่กำลังทำงาน
+                                                <div className="relative flex flex-col items-start">
+                                                    <div className={`ml-[22px] px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                                        expandedGuideBox === 2
+                                                            ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                                            : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                                    }`}>
+                                                        <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                                            Active DD : แสดง DD ของพอร์ตที่กำลังทำงาน
+                                                        </div>
+                                                        <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                                            คลิกเพื่อแยกดู DD แต่ละส่วน
+                                                        </div>
                                                     </div>
-                                                    <div className="text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
-                                                        คลิกเพื่อแยกดู DD แต่ละส่วน
-                                                    </div>
+                                                    {/* เส้นทแยงเยื้องจากมุมซ้ายล่างของกล่อง ชี้ลงซ้ายไปยังมุมขวาบนของกรอบ Active DD */}
+                                                    <svg width="28" height="22" viewBox="0 0 28 22" className="overflow-visible pointer-events-none -mt-[1px]">
+                                                        <line x1="24" y1="0" x2="4" y2="18" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" className="drop-shadow-[0_0_4px_#fbbf24]" />
+                                                        <circle cx="4" cy="18" r="3" fill="#fcd34d" className="drop-shadow-[0_0_8px_#fbbf24]" />
+                                                    </svg>
                                                 </div>
                                             </div>
                                         )}
@@ -2871,7 +2878,7 @@ export default function FarmClient({
                             );
                         })()}
 
-                        {/* 🎬 CENTER FARM CREDITS PLAQUE (แปะติดกึ่งกลางฟาร์ม ขยับขึ้นลงพร้อมฟาร์ม สไตล์ไตเติ้ลท้ายหนัง สีเดียวสะอาดตา) */}
+                        {/* 🎬 CENTER FARM CREDITS PLAQUE (รวมคำอธิบายแปลงสุขภาพไว้ตอนบน ต่อด้วยชื่อ EA และข้อมูลอื่นๆ ขยายใหญ่ขึ้นอีกนิด สไตล์ไตเติ้ลท้ายหนังสีเดียว ขยับพร้อมฟาร์ม) */}
                         {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
                             <div
                                 className="absolute pointer-events-none select-none animate-fade-in"
@@ -2884,81 +2891,49 @@ export default function FarmClient({
                                 }}
                             >
                                 <div 
-                                    className="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 w-[195px] px-3 py-2 rounded-sm bg-black/55 border border-white/15 shadow-[0_6px_20px_rgba(0,0,0,0.85)] flex flex-col items-center text-center"
+                                    className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 w-[268px] px-4 py-3 rounded-sm bg-black/60 border border-white/15 shadow-[0_8px_28px_rgba(0,0,0,0.9)] flex flex-col items-center text-center"
                                     style={{ marginTop: `${TREE_Y_OFFSET}px` }}
                                 >
-                                    <span className="text-[6px] font-mono tracking-[0.3em] text-white/60 uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                    {/* ตอนบน: คำอธิบายแปลงสุขภาพ 20 คู่เงิน */}
+                                    <div className="text-[11px] font-bold tracking-[0.06em] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                                        แปลงสุขภาพ 20 คู่เงิน
+                                    </div>
+                                    <p className="text-[8.5px] text-white/80 leading-relaxed mt-0.5 drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
+                                        แสดงสุขภาพฟาร์ม, ต้นไม้แห้งแทนค่า DD,<br />ดอกไม้แสดงจำนวนออเดอร์ปัจจุบัน
+                                    </p>
+
+                                    <div className="w-16 h-[1px] bg-white/25 my-2" />
+
+                                    {/* ตอนล่าง: ชื่อ EA และข้อมูลระบบ */}
+                                    <span className="text-[7px] font-mono tracking-[0.3em] text-white/60 uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                                         PORTFOLIO SYSTEM
                                     </span>
-                                    <h3 className="text-[12px] font-black tracking-[0.18em] text-white uppercase mt-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
+                                    <h3 className="text-[14px] font-black tracking-[0.18em] text-white uppercase mt-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)] whitespace-nowrap">
                                         {fullEaName}
                                     </h3>
-                                    <span className="text-[7px] font-mono tracking-[0.25em] text-white/75 uppercase mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                    <span className="text-[8px] font-mono tracking-[0.25em] text-white/75 uppercase mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                                         VERSION {fullEaVersion}
                                     </span>
 
-                                    <div className="w-10 h-[1px] bg-white/25 my-1.5" />
+                                    <div className="w-12 h-[1px] bg-white/20 my-1.5" />
 
-                                    <div className="w-full space-y-0.5 text-[7.5px] font-mono leading-snug drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
-                                        <div className="grid grid-cols-2 gap-2">
+                                    <div className="w-full space-y-0.5 text-[8.5px] font-mono leading-snug drop-shadow-[0_1px_3px_rgba(0,0,0,1)]">
+                                        <div className="grid grid-cols-2 gap-2.5">
                                             <span className="text-right text-white/60">สถาปัตยกรรม</span>
                                             <span className="text-left font-bold text-white/95 whitespace-nowrap">20-Pair Grid</span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 gap-2.5">
                                             <span className="text-right text-white/60">ระบบคุ้มครอง</span>
                                             <span className="text-left font-bold text-white/95 whitespace-nowrap">Capital Buffer</span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 gap-2.5">
                                             <span className="text-right text-white/60">การกักกัน</span>
                                             <span className="text-left font-bold text-white/95 whitespace-nowrap">Auto-Quarantine</span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 gap-2.5">
                                             <span className="text-right text-white/60">การเชื่อมต่อ</span>
                                             <span className="text-left font-bold text-white/95 whitespace-nowrap">MT5 Live 24/5</span>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 🏷️ กล่องอธิบายที่ 4: แปลงสุขภาพ 20 คู่เงิน (ชี้ลงไปที่ต้นไม้ฝั่งซ้ายบน c=0, r=2) */}
-                        {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
-                            <div
-                                className="absolute pointer-events-none select-none animate-fade-in"
-                                style={{
-                                    left: `${(0 - 2) * TILE_W}px`,
-                                    top: `${(0 + 2) * TILE_H_OFFSET}px`,
-                                    zIndex: 99998,
-                                    width: '280px',
-                                    height: '280px'
-                                }}
-                            >
-                                <div 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedGuideBox(prev => prev === 4 ? null : 4);
-                                    }}
-                                    style={{
-                                        transform: `translateX(-50%) scale(${((scale > 0 && scale < 0.38) ? (0.38 / scale) : 1) * (expandedGuideBox === 4 ? 1.35 : 1)})`,
-                                        transformOrigin: 'bottom center'
-                                    }}
-                                    className="absolute bottom-[190px] left-1/2 flex flex-col items-center pointer-events-auto cursor-pointer select-none transition-all duration-300"
-                                >
-                                    <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left max-w-[210px] ${
-                                        expandedGuideBox === 4
-                                            ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
-                                            : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
-                                    }`}>
-                                        <div className="text-[10px] font-bold text-amber-300 leading-tight whitespace-nowrap">
-                                            แปลงสุขภาพ 20 คู่เงิน
-                                        </div>
-                                        <div className="text-[8.5px] text-white/80 leading-snug mt-0.5">
-                                            แสดงสุขภาพฟาร์ม, ต้นไม้แห้งแทนค่า DD, ดอกไม้แสดงจำนวนออเดอร์ปัจจุบัน
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-center pointer-events-none">
-                                        <div className="w-[1.5px] h-5 bg-gradient-to-b from-amber-400/70 to-amber-300 shadow-[0_0_4px_#fbbf24]" />
-                                        <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
                                     </div>
                                 </div>
                             </div>
@@ -3124,7 +3099,7 @@ export default function FarmClient({
                                     </div>
                                 </div>
 
-                                {/* 🏷️ กล่องอธิบายที่ 3: โดมฟื้นฟู (ชี้ไปที่โดมต้นไม้) */}
+                                {/* 🏷️ กล่องอธิบายที่ 3: โดมฟื้นฟู (เยื้องลงด้านล่างขวาของโดม + เส้นทแยงชี้ขึ้นซ้าย ↖ ไปที่ตัวโดม) */}
                                 {isOrb4Unlocked && isFarmGuideActive && (
                                     <div 
                                         onClick={(e) => {
@@ -3132,25 +3107,30 @@ export default function FarmClient({
                                             setExpandedGuideBox(prev => prev === 3 ? null : 3);
                                         }}
                                         style={{
-                                            transform: `translateX(-50%) scale(${((scale > 0 && scale < 0.38) ? (0.38 / scale) : 1) * (expandedGuideBox === 3 ? 1.35 : 1)})`,
-                                            transformOrigin: 'top center'
+                                            transform: `scale(${(scale > 0 ? 1 / scale : 1) * (expandedGuideBox === 3 ? 1.3 : 1)})`,
+                                            transformOrigin: 'top left'
                                         }}
-                                        className="absolute top-[252px] left-1/2 flex flex-col items-center z-[999] cursor-pointer select-none transition-all duration-300"
+                                        className={`absolute top-[224px] left-[192px] cursor-pointer select-none transition-all duration-300 ${
+                                            expandedGuideBox === 3 ? 'z-[99999]' : 'hover:brightness-110 z-[999]'
+                                        }`}
                                     >
-                                        <div className="flex flex-col items-center pointer-events-none">
-                                            <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
-                                            <div className="w-[1.5px] h-5 bg-gradient-to-b from-amber-300 to-amber-400/70 shadow-[0_0_4px_#fbbf24]" />
-                                        </div>
-                                        <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
-                                            expandedGuideBox === 3
-                                                ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
-                                                : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
-                                        }`}>
-                                            <div className="text-[10px] font-bold text-amber-300 leading-tight whitespace-nowrap">
-                                                โดมฟื้นฟู : แสดงคู่เงินที่แยกออกมาเพื่อฟื้นฟู
-                                            </div>
-                                            <div className="text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
-                                                คลิกเพื่อแยกดูคู่เงินที่กำลังฟื้นฟู
+                                        <div className="relative flex flex-col items-start">
+                                            {/* เส้นทแยงเยื้องจากตัวโดม (มุมซ้ายบน) ชี้ลงขวามายังมุมซ้ายบนของกรอบอธิบาย */}
+                                            <svg width="28" height="22" viewBox="0 0 28 22" className="overflow-visible pointer-events-none -mb-[1px]">
+                                                <circle cx="4" cy="4" r="3" fill="#fcd34d" className="drop-shadow-[0_0_8px_#fbbf24]" />
+                                                <line x1="4" y1="4" x2="24" y2="22" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" className="drop-shadow-[0_0_4px_#fbbf24]" />
+                                            </svg>
+                                            <div className={`ml-[22px] px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                                expandedGuideBox === 3
+                                                    ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                                    : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                            }`}>
+                                                <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                                    โดมฟื้นฟู : แสดงคู่เงินที่แยกออกมาเพื่อฟื้นฟู
+                                                </div>
+                                                <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                                    คลิกเพื่อแยกดูคู่เงินที่กำลังฟื้นฟู
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -3641,18 +3621,18 @@ export default function FarmClient({
 
             {isClient && (
                 <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
-                    {/* 🏷️ กล่องอธิบายที่ 5: ประวัติผลผลิตย้อนหลัง 90 วัน (ชี้ลงไปที่แถบลังไม้) */}
+                    {/* 🏷️ กล่องอธิบายที่ 5: ประวัติผลผลิตย้อนหลัง 90 วัน (เยื้องขึ้นทางซ้ายบน + เส้นทแยงชี้ลงขวา ↘ ไปที่แถบลังไม้) */}
                     {isPrime && isOrb4Unlocked && isFarmGuideActive && (
                         <div 
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setExpandedGuideBox(prev => prev === 5 ? null : 5);
                             }}
-                            className={`absolute bottom-full right-4 sm:right-16 mb-0.5 flex flex-col items-center cursor-pointer select-none transition-all duration-300 origin-bottom ${
+                            className={`absolute bottom-full right-8 sm:right-20 -mb-2 flex flex-col items-end cursor-pointer select-none transition-all duration-300 origin-bottom-right ${
                                 expandedGuideBox === 5 ? 'scale-[1.3] z-[99999]' : 'scale-100 hover:scale-105 z-[160]'
                             }`}
                         >
-                            <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                            <div className={`mr-[22px] px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
                                 expandedGuideBox === 5
                                     ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
                                     : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
@@ -3664,10 +3644,11 @@ export default function FarmClient({
                                     เลื่อนดูประวัติผลผลิตย้อนหลังได้ 90 วัน
                                 </div>
                             </div>
-                            <div className="flex flex-col items-center pointer-events-none">
-                                <div className="w-[1.5px] h-4 sm:h-5 bg-gradient-to-b from-amber-400/70 to-amber-300 shadow-[0_0_4px_#fbbf24]" />
-                                <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
-                            </div>
+                            {/* เส้นทแยงเยื้องจากมุมขวาล่างของกรอบ ชี้ลงขวามายังแถบลังไม้ */}
+                            <svg width="28" height="22" viewBox="0 0 28 22" className="overflow-visible pointer-events-none -mt-[1px]">
+                                <line x1="4" y1="0" x2="24" y2="18" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" className="drop-shadow-[0_0_4px_#fbbf24]" />
+                                <circle cx="24" cy="18" r="3" fill="#fcd34d" className="drop-shadow-[0_0_8px_#fbbf24]" />
+                            </svg>
                         </div>
                     )}
 
@@ -3782,18 +3763,18 @@ export default function FarmClient({
                     <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto items-end">
                         {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 ลูก) */}
                         <div className="relative flex items-center gap-2 sm:gap-3">
-                            {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต (ชี้ไปที่ลูกแก้วเมนูที่ 1) */}
+                            {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต (เยื้องขึ้นทางซ้ายบนของลูกแก้วที่ 1 + เส้นทแยงชี้ลงขวา ↘) */}
                             {isOrb4Unlocked && isFarmGuideActive && (
                                 <div 
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setExpandedGuideBox(prev => prev === 1 ? null : 1);
                                     }}
-                                    className={`flex items-center pr-1 cursor-pointer select-none transition-all duration-300 origin-right ${
+                                    className={`absolute right-[52px] sm:right-[62px] bottom-[38px] sm:bottom-[44px] flex flex-col items-end cursor-pointer select-none transition-all duration-300 origin-bottom-right ${
                                         expandedGuideBox === 1 ? 'scale-[1.3] z-[99999]' : 'scale-100 hover:scale-105 z-[160]'
                                     }`}
                                 >
-                                    <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                    <div className={`mr-[22px] px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
                                         expandedGuideBox === 1
                                             ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
                                             : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
@@ -3805,10 +3786,11 @@ export default function FarmClient({
                                             คลิกเพื่อแยกดู DD แต่ละส่วน
                                         </div>
                                     </div>
-                                    <div className="flex items-center pointer-events-none">
-                                        <div className="w-4 sm:w-6 h-[1.5px] bg-gradient-to-r from-amber-400/70 to-amber-300 shadow-[0_0_4px_#fbbf24]" />
-                                        <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
-                                    </div>
+                                    {/* เส้นทแยงเยื้องจากมุมขวาล่างของกรอบ ชี้ลงขวามายังขอบซ้ายบนของลูกแก้วที่ 1 */}
+                                    <svg width="28" height="22" viewBox="0 0 28 22" className="overflow-visible pointer-events-none -mt-[1px]">
+                                        <line x1="4" y1="0" x2="24" y2="18" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" className="drop-shadow-[0_0_4px_#fbbf24]" />
+                                        <circle cx="24" cy="18" r="3" fill="#fcd34d" className="drop-shadow-[0_0_8px_#fbbf24]" />
+                                    </svg>
                                 </div>
                             )}
 
