@@ -333,22 +333,33 @@ const GlowingDdOrb = ({
 };
 
 export default function FarmClient({ 
-    portNumber, 
+    portNumber: initialPortNumber, 
     initialOrders, 
     initialPortStatus,
+    initialUserFarmPorts = [],
+    ownerUserId = null,
     initialIsGlobalPrimeReleased = false,
     initialIsPhase2Released = false,
-    licenseCreatedAt,
+    licenseCreatedAt: initialLicenseCreatedAt,
     customName,
     licenseTier = 'free',
     dashboardSkin = 'avatar_scifi',
     isAdmin = false,
     isSuperAdmin = false,
-    licenseInfo = null
+    licenseInfo: initialLicenseInfo = null
 }: { 
     portNumber: string;
     initialOrders: any[];
     initialPortStatus?: any;
+    initialUserFarmPorts?: Array<{
+        portNumber: string;
+        portName: string | null;
+        eaType: 'PRIME' | 'MAX';
+        createdAt: string | null;
+        portStatus: any | null;
+        licenseInfo: any;
+    }>;
+    ownerUserId?: string | null;
     initialIsGlobalPrimeReleased?: boolean;
     initialIsPhase2Released?: boolean;
     licenseCreatedAt: string | null;
@@ -359,10 +370,22 @@ export default function FarmClient({
     isSuperAdmin?: boolean;
     licenseInfo?: any;
 }) {
+    const [portNumber, setPortNumber] = useState<string>(initialPortNumber);
+    const [licenseCreatedAt, setLicenseCreatedAt] = useState<string | null>(initialLicenseCreatedAt);
+    const [licenseInfo, setLicenseInfo] = useState<any>(initialLicenseInfo);
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '1000.00', equity: '750.00', account_type: 'USC' });
     const [history, setHistory] = useState<any[]>([]);
     const [currentCustomName, setCurrentCustomName] = useState(customName || '');
+    const [isMultiFarmView, setIsMultiFarmView] = useState<boolean>(false);
+    const [userFarmPorts, setUserFarmPorts] = useState<Array<{
+        portNumber: string;
+        portName: string | null;
+        eaType: 'PRIME' | 'MAX';
+        createdAt: string | null;
+        portStatus: any | null;
+        licenseInfo: any;
+    }>>(initialUserFarmPorts);
     
     useEffect(() => {
         if (customName) setCurrentCustomName(customName);
@@ -413,7 +436,13 @@ export default function FarmClient({
     // 👑 Owner Developer Sandbox & Customer Release Gate:
     // 1. Only Port 97053088 has access to the Draggable Floating Controller Dock.
     // 2. Port 21692434 and customer ports act as standard client ports to observe the true released experience.
-    const isDevPort3088 = String(portNumber) === '97053088' || String(portNumber).endsWith('3088') || String(portNumber) === '3088';
+    const isDevPort3088 =
+        String(portNumber) === '97053088' ||
+        String(portNumber).endsWith('3088') ||
+        String(portNumber) === '3088' ||
+        String(initialPortNumber) === '97053088' ||
+        String(initialPortNumber).endsWith('3088') ||
+        String(initialPortNumber) === '3088';
     const isOwnerTestPort = isDevPort3088;
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
@@ -439,6 +468,165 @@ export default function FarmClient({
     const isOrb4Unlocked = isDevPort3088 && isOwnerDevUser;
     const [isFarmGuideActive, setIsFarmGuideActive] = useState<boolean>(false);
     const [expandedGuideBox, setExpandedGuideBox] = useState<number | null>(null);
+
+    // 🌾 Multi-Port 2x2 Farm View: ดึงข้อมูลพอร์ต EasyM MAX และ EasyM Prime ที่เปิดใช้งานของลูกค้าคนนี้
+    useEffect(() => {
+        if (!isMultiFarmView || !ownerUserId) return;
+        let isMounted = true;
+
+        const refreshUserFarmPorts = async () => {
+            try {
+                const { data: ownerLicenses } = await supabase
+                    .from('licenses')
+                    .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
+                    .eq('user_id', ownerUserId)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: true });
+
+                if (!ownerLicenses || !isMounted) return;
+
+                const accNums = Array.from(new Set(
+                    ownerLicenses.map((l: any) => String(l.account_number || '').trim()).filter(Boolean)
+                ));
+
+                const { data: statuses } = accNums.length > 0
+                    ? await supabase.from('farm_port_status').select('*').in('port_number', accNums)
+                    : { data: [] as any[] };
+
+                if (!isMounted) return;
+
+                const statusMap = new Map((statuses || []).map((ps: any) => [String(ps.port_number).trim(), ps]));
+                const nowMs = Date.now();
+                const seen = new Set<string>();
+                const nextPorts: Array<{
+                    portNumber: string;
+                    portName: string | null;
+                    eaType: 'PRIME' | 'MAX';
+                    createdAt: string | null;
+                    portStatus: any | null;
+                    licenseInfo: any;
+                }> = [];
+
+                for (const lic of ownerLicenses) {
+                    const accNum = String(lic.account_number || '').trim();
+                    if (!accNum || seen.has(accNum)) continue;
+                    if (lic.is_active === false) continue;
+                    if (lic.type !== 'lifetime' && lic.expiry_date) {
+                        const expMs = new Date(lic.expiry_date).getTime();
+                        if (expMs <= nowMs && accNum !== String(portNumber).trim()) continue;
+                    }
+
+                    const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
+                    const pKey = String(prod?.product_key || '').toUpperCase();
+                    const pName = String(prod?.name || '').toLowerCase();
+                    const ps = statusMap.get(accNum) || (accNum === String(portNumber).trim() ? portStatus : null);
+                    const rawSys = String(ps?.system_code || '');
+                    const sys = rawSys.split(':::')[0].toLowerCase();
+                    const eaVerStr = String(ps?.ea_version || '').toLowerCase();
+
+                    if (
+                        pName.includes('gold') || pKey.includes('GOLD') || pKey.includes('EZG') || sys.includes('gold') ||
+                        pName.includes('mini') || pKey.includes('MINI') || sys.includes('mini') ||
+                        sys.includes('turbo')
+                    ) {
+                        continue;
+                    }
+
+                    const isPrimePort =
+                        pName.includes('prime') ||
+                        pKey.includes('PRIME') ||
+                        sys.includes('prime') ||
+                        rawSys.includes(':::') ||
+                        eaVerStr.startsWith('2.') ||
+                        eaVerStr.startsWith('v2.');
+
+                    const isMaxPort =
+                        pName.includes('max') ||
+                        pKey.includes('MAX') ||
+                        sys.includes('max') ||
+                        ((pKey.startsWith('EZM') || pName.includes('easym') || pName.includes('easy m')) && !pName.includes('farm') && !sys.includes('farm'));
+
+                    if (!isPrimePort && !isMaxPort) continue;
+
+                    seen.add(accNum);
+                    nextPorts.push({
+                        portNumber: accNum,
+                        portName: lic.port_name || null,
+                        eaType: isPrimePort ? 'PRIME' : 'MAX',
+                        createdAt: lic.created_at || null,
+                        portStatus: ps || null,
+                        licenseInfo: {
+                            isActive: true,
+                            productName: prod?.name || (isPrimePort ? 'EasyM Prime' : 'EasyM MAX'),
+                            productKey: prod?.product_key || '',
+                            minBalance: prod?.min_balance || 0,
+                            currency: prod?.currency || 'USC',
+                            createdAt: lic.created_at || null
+                        }
+                    });
+                }
+
+                if (nextPorts.length > 0 && isMounted) {
+                    setUserFarmPorts(nextPorts);
+                }
+            } catch (err) {
+                console.warn('Refresh user farm ports error:', err);
+            }
+        };
+
+        refreshUserFarmPorts();
+        return () => { isMounted = false; };
+    }, [isMultiFarmView, ownerUserId, portNumber, portStatus]);
+
+    const handleSelectMultiFarmPort = async (target: {
+        portNumber: string;
+        portName: string | null;
+        eaType: 'PRIME' | 'MAX';
+        createdAt: string | null;
+        portStatus: any | null;
+        licenseInfo: any;
+    }) => {
+        setIsMultiFarmView(false);
+        setIsFarmGuideActive(false);
+        setExpandedGuideBox(null);
+        setIsDdExpanded(false);
+        setIsQuarantineExpanded(false);
+        setIsQuarantineEnlarged(false);
+
+        if (String(target.portNumber) === String(portNumber)) {
+            return;
+        }
+
+        // สลับข้อมูลหน้าฟาร์มไปยังพอร์ตที่คลิกทันที
+        setPortNumber(target.portNumber);
+        setCurrentCustomName(target.portName || '');
+        setLicenseCreatedAt(target.createdAt || null);
+        if (target.licenseInfo) {
+            setLicenseInfo(target.licenseInfo);
+        }
+        if (target.portStatus) {
+            setPortStatus(target.portStatus);
+        }
+        setOrders([]);
+        setRecentlyClosed([]);
+
+        if (typeof window !== 'undefined') {
+            window.history.pushState(null, '', `/farm/${target.portNumber}`);
+        }
+
+        try {
+            const [statusRes, ordersRes, histRes] = await Promise.all([
+                supabase.from('farm_port_status').select('*').eq('port_number', target.portNumber).maybeSingle(),
+                supabase.from('farm_active_orders').select('*').eq('port_number', target.portNumber),
+                supabase.from('farm_daily_history').select('*').eq('port_number', target.portNumber).order('date', { ascending: false }).limit(120)
+            ]);
+            if (statusRes.data) setPortStatus(statusRes.data);
+            if (ordersRes.data) setOrders(ordersRes.data);
+            if (histRes.data) setHistory([...histRes.data].reverse());
+        } catch (e) {
+            console.warn('Switch farm port fetch error:', e);
+        }
+    };
 
     // คลิกพื้นที่อื่นที่ไม่ได้อยู่ในกรอบอธิบาย (หรือปุ่มลูกแก้วที่ 4) ให้ซ่อนกรอบอธิบายทั้งหมดทันที
     useEffect(() => {
@@ -2517,6 +2705,131 @@ export default function FarmClient({
                     className="relative transition-all duration-500 ease-out origin-center"
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
                 >
+                    {isMultiFarmView ? (
+                        /* ═══════════════════════════════════════════════════════════════════ */
+                        /* 🌐 ORB 3: MULTI-PORT 2x2 FARM VIEW (แสดงฟาร์มหลายพอร์ต 4 ฟาร์มแบบ 2x2) */
+                        /* ═══════════════════════════════════════════════════════════════════ */
+                        <div className="absolute left-1/2 top-1/2">
+                            {Array.from({ length: 4 }).map((_, slotIdx) => {
+                                const col = slotIdx % 2;
+                                const row = Math.floor(slotIdx / 2);
+                                const offsetX = col === 0 ? -268 : 268;
+                                const offsetY = row === 0 ? -176 : 176;
+                                const activePort = userFarmPorts[slotIdx] || null;
+                                const isActive = Boolean(activePort);
+                                const isCurrentPort = isActive && String(activePort?.portNumber) === String(portNumber);
+
+                                return (
+                                    <div
+                                        key={`multi_farm_slot_${slotIdx}`}
+                                        style={{
+                                            left: `${offsetX}px`,
+                                            top: `${offsetY}px`,
+                                            zIndex: 30 + row * 10 + col
+                                        }}
+                                        className="absolute"
+                                    >
+                                        <div
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (activePort) {
+                                                    handleSelectMultiFarmPort(activePort);
+                                                }
+                                            }}
+                                            style={{ transform: 'scale(0.40)', transformOrigin: 'center center' }}
+                                            className={`relative transition-all duration-300 select-none ${
+                                                isActive
+                                                    ? 'cursor-pointer group hover:scale-[0.425]'
+                                                    : 'pointer-events-none'
+                                            }`}
+                                            title={isActive ? `คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${activePort?.portNumber}` : 'พอร์ตยังไม่ได้เปิดใช้งาน (Inactive)'}
+                                        >
+                                            <div className={`absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px] ${
+                                                isActive ? 'animate-float-farm' : 'grayscale contrast-75 brightness-75 opacity-35'
+                                            }`}>
+                                                {/* 25 Isometric Trees of this Mini-Farm */}
+                                                {Array.from({ length: 25 }).map((__, i) => {
+                                                    const c = i % 5;
+                                                    const r = Math.floor(i / 5);
+                                                    const tZIndex = (c + r) + 20;
+                                                    return (
+                                                        <div
+                                                            key={`mini_tile_${slotIdx}_${i}`}
+                                                            className="absolute"
+                                                            style={{
+                                                                left: `${(c - r) * TILE_W}px`,
+                                                                top: `${(c + r) * TILE_H_OFFSET}px`,
+                                                                zIndex: tZIndex,
+                                                                width: '280px',
+                                                                height: '280px'
+                                                            }}
+                                                        >
+                                                            {isClient && (
+                                                                <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
+                                                                    <Image
+                                                                        src="/farm/base_tree_new.png"
+                                                                        alt="Farm Tree"
+                                                                        fill
+                                                                        className="object-contain object-bottom drop-shadow-2xl"
+                                                                        unoptimized
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {/* 🏷️ Center Port Number Plaque on each of the 4 Farms */}
+                                                <div
+                                                    style={{
+                                                        left: `${(2 - 2) * TILE_W}px`,
+                                                        top: `${(2 + 2) * TILE_H_OFFSET}px`,
+                                                        zIndex: 150,
+                                                        width: '280px',
+                                                        height: '280px'
+                                                    }}
+                                                    className="absolute pointer-events-none"
+                                                >
+                                                    {isActive && activePort ? (
+                                                        <div
+                                                            style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                            className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-3 rounded-2xl bg-[#051811]/92 backdrop-blur-md border-2 transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
+                                                                isCurrentPort
+                                                                    ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white'
+                                                                    : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-300 group-hover:shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)]'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                                                                <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
+                                                                    {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
+                                                                {activePort.portNumber}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div
+                                                            style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                            className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-2.5 rounded-2xl bg-slate-950/85 border border-slate-500/40 shadow-[0_10px_25px_rgba(0,0,0,0.85)] flex flex-col items-center justify-center text-center whitespace-nowrap"
+                                                        >
+                                                            <span className="text-[14px] font-mono font-bold tracking-[0.22em] text-slate-300/75 uppercase">
+                                                                INACTIVE
+                                                            </span>
+                                                            <span className="text-[12px] text-slate-400/70 mt-0.5">
+                                                                ยังไม่ได้เปิดใช้งาน
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
                     <div className="absolute left-1/2 top-1/2 -ml-[140px] -mt-[360px]">
                         {/* 🌑 GENTLE SPOTLIGHT FOCUS BACKDROP WHEN QUARANTINE IS ACTIVE */}
                         <div 
@@ -3624,13 +3937,14 @@ export default function FarmClient({
                             );
                         })()}
                     </div>
+                    )}
                 </div>
             </div>
 
             {isClient && (
                 <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
                     {/* 🏷️ กล่องอธิบายที่ 5: ประวัติผลผลิตย้อนหลัง 90 วัน (เยื้องขึ้นทางขวาบน + เส้นทแยงชี้ลงซ้ายล่าง ↙ ไปที่แถบลังไม้) */}
-                    {isPrime && isOrb4Unlocked && isFarmGuideActive && (
+                    {isPrime && isOrb4Unlocked && isFarmGuideActive && !isMultiFarmView && (
                         <div 
                             data-farm-guide="true"
                             onClick={(e) => {
@@ -3745,13 +4059,13 @@ export default function FarmClient({
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* 🔮 PRIME EDITION: 4 FLOATING GLOWING ORBS (RIGHT DOCK)           */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {isPrime && (
+            {(isPrime || userFarmPorts.some(p => p.eaType === 'PRIME')) && (
                 <>
                     <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto items-end">
                         {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 ลูก) */}
                         <div className="relative flex items-center gap-2 sm:gap-3">
                             {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต (ขยับชิดลูกแก้วเมนูที่ 1 เยื้องขึ้นด้านบนซ้าย + เส้นทแยงชี้ลงขวา ↘) */}
-                            {isOrb4Unlocked && isFarmGuideActive && (
+                            {isOrb4Unlocked && isFarmGuideActive && !isMultiFarmView && (
                                 <div 
                                     data-farm-guide="true"
                                     onClick={(e) => {
@@ -3832,24 +4146,33 @@ export default function FarmClient({
                             <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
                         </button>
 
-                        {/* Orb 3: Purple/Violet Glow (Recovery Engine) */}
+                        {/* Orb 3: Purple/Violet Glow (Multi-Port 2x2 Farm View - แสดงฟาร์มหลายพอร์ตในหน้าเดียว) */}
                         <button
-                            onClick={() => {
-                                if (isOwnerDevUser) {
-                                    setPrimeActiveOrb(3);
-                                } else {
-                                    toast.info('🔮 ระบบ Recovery Engine อยู่ในระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้ครับ');
-                                }
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsMultiFarmView(prev => {
+                                    const next = !prev;
+                                    if (next) {
+                                        setIsFarmGuideActive(false);
+                                        setExpandedGuideBox(null);
+                                        setIsDdExpanded(false);
+                                        setIsQuarantineExpanded(false);
+                                        setIsQuarantineEnlarged(false);
+                                        setPrimeActiveOrb(null);
+                                    }
+                                    return next;
+                                });
                             }}
-                            className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
-                            title={isOwnerDevUser ? "Prime menu 3: Recovery Engine" : "🔒 Recovery Engine (กำลังพัฒนา - เร็วๆ นี้)"}
+                            className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
+                                isMultiFarmView
+                                    ? 'border-purple-400 ring-2 ring-purple-400/90 shadow-[0_0_35px_rgba(168,85,247,0.85)] scale-110 bg-purple-950/50 z-[150]'
+                                    : 'border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.75)] hover:scale-110 active:scale-95'
+                            }`}
+                            title="แสดงฟาร์มหลายพอร์ตในหน้าเดียว (Multi-Port Farm View 2x2)"
                         >
-                            <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400 group-hover:scale-125 transition-transform" />
-                            {!isOwnerDevUser && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/90 border border-purple-500/40 text-[9px] shadow" title="เร็วๆ นี้">
-                                    🔒
-                                </span>
-                            )}
+                            <Zap className={`h-5 w-5 sm:h-6 sm:w-6 transition-all duration-300 ${
+                                isMultiFarmView ? 'text-purple-300 scale-110' : 'text-purple-400 group-hover:scale-125'
+                            }`} />
                         </button>
 
                         {/* Orb 4: Info & Interactive Guide Mode (เมนูแสดงข้อมูลและคำแนะนำการใช้งาน - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088) */}
@@ -3858,6 +4181,7 @@ export default function FarmClient({
                                 data-farm-guide="true"
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    setIsMultiFarmView(false);
                                     setIsFarmGuideActive(prev => !prev);
                                     setExpandedGuideBox(null);
                                 }}

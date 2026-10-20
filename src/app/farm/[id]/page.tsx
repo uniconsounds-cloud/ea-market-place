@@ -88,6 +88,121 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         .eq('port_number', portNumber)
         .single();
 
+    // Fetch all active EasyM MAX & EasyM Prime ports belonging to this customer (for Multi-Port 2x2 View)
+    const ownerUserId = license?.user_id || session.user.id;
+    const { data: ownerLicenses } = await supabase
+        .from('licenses')
+        .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, products:product_id(id, name, product_key, min_balance, currency)')
+        .eq('user_id', ownerUserId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true });
+
+    const ownerAccountNumbers = Array.from(new Set(
+        (ownerLicenses || [])
+            .map((l: any) => String(l.account_number || '').trim())
+            .filter(Boolean)
+    ));
+
+    const { data: ownerPortStatuses } = ownerAccountNumbers.length > 0
+        ? await supabase
+            .from('farm_port_status')
+            .select('*')
+            .in('port_number', ownerAccountNumbers)
+        : { data: [] as any[] };
+
+    const statusByPort = new Map((ownerPortStatuses || []).map((ps: any) => [String(ps.port_number).trim(), ps]));
+    const nowMs = Date.now();
+    const seenPorts = new Set<string>();
+    const initialUserFarmPorts: Array<{
+        portNumber: string;
+        portName: string | null;
+        eaType: 'PRIME' | 'MAX';
+        createdAt: string | null;
+        portStatus: any | null;
+        licenseInfo: any;
+    }> = [];
+
+    for (const lic of (ownerLicenses || [])) {
+        const accNum = String(lic.account_number || '').trim();
+        if (!accNum || seenPorts.has(accNum)) continue;
+        if (lic.is_active === false) continue;
+        if (lic.type !== 'lifetime' && lic.expiry_date) {
+            const expMs = new Date(lic.expiry_date).getTime();
+            if (expMs <= nowMs && accNum !== String(portNumber).trim()) continue;
+        }
+
+        const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
+        const pKey = String(prod?.product_key || '').toUpperCase();
+        const pName = String(prod?.name || '').toLowerCase();
+        const ps = statusByPort.get(accNum) || (accNum === String(portNumber).trim() ? portStatus : null);
+        const rawSys = String(ps?.system_code || '');
+        const sys = rawSys.split(':::')[0].toLowerCase();
+        const eaVer = String(ps?.ea_version || '').toLowerCase();
+
+        // Exclude Gold, Mini, Turbo
+        if (
+            pName.includes('gold') || pKey.includes('GOLD') || pKey.includes('EZG') || sys.includes('gold') ||
+            pName.includes('mini') || pKey.includes('MINI') || sys.includes('mini') ||
+            sys.includes('turbo')
+        ) {
+            continue;
+        }
+
+        const isPrimePort =
+            pName.includes('prime') ||
+            pKey.includes('PRIME') ||
+            sys.includes('prime') ||
+            rawSys.includes(':::') ||
+            eaVer.startsWith('2.') ||
+            eaVer.startsWith('v2.');
+
+        const isMaxPort =
+            pName.includes('max') ||
+            pKey.includes('MAX') ||
+            sys.includes('max') ||
+            ((pKey.startsWith('EZM') || pName.includes('easym') || pName.includes('easy m')) && !pName.includes('farm') && !sys.includes('farm'));
+
+        if (!isPrimePort && !isMaxPort) continue;
+
+        seenPorts.add(accNum);
+        initialUserFarmPorts.push({
+            portNumber: accNum,
+            portName: lic.port_name || null,
+            eaType: isPrimePort ? 'PRIME' : 'MAX',
+            createdAt: lic.created_at || null,
+            portStatus: ps || null,
+            licenseInfo: {
+                isActive: true,
+                productName: prod?.name || (isPrimePort ? 'EasyM Prime' : 'EasyM MAX'),
+                productKey: prod?.product_key || '',
+                minBalance: prod?.min_balance || 0,
+                currency: prod?.currency || 'USC',
+                createdAt: lic.created_at || null
+            }
+        });
+    }
+
+    // Ensure current opened port is always present if it's an EasyM port
+    if (!seenPorts.has(String(portNumber).trim()) && isEasyM) {
+        const rawSys = String(portStatus?.system_code || '');
+        const isCurrentPrime = prodKey.includes('PRIME') || prodName.includes('prime') || rawSys.toLowerCase().includes('prime') || rawSys.includes(':::');
+        initialUserFarmPorts.unshift({
+            portNumber: String(portNumber).trim(),
+            portName: license?.port_name || null,
+            eaType: isCurrentPrime ? 'PRIME' : 'MAX',
+            createdAt: license?.created_at || null,
+            portStatus: portStatus || null,
+            licenseInfo: {
+                isActive: true,
+                productName: product?.name || (isCurrentPrime ? 'EasyM Prime' : 'EasyM MAX'),
+                productKey: product?.product_key || '',
+                minBalance: product?.min_balance || 0,
+                currency: product?.currency || 'USC',
+                createdAt: license?.created_at || null
+            }
+        });
+    }
+
     // Fetch Global Prime Release Gate status (persisted in farm_port_status prime_release_gate_config)
     const { data: releaseGateRow } = await supabase
         .from('farm_port_status')
@@ -111,6 +226,8 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
                 portNumber={portNumber}
                 initialOrders={initialOrders || []}
                 initialPortStatus={portStatus || null}
+                initialUserFarmPorts={initialUserFarmPorts}
+                ownerUserId={ownerUserId}
                 initialIsGlobalPrimeReleased={initialIsGlobalPrimeReleased}
                 initialIsPhase2Released={initialIsPhase2Released}
                 licenseCreatedAt={license?.created_at || null}
