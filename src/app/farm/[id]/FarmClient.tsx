@@ -438,6 +438,7 @@ export default function FarmClient({
     // 🧭 Interactive Farm Guide & System Specs Tour (เมนูลูกแก้วที่สี่ - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088)
     const isOrb4Unlocked = isDevPort3088 && isOwnerDevUser;
     const [isFarmGuideActive, setIsFarmGuideActive] = useState<boolean>(false);
+    const [expandedGuideBox, setExpandedGuideBox] = useState<number | null>(null);
 
     const fullEaName = useMemo(() => {
         if (cleanSysCode) return cleanSysCode;
@@ -2489,7 +2490,15 @@ export default function FarmClient({
                 </>
             )}
 
-            <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
+            <div 
+                ref={containerRef} 
+                onClick={() => {
+                    if (expandedGuideBox !== null) {
+                        setExpandedGuideBox(null);
+                    }
+                }}
+                className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]"
+            >
                 <div
                     className="relative transition-all duration-500 ease-out origin-center"
                     style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
@@ -2659,6 +2668,36 @@ export default function FarmClient({
                                             transformOrigin: 'bottom center'
                                         }}
                                     >
+                                        {/* 🏷️ กล่องอธิบายที่ 2: ชี้ไปที่กรอบแสดง Active DD */}
+                                        {isOrb4Unlocked && isFarmGuideActive && (
+                                            <div 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setExpandedGuideBox(prev => prev === 2 ? null : 2);
+                                                }}
+                                                className={`absolute left-full top-[26px] -translate-y-1/2 flex items-center pl-1 cursor-pointer select-none transition-all duration-300 origin-left ${
+                                                    expandedGuideBox === 2 ? 'scale-[1.35] z-[99999]' : 'scale-100 hover:scale-105 z-[9999]'
+                                                }`}
+                                            >
+                                                <div className="flex items-center pointer-events-none">
+                                                    <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
+                                                    <div className="w-5 sm:w-7 h-[1.5px] bg-gradient-to-r from-amber-300 to-amber-400/70 shadow-[0_0_4px_#fbbf24]" />
+                                                </div>
+                                                <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                                    expandedGuideBox === 2
+                                                        ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                                        : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                                }`}>
+                                                    <div className="text-[10px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                                        Active DD : แสดง DD ของพอร์ตที่กำลังทำงาน
+                                                    </div>
+                                                    <div className="text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                                        คลิกเพื่อแยกดู DD แต่ละส่วน
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Main DD Badge Container (Step 1: Expands width & height proportionally, enlarges number) */}
                                         {(() => {
                                             const activeTheme = getDDLevelTheme(portDDPct);
@@ -2881,6 +2920,49 @@ export default function FarmClient({
                                 </div>
                             </div>
                         )}
+
+                        {/* 🏷️ กล่องอธิบายที่ 4: แปลงสุขภาพ 20 คู่เงิน (ชี้ลงไปที่ต้นไม้ฝั่งซ้ายบน c=0, r=2) */}
+                        {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
+                            <div
+                                className="absolute pointer-events-none select-none animate-fade-in"
+                                style={{
+                                    left: `${(0 - 2) * TILE_W}px`,
+                                    top: `${(0 + 2) * TILE_H_OFFSET}px`,
+                                    zIndex: 99998,
+                                    width: '280px',
+                                    height: '280px'
+                                }}
+                            >
+                                <div 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedGuideBox(prev => prev === 4 ? null : 4);
+                                    }}
+                                    style={{
+                                        transform: `translateX(-50%) scale(${((scale > 0 && scale < 0.38) ? (0.38 / scale) : 1) * (expandedGuideBox === 4 ? 1.35 : 1)})`,
+                                        transformOrigin: 'bottom center'
+                                    }}
+                                    className="absolute bottom-[190px] left-1/2 flex flex-col items-center pointer-events-auto cursor-pointer select-none transition-all duration-300"
+                                >
+                                    <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left max-w-[210px] ${
+                                        expandedGuideBox === 4
+                                            ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                            : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                    }`}>
+                                        <div className="text-[10px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                            แปลงสุขภาพ 20 คู่เงิน
+                                        </div>
+                                        <div className="text-[8.5px] text-white/80 leading-snug mt-0.5">
+                                            แสดงสุขภาพฟาร์ม, ต้นไม้แห้งแทนค่า DD, ดอกไม้แสดงจำนวนออเดอร์ปัจจุบัน
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-center pointer-events-none">
+                                        <div className="w-[1.5px] h-5 bg-gradient-to-b from-amber-400/70 to-amber-300 shadow-[0_0_4px_#fbbf24]" />
+                                        <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         </div> {/* 🌾 End of animate-float-farm */}
 
                         {/* 🏡 SINGLE QUARANTINE GREENHOUSE DOME (แสดงโรงเรือนกระจกที่แปลงที่ 2: c: 1.0, r: 5 พร้อมรัศมีโดนัทครึ่งวงกลมแสดงขนาดบัฟเฟอร์) */}
@@ -3041,6 +3123,38 @@ export default function FarmClient({
                                         })()}
                                     </div>
                                 </div>
+
+                                {/* 🏷️ กล่องอธิบายที่ 3: โดมฟื้นฟู (ชี้ไปที่โดมต้นไม้) */}
+                                {isOrb4Unlocked && isFarmGuideActive && (
+                                    <div 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedGuideBox(prev => prev === 3 ? null : 3);
+                                        }}
+                                        style={{
+                                            transform: `translateX(-50%) scale(${((scale > 0 && scale < 0.38) ? (0.38 / scale) : 1) * (expandedGuideBox === 3 ? 1.35 : 1)})`,
+                                            transformOrigin: 'top center'
+                                        }}
+                                        className="absolute top-[252px] left-1/2 flex flex-col items-center z-[999] cursor-pointer select-none transition-all duration-300"
+                                    >
+                                        <div className="flex flex-col items-center pointer-events-none">
+                                            <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
+                                            <div className="w-[1.5px] h-5 bg-gradient-to-b from-amber-300 to-amber-400/70 shadow-[0_0_4px_#fbbf24]" />
+                                        </div>
+                                        <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                            expandedGuideBox === 3
+                                                ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                                : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                        }`}>
+                                            <div className="text-[10px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                                โดมฟื้นฟู : แสดงคู่เงินที่แยกออกมาเพื่อฟื้นฟู
+                                            </div>
+                                            <div className="text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                                คลิกเพื่อแยกดูคู่เงินที่กำลังฟื้นฟู
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -3527,6 +3641,36 @@ export default function FarmClient({
 
             {isClient && (
                 <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
+                    {/* 🏷️ กล่องอธิบายที่ 5: ประวัติผลผลิตย้อนหลัง 90 วัน (ชี้ลงไปที่แถบลังไม้) */}
+                    {isPrime && isOrb4Unlocked && isFarmGuideActive && (
+                        <div 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedGuideBox(prev => prev === 5 ? null : 5);
+                            }}
+                            className={`absolute bottom-full right-4 sm:right-16 mb-0.5 flex flex-col items-center cursor-pointer select-none transition-all duration-300 origin-bottom ${
+                                expandedGuideBox === 5 ? 'scale-[1.3] z-[99999]' : 'scale-100 hover:scale-105 z-[160]'
+                            }`}
+                        >
+                            <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                expandedGuideBox === 5
+                                    ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                    : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                            }`}>
+                                <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                    ประวัติผลผลิตย้อนหลัง 90 วัน
+                                </div>
+                                <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                    เลื่อนดูประวัติผลผลิตย้อนหลังได้ 90 วัน
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center pointer-events-none">
+                                <div className="w-[1.5px] h-4 sm:h-5 bg-gradient-to-b from-amber-400/70 to-amber-300 shadow-[0_0_4px_#fbbf24]" />
+                                <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Desktop header row */}
                     <div className="hidden sm:flex justify-between px-6 pt-2 mb-1">
                         <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
@@ -3637,7 +3781,37 @@ export default function FarmClient({
                 <>
                     <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto items-end">
                         {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 ลูก) */}
-                        <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="relative flex items-center gap-2 sm:gap-3">
+                            {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต (ชี้ไปที่ลูกแก้วเมนูที่ 1) */}
+                            {isOrb4Unlocked && isFarmGuideActive && (
+                                <div 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedGuideBox(prev => prev === 1 ? null : 1);
+                                    }}
+                                    className={`flex items-center pr-1 cursor-pointer select-none transition-all duration-300 origin-right ${
+                                        expandedGuideBox === 1 ? 'scale-[1.3] z-[99999]' : 'scale-100 hover:scale-105 z-[160]'
+                                    }`}
+                                >
+                                    <div className={`px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                        expandedGuideBox === 1
+                                            ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                            : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                    }`}>
+                                        <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                            Total DD : แสดง DD ของพอร์ต
+                                        </div>
+                                        <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                            คลิกเพื่อแยกดู DD แต่ละส่วน
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center pointer-events-none">
+                                        <div className="w-4 sm:w-6 h-[1.5px] bg-gradient-to-r from-amber-400/70 to-amber-300 shadow-[0_0_4px_#fbbf24]" />
+                                        <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24] shrink-0" />
+                                    </div>
+                                </div>
+                            )}
+
                             {isDdOrbExpanded && (
                                 <>
                                     {/* 1. Leftmost Orb: Quarantine Total DD (คู่เงินที่ถูกขังทั้งหมด) */}
@@ -3711,7 +3885,10 @@ export default function FarmClient({
                         {/* Orb 4: Info & Interactive Guide Mode (เมนูแสดงข้อมูลและคำแนะนำการใช้งาน - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088) */}
                         {isOrb4Unlocked ? (
                             <button
-                                onClick={() => setIsFarmGuideActive(prev => !prev)}
+                                onClick={() => {
+                                    setIsFarmGuideActive(prev => !prev);
+                                    setExpandedGuideBox(null);
+                                }}
                                 className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
                                     isFarmGuideActive
                                         ? 'border-amber-400 ring-2 ring-amber-400/90 shadow-[0_0_35px_rgba(245,158,11,0.85)] scale-110 bg-amber-950/50 z-[150]'
@@ -3744,122 +3921,6 @@ export default function FarmClient({
                             </button>
                         )}
                     </div>
-
-                    {/* 🧭 INTERACTIVE FARM GUIDE & SYSTEM SPECS OVERLAY (เมนูลูกแก้วที่สี่) */}
-                    {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
-                        <div className="fixed inset-0 z-[130] pointer-events-none animate-fade-in">
-                            {/* Transparent click catcher - NO background blur, NO darkening (หน้าฟาร์มคมชัด 100%) */}
-                            <div 
-                                className="absolute inset-0 bg-transparent pointer-events-auto cursor-default" 
-                                onClick={() => setIsFarmGuideActive(false)} 
-                            />
-
-                            {/* 🗺️ SVG Glowing Beacons at target features */}
-                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
-                                {/* Beacon 1 (Top-Right Orbs) */}
-                                <circle cx="calc(100% - 32px)" cy="115px" r="5" fill="#fbbf24" className="animate-ping opacity-75" />
-                                <circle cx="calc(100% - 32px)" cy="115px" r="3" fill="#f59e0b" />
-
-                                {/* Beacon 2 (Active Farm DD Badge) */}
-                                <circle cx="50%" cy="17%" r="5" fill="#34d399" className="animate-ping opacity-75" />
-                                <circle cx="50%" cy="17%" r="3" fill="#10b981" />
-
-                                {/* Beacon 3 (Quarantine Greenhouse Dome) */}
-                                <circle cx="33%" cy="66%" r="5" fill="#f43f5e" className="animate-ping opacity-75" />
-                                <circle cx="33%" cy="66%" r="3" fill="#e11d48" />
-
-                                {/* Beacon 4 (20-Pair Trees Plantation) */}
-                                <circle cx="65%" cy="50%" r="5" fill="#38bdf8" className="animate-ping opacity-75" />
-                                <circle cx="65%" cy="50%" r="3" fill="#0284c7" />
-
-                                {/* Beacon 5 (Daily Harvest Crates) */}
-                                <circle cx="75%" cy="92%" r="5" fill="#fbbf24" className="animate-ping opacity-75" />
-                                <circle cx="75%" cy="92%" r="3" fill="#d97706" />
-                            </svg>
-
-                            {/* 🏷️ UNIFIED SLEEK TOOLTIPS - Compact, Consistent, Non-overlapping */}
-                            
-                            {/* 1. Top-Right: Port DD Orbs (ลอยเยื้องซ้ายของลูกแก้ว ไม่บังลูกแก้ว) */}
-                            <div 
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-16 sm:right-28 top-16 sm:top-24 w-[175px] sm:w-[200px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
-                            >
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0 shadow-[0_0_6px_#fbbf24]" />
-                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-amber-300 tracking-wide uppercase">
-                                        ลูกแก้ว DD รวมพอร์ต
-                                    </span>
-                                </div>
-                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
-                                    แตะเพื่อคลี่ลูกแก้วย่อยดู DD ของฟาร์ม และ DD คู่เงินที่ถูกขัง
-                                </p>
-                            </div>
-
-                            {/* 2. Top-Center-Left: Active Farm DD Badge (ลอยเยื้องซ้ายบน ไม่ทับ badge และไม่ทับกล่องกลาง) */}
-                            <div 
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute left-3 sm:left-[20%] top-14 sm:top-[14%] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
-                            >
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_6px_#34d399]" />
-                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-emerald-300 tracking-wide uppercase">
-                                        DD ฟาร์มปัจจุบัน
-                                    </span>
-                                </div>
-                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
-                                    Drawdown สดของคู่เงินที่กำลังทำงาน แตะเพื่อดูหลอดปรอท
-                                </p>
-                            </div>
-
-                            {/* 3. Mid-Left: Quarantine Dome & Buffer Aura (ลอยอยู่ขอบซ้ายข้างโดม ไม่บังโดม) */}
-                            <div 
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute left-3 sm:left-6 top-[60%] sm:top-[58%] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
-                            >
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0 shadow-[0_0_6px_#f43f5e]" />
-                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-rose-300 tracking-wide uppercase">
-                                        โดมกักกัน & บัฟเฟอร์
-                                    </span>
-                                </div>
-                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
-                                    แยกฟื้นฟูคู่เงินที่มี DD สูง รัศมีแสงบอกความหนาเกราะบัฟเฟอร์
-                                </p>
-                            </div>
-
-                            {/* 4. Mid-Right: 20-Pair Plantation (ลอยอยู่ขอบขวาข้างแปลง ไม่บังแปลงและไม่ทับกล่องกลาง) */}
-                            <div 
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-3 sm:right-6 top-[52%] sm:top-[48%] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
-                            >
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_6px_#38bdf8]" />
-                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-cyan-300 tracking-wide uppercase">
-                                        แปลงสุขภาพ 20 คู่เงิน
-                                    </span>
-                                </div>
-                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
-                                    ดอกบัวแทนออเดอร์ที่เปิดอยู่ และผลไม้ทองเมื่อปิดทำกำไร
-                                </p>
-                            </div>
-
-                            {/* 5. Bottom-Right: Daily Harvest Crates (ลอยอยู่เหนือลังไม้ด้านขวาล่าง ไม่บังลังไม้) */}
-                            <div 
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-3 sm:right-16 bottom-[115px] sm:bottom-[165px] w-[175px] sm:w-[205px] p-2 sm:p-2.5 rounded-xl bg-[#080e1a]/95 border border-amber-500/35 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(245,158,11,0.15)] z-20 select-none animate-fade-in pointer-events-auto"
-                            >
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0 shadow-[0_0_6px_#fbbf24]" />
-                                    <span className="text-[9.5px] sm:text-[10px] font-mono font-black text-amber-300 tracking-wide uppercase">
-                                        ประวัติผลผลิต (90D)
-                                    </span>
-                                </div>
-                                <p className="text-[8.5px] sm:text-[9px] text-white/80 leading-snug font-sans">
-                                    เก็บบันทึกกำไรรายวัน เลื่อนดูย้อนหลัง 90 วันและโหลด CSV
-                                </p>
-                            </div>
-                        </div>
-                    )}
 
                     {/* 🪟 PRIME TRANSLUCENT GLOWING MODAL POPUP */}
                     {primeActiveOrb !== null && (isOwnerDevUser || primeActiveOrb === 1 || primeActiveOrb === 2) && (
