@@ -287,7 +287,7 @@ export async function POST(req: Request) {
 
                 const { data: existingStatus } = await supabase
                     .from('farm_port_status')
-                    .select('port_number, equity, account_type, balance, today_pnl, updated_at, daily_max_drawdown, floating_pnl, system_code, ea_version')
+                    .select('port_number, equity, account_type, balance, today_pnl, today_closed_lots, updated_at, daily_max_drawdown, floating_pnl, buy_pnl, sell_pnl, buy_count, sell_count, total_lots, asset_type, system_code, ea_version')
                     .eq('port_number', String(account_number))
                     .maybeSingle();
 
@@ -305,13 +305,18 @@ export async function POST(req: Request) {
                             ? Number((numBal + Number(existingStatus.floating_pnl)).toFixed(2))
                             : ((existingStatus.equity && Number(existingStatus.equity) > 0) ? Number(existingStatus.equity) : numBal));
 
-                    // Automatic calculation of Floating PnL & Drawdowns from Balance & Equity
-                    const calculatedFloatingPnl = (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
-                        ? Number((numEquity - numBal).toFixed(2))
-                        : (existingStatus.floating_pnl != null ? Number(existingStatus.floating_pnl) : Number((numEquity - numBal).toFixed(2)));
+                    // Preserve EasyM-only floating_pnl if this port is already syncing order-level telemetry (buy_pnl / sell_pnl)
+                    const hasOrderLevelTelemetry = (Number(existingStatus.buy_count) || 0) > 0 || (Number(existingStatus.sell_count) || 0) > 0 || (Number(existingStatus.total_lots) || 0) > 0;
+                    const eaOrderFloatingPnl = Number(((Number(existingStatus.buy_pnl) || 0) + (Number(existingStatus.sell_pnl) || 0)).toFixed(2));
+                    const calculatedFloatingPnl = hasOrderLevelTelemetry && (existingStatus.buy_pnl != null || existingStatus.sell_pnl != null)
+                        ? (eaOrderFloatingPnl !== 0 ? eaOrderFloatingPnl : Number(existingStatus.floating_pnl) || 0)
+                        : (equity !== undefined && !isNaN(Number(equity)) && Number(equity) > 0)
+                            ? Number((numEquity - numBal).toFixed(2))
+                            : (existingStatus.floating_pnl != null ? Number(existingStatus.floating_pnl) : Number((numEquity - numBal).toFixed(2)));
                     let currentDD = 0;
-                    if (numBal > 0 && numEquity < numBal) {
-                        currentDD = Number((((numBal - numEquity) / numBal) * 100).toFixed(1));
+                    const effectiveEquityForDD = hasOrderLevelTelemetry ? (numBal + calculatedFloatingPnl) : numEquity;
+                    if (numBal > 0 && effectiveEquityForDD < numBal) {
+                        currentDD = Number((((numBal - effectiveEquityForDD) / numBal) * 100).toFixed(1));
                     }
                     const existingDailyDD = Number(existingStatus.daily_max_drawdown) || 0;
                     const resolvedDailyDD = Math.max(existingDailyDD, currentDD);
@@ -363,10 +368,14 @@ export async function POST(req: Request) {
                     const prodKeyUpper = (resolvedProduct?.product_key || '').toUpperCase();
                     const prodNameUpper = (resolvedProduct?.name || '').toUpperCase();
                     const prodIdUpper = String(product_id || '').toUpperCase();
+                    const symUpper = String(symbol || '').toUpperCase();
                     const isProdGold = prodKeyUpper.includes('GOLD') || 
                                        prodNameUpper.includes('GOLD') ||
                                        prodIdUpper.includes('GOLD') ||
-                                       prodIdUpper.includes('EZG');
+                                       prodIdUpper.includes('EZG') ||
+                                       symUpper.includes('XAU') ||
+                                       symUpper.includes('GOLD') ||
+                                       (hasOrderLevelTelemetry && existingStatus.asset_type === 'GOLD');
 
                     const currentAssetType = isProdGold ? 'GOLD' : 'FOREX';
                     const currentSystemCode = resolvedProduct?.name || (isProdGold ? 'EasyGold' : 'EasyM MAX');

@@ -46,6 +46,43 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+export type ExternalActivityReason =
+    | 'GOLD_EA_MISMATCH'
+    | 'GOLD_CHART_ATTACHED'
+    | 'EXTERNAL_FLOATING_LOSS'
+    | 'EXCESSIVE_CLOSED_LOTS'
+    | 'UNVERIFIED_PROFIT_SPIKE'
+    | 'MULTI_LICENSE_PORT';
+
+export interface ExternalHistoryAnomaly {
+    date: string;
+    profit: number;
+    closedLots: number;
+    maxDD: number;
+    reason: string;
+}
+
+export interface ExternalActivityInfo {
+    hasExternalActivity: boolean;
+    isStatsFiltered: boolean;
+    severity: 'high' | 'warning' | 'info';
+    reasons: ExternalActivityReason[];
+    badgeText: string;
+    summaryText: string;
+    rawAccountEquity: number;
+    rawAccountFloatingPnl: number;
+    easymFloatingPnl: number;
+    externalFloatingDiff: number;
+    rawTodayPnl: number;
+    filteredTodayPnl: number;
+    rawTodayClosedLots: number;
+    easymActiveLots: number;
+    easymBuyCount: number;
+    easymSellCount: number;
+    otherLicenses: string[];
+    historyAnomalies: ExternalHistoryAnomaly[];
+}
+
 interface EasyMPortItem {
     portNumber: string;
     portName: string | null;
@@ -95,6 +132,7 @@ interface EasyMPortItem {
     runStatus: 'running' | 'offline_48h' | 'insufficient_balance' | 'no_telemetry' | 'tester' | 'inactive_license' | 'mismatch_gold';
     lastViewedAt?: string | null;
     state?: EasyMPortState;
+    externalActivity?: ExternalActivityInfo;
 }
 
 export type EasyMPortState =
@@ -550,6 +588,12 @@ export interface FleetDailyComparison {
     isWeekend?: boolean;
     holidayLabel?: string;
     marketOpenHour?: number;
+    filteredOutTodayPorts?: {
+        portNumber: string;
+        rawProfit: number;
+        closedLots: number;
+        reason: string;
+    }[];
 }
 
 function FleetProfitBarChart({ 
@@ -739,6 +783,7 @@ export default function EasyMMasterDashboardPage() {
     const [selectedStateFilter, setSelectedStateFilter] = useState<string>('all');
     const [hoveredPortForMatrix, setHoveredPortForMatrix] = useState<EasyMPortItem | null>(null);
     const [pinnedPortForMatrix, setPinnedPortForMatrix] = useState<EasyMPortItem | null>(null);
+    const [inspectingExternalPort, setInspectingExternalPort] = useState<EasyMPortItem | null>(null);
     const [isLegendOpen, setIsLegendOpen] = useState<boolean>(true);
     const [viewMode, setViewMode] = useState<'customer' | 'table' | 'cards'>('customer');
     const [activeTab, setActiveTab] = useState<'performance' | 'ports' | 'team-analytics'>('performance');
@@ -863,18 +908,28 @@ export default function EasyMMasterDashboardPage() {
                 }
             }
 
-            // Set of accounts that actually have a Gold EA license in system
+            // Set of accounts that actually have a Gold EA license or other non-EasyM EA license in system
             const goldLicenseAccountSet = new Set<string>();
+            const otherEaProductsByAcc = new Map<string, Set<string>>();
             (licenses || []).forEach(l => {
                 const prod = Array.isArray(l.products) ? l.products[0] : l.products;
                 const pKey = ((prod as any)?.product_key || '').toUpperCase();
-                const pName = ((prod as any)?.name || '').toUpperCase();
-                if (pKey.includes('GOLD') || pName.includes('GOLD') || pKey.includes('EZG')) {
-                    const rawAcc = (l.account_number || '').trim();
-                    if (rawAcc) {
-                        rawAcc.split(/[\s,]+/).filter(Boolean).forEach((acc: string) => goldLicenseAccountSet.add(acc));
+                const pName = ((prod as any)?.name || '');
+                const pNameUpper = pName.toUpperCase();
+                const isEasyMProd = pKey.includes('EZM') || pNameUpper.includes('EASYM') || pNameUpper.includes('EASY M');
+                const rawAcc = (l.account_number || '').trim();
+                if (!rawAcc) return;
+                rawAcc.split(/[\s,]+/).filter(Boolean).forEach((acc: string) => {
+                    if (pKey.includes('GOLD') || pNameUpper.includes('GOLD') || pKey.includes('EZG')) {
+                        goldLicenseAccountSet.add(acc);
                     }
-                }
+                    if (!isEasyMProd && (pName || pKey)) {
+                        if (!otherEaProductsByAcc.has(acc)) {
+                            otherEaProductsByAcc.set(acc, new Set());
+                        }
+                        otherEaProductsByAcc.get(acc)!.add(pName || pKey);
+                    }
+                });
             });
 
             // C. Fetch all farm_port_status (paginated)
@@ -943,7 +998,7 @@ export default function EasyMMasterDashboardPage() {
             while (true) {
                 const { data: batch, error: batchErr } = await supabase
                     .from('farm_daily_history')
-                    .select('port_number, profit, max_dd, max_drawdown, date')
+                    .select('port_number, profit, closed_lots, max_dd, max_drawdown, date')
                     .range(histPage * histPageSize, (histPage + 1) * histPageSize - 1)
                     .order('date', { ascending: false });
                 if (batchErr || !batch || batch.length === 0) break;
@@ -1070,12 +1125,15 @@ export default function EasyMMasterDashboardPage() {
                 return testPatterns.includes(str) || /^(\d)\1{5,}$/.test(str);
             };
 
-            // Group history profit & worst DD by port
+            // Group history profit & worst DD by port (filtering out non-EasyM / Gold / Deposit / Manual trade contamination)
             const portHistoryProfitMap = new Map<string, number>();
+            const portRawHistoryProfitMap = new Map<string, number>();
             const portWorstDDMap = new Map<string, number>();
             const portFirstDateMap = new Map<string, string>();
             const portLastDateMap = new Map<string, string>();
             const portActiveMonthsMap = new Map<string, Set<string>>();
+            const portHistoryAnomaliesMap = new Map<string, ExternalHistoryAnomaly[]>();
+            const filteredOutTodayPorts: { portNumber: string; rawProfit: number; closedLots: number; reason: string }[] = [];
             const todayHistoryRecords: any[] = [];
             const yesterdayHistoryRecords: any[] = [];
             let allTimePeakRecord: any = null;
@@ -1088,17 +1146,57 @@ export default function EasyMMasterDashboardPage() {
             });
             easymPortSet.add('21692434');
 
+            // Helper: Detect if a daily history row is contaminated by external/manual/Gold trading or balance deposit delta
+            const evaluateDailyRecordContamination = (port: string, profitVal: number, closedLotsVal: number, dateStr: string): string | null => {
+                const st = statusMap.get(port);
+                const isGoldMismatchPort = (port === '97072259') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
+                if (isGoldMismatchPort) {
+                    return 'พอร์ตรัน EA ทองคำ (EasyGold) ทั้งระบบ';
+                }
+                const isGoldChart = String(st?.asset_type || '').toUpperCase() === 'GOLD';
+                // 1. Massive closed lots in a single day (> 15.0 lots) — e.g. #97130324 (52.91 lots, +15,178.84 USC), #97115162 (23.5 lots on GOLD chart)
+                if (closedLotsVal > 15.0) {
+                    return `ปิดล็อตสูงผิดปกติ (${closedLotsVal.toFixed(2)} Lots ในวันเดียว${isGoldChart ? ' บนชาร์ต GOLD' : ''}) คาดว่ามีออเดอร์เทรดมือ/ทองคำ/EA อื่นปะปน`;
+                }
+                // 2. Port has open non-EasyM floating loss right now (Account Equity - Balance is much worse than EasyM floating_pnl)
+                const rawBal = Number(st?.balance) || 0;
+                const rawEq = Number(st?.equity) || 0;
+                const eqMinusBal = (rawBal > 0 && rawEq > 0) ? (rawEq - rawBal) : 0;
+                const easymFlt = Number(st?.floating_pnl) || 0;
+                const hasOrderTele = (Number(st?.buy_count) || 0) > 0 || (Number(st?.sell_count) || 0) > 0 || (Number(st?.total_lots) || 0) > 0 || activeOrdersSummaryMap.has(port);
+                const extFltDiff = (hasOrderTele && rawBal > 0 && rawEq > 0) ? (eqMinusBal - easymFlt) : 0;
+                if (dateStr === day1DateStr && extFltDiff < -200 && (profitVal > 1500 || closedLotsVal > 8.0)) {
+                    return `พอร์ตมีออเดอร์นอกระบบ/ทองคำติดลบค้างอยู่ (${extFltDiff.toLocaleString('en-US', { maximumFractionDigits: 2 })} USC) และมียอดปิดกำไรปะปน`;
+                }
+                // 3. Unverified 0-lot spike (from 1U balance delta / deposit or v1.16 EAE_ScanHistoryToday without Magic filter)
+                if (closedLotsVal === 0 && profitVal >= 1500) {
+                    const isExactDeposit = profitVal >= 5000 && Math.abs(profitVal - Math.round(profitVal / 1000) * 1000) < 1;
+                    if (isExactDeposit) {
+                        return `ยอด Balance เพิ่มขึ้นแบบตัวเลขกลม (+${profitVal.toLocaleString()} USC โดยไม่มีข้อมูลล็อต) คาดว่าเป็นการเติมเงินเข้าพอร์ต`;
+                    }
+                    // Preserve verified historical EasyM MAX champions from July-Aug 2026 (#97037173, #97032895) before closed_lots column was added
+                    const isHistoricalMaxChampion = (port === '97037173' || port === '97032895') && dateStr < '2026-09-01';
+                    if (!isHistoricalMaxChampion) {
+                        if (profitVal >= 10000) {
+                            return `กำไรสูงผิดปกติ (+${profitVal.toLocaleString()} USC) โดยไม่มีบันทึกจำนวนล็อตของ EasyM (คาดว่ามาจากการเทรดทองคำ/เทรดมือ หรือฝากเงิน)`;
+                        }
+                        if (dateStr >= '2026-10-01') {
+                            return `กำไร +${profitVal.toLocaleString()} USC จากพอร์ตที่ไม่ได้ส่งล็อตออเดอร์ EasyM ยืนยัน (คาดว่าปนกำไรเทรดทองคำ/คู่เงินอื่นจาก MT5 History หรือยอดฝากเงิน)`;
+                        }
+                    }
+                }
+                return null;
+            };
+
             allDailyHistory.forEach(h => {
                 const port = h.port_number?.toString();
                 if (!port || !easymPortSet.has(port) || isTestPort(port)) return;
 
                 const p = Number(h.profit) || 0;
+                const lots = Number(h.closed_lots) || 0;
                 const dd = Number(h.max_dd || h.max_drawdown) || 0;
 
-                portHistoryProfitMap.set(port, (portHistoryProfitMap.get(port) || 0) + p);
-                if (dd > (portWorstDDMap.get(port) || 0)) {
-                    portWorstDDMap.set(port, dd);
-                }
+                portRawHistoryProfitMap.set(port, (portRawHistoryProfitMap.get(port) || 0) + p);
 
                 const curFirst = portFirstDateMap.get(port);
                 if (!curFirst || (h.date && h.date < curFirst)) {
@@ -1116,44 +1214,93 @@ export default function EasyMMasterDashboardPage() {
                     portActiveMonthsMap.get(port)!.add(mKey);
                 }
 
-                // Check all-time peak
+                // Check if this daily record is contaminated by external/Gold/manual/deposit activity
+                const contaminationReason = evaluateDailyRecordContamination(port, p, lots, h.date || '');
+                if (contaminationReason) {
+                    if (!portHistoryAnomaliesMap.has(port)) {
+                        portHistoryAnomaliesMap.set(port, []);
+                    }
+                    portHistoryAnomaliesMap.get(port)!.push({
+                        date: h.date || '-',
+                        profit: p,
+                        closedLots: lots,
+                        maxDD: dd,
+                        reason: contaminationReason,
+                    });
+                    if (h.date === day1DateStr && p > 0) {
+                        filteredOutTodayPorts.push({
+                            portNumber: port,
+                            rawProfit: p,
+                            closedLots: lots,
+                            reason: contaminationReason,
+                        });
+                    }
+                    return; // Exclude contaminated record from clean EasyM fleet statistics
+                }
+
+                portHistoryProfitMap.set(port, (portHistoryProfitMap.get(port) || 0) + p);
+                if (dd > (portWorstDDMap.get(port) || 0)) {
+                    portWorstDDMap.set(port, dd);
+                }
+
+                // Check all-time peak (only clean EasyM records!)
                 if (p > (allTimePeakRecord?.profit || 0)) {
                     allTimePeakRecord = { portNumber: port, profit: p, date: h.date, maxDD: dd };
                 }
 
-                // Split Today & Yesterday (strictly EasyM only: exclude Gold EA mismatches like 97072259)
-                const st = statusMap.get(port);
-                const isGoldPort = (port === '97072259') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
-                if (!isGoldPort) {
-                    if (h.date === day1DateStr) {
-                        todayHistoryRecords.push({ ...h, port_number: port });
-                    } else if (h.date === day2DateStr) {
-                        yesterdayHistoryRecords.push({ ...h, port_number: port });
-                    }
+                // Split Today & Yesterday (strictly clean EasyM only)
+                if (h.date === day1DateStr) {
+                    todayHistoryRecords.push({ ...h, port_number: port });
+                } else if (h.date === day2DateStr) {
+                    yesterdayHistoryRecords.push({ ...h, port_number: port });
                 }
             });
 
-            // Merge live farm_port_status for today ONLY if not weekend, last_ping is within today's market session (< 24h) and belongs to genuine EasyM (not Gold)
+            // Merge live farm_port_status for today ONLY if not weekend, last_ping is within today's market session (< 24h) and belongs to genuine EasyM (not contaminated)
             if (!isWeekend) {
                 (portStatuses || []).forEach(s => {
                     const accNum = s.port_number?.toString();
                     if (!accNum || !easymPortSet.has(accNum) || isTestPort(accNum)) return;
-                    
-                    // CRITICAL 1: Exclude Gold EA mismatches
-                    const isGold = (accNum === '97072259') || (goldLicenseAccountSet.has(accNum) && (s.system_code?.toLowerCase().includes('gold') || s.system_code === 'EG_FARMING'));
-                    if (isGold) return;
 
-                    // CRITICAL 2: Only consider farm_port_status if last_ping is within today's market session and < 24 hours
+                    // CRITICAL 1: Only consider farm_port_status if last_ping is within today's market session and < 24 hours
                     if (!s.last_ping) return;
                     const pingBkk = getMarketTradingDateStr(new Date(s.last_ping));
                     const pingAgeHours = (now.getTime() - new Date(s.last_ping).getTime()) / (1000 * 60 * 60);
-                    if (pingBkk !== day1DateStr || pingAgeHours > 24) return; // Ignore stale records from previous days or dead pings (e.g. 97033490!)
+                    if (pingBkk !== day1DateStr || pingAgeHours > 24) return;
 
                     const pnl = Number(s.today_pnl) || 0;
+                    const closedLots = Number(s.today_closed_lots) || 0;
                     const dd = Number(s.daily_max_drawdown) || 0;
+
+                    // CRITICAL 2: Check if today's status PnL is contaminated by external/Gold/manual trading
+                    const statusContamination = evaluateDailyRecordContamination(accNum, pnl, closedLots, day1DateStr);
+                    if (statusContamination) {
+                        if (!portHistoryAnomaliesMap.get(accNum)?.some(a => a.date === day1DateStr)) {
+                            if (!portHistoryAnomaliesMap.has(accNum)) {
+                                portHistoryAnomaliesMap.set(accNum, []);
+                            }
+                            portHistoryAnomaliesMap.get(accNum)!.push({
+                                date: day1DateStr,
+                                profit: pnl,
+                                closedLots,
+                                maxDD: dd,
+                                reason: statusContamination,
+                            });
+                        }
+                        if (pnl > 0 && !filteredOutTodayPorts.some(f => f.portNumber === accNum)) {
+                            filteredOutTodayPorts.push({
+                                portNumber: accNum,
+                                rawProfit: pnl,
+                                closedLots,
+                                reason: statusContamination,
+                            });
+                        }
+                        return;
+                    }
+
                     const existing = todayHistoryRecords.find(r => r.port_number === accNum);
                     if (!existing && (pnl !== 0 || dd > 0)) {
-                        todayHistoryRecords.push({ port_number: accNum, profit: pnl, max_dd: dd, max_drawdown: dd, date: day1DateStr });
+                        todayHistoryRecords.push({ port_number: accNum, profit: pnl, closed_lots: closedLots, max_dd: dd, max_drawdown: dd, date: day1DateStr });
                     } else if (existing) {
                         if (pnl < 0) {
                             existing.profit = pnl;
@@ -1262,7 +1409,8 @@ export default function EasyMMasterDashboardPage() {
                 allTimePeak: allTimePeakRecord || { portNumber: '97037173', profit: 11091.17, date: '2026-07-30', maxDD: 0 },
                 isWeekend,
                 holidayLabel,
-                marketOpenHour: getMarketOpenHourBangkok()
+                marketOpenHour: getMarketOpenHourBangkok(),
+                filteredOutTodayPorts: filteredOutTodayPorts.sort((a, b) => b.rawProfit - a.rawProfit)
             };
             setFleetStats(computedFleetStats);
 
@@ -1355,15 +1503,19 @@ export default function EasyMMasterDashboardPage() {
                     const hoursSinceLastPing = lastActive > 0 ? (now.getTime() - lastActive) / (1000 * 60 * 60) : 9999;
 
                     // Resolve accurate today pnl and drawdowns:
-                    // CRITICAL: Only count status.today_pnl if not weekend, port sent ping today (<24h), and is NOT running a Gold EA!
+                    // CRITICAL: Only count status.today_pnl if not weekend, port sent ping today (<24h), and is NOT running a Gold EA or contaminated!
                     const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
                     const pingMarketDateStr = effectiveLastPing ? getMarketTradingDateStr(new Date(effectiveLastPing)) : '';
                     const isPingToday = !isWeekend && pingMarketDateStr === day1DateStr && hoursSinceLastPing <= 24;
-                    const statusTodayPnl = (isPingToday && !isGoldMismatch) ? (Number(status?.today_pnl) || 0) : 0;
+                    const rawAccountTodayPnl = isPingToday ? (Number(status?.today_pnl) || 0) : (Number(histToday?.profit) || 0);
+                    const rawTodayClosedLots = Number(status?.today_closed_lots) || 0;
+                    const todayContaminationReason = evaluateDailyRecordContamination(accNum, rawAccountTodayPnl, rawTodayClosedLots, day1DateStr);
+
+                    const statusTodayPnl = (isPingToday && !isGoldMismatch && !todayContaminationReason) ? (Number(status?.today_pnl) || 0) : 0;
                     const histPnl = Number(histToday?.profit) || 0;
                     let resolvedTodayPnl = 0;
-                    if (isGoldMismatch) {
-                        resolvedTodayPnl = 0;
+                    if (isGoldMismatch || todayContaminationReason) {
+                        resolvedTodayPnl = histPnl; // 0 if filtered out of todayHistoryRecords
                     } else if (isPingToday && status?.today_pnl !== undefined && status?.today_pnl !== null) {
                         if (statusTodayPnl < 0) {
                             resolvedTodayPnl = statusTodayPnl;
@@ -1378,18 +1530,34 @@ export default function EasyMMasterDashboardPage() {
                         resolvedTodayPnl = histPnl;
                     }
 
-                    // Fallback Floating PnL & DD if status has equity & balance but floating_pnl is 0
+                    // Fallback Floating PnL & DD if status has equity & balance
                     const rawBalVal = Number(status?.balance) || 0;
                     const rawEqVal = Number(status?.equity) || 0;
-                    let resolvedFloatingPnl = Number(status?.floating_pnl) || 0;
-                    if (resolvedFloatingPnl === 0 && hasActiveOrders) {
-                        resolvedFloatingPnl = Number(activeOrderSummary.floatingPnl.toFixed(2));
-                    } else if (resolvedFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
-                        resolvedFloatingPnl = Number((rawEqVal - rawBalVal).toFixed(2));
+                    const rawAccountFloating = (rawBalVal > 0 && rawEqVal > 0) ? Number((rawEqVal - rawBalVal).toFixed(2)) : (Number(status?.floating_pnl) || 0);
+                    const hasOrderLevelTele = (Number(status?.buy_count) || 0) > 0 || (Number(status?.sell_count) || 0) > 0 || (Number(status?.total_lots) || 0) > 0 || hasActiveOrders;
+                    const rawStatusFloating = Number(status?.floating_pnl) || 0;
+
+                    let easymOnlyFloatingPnl = rawStatusFloating;
+                    if (hasActiveOrders && activeOrderSummary) {
+                        easymOnlyFloatingPnl = Number(activeOrderSummary.floatingPnl.toFixed(2));
+                    } else if (hasOrderLevelTele && rawStatusFloating !== 0) {
+                        easymOnlyFloatingPnl = rawStatusFloating;
+                    } else if (easymOnlyFloatingPnl === 0 && rawBalVal > 0 && rawEqVal > 0 && rawEqVal !== rawBalVal) {
+                        easymOnlyFloatingPnl = rawAccountFloating;
                     }
 
+                    // Detect external open floating loss (e.g. #97130324 where Eq-Bal = -12,539.09 while EasyM floating = -109.09 -> diff = -12,430.00 USC)
+                    // Note: Positive diff on Prime ports (#21692434, #97053088, #97065753) is Hedge/Rescue Magic 3000+/4000+ profit, NOT external!
+                    const externalFloatingDiff = (hasOrderLevelTele && rawBalVal > 0 && rawEqVal > 0)
+                        ? Number((rawAccountFloating - easymOnlyFloatingPnl).toFixed(2))
+                        : 0;
+                    const hasExternalFloatingLoss = externalFloatingDiff < -200;
+
+                    const resolvedFloatingPnl = easymOnlyFloatingPnl;
                     let resolvedEquity = rawEqVal;
-                    if ((resolvedEquity === 0 || resolvedEquity === rawBalVal) && resolvedFloatingPnl !== 0 && rawBalVal > 0) {
+                    if (hasExternalFloatingLoss && rawBalVal > 0) {
+                        resolvedEquity = Number((rawBalVal + easymOnlyFloatingPnl).toFixed(2));
+                    } else if ((resolvedEquity === 0 || resolvedEquity === rawBalVal) && resolvedFloatingPnl !== 0 && rawBalVal > 0) {
                         resolvedEquity = Number((rawBalVal + resolvedFloatingPnl).toFixed(2));
                     }
 
@@ -1397,12 +1565,89 @@ export default function EasyMMasterDashboardPage() {
                     if (rawBalVal > 0 && resolvedEquity > 0 && resolvedEquity < rawBalVal) {
                         calculatedDD = Number((((rawBalVal - resolvedEquity) / rawBalVal) * 100).toFixed(1));
                     }
-                    const statusDailyDD = Math.max(Number(status?.daily_max_drawdown) || 0, calculatedDD);
+                    const rawStatusDailyDD = Number(status?.daily_max_drawdown) || 0;
+                    const rawStatusMaxDD = Number(status?.max_drawdown) || 0;
+                    const statusDailyDD = hasExternalFloatingLoss ? calculatedDD : Math.max(rawStatusDailyDD, calculatedDD);
                     const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
 
-                    const statusMaxDD = Math.max(Number(status?.max_drawdown) || 0, calculatedDD);
+                    const statusMaxDD = hasExternalFloatingLoss ? calculatedDD : Math.max(rawStatusMaxDD, calculatedDD);
                     const histWorstDD = portWorstDDMap.get(accNum) || 0;
                     const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
+
+                    // Build External / Non-EasyM Activity Info for Badge & Clickable Inspector Modal
+                    const extReasons: ExternalActivityReason[] = [];
+                    if (isGoldMismatch) {
+                        extReasons.push('GOLD_EA_MISMATCH');
+                    }
+                    if (String(status?.asset_type || '').toUpperCase() === 'GOLD' && !isGoldMismatch) {
+                        extReasons.push('GOLD_CHART_ATTACHED');
+                    }
+                    if (hasExternalFloatingLoss) {
+                        extReasons.push('EXTERNAL_FLOATING_LOSS');
+                    }
+                    if (rawTodayClosedLots > 15.0) {
+                        extReasons.push('EXCESSIVE_CLOSED_LOTS');
+                    }
+                    if (todayContaminationReason && rawTodayClosedLots === 0 && rawAccountTodayPnl >= 1500) {
+                        extReasons.push('UNVERIFIED_PROFIT_SPIKE');
+                    }
+                    const portAnomalies = portHistoryAnomaliesMap.get(accNum) || [];
+                    if (portAnomalies.length > 0 && extReasons.length === 0) {
+                        extReasons.push('UNVERIFIED_PROFIT_SPIKE');
+                    }
+                    const otherEaLicList = Array.from(otherEaProductsByAcc.get(accNum) || []);
+                    if (otherEaLicList.length > 0 && !isGoldMismatch) {
+                        extReasons.push('MULTI_LICENSE_PORT');
+                    }
+
+                    const hasExternalActivity = extReasons.length > 0;
+                    const isStatsFiltered = isGoldMismatch || hasExternalFloatingLoss || !!todayContaminationReason || portAnomalies.length > 0;
+
+                    let badgeText = '';
+                    let summaryText = '';
+                    if (extReasons.includes('GOLD_EA_MISMATCH')) {
+                        badgeText = '🥇 รัน EasyGold (คลิกดู)';
+                        summaryText = 'พอร์ตนี้ส่งรหัสระบบเป็น EA ทองคำ (EasyGold) จึงถูกคัดแยกออกจากสถิติฟาร์ม EasyM';
+                    } else if (extReasons.includes('EXTERNAL_FLOATING_LOSS') || extReasons.includes('EXCESSIVE_CLOSED_LOTS')) {
+                        badgeText = '⚠️ ปนเทรดนอกระบบ/ทองคำ (คลิกดู)';
+                        summaryText = `ตรวจพบออเดอร์นอกระบบ EasyM ปะปนในพอร์ตเดียว (ส่วนต่าง Floating ${externalFloatingDiff.toLocaleString()} ${resolvedAccType}${rawTodayClosedLots > 15 ? ` / ปิดสะสม ${rawTodayClosedLots.toFixed(2)} Lots` : ''}) ระบบกรองเอาเฉพาะสถิติของ EasyM มาแสดงแล้ว`;
+                    } else if (extReasons.includes('GOLD_CHART_ATTACHED')) {
+                        badgeText = '🥇 แปะกราฟทองคำ XAUUSD (คลิกดู)';
+                        summaryText = 'ตรวจพบการนำ EA EasyM ไปแปะบนชาร์ตทองคำ (asset_type = GOLD) หรือเทรดทองคำควบคู่ในพอร์ตเดียวกัน';
+                    } else if (extReasons.includes('UNVERIFIED_PROFIT_SPIKE')) {
+                        badgeText = '⚠️ มียอดปนเปื้อน/ฝากเงิน (คลิกดู)';
+                        summaryText = 'ตรวจพบยอดกำไรรายวันสูงผิดปกติโดยไม่มีจำนวนล็อตออเดอร์ EasyM ยืนยัน (คาดว่าปนกำไรทองคำ/คู่อื่นจาก MT5 History หรือยอดฝากเงิน) ระบบได้คัดกรองออกแล้ว';
+                    } else if (extReasons.includes('MULTI_LICENSE_PORT')) {
+                        badgeText = `🔀 พ่วงสิทธิ์ ${otherEaLicList.join(', ')} (คลิกดู)`;
+                        summaryText = `พอร์ตนี้ลงทะเบียนใบอนุญาตควบคู่กับ EA อื่น (${otherEaLicList.join(', ')}) บนหมายเลขพอร์ตเดียวกัน`;
+                    }
+
+                    const externalActivityInfo: ExternalActivityInfo = {
+                        hasExternalActivity,
+                        isStatsFiltered,
+                        severity: (isGoldMismatch || hasExternalFloatingLoss || rawTodayClosedLots > 15 || !!todayContaminationReason) ? 'high' : 'warning',
+                        reasons: extReasons,
+                        badgeText,
+                        summaryText,
+                        rawAccountEquity: rawEqVal,
+                        rawAccountFloatingPnl: rawAccountFloating,
+                        easymFloatingPnl: resolvedFloatingPnl,
+                        externalFloatingDiff,
+                        rawTodayPnl: rawAccountTodayPnl,
+                        filteredTodayPnl: resolvedTodayPnl,
+                        rawTodayClosedLots,
+                        easymActiveLots: (status?.total_lots != null && Number(status.total_lots) > 0)
+                            ? Number(status.total_lots)
+                            : (activeOrderSummary ? Number(activeOrderSummary.totalLots.toFixed(2)) : 0),
+                        easymBuyCount: (status?.buy_count != null && Number(status.buy_count) > 0)
+                            ? Number(status.buy_count)
+                            : (activeOrderSummary?.buyCount || 0),
+                        easymSellCount: (status?.sell_count != null && Number(status.sell_count) > 0)
+                            ? Number(status.sell_count)
+                            : (activeOrderSummary?.sellCount || 0),
+                        otherLicenses: otherEaLicList,
+                        historyAnomalies: portAnomalies,
+                    };
 
                     // Telemetry type & 3-Tier Engine classification
                     const telemetryType: 'full_sync' | 'license_only' | 'none' = hasUniversalTelemetry 
@@ -1544,7 +1789,8 @@ export default function EasyMMasterDashboardPage() {
                             lastPing: effectiveLastPing,
                             engineTier,
                             lastViewedAt: (status as any)?.last_viewed_at || null
-                        }, isWeekend)
+                        }, isWeekend),
+                        externalActivity: externalActivityInfo
                     };
 
 
@@ -2097,6 +2343,8 @@ export default function EasyMMasterDashboardPage() {
                     const eaVer = (p.eaVersion || '').toLowerCase();
                     const isP = prodKey.includes('PRIME') || prodName.includes('prime') || actualSys.includes('prime') || eaVer.includes('prime');
                     if (!isP) return false;
+                } else if (selectedStateFilter === 'external_activity') {
+                    if (!p.externalActivity?.hasExternalActivity) return false;
                 } else {
                     if (portSt !== selectedStateFilter) return false;
                 }
@@ -2107,6 +2355,7 @@ export default function EasyMMasterDashboardPage() {
                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
                 const portSt = resolvePortState(p, isWk, currentTime);
                 if (selectedStatus === 'real_running' && !p.isRealRunning) return false;
+                if (selectedStatus === 'external_activity' && !p.externalActivity?.hasExternalActivity) return false;
                 if (selectedStatus === 'mismatch_gold' && p.runStatus !== 'mismatch_gold') return false;
                 if (selectedStatus === 'offline_48h' && p.runStatus !== 'offline_48h') return false;
                 if (selectedStatus === 'insufficient_bal' && p.runStatus !== 'insufficient_balance') return false;
@@ -2161,11 +2410,15 @@ export default function EasyMMasterDashboardPage() {
             legacy_2url: 0,
             legacy_2url_minus: 0,
             legacy_1url: 0,
+            external_activity: 0,
         };
 
         searchFilteredPorts.forEach(p => {
             const st = resolvePortState(p, isWk, currentTime);
             counts[st] = (counts[st] || 0) + 1;
+            if (p.externalActivity?.hasExternalActivity) {
+                counts.external_activity++;
+            }
             if (isWk && (st === 'STATE_1_LIVE' || st === 'STATE_2_ONLINE' || st === 'STATE_3_STANDBY_12H' || p.isRealRunning)) {
                 counts.weekend_standby++;
             }
@@ -3123,19 +3376,75 @@ export default function EasyMMasterDashboardPage() {
                     {fleetStats && (
                 <div className="bg-gradient-to-br from-[#1c1209] via-[#140b05] to-[#0a0502] border border-amber-500/30 rounded-xl p-4 sm:p-5 space-y-4 shadow-lg relative overflow-hidden">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/20 pb-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <Sparkles className="w-5 h-5 text-amber-400" />
-                            <h2 className="text-base sm:text-lg font-bold text-amber-200 flex items-center gap-2">
+                            <h2 className="text-base sm:text-lg font-bold text-amber-200 flex items-center gap-2 flex-wrap">
                                 <span>สถิติผลงานฟาร์ม EasyM วันนี้ vs เมื่อวาน</span>
                                 <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
                                     Live Synchronized
                                 </span>
+                                <span className="text-[11px] font-sans font-medium text-cyan-300 bg-cyan-500/15 px-2 py-0.5 rounded border border-cyan-500/30" title="ระบบคัดกรองเฉพาะข้อมูลที่มาจากอีเอ EasyM ของเรา ไม่นำกำไร/ขาดทุนจากการเทรดทองคำ เทรดมือ หรืออีเออื่นมารวมในสถิติ">
+                                    🛡️ กรองเฉพาะออเดอร์ EasyM แท้ 100%
+                                </span>
                             </h2>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono flex-wrap">
+                            {stateCounts.external_activity > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveTab('ports');
+                                        setSelectedStateFilter('external_activity');
+                                        setSelectedStatus('external_activity');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-sans font-semibold text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
+                                    title="คลิกเพื่อดูรายการพอร์ตที่มีการเทรดทองคำ / คู่เงินอื่น / เทรดมือ หรือพ่วงอีเออื่นในพอร์ตเดียวกัน"
+                                >
+                                    <span>⚠️ พบพอร์ตปนเทรดนอกระบบ/ทองคำ {stateCounts.external_activity} พอร์ต (คลิกดู)</span>
+                                </button>
+                            )}
                             <span>สะสมประวัติทั้งระบบ: {tableCounts['farm_daily_history'] || 3974} รายการ</span>
                         </div>
                     </div>
+
+                    {/* แถบแจ้งเตือนพอร์ตที่ถูกคัดกรองออกจากสถิติวันนี้ (หากมีพอร์ตปนทองคำ/เทรดมือ/ฝากเงินในวันนี้) */}
+                    {fleetStats.filteredOutTodayPorts && fleetStats.filteredOutTodayPorts.length > 0 && (
+                        <div className="bg-amber-950/35 border border-amber-500/40 rounded-lg px-3.5 py-2.5 text-xs space-y-1.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                                    <span>🔍 ระบบคัดกรองยอดปนเปื้อนออกจากสถิติวันนี้แล้ว ({fleetStats.filteredOutTodayPorts.length} พอร์ต):</span>
+                                    <span className="text-[11px] font-normal text-amber-200/80">
+                                        เพื่อป้องกันยอดเทรดทองคำ/เทรดมือ/คู่เงินอื่น หรือยอดฝากเงิน มาทำให้สถิติฟาร์ม EasyM คลาดเคลื่อน (คลิกที่พอร์ตเพื่อดูรายละเอียดสิ่งที่ไม่ได้มาจาก EasyM)
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {fleetStats.filteredOutTodayPorts.map(fp => {
+                                    const fullPort = ports.find(p => p.portNumber === fp.portNumber);
+                                    return (
+                                        <button
+                                            key={fp.portNumber}
+                                            type="button"
+                                            onClick={() => {
+                                                if (fullPort) {
+                                                    setInspectingExternalPort(fullPort);
+                                                }
+                                            }}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/60 hover:bg-amber-500/20 border border-amber-500/40 text-amber-200 font-mono text-[11px] transition-colors cursor-pointer"
+                                            title={`${fp.reason} — คลิกเพื่อเปิดหน้าต่างตรวจสอบข้อมูลที่ไม่ได้มาจาก EasyM`}
+                                        >
+                                            <span className="font-bold text-amber-300">#{fp.portNumber}</span>
+                                            <span className="text-rose-300 line-through opacity-85">+{fp.rawProfit.toLocaleString()} USC</span>
+                                            {fp.closedLots > 0 && (
+                                                <span className="text-[10px] text-amber-400">({fp.closedLots.toFixed(2)} Lots)</span>
+                                            )}
+                                            <span className="text-[10px] font-sans text-cyan-300 underline ml-0.5">คลิกดูสาเหตุ</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* ส่วนที่ 1: พอร์ตกำไรสูงสุดเดี่ยวประจำวัน (แสดงสถิติเชิงลึก จัดสัดส่วนสวยงาม) */}
                     <div className="space-y-2">
@@ -4437,6 +4746,20 @@ export default function EasyMMasterDashboardPage() {
                                     <span className="sm:hidden">🔑 1U</span>
                                     <span>({stateCounts.legacy_1url})</span>
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedStateFilter(selectedStateFilter === 'external_activity' ? 'all' : 'external_activity')}
+                                    className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                        selectedStateFilter === 'external_activity'
+                                            ? 'bg-amber-500 text-black font-bold ring-2 ring-amber-300 shadow-md'
+                                            : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/40'
+                                    }`}
+                                    title="พอร์ตที่มีการเทรดทองคำ / คู่เงินอื่น / เปิดด้วยมือ หรือพ่วงอีเออื่นในพอร์ตเดียวกัน (คลิกเพื่อกรอง)"
+                                >
+                                    <span className="hidden sm:inline">⚠️ ปนเทรดนอกระบบ/ทองคำ</span>
+                                    <span className="sm:hidden">⚠️ ปนทอง/นอกระบบ</span>
+                                    <span>({stateCounts.external_activity})</span>
+                                </button>
                             </div>
                         </CardHeader>
 
@@ -4494,6 +4817,7 @@ export default function EasyMMasterDashboardPage() {
                                                 else if (selectedStateFilter === 'legacy_2url_minus') isFilteredOut = port.engineTier !== 'legacy_2url_minus';
                                                 else if (selectedStateFilter === 'legacy_1url') isFilteredOut = port.engineTier !== 'legacy_1url';
                                                 else if (selectedStateFilter === 'prime') isFilteredOut = !isPrime;
+                                                else if (selectedStateFilter === 'external_activity') isFilteredOut = !port.externalActivity?.hasExternalActivity;
                                                 else if (selectedStateFilter === 'weekend_standby') isFilteredOut = !isWk || (pState !== 'STATE_1_LIVE' && pState !== 'STATE_2_ONLINE' && pState !== 'STATE_3_STANDBY_12H' && !port.isRealRunning);
                                                 else isFilteredOut = pState !== selectedStateFilter;
                                             }
@@ -4519,9 +4843,13 @@ export default function EasyMMasterDashboardPage() {
                                                     onMouseEnter={() => setHoveredPortForMatrix(port)}
                                                     onClick={() => {
                                                         setPinnedPortForMatrix(port);
-                                                        const targetEl = document.getElementById('port-list-section');
-                                                        if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                        toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
+                                                        if (port.externalActivity?.hasExternalActivity) {
+                                                            setInspectingExternalPort(port);
+                                                        } else {
+                                                            const targetEl = document.getElementById('port-list-section');
+                                                            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                            toast.info(`เลือกพอร์ต #${port.portNumber} (${port.customerName})`);
+                                                        }
                                                     }}
                                                 className={`group relative flex flex-col justify-between items-center w-12 h-12 sm:w-13 sm:h-13 rounded-lg cursor-pointer transition-all duration-150 select-none overflow-hidden ${
                                                     meta.colorBg
@@ -4587,7 +4915,11 @@ export default function EasyMMasterDashboardPage() {
                                                             return `${base} 1U`;
                                                         })()}
                                                     </span>
-                                                    {pState === 'STATE_1_LIVE' ? (
+                                                    {port.externalActivity?.hasExternalActivity ? (
+                                                        <span className="text-[9px] leading-none animate-pulse" title={port.externalActivity.summaryText}>
+                                                            {port.externalActivity.reasons.includes('GOLD_EA_MISMATCH') || port.externalActivity.reasons.includes('GOLD_CHART_ATTACHED') ? '🥇' : '⚠️'}
+                                                        </span>
+                                                    ) : pState === 'STATE_1_LIVE' ? (
                                                         <div className="relative flex items-center justify-center w-2 h-2 shrink-0" title="🟢 กำลังเปิดดูหน้าฟาร์มสด (Live Streaming 20s)">
                                                             <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-80 animate-ping" />
                                                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white shadow-[0_0_8px_rgba(255,255,255,1)]" />
@@ -4702,6 +5034,17 @@ export default function EasyMMasterDashboardPage() {
                                                         <span className="hidden sm:inline">🔑 1U (ดั้งเดิม ส่งแค่ Balance)</span>
                                                         <span className="sm:hidden">🔑 1U</span>
                                                     </Badge>
+                                                )}
+
+                                                {targetPort.externalActivity?.hasExternalActivity && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setInspectingExternalPort(targetPort)}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/50 transition-colors cursor-pointer shrink-0"
+                                                        title={targetPort.externalActivity.summaryText}
+                                                    >
+                                                        <span>{targetPort.externalActivity.badgeText}</span>
+                                                    </button>
                                                 )}
                                             </div>
 
@@ -5096,6 +5439,7 @@ export default function EasyMMasterDashboardPage() {
                                             <SelectItem value="legacy_2url">📡 2U (ส่งข้อมูลสดครบ 2 URLs)</SelectItem>
                                             <SelectItem value="legacy_2url_minus">📡 2U- (รอบตรวจ 12h ขาด URL 2)</SelectItem>
                                             <SelectItem value="legacy_1url">🔑 1U (ดั้งเดิม ส่งแค่ Balance)</SelectItem>
+                                            <SelectItem value="external_activity">⚠️ ปนเทรดนอกระบบ / ทองคำ / เทรดมือ ({stateCounts.external_activity})</SelectItem>
                                             <SelectItem value="mismatch_gold">🥇 รัน EA ทองคำ (EasyGold)</SelectItem>
                                             <SelectItem value="offline_48h">⏸️ ขาดติดต่อ (&gt; 48 ชม.)</SelectItem>
                                             <SelectItem value="insufficient_bal">⚠️ ทุนต่ำกว่าเกณฑ์</SelectItem>
@@ -5129,6 +5473,15 @@ export default function EasyMMasterDashboardPage() {
                                     className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
                                 >
                                     ⚡ รันจริง ({searchFilteredPorts.filter(p => p.isRealRunning).length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'external_activity' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus(selectedStatus === 'external_activity' ? 'all' : 'external_activity')}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'external_activity' ? 'bg-amber-500 hover:bg-amber-600 text-black font-bold' : 'text-amber-300 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20'}`}
+                                    title="พอร์ตที่มีการเทรดทองคำ / คู่เงินอื่น / เปิดด้วยมือ หรือพ่วงอีเออื่นในพอร์ตเดียวกัน"
+                                >
+                                    ⚠️ ปนเทรดนอกระบบ/ทองคำ ({searchFilteredPorts.filter(p => p.externalActivity?.hasExternalActivity).length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'v2_3tier' ? 'default' : 'outline'} 
@@ -5289,19 +5642,31 @@ export default function EasyMMasterDashboardPage() {
                                             {group.ports.map(port => (
                                                 <TableRow key={port.portNumber} className="hover:bg-muted/30">
                                                     <TableCell className="font-mono font-bold text-foreground">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <a
-                                                                href={`/farm/${port.portNumber}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="hover:underline hover:text-blue-400 inline-flex items-center gap-1 group transition-colors"
-                                                                title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
-                                                            >
-                                                                <span>{port.portNumber}</span>
-                                                                <ExternalLink className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
-                                                            </a>
-                                                            {port.portName && (
-                                                                <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <a
+                                                                    href={`/farm/${port.portNumber}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="hover:underline hover:text-blue-400 inline-flex items-center gap-1 group transition-colors"
+                                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
+                                                                >
+                                                                    <span>{port.portNumber}</span>
+                                                                    <ExternalLink className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                                                </a>
+                                                                {port.portName && (
+                                                                    <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
+                                                                )}
+                                                            </div>
+                                                            {port.externalActivity?.hasExternalActivity && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setInspectingExternalPort(port)}
+                                                                    className="self-start inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-500/40 transition-colors cursor-pointer whitespace-nowrap"
+                                                                    title={port.externalActivity.summaryText}
+                                                                >
+                                                                    <span>{port.externalActivity.badgeText}</span>
+                                                                </button>
                                                             )}
                                                         </div>
                                                     </TableCell>
@@ -5510,19 +5875,31 @@ export default function EasyMMasterDashboardPage() {
                                 {filteredPorts.map(port => (
                                     <TableRow key={port.portNumber} className="hover:bg-muted/30">
                                         <TableCell className="font-mono font-bold text-foreground">
-                                            <div className="flex items-center gap-1.5">
-                                                <a
-                                                    href={`/farm/${port.portNumber}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="hover:underline hover:text-blue-400 inline-flex items-center gap-1 group transition-colors"
-                                                    title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
-                                                >
-                                                    <span>{port.portNumber}</span>
-                                                    <ExternalLink className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
-                                                </a>
-                                                {port.portName && (
-                                                    <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <a
+                                                        href={`/farm/${port.portNumber}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="hover:underline hover:text-blue-400 inline-flex items-center gap-1 group transition-colors"
+                                                        title={`คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${port.portNumber}`}
+                                                    >
+                                                        <span>{port.portNumber}</span>
+                                                        <ExternalLink className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                                    </a>
+                                                    {port.portName && (
+                                                        <span className="text-[11px] text-muted-foreground font-normal">({port.portName})</span>
+                                                    )}
+                                                </div>
+                                                {port.externalActivity?.hasExternalActivity && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setInspectingExternalPort(port)}
+                                                        className="self-start inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-500/40 transition-colors cursor-pointer whitespace-nowrap"
+                                                        title={port.externalActivity.summaryText}
+                                                    >
+                                                        <span>{port.externalActivity.badgeText}</span>
+                                                    </button>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -5752,10 +6129,15 @@ export default function EasyMMasterDashboardPage() {
                                                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> 🔑 1U (ดั้งเดิม)
                                             </span>
                                         )}
-                                        {port.runStatus === 'mismatch_gold' && (
-                                            <span className="text-[9px] bg-amber-500/15 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-medium" title="พอร์ตนี้ลงทะเบียน EasyM แต่บน MT5 กำลังส่งข้อมูลเป็น EA ทองคำ (EasyGold)">
-                                                🥇 รันทองคำ (EasyGold)
-                                            </span>
+                                        {port.externalActivity?.hasExternalActivity && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setInspectingExternalPort(port)}
+                                                className="text-[9px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-semibold transition-colors cursor-pointer"
+                                                title={port.externalActivity.summaryText}
+                                            >
+                                                {port.externalActivity.badgeText}
+                                            </button>
                                         )}
                                         {!port.isActive && (
                                             <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full">
@@ -5881,6 +6263,226 @@ export default function EasyMMasterDashboardPage() {
                     ))}
                 </div>
             )}
+                </div>
+            )}
+
+            {/* Modal ตรวจสอบข้อมูลที่ไม่ได้มาจากอีเอ EasyM (External / Non-EasyM Activity Inspector Modal) */}
+            {inspectingExternalPort && inspectingExternalPort.externalActivity && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+                    onClick={() => setInspectingExternalPort(null)}
+                >
+                    <div
+                        className="bg-zinc-950 border border-amber-500/40 rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-start justify-between gap-3 border-b border-border/50 pb-3">
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-lg font-mono font-black text-amber-300">
+                                        พอร์ต #{inspectingExternalPort.portNumber}
+                                    </span>
+                                    <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs">
+                                        {inspectingExternalPort.externalActivity.badgeText.replace(' (คลิกดู)', '')}
+                                    </Badge>
+                                    {inspectingExternalPort.externalActivity.isStatsFiltered && (
+                                        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/40 text-xs">
+                                            🛡️ คัดแยกออกจากสถิติรวม EasyM แล้ว
+                                        </Badge>
+                                    )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    เจ้าของพอร์ต: <strong className="text-foreground">{inspectingExternalPort.customerName}</strong> ({inspectingExternalPort.customerEmail}) • สินค้า: <span className="text-blue-400 font-semibold">{inspectingExternalPort.productName} ({inspectingExternalPort.eaVersion})</span>
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setInspectingExternalPort(null)}
+                                className="h-8 w-8 p-0 rounded-full hover:bg-muted"
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+
+                        {/* สรุปสาเหตุที่ตรวจพบ */}
+                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs">
+                            <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                                <span>สิ่งที่ระบบตรวจพบว่าไม่ได้มาจากอีเอ EasyM มาตรฐาน:</span>
+                            </div>
+                            <p className="text-amber-100/90 leading-relaxed">
+                                {inspectingExternalPort.externalActivity.summaryText}
+                            </p>
+                            <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-200/80 pt-1">
+                                {inspectingExternalPort.externalActivity.reasons.includes('EXTERNAL_FLOATING_LOSS') && (
+                                    <li>
+                                        <strong>มีออเดอร์นอกระบบกำลังเปิดค้างอยู่ (Open External Floating):</strong> ยอดรวมทั้งบัญชี MT5 (<code className="text-amber-300">Equity - Balance = {inspectingExternalPort.externalActivity.rawAccountFloatingPnl.toLocaleString()} {inspectingExternalPort.accountType}</code>) ติดลบมากกว่าออเดอร์ของ EasyM (<code className="text-emerald-300">{inspectingExternalPort.externalActivity.easymFloatingPnl.toLocaleString()} {inspectingExternalPort.accountType}</code>) อยู่ถึง <strong className="text-rose-400">{inspectingExternalPort.externalActivity.externalFloatingDiff.toLocaleString()} {inspectingExternalPort.accountType}</strong>
+                                    </li>
+                                )}
+                                {inspectingExternalPort.externalActivity.reasons.includes('EXCESSIVE_CLOSED_LOTS') && (
+                                    <li>
+                                        <strong>ปริมาณล็อตที่ปิดในวันนี้สูงผิดปกติ:</strong> ปิดรวม <strong className="text-amber-300">{inspectingExternalPort.externalActivity.rawTodayClosedLots.toFixed(2)} Lots</strong> ในวันเดียว (ขณะที่ออเดอร์ EasyM ปัจจุบันถืออยู่ {inspectingExternalPort.externalActivity.easymBuyCount}B/{inspectingExternalPort.externalActivity.easymSellCount}S รวม {inspectingExternalPort.externalActivity.easymActiveLots.toFixed(2)} Lots) บ่งชี้ว่ามีการเทรดมือหรือรันทองคำ/คู่เงินอื่นในพอร์ตเดียวกัน
+                                    </li>
+                                )}
+                                {inspectingExternalPort.externalActivity.reasons.includes('GOLD_CHART_ATTACHED') && (
+                                    <li>
+                                        <strong>รายงานชนิดสินทรัพย์เป็นทองคำ (<code className="text-amber-300">asset_type = GOLD</code>):</strong> ลูกค้านำ EA ไปแปะบนกราฟทองคำ (<code className="text-amber-300">XAUUSD</code>) หรือรันทองคำในพอร์ตนี้
+                                    </li>
+                                )}
+                                {inspectingExternalPort.externalActivity.reasons.includes('GOLD_EA_MISMATCH') && (
+                                    <li>
+                                        <strong>รันบอททองคำ EasyGold:</strong> พอร์ตนี้ส่งรหัสระบบจาก MT5 เป็น <code className="text-amber-300">{inspectingExternalPort.actualSystemCode}</code>
+                                    </li>
+                                )}
+                                {inspectingExternalPort.externalActivity.reasons.includes('MULTI_LICENSE_PORT') && (
+                                    <li>
+                                        <strong>พอร์ตนี้ผูกใบอนุญาตหลายสินค้า:</strong> ลงทะเบียนควบคู่กับ <strong className="text-amber-300">{inspectingExternalPort.externalActivity.otherLicenses.join(', ')}</strong> บนเลขพอร์ต MT5 เดียวกัน
+                                    </li>
+                                )}
+                                {inspectingExternalPort.externalActivity.reasons.includes('UNVERIFIED_PROFIT_SPIKE') && (
+                                    <li>
+                                        <strong>มียอดกำไร/ยอดเงินกระโดดโดยไม่มีล็อตออเดอร์ของ EasyM ยืนยัน (<code className="text-amber-300">closed_lots = 0</code>):</strong> เกิดจากการดึง History รวมของ MT5 ในรุ่นเก่าหรือการฝากเงินเข้าพอร์ต
+                                    </li>
+                                )}
+                            </ul>
+                        </div>
+
+                        {/* ตารางเปรียบเทียบ: ค่าดิบจากบัญชี MT5 ทั้งพอร์ต vs ค่าที่คัดกรองเฉพาะ EasyM */}
+                        <div className="space-y-2">
+                            <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>เปรียบเทียบข้อมูลทั้งพอร์ต MT5 vs ข้อมูลที่คัดกรองเฉพาะ EasyM:</span>
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                                <div className="p-3 rounded-xl bg-muted/20 border border-border/50 space-y-1">
+                                    <span className="text-[10px] font-sans text-muted-foreground block">1. ยอดรวมทั้งบัญชี MT5 (Raw Account)</span>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Balance:</span>
+                                        <span className="font-bold">{inspectingExternalPort.balance.toLocaleString()} {inspectingExternalPort.accountType}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Account Equity:</span>
+                                        <span className="font-bold">{inspectingExternalPort.externalActivity.rawAccountEquity.toLocaleString()} {inspectingExternalPort.accountType}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Eq - Balance:</span>
+                                        <span className={inspectingExternalPort.externalActivity.rawAccountFloatingPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                            {inspectingExternalPort.externalActivity.rawAccountFloatingPnl >= 0 ? '+' : ''}{inspectingExternalPort.externalActivity.rawAccountFloatingPnl.toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Raw Today PnL:</span>
+                                        <span className="text-amber-300 font-bold">
+                                            {inspectingExternalPort.externalActivity.rawTodayPnl >= 0 ? '+' : ''}{inspectingExternalPort.externalActivity.rawTodayPnl.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/40 space-y-1">
+                                    <span className="text-[10px] font-sans text-emerald-300 font-semibold block">2. เฉพาะออเดอร์ EasyM (ที่ใช้แสดงสถิติ)</span>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">ออเดอร์ถือครอง:</span>
+                                        <span className="font-bold text-emerald-300">
+                                            {inspectingExternalPort.externalActivity.easymBuyCount}B / {inspectingExternalPort.externalActivity.easymSellCount}S ({inspectingExternalPort.externalActivity.easymActiveLots.toFixed(2)} L)
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">EasyM Equity:</span>
+                                        <span className="font-bold text-emerald-300">{inspectingExternalPort.equity.toLocaleString()} {inspectingExternalPort.accountType}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">EasyM Floating:</span>
+                                        <span className={inspectingExternalPort.externalActivity.easymFloatingPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                            {inspectingExternalPort.externalActivity.easymFloatingPnl >= 0 ? '+' : ''}{inspectingExternalPort.externalActivity.easymFloatingPnl.toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">EasyM Today PnL:</span>
+                                        <span className="text-emerald-400 font-bold">
+                                            {inspectingExternalPort.externalActivity.filteredTodayPnl >= 0 ? '+' : ''}{inspectingExternalPort.externalActivity.filteredTodayPnl.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 space-y-1">
+                                    <span className="text-[10px] font-sans text-rose-300 font-semibold block">3. ส่วนต่างที่ไม่ได้มาจาก EasyM</span>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Floating นอกระบบ:</span>
+                                        <span className="font-bold text-rose-400">
+                                            {inspectingExternalPort.externalActivity.externalFloatingDiff >= 0 ? '+' : ''}{inspectingExternalPort.externalActivity.externalFloatingDiff.toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Today PnL ที่ตัดออก:</span>
+                                        <span className="font-bold text-amber-300">
+                                            {(inspectingExternalPort.externalActivity.rawTodayPnl - inspectingExternalPort.externalActivity.filteredTodayPnl).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">ล็อตปิดรวมวันนี้:</span>
+                                        <span className="font-bold text-amber-300">
+                                            {inspectingExternalPort.externalActivity.rawTodayClosedLots.toFixed(2)} Lots
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Asset บนชาร์ต:</span>
+                                        <span className="font-bold text-amber-300">{inspectingExternalPort.actualAssetType}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ประวัติรายวันที่ถูกตรวจพบและคัดกรองออก */}
+                        {inspectingExternalPort.externalActivity.historyAnomalies.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-bold text-amber-300">
+                                    📅 รายการประวัติรายวันที่ตรวจพบการปนเปื้อนและถูกแยกออกจากสถิติฟาร์ม ({inspectingExternalPort.externalActivity.historyAnomalies.length} รายการ):
+                                </h4>
+                                <div className="max-h-40 overflow-y-auto rounded-lg border border-border/50 bg-black/40 divide-y divide-border/30 text-xs">
+                                    {inspectingExternalPort.externalActivity.historyAnomalies.map((anom, idx) => (
+                                        <div key={`${anom.date}-${idx}`} className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                            <div className="font-mono flex items-center gap-2">
+                                                <span className="text-amber-300 font-bold">{anom.date}</span>
+                                                <span className="text-emerald-400 font-bold">+{anom.profit.toLocaleString()} USC</span>
+                                                <span className="text-muted-foreground">({anom.closedLots.toFixed(2)} Lots)</span>
+                                            </div>
+                                            <span className="text-[11px] text-amber-200/80">{anom.reason}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ข้อจำกัดทางเทคนิคปัจจุบัน & สิ่งที่อัปเดตเพิ่มในโค้ด EA */}
+                        <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/30 text-[11px] text-blue-200/90 space-y-1">
+                            <div className="font-bold text-blue-300">ℹ️ ขอบเขตข้อมูลที่ตรวจสอบได้ตอนนี้ vs หลังอัปเดต EA:</div>
+                            <p className="leading-relaxed text-muted-foreground">
+                                • <strong>สิ่งที่ระบบเว็บแยกแยะได้ทันทีตอนนี้:</strong> เปรียบเทียบส่วนต่าง <code>Account Equity - Balance</code> กับ <code>EasyM Floating PnL</code>, ตรวจสอบ <code>asset_type = GOLD</code>, ตรวจจับยอดล็อตปิดสะสมที่สูงผิดปกติ และกรองยอดกำไรที่ไม่มีล็อตของ EasyM ยืนยันออกจากสถิติรวมทันที<br />
+                                • <strong>สิ่งที่เพิ่มในโค้ด MT5 EA ล่าสุด (EAE_WebSync.mqh &amp; EAE_Licensing.mqh):</strong> บังคับคัดกรองเฉพาะ <code>Magic Number</code> ของตระกูล EasyM (2000..2099, 3000..3099, 4000..4099) ในการคำนวณกำไรปิดรายวัน ทำให้เมื่อพอร์ตอัปเดต EA แล้ว ออเดอร์มือหรือทองคำจะไม่ถูกบวกรวมเข้ามาตั้งแต่ต้นทาง
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                            <a
+                                href={`/farm/${inspectingExternalPort.portNumber}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 underline"
+                            >
+                                <span>เปิดดูหน้าฟาร์มพอร์ต #{inspectingExternalPort.portNumber}</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setInspectingExternalPort(null)}
+                                className="text-xs"
+                            >
+                                ปิดหน้าต่าง
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
