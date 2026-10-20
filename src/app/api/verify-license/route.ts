@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { sweepAndDeactivateExpiredLicenses, recordLicenseAudit } from '@/lib/license-audit';
 
 export const runtime = 'edge';
 
@@ -182,11 +183,39 @@ export async function POST(req: Request) {
             .eq('is_active', true)
             .single();
 
-        // Fallback check: EasyM Max, Prime & Universal cross-compatibility
+        // Check if this port has an explicit license for targetProductUUID that is already expired/inactive
         const currentProductKey = resolvedProduct?.product_key || product_id;
+        if (error || !license) {
+            const { data: exactProductLicense } = await supabase
+                .from('licenses')
+                .select('*')
+                .eq('account_number', account_number)
+                .eq('product_id', targetProductUUID)
+                .maybeSingle();
+
+            if (exactProductLicense) {
+                const isIb = exactProductLicense.type === 'ib' || Boolean(exactProductLicense.is_ib_request) || Boolean(exactProductLicense.ib_broker_name);
+                const isLifetime = !isIb && exactProductLicense.type === 'lifetime';
+                if (!isLifetime && exactProductLicense.expiry_date && new Date() > new Date(exactProductLicense.expiry_date)) {
+                    if (exactProductLicense.is_active) {
+                        await supabase.from('licenses').update({ is_active: false }).eq('id', exactProductLicense.id);
+                        await recordLicenseAudit(supabase, [exactProductLicense.id], 'auto', 'ระบบปิดการใช้งานอัตโนมัติ (ครบกำหนดวันหมดอายุ)');
+                    }
+                    return NextResponse.json({ status: 'expired', message: 'License Expired' }, { status: 200 });
+                }
+                if (!exactProductLicense.is_active) {
+                    return NextResponse.json({ status: 'invalid', message: 'License is inactive' }, { status: 200 });
+                }
+            }
+        }
+
+        // Fallback check: EasyM Max, Prime & Universal cross-compatibility
+        // Note: EZM-PRIME-V1 requires an active Prime (or Universal) license so expired/unupgraded MAX ports cannot bypass Prime trial rules
         const easymMaxKeys = ['EZM-MAX-V1', 'EZM-MAX-TEST', 'EZM-PRIME-V1', 'EZM-UNI-V1'];
         if ((error || !license) && easymMaxKeys.includes(currentProductKey)) {
-            const alternateKeys = easymMaxKeys.filter(k => k !== currentProductKey);
+            const alternateKeys = currentProductKey === 'EZM-PRIME-V1'
+                ? ['EZM-UNI-V1']
+                : easymMaxKeys.filter(k => k !== currentProductKey);
             for (const altKey of alternateKeys) {
                 const { data: altProduct } = await supabase
                     .from('products')
@@ -485,26 +514,31 @@ export async function POST(req: Request) {
         }
 
         // 5. Check Expiry
-        if (license.expiry_date) {
+        const isIbLic = license.type === 'ib' || Boolean(license.is_ib_request) || Boolean(license.ib_broker_name);
+        const isPureLifetime = !isIbLic && license.type === 'lifetime';
+        if (!isPureLifetime && license.expiry_date) {
             const expiry = new Date(license.expiry_date);
             const now = new Date();
             if (now > expiry) {
-                // Opportunistic Update: Auto-deactivate it in the database immediately
+                // Opportunistic Update: Auto-deactivate it in the database immediately and log 'auto'
                 await supabase.from('licenses')
                     .update({ is_active: false })
                     .eq('id', license.id);
+
+                await recordLicenseAudit(
+                    supabase,
+                    [license.id],
+                    'auto',
+                    'ระบบปิดการใช้งานอัตโนมัติ (ครบกำหนดวันหมดอายุ)',
+                    now.toISOString()
+                );
 
                 return NextResponse.json({ status: 'expired', message: 'License Expired' }, { status: 200 });
             }
         }
 
-        // Opportunistic global sweep: auto-deactivate any expired licenses across the platform
-        supabase.from('licenses')
-            .update({ is_active: false })
-            .eq('is_active', true)
-            .neq('type', 'lifetime')
-            .lt('expiry_date', new Date().toISOString())
-            .then();
+        // Opportunistic global sweep: auto-deactivate any expired licenses across the platform and log 'auto'
+        void sweepAndDeactivateExpiredLicenses(supabase);
 
         // 6. Success
         return NextResponse.json({

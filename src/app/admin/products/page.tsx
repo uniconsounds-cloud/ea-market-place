@@ -4,10 +4,16 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, ArrowRight, Filter, X, Sparkles } from 'lucide-react';
+import { Plus, Pencil, ArrowRight, Filter, X, Sparkles, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import {
+    fetchStorefrontVisibilityConfig,
+    isProductShownOnStore,
+    saveProductStorefrontVisibility,
+    sweepAndDeactivateExpiredLicenses
+} from '@/lib/license-audit';
 
 export default function AdminProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
@@ -52,30 +58,24 @@ export default function AdminProductsPage() {
     }, []);
 
     const fetchProducts = async () => {
-        // Auto-deactivate any expired licenses
-        try {
-            await supabase
-                .from('licenses')
-                .update({ is_active: false })
-                .eq('is_active', true)
-                .neq('type', 'lifetime')
-                .lt('expiry_date', new Date().toISOString());
-        } catch (e) {
-            console.error('Error auto-deactivating expired licenses:', e);
-        }
+        // Auto-deactivate any expired licenses and record audit log ('auto')
+        await sweepAndDeactivateExpiredLicenses(supabase);
 
-        const { data } = await supabase
-            .from('products')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const [{ data }, visibilityConfig] = await Promise.all([
+            supabase
+                .from('products')
+                .select('*')
+                .order('created_at', { ascending: false }),
+            fetchStorefrontVisibilityConfig(supabase)
+        ]);
 
         if (data) {
-            // Auto-check if EasyM Prime exists; if not, create it hidden (is_active: false)
+            // Auto-check if EasyM Prime exists; if not, create it Active in system (is_active: true) and hidden on storefront (show_on_store: false)
             const primeSupabaseUrl = 'https://mfrspvzxmpksqnzcrysz.supabase.co/storage/v1/object/public/ea_files/5268_EasyM_Prime_v200_B261014_1.ex5';
             const primeExists = data.some(p => p.product_key === 'EZM-PRIME-V1');
             if (!primeExists) {
                 try {
-                    await supabase.from('products').insert([{
+                    const { data: insertedPrime } = await supabase.from('products').insert([{
                         name: 'EasyM Prime',
                         product_key: 'EZM-PRIME-V1',
                         description: 'เรือธงใหม่ล่าสุด ระบบกู้พอร์ตอัจฉริยะ ห้องฟื้นฟู Dynamic Rescue Sniper และ Cross-Pair Drawdown Offset พร้อม Live Farm Telemetry สลับชุด 20 คู่เงินใหม่',
@@ -85,27 +85,49 @@ export default function AdminProductsPage() {
                         file_url: primeSupabaseUrl,
                         image_url: '/assets/easym_max_box.png',
                         version: '2.00',
-                        is_active: false,
+                        is_active: true,
                         platform: 'mt5',
                         asset_class: 'currency',
                         strategy: 'grid',
                         min_balance: 1000,
                         currency: 'USC',
-                        allow_rent: false,
-                        allow_ib: true,
+                        allow_rent: true,
+                        allow_ib: false,
                         is_multi_port: false,
                         port_count: 1
-                    }]);
+                    }]).select('*').maybeSingle();
+                    if (insertedPrime) {
+                        await saveProductStorefrontVisibility(supabase, insertedPrime.id, 'EZM-PRIME-V1', false);
+                    }
                 } catch (e) {
                     console.error('Failed to auto-seed EasyM Prime:', e);
                 }
             } else {
-                // If prime exists but still has local /downloads/ path or empty, heal to Supabase Storage URL
                 const existingPrime = data.find(p => p.product_key === 'EZM-PRIME-V1');
-                if (existingPrime && (existingPrime.file_url?.startsWith('/downloads/') || !existingPrime.file_url)) {
-                    supabase.from('products').update({ file_url: primeSupabaseUrl }).eq('id', existingPrime.id).then(() => {
+                if (existingPrime) {
+                    const primeUpdates: Record<string, any> = {};
+                    if (existingPrime.file_url?.startsWith('/downloads/') || !existingPrime.file_url) {
+                        primeUpdates.file_url = primeSupabaseUrl;
                         existingPrime.file_url = primeSupabaseUrl;
-                    });
+                    }
+                    // Migrate EasyM Prime from legacy is_active=false (used previously to hide from store) to is_active=true + show_on_store=false
+                    const hasExplicitVisibility = typeof visibilityConfig.byProductId[existingPrime.id] === 'boolean';
+                    if (!hasExplicitVisibility) {
+                        await saveProductStorefrontVisibility(supabase, existingPrime.id, 'EZM-PRIME-V1', false);
+                        visibilityConfig.byProductId[existingPrime.id] = false;
+                        visibilityConfig.byProductKey['EZM-PRIME-V1'] = false;
+                        if (!existingPrime.is_active) {
+                            primeUpdates.is_active = true;
+                            existingPrime.is_active = true;
+                        }
+                    } else if (!existingPrime.is_active && visibilityConfig.byProductId[existingPrime.id] === false) {
+                        // Heal EasyM Prime so it is Active in system while hidden on storefront
+                        primeUpdates.is_active = true;
+                        existingPrime.is_active = true;
+                    }
+                    if (Object.keys(primeUpdates).length > 0) {
+                        await supabase.from('products').update(primeUpdates).eq('id', existingPrime.id);
+                    }
                 }
             }
 
@@ -198,6 +220,7 @@ export default function AdminProductsPage() {
 
                 return {
                     ...product,
+                    show_on_store: isProductShownOnStore(product, visibilityConfig),
                     stats: {
                         regular: regularCount,
                         ib: ibCount,
@@ -465,9 +488,27 @@ export default function AdminProductsPage() {
                                                             {formatStrategy(product.strategy)}
                                                         </Badge>
                                                     )}
-                                                    <Badge variant={product.is_active ? 'default' : 'destructive'} className="text-xs py-0 h-5">
-                                                        {product.is_active ? 'Active' : 'Inactive'}
+                                                    <Badge
+                                                        variant={product.is_active ? 'default' : 'destructive'}
+                                                        className={`text-xs py-0 h-5 gap-1 ${product.is_active ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20' : ''}`}
+                                                    >
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                        {product.is_active ? 'Active (เปิดใช้งาน)' : 'Inactive (ปิดใช้งาน)'}
                                                     </Badge>
+                                                    {product.show_on_store ? (
+                                                        <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30">
+                                                            <Eye className="w-3 h-3" /> แสดงหน้าเว็บ
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                                            <EyeOff className="w-3 h-3" /> ซ่อนจากหน้าเว็บ
+                                                        </Badge>
+                                                    )}
+                                                    {product.product_key === 'EZM-PRIME-V1' && (
+                                                        <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-purple-500/15 text-purple-300 border-purple-500/30">
+                                                            <Sparkles className="w-3 h-3 text-yellow-300" /> สิทธิ์อัปเกรดทดลองฟรี 2 เดือน
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 <div className="text-sm text-muted-foreground flex flex-wrap gap-4 mt-2">
                                                     <span>รายเดือน: ฿{product.price_monthly?.toLocaleString()}</span>

@@ -6,18 +6,24 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { HomeIbButton } from '@/components/home-ib-button';
+import { fetchStorefrontVisibilityConfig, isProductShownOnStore } from '@/lib/license-audit';
 
-export const revalidate = 60; // Cache the landing page for 60 seconds to reduce Vercel CPU usage
+export const revalidate = 0;
 
 export default async function Home() {
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
+  const [{ data: rawProducts }, visibilityConfig] = await Promise.all([
+    supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false }),
+    fetchStorefrontVisibilityConfig(supabase)
+  ]);
 
-  const monitorProduct = products?.find(p => p.product_key === 'EA-UNIMON-01');
-  const eaProducts = products?.filter(p => p.product_key !== 'EA-UNIMON-01') || [];
+  const products = (rawProducts || []).filter(p => isProductShownOnStore(p, visibilityConfig));
+
+  const monitorProduct = products.find(p => p.product_key === 'EA-UNIMON-01');
+  const eaProducts = products.filter(p => p.product_key !== 'EA-UNIMON-01');
 
   return (
     <main className="min-h-screen flex flex-col bg-background selection:bg-primary/30">

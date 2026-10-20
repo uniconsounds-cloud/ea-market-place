@@ -45,4 +45,6 @@ scratch/
 *.mjs
 *.bak
 *.ex5
+graphify-out/
+.graphify*
 

@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search, Trash2, Mail, Pencil, User, Key, Calendar, Zap, Package } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Save, CreditCard, ShoppingCart, Users, CheckCircle2, Clock, Search, Trash2, Mail, Pencil, User, Key, Calendar, Zap, Package, Eye, EyeOff, Sparkles, ShieldCheck, Bot } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -27,6 +27,15 @@ import {
 } from "@/components/ui/dialog"
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
+import {
+    fetchStorefrontVisibilityConfig,
+    isProductShownOnStore,
+    saveProductStorefrontVisibility,
+    sweepAndDeactivateExpiredLicenses,
+    fetchLicenseAuditMap,
+    recordLicenseAudit,
+    resolveLicenseAuditInfo
+} from '@/lib/license-audit';
 
 // Use 'new' as a special ID for creating
 export default function ProductFormPage() {
@@ -56,6 +65,12 @@ export default function ProductFormPage() {
             email: string;
             full_name: string;
             is_tester?: boolean;
+        };
+        audit_info?: {
+            updatedAt: string | null;
+            updatedBy: 'admin' | 'auto';
+            label: string;
+            reason: string;
         };
     }
 
@@ -98,6 +113,7 @@ export default function ProductFormPage() {
         file_url: '',
         version: '1.0',
         is_active: true,
+        show_on_store: true,
         platform: 'mt4',
         asset_class: 'gold',
         strategy: 'trend_following',
@@ -122,16 +138,33 @@ export default function ProductFormPage() {
     }, [id]);
 
     const fetchProduct = async () => {
-        const { data } = await supabase.from('products').select('*').eq('id', id).single();
+        const [{ data }, visibilityConfig] = await Promise.all([
+            supabase.from('products').select('*').eq('id', id).single(),
+            fetchStorefrontVisibilityConfig(supabase)
+        ]);
         if (data) {
             let currentFileUrl = data.file_url || '';
+            let resolvedIsActive = data.is_active;
             const primeStorageUrl = 'https://mfrspvzxmpksqnzcrysz.supabase.co/storage/v1/object/public/ea_files/5268_EasyM_Prime_v200_B261014_1.ex5';
-            if (data.product_key === 'EZM-PRIME-V1' && (currentFileUrl.startsWith('/downloads/') || !currentFileUrl)) {
-                currentFileUrl = primeStorageUrl;
-                supabase.from('products').update({ file_url: primeStorageUrl }).eq('id', id).then(() => {
-                    console.log('Auto-healed Prime file_url to Supabase storage');
-                });
+            if (data.product_key === 'EZM-PRIME-V1') {
+                const primeUpdates: Record<string, any> = {};
+                if (currentFileUrl.startsWith('/downloads/') || !currentFileUrl) {
+                    currentFileUrl = primeStorageUrl;
+                    primeUpdates.file_url = primeStorageUrl;
+                }
+                const hasExplicitVis = typeof visibilityConfig.byProductId[data.id] === 'boolean';
+                if (!hasExplicitVis && !data.is_active) {
+                    resolvedIsActive = true;
+                    primeUpdates.is_active = true;
+                    await saveProductStorefrontVisibility(supabase, data.id, 'EZM-PRIME-V1', false);
+                    visibilityConfig.byProductId[data.id] = false;
+                }
+                if (Object.keys(primeUpdates).length > 0) {
+                    await supabase.from('products').update(primeUpdates).eq('id', id);
+                }
             }
+
+            const showOnStore = isProductShownOnStore({ ...data, is_active: resolvedIsActive }, visibilityConfig);
 
             setFormData({
                 name: data.name,
@@ -143,7 +176,8 @@ export default function ProductFormPage() {
                 image_url: data.image_url || '',
                 file_url: currentFileUrl,
                 version: data.version || '1.0',
-                is_active: data.is_active,
+                is_active: resolvedIsActive,
+                show_on_store: showOnStore,
                 platform: data.platform || 'mt4',
                 asset_class: data.asset_class || 'gold',
                 strategy: data.strategy || 'trend_following',
@@ -161,6 +195,10 @@ export default function ProductFormPage() {
     const fetchStats = async () => {
         setLoadingStats(true);
         try {
+            // 0. Auto-deactivate expired licenses and get audit log
+            await sweepAndDeactivateExpiredLicenses(supabase);
+            const auditMap = await fetchLicenseAuditMap(supabase);
+
             // 1. Get Orders (Completed) for Revenue & Sales
             const { data: orders } = await supabase
                 .from('orders')
@@ -190,7 +228,7 @@ export default function ProductFormPage() {
 
             if (userIds.length > 0) {
                 // Fetch Profiles with is_tester
-                const { data: profiles, error: profileError } = await supabase
+                const { data: profiles } = await supabase
                     .from('profiles')
                     .select('id, email, full_name, ib_account_number, is_tester')
                     .in('id', userIds);
@@ -223,13 +261,18 @@ export default function ProductFormPage() {
                 const userIbAccounts = ibMap.get(l.user_id) || [];
                 const matchedIb = userIbAccounts.find((a: any) => a.account_number === l.account_number);
 
-                const isIbPort = Boolean(matchedIb) || (profileData.ib_account_number === l.account_number);
+                const isIbPort = Boolean(matchedIb) || (profileData.ib_account_number === l.account_number) || Boolean(l.is_ib_request) || l.type === 'ib';
 
-                licensesData.push({
+                const enriched = {
                     ...l,
                     is_ib: isIbPort,
-                    ib_broker_name: matchedIb ? matchedIb.broker_name : (profileData.ib_account_number === l.account_number ? 'Customer' : undefined),
+                    ib_broker_name: matchedIb ? matchedIb.broker_name : (profileData.ib_account_number === l.account_number ? 'Customer' : l.ib_broker_name),
                     profiles: profileData
+                };
+
+                licensesData.push({
+                    ...enriched,
+                    audit_info: resolveLicenseAuditInfo(enriched, auditMap)
                 });
             });
 
@@ -242,7 +285,7 @@ export default function ProductFormPage() {
             const totalSales = realOrders.length;
             const totalRevenue = realOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
             
-            const realLicenses = licensesData.filter(l => !l.profiles?.is_tester);
+            const realLicenses = licensesData.filter(l => !l.profiles?.is_tester && l.is_active);
             const activeUsers = realLicenses.length;
 
             setStats({ totalRevenue, totalSales, activeUsers });
@@ -351,15 +394,33 @@ export default function ProductFormPage() {
             };
 
             let error;
+            let savedProductId = id;
             if (isNew) {
-                const { error: insertError } = await supabase.from('products').insert([payload]);
+                const { data: insertedData, error: insertError } = await supabase
+                    .from('products')
+                    .insert([payload])
+                    .select('id')
+                    .single();
                 error = insertError;
+                if (insertedData?.id) {
+                    savedProductId = insertedData.id;
+                }
             } else {
                 const { error: updateError } = await supabase.from('products').update(payload).eq('id', id);
                 error = updateError;
             }
 
             if (error) throw error;
+
+            if (savedProductId && savedProductId !== 'new') {
+                await saveProductStorefrontVisibility(
+                    supabase,
+                    savedProductId,
+                    formData.product_key?.trim() || null,
+                    Boolean(formData.show_on_store)
+                );
+            }
+
             alert('บันทึกข้อมูลสำเร็จ!');
             router.push('/admin/products');
             router.refresh();
@@ -485,33 +546,51 @@ export default function ProductFormPage() {
         try {
             let finalExpiryDate: Date | null = null;
             const now = new Date();
+            // Base date for extension: if current license is still unexpired, extend from current expiry_date; if expired, extend from today
+            const existingExp = editingLicense.expiry_date ? new Date(editingLicense.expiry_date) : null;
+            const baseDate = (existingExp && existingExp > now) ? new Date(existingExp) : new Date(now);
 
-            if (editingLicense.is_ib) {
+            const isPureLifetime = !editingLicense.is_ib && editingLicense.type === 'lifetime';
+
+            if (!isPureLifetime) {
                 if (expiryOption === "1month") {
-                    now.setMonth(now.getMonth() + 1);
-                    finalExpiryDate = now;
+                    baseDate.setMonth(baseDate.getMonth() + 1);
+                    finalExpiryDate = baseDate;
+                } else if (expiryOption === "2months") {
+                    baseDate.setDate(baseDate.getDate() + 60);
+                    finalExpiryDate = baseDate;
+                } else if (expiryOption === "3months") {
+                    baseDate.setMonth(baseDate.getMonth() + 3);
+                    finalExpiryDate = baseDate;
                 } else if (expiryOption === "6months") {
-                    now.setMonth(now.getMonth() + 6);
-                    finalExpiryDate = now;
+                    baseDate.setMonth(baseDate.getMonth() + 6);
+                    finalExpiryDate = baseDate;
                 } else if (expiryOption === "1year") {
-                    now.setFullYear(now.getFullYear() + 1);
-                    finalExpiryDate = now;
+                    baseDate.setFullYear(baseDate.getFullYear() + 1);
+                    finalExpiryDate = baseDate;
                 } else if (expiryOption === "custom" && customDate) {
                     finalExpiryDate = new Date(customDate);
+                } else if (editExpiryDate) {
+                    finalExpiryDate = new Date(editExpiryDate);
                 }
-            } else if (editingLicense.type !== 'lifetime' && editExpiryDate) {
-                finalExpiryDate = new Date(editExpiryDate);
             }
 
             const { error } = await supabase
                 .from('licenses')
                 .update({
-                    expiry_date: finalExpiryDate ? finalExpiryDate.toISOString() : null,
+                    ...(finalExpiryDate ? { expiry_date: finalExpiryDate.toISOString() } : {}),
                     is_active: editIsActive
                 })
                 .eq('id', editingLicense.id);
 
             if (error) throw error;
+
+            await recordLicenseAudit(
+                supabase,
+                [editingLicense.id],
+                'admin',
+                editIsActive ? 'แอดมินเปิดสิทธิ์/ต่ออายุการใช้งาน' : 'แอดมินปิดสิทธิ์การใช้งาน'
+            );
 
             alert('อัพเดทสิทธิ์การใช้งานพอร์ตเรียบร้อยแล้ว');
 
@@ -653,13 +732,14 @@ export default function ProductFormPage() {
                                             <th className="px-6 py-4 font-medium">Account / Port</th>
                                             <th className="px-6 py-4 font-medium">วันหมดอายุ (Expiry)</th>
                                             <th className="px-6 py-4 font-medium text-center">สถานะ</th>
+                                            <th className="px-6 py-4 font-medium">แก้ไขสิทธิ์ล่าสุด / แก้ไขโดย</th>
                                             <th className="px-6 py-4 font-medium string-center w-[80px]"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/50">
                                         {loadingStats ? (
                                             <tr>
-                                                <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
+                                                <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                                                     <Loader2 className="animate-spin h-6 w-6 mx-auto mb-2" />
                                                     กำลังโหลดข้อมูล...
                                                 </td>
@@ -684,11 +764,18 @@ export default function ProductFormPage() {
                                                             <div className="font-mono bg-muted/50 px-2 py-1 rounded w-fit text-xs">
                                                                 {license.account_number}
                                                             </div>
-                                                            {license.is_ib && (
-                                                                <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded font-bold border border-blue-200 uppercase tracking-wide">
-                                                                    IB {license.ib_broker_name || 'Customer'}
-                                                                </span>
-                                                            )}
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {license.type === 'pro' && (
+                                                                    <span className="inline-block px-1.5 py-0.5 text-[10px] bg-purple-500/15 text-purple-400 rounded font-bold border border-purple-500/30">
+                                                                        Prime Trial / Pro
+                                                                    </span>
+                                                                )}
+                                                                {license.is_ib && (
+                                                                    <span className="inline-block px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded font-bold border border-blue-200 uppercase tracking-wide">
+                                                                        IB {license.ib_broker_name || 'Customer'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className={`flex items-center gap-2 ${isExpiringSoon ? 'text-orange-500 font-bold' : isExpired ? 'text-red-500' : ''}`}>
@@ -716,6 +803,22 @@ export default function ProductFormPage() {
                                                                 </span>
                                                             )}
                                                         </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="text-xs font-medium text-foreground">
+                                                                {license.audit_info?.updatedAt ? formatDate(license.audit_info.updatedAt) : '-'}
+                                                            </div>
+                                                            <div className="mt-1">
+                                                                {license.audit_info?.updatedBy === 'auto' ? (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                                        <Bot className="w-2.5 h-2.5" /> อัตโนมัติ
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                                                                        <ShieldCheck className="w-2.5 h-2.5" /> แอดมิน
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                         <td className="px-6 py-4 text-center">
                                                             <Button variant="ghost" size="icon" onClick={() => handleEditLicense(license)} title="แก้ไข License">
                                                                 <Pencil className="w-4 h-4" />
@@ -726,7 +829,7 @@ export default function ProductFormPage() {
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
+                                                <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                                                     {searchQuery ? 'ไม่พบข้อมูลที่ตรงกับการค้นหา' : 'ยังไม่มีลูกค้าใช้งานสินค้านี้'}
                                                 </td>
                                             </tr>
@@ -873,38 +976,56 @@ export default function ProductFormPage() {
                                     <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
                                 </div>
 
-                                {editingLicense.is_ib ? (
+                                {(editingLicense.is_ib || editingLicense.type !== 'lifetime') ? (
                                     <div className="space-y-3 pt-2 border-t border-border">
-                                        <Label className="flex items-center gap-2 text-blue-600 font-bold">
-                                            <Zap className="w-4 h-4" /> ปรับอายุสิทธิ์ IB (IB {editingLicense.ib_broker_name || 'Customer'})
+                                        <Label className="flex items-center gap-2 text-cyan-400 font-bold">
+                                            <Zap className="w-4 h-4" /> ขยายเวลา / ปรับอายุสิทธิ์การใช้งาน
                                         </Label>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-3 gap-2">
                                             <Button
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "1month" ? "default" : "outline"}
                                                 className={expiryOption === "1month" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                                onClick={() => setExpiryOption("1month")}
+                                                onClick={() => { setExpiryOption("1month"); setEditIsActive(true); }}
                                             >
-                                                1 เดือน
+                                                +1 เดือน
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "2months" ? "default" : "outline"}
+                                                className={expiryOption === "2months" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => { setExpiryOption("2months"); setEditIsActive(true); }}
+                                            >
+                                                +2 เดือน (60 วัน)
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={expiryOption === "3months" ? "default" : "outline"}
+                                                className={expiryOption === "3months" ? "bg-primary text-primary-foreground" : "text-foreground"}
+                                                onClick={() => { setExpiryOption("3months"); setEditIsActive(true); }}
+                                            >
+                                                +3 เดือน
                                             </Button>
                                             <Button
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "6months" ? "default" : "outline"}
                                                 className={expiryOption === "6months" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                                onClick={() => setExpiryOption("6months")}
+                                                onClick={() => { setExpiryOption("6months"); setEditIsActive(true); }}
                                             >
-                                                6 เดือน
+                                                +6 เดือน
                                             </Button>
                                             <Button
                                                 type="button"
                                                 size="sm"
                                                 variant={expiryOption === "1year" ? "default" : "outline"}
                                                 className={expiryOption === "1year" ? "bg-primary text-primary-foreground" : "text-foreground"}
-                                                onClick={() => setExpiryOption("1year")}
+                                                onClick={() => { setExpiryOption("1year"); setEditIsActive(true); }}
                                             >
-                                                1 ปี
+                                                +1 ปี
                                             </Button>
                                             <Button
                                                 type="button"
@@ -925,27 +1046,26 @@ export default function ProductFormPage() {
                                                         id="customDate"
                                                         type="date"
                                                         value={customDate}
-                                                        onChange={(e) => setCustomDate(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setCustomDate(e.target.value);
+                                                            setEditExpiryDate(e.target.value);
+                                                            if (new Date(e.target.value) > new Date()) {
+                                                                setEditIsActive(true);
+                                                            }
+                                                        }}
                                                         className="pl-9"
-                                                        min={new Date().toISOString().split('T')[0]}
                                                         required={expiryOption === "custom"}
                                                     />
                                                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                                 </div>
                                             </div>
                                         )}
-                                        <p className="text-xs text-muted-foreground">วันหมดอายุเดิม: {editingLicense.expiry_date ? formatDate(editingLicense.expiry_date) : '-'}</p>
-                                    </div>
-                                ) : (!editingLicense.is_ib && editingLicense.type !== 'lifetime') ? (
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2">
-                                            <Calendar className="w-4 h-4" /> วันหมดอายุ (Expiry Date)
-                                        </Label>
-                                        <Input
-                                            type="datetime-local"
-                                            value={editExpiryDate}
-                                            onChange={(e) => setEditExpiryDate(e.target.value)}
-                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            วันหมดอายุเดิม: {editingLicense.expiry_date ? formatDate(editingLicense.expiry_date) : '-'}
+                                            <span className="block text-[11px] text-cyan-400/80 mt-0.5">
+                                                * เมื่อเลือกปุ่มขยายเวลา ระบบจะเปิดสถานะ Active ให้อัตโนมัติ (นับต่อจากวันหมดอายุเดิม หรือนับจากวันนี้หากหมดอายุแล้ว)
+                                            </span>
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="text-center p-3 border border-orange-200 bg-orange-50 text-orange-800 rounded-lg text-sm">
@@ -1255,28 +1375,107 @@ function EditForm({ formData, setFormData, handleChange, handleImageUpload, hand
                         </div>
                     )}
                 </div>
-                <div className="space-y-3 col-span-2 md:col-span-1 border p-3 rounded-lg bg-card">
-                    <label className="text-sm font-semibold flex items-center gap-2">ช่องทางการขาย & สถานะ</label>
-                    <div className="flex flex-col gap-3 mt-2">
-                        <div className="flex items-center gap-2">
-                            <Switch checked={formData.is_active} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, is_active: val }))} />
-                            <span className="text-sm font-medium">เปิดใช้งานสินค้านี้ (Active)</span>
+                <div className="space-y-3 col-span-2 md:col-span-1 border p-4 rounded-xl bg-card shadow-sm">
+                    <label className="text-sm font-semibold flex items-center gap-2">สถานะการใช้งาน, การแสดงหน้าร้าน & ช่องทางการขาย</label>
+                    <div className="flex flex-col gap-3.5 mt-2">
+                        {/* 1. System Active / Inactive */}
+                        <div className={`p-3 rounded-lg border transition-colors ${formData.is_active ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${formData.is_active ? 'text-emerald-400' : 'text-red-400'}`} />
+                                    <span className="text-sm font-semibold text-foreground">
+                                        อนุญาตให้ใช้งานสินค้านี้ ({formData.is_active ? 'Active' : 'Inactive'})
+                                    </span>
+                                </div>
+                                <Switch
+                                    checked={formData.is_active}
+                                    onCheckedChange={(val) => setFormData((p: any) => ({ ...p, is_active: val }))}
+                                />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                                {formData.is_active
+                                    ? 'เปิดให้พอร์ตที่มีสิทธิ์สามารถรัน EA และยืนยันลิขสิทธิ์ผ่าน API ได้ตามปกติ'
+                                    : 'ระงับการใช้งานระบบชั่วคราว (พอร์ตของสินค้านี้จะไม่สามารถยืนยันสิทธิ์ได้)'}
+                            </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Switch checked={formData.allow_rent} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_rent: val }))} disabled={!formData.is_active} />
-                            <span className="text-sm text-muted-foreground">อนุญาตให้เช่า / ซื้อขาด</span>
+
+                        {/* 2. Storefront Visibility (Show on Website) */}
+                        <div className={`p-3 rounded-lg border transition-colors ${formData.show_on_store ? 'bg-sky-500/10 border-sky-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    {formData.show_on_store ? (
+                                        <Eye className="w-4 h-4 shrink-0 text-sky-400" />
+                                    ) : (
+                                        <EyeOff className="w-4 h-4 shrink-0 text-amber-400" />
+                                    )}
+                                    <span className="text-sm font-semibold text-foreground">
+                                        แสดงสินค้าที่หน้าสินค้าของเว็บฯ ({formData.show_on_store ? 'แสดงหน้าร้าน' : 'ซ่อนจากหน้าร้าน'})
+                                    </span>
+                                </div>
+                                <Switch
+                                    checked={Boolean(formData.show_on_store)}
+                                    onCheckedChange={(val) => setFormData((p: any) => ({ ...p, show_on_store: val }))}
+                                    disabled={!formData.is_active}
+                                />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                                {formData.show_on_store
+                                    ? 'แสดงสินค้าในหน้าแรกและหน้ารวมสินค้าของเว็บไซต์ ให้ลูกค้าทั่วไปกดดูและสั่งซื้อได้'
+                                    : 'ซ่อนจากหน้าเว็บไซต์สาธารณะ (เหมาะสำหรับสินค้าเฉพาะกลุ่มหรือแคมเปญอัปเกรด เช่น EasyM Prime โดยที่ลูกค้ายังใช้งานและต่ออายุในแดชบอร์ดได้)'}
+                            </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Switch checked={formData.allow_ib} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_ib: val }))} disabled={!formData.is_active} />
-                            <span className="text-sm text-muted-foreground">อนุญาตให้สมัครใช้งานผ่านสิทธิ์ IB</span>
+
+                        {/* 3. Sales Channels */}
+                        <div className="space-y-2.5 pt-2 border-t border-border/60">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                                ช่องทางการจำหน่าย / ต่ออายุ
+                            </span>
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <span className="text-sm font-medium block">อนุญาตให้เช่า / ซื้อขาด / ต่ออายุแบบชำระเงิน</span>
+                                    <span className="text-[11px] text-muted-foreground">เปิดให้ลูกค้าเลือกแพ็กเกจ รายเดือน / 3 เดือน / ถาวร และแนบสลิปได้</span>
+                                </div>
+                                <Switch
+                                    checked={formData.allow_rent}
+                                    onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_rent: val }))}
+                                    disabled={!formData.is_active}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                                <div>
+                                    <span className="text-sm font-medium block">อนุญาตให้สมัครใช้งานผ่านสิทธิ์ IB ฟรี</span>
+                                    <span className="text-[11px] text-muted-foreground">เปิดให้ลูกค้าที่มีพอร์ตภายใต้ IB ขอรับสิทธิ์ใช้งานฟรี</span>
+                                </div>
+                                <Switch
+                                    checked={formData.allow_ib}
+                                    onCheckedChange={(val) => setFormData((p: any) => ({ ...p, allow_ib: val }))}
+                                    disabled={!formData.is_active}
+                                />
+                            </div>
                         </div>
-                        <div className="flex flex-col gap-2 pt-2 border-t mt-1">
-                            <div className="flex items-center gap-2">
-                                <Switch checked={formData.is_multi_port} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, is_multi_port: val }))} />
+
+                        {/* Special Note for EasyM Prime */}
+                        {formData.product_key === 'EZM-PRIME-V1' && (
+                            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs space-y-1.5">
+                                <div className="font-bold text-purple-300 flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                    โหมดแคมเปญ EasyM Prime (ทดลองฟรี 2 เดือน)
+                                </div>
+                                <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside leading-relaxed">
+                                    <li>แนะนำให้ตั้ง <strong>อนุญาตให้ใช้งาน = Active</strong> และ <strong>แสดงหน้าเว็บ = ปิด (ซ่อน)</strong></li>
+                                    <li>เปิด <strong>อนุญาตให้เช่า/ซื้อขาด = เปิด</strong> เพื่อให้ลูกค้าที่ครบกำหนด 2 เดือน สามารถกดปุ่ม <strong>&quot;ต่ออายุ&quot;</strong> ในแดชบอร์ดเพื่อเลือกชำระเงินต่อเองได้ทันที</li>
+                                    <li>เมื่อครบ 60 วัน ระบบจะปรับพอร์ตเป็น <strong>Inactive อัตโนมัติ</strong> หรือแอดมินสามารถกดขยายเวลา (+1 เดือน / +2 เดือน / กำหนดเอง) ให้รายบุคคลได้ที่หน้าจัดการลิขสิทธิ์</li>
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-2 pt-2 border-t border-border/60 mt-1">
+                            <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-medium">เปิดโหมด Multi-Port (1 สั่งซื้อ = หลายพอร์ต)</span>
+                                <Switch checked={formData.is_multi_port} onCheckedChange={(val) => setFormData((p: any) => ({ ...p, is_multi_port: val }))} />
                             </div>
                             {formData.is_multi_port && (
-                                <div className="pl-11 pr-2">
+                                <div className="pl-2 pr-2 pt-1">
                                     <label className="text-xs text-muted-foreground block mb-1">จำนวนพอร์ตที่จะลดรวบยอดอนุมัติ (สูงสุด 10)</label>
                                     <Input 
                                         type="number" 

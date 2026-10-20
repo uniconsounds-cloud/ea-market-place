@@ -16,6 +16,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Check, X, Search, FileText, Loader2, Filter, Zap, Calendar, Mail, RotateCw, RefreshCw, Sparkles } from 'lucide-react';
+import { sweepAndDeactivateExpiredLicenses, recordLicenseAudit } from '@/lib/license-audit';
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
@@ -41,17 +42,8 @@ export default function AdminOrdersPage() {
     const fetchOrders = async () => {
         setLoading(true);
 
-        // Auto-deactivate any expired licenses
-        try {
-            await supabase
-                .from('licenses')
-                .update({ is_active: false })
-                .eq('is_active', true)
-                .neq('type', 'lifetime')
-                .lt('expiry_date', new Date().toISOString());
-        } catch (e) {
-            console.error('Error auto-deactivating expired licenses:', e);
-        }
+        // Auto-deactivate any expired licenses and record audit log ('auto')
+        await sweepAndDeactivateExpiredLicenses(supabase);
 
         // Fetch all orders with pagination (>1000 records supported)
         let allOrders: any[] = [];
@@ -409,7 +401,7 @@ export default function AdminOrdersPage() {
                             expiry_date: commonExpiryDate,
                             created_at: approvalTimestamp, // Update approval timestamp so upgrade/renewal is treated as newly approved
                             ...(order.plan_type !== 'upgrade' && order.ib_broker_name && { ib_broker_name: order.ib_broker_name }),
-                            is_ib_request: order.is_ib_request // flag it as IB if it is one
+                            is_ib_request: order.plan_type === 'upgrade' ? Boolean(existingLicense.is_ib_request) : order.is_ib_request
                         })
                         .eq('id', existingLicense.id);
 
@@ -418,10 +410,18 @@ export default function AdminOrdersPage() {
                         throw updateError;
                     }
 
+                    await recordLicenseAudit(
+                        supabase,
+                        [existingLicense.id],
+                        'admin',
+                        order.plan_type === 'upgrade' ? 'แอดมินอนุมัติอัปเกรด EasyM Prime (60 วัน)' : 'แอดมินอนุมัติคำสั่งซื้อ/ต่ออายุ',
+                        approvalTimestamp
+                    );
+
                 } else {
                     // Create new license
                     console.log('Creating New License for', port);
-                    const { error: licenseError } = await supabase
+                    const { data: insertedLic, error: licenseError } = await supabase
                         .from('licenses')
                         .insert({
                             user_id: order.user_id,
@@ -431,13 +431,25 @@ export default function AdminOrdersPage() {
                             expiry_date: commonExpiryDate,
                             account_number: port,
                             ib_broker_name: order.plan_type === 'upgrade' ? null : (order.ib_broker_name || null),
-                            is_ib_request: order.is_ib_request,
+                            is_ib_request: order.plan_type === 'upgrade' ? false : order.is_ib_request,
                             created_at: approvalTimestamp
-                        });
+                        })
+                        .select('id')
+                        .maybeSingle();
 
                     if (licenseError) {
                         console.error('Insert Error:', licenseError);
                         throw licenseError;
+                    }
+
+                    if (insertedLic?.id) {
+                        await recordLicenseAudit(
+                            supabase,
+                            [insertedLic.id],
+                            'admin',
+                            order.plan_type === 'upgrade' ? 'แอดมินอนุมัติอัปเกรด EasyM Prime (60 วัน)' : 'แอดมินอนุมัติคำสั่งซื้อใหม่',
+                            approvalTimestamp
+                        );
                     }
                 }
             }

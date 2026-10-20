@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, BadgeCheck, QrCode, ArrowLeft, Download } from 'lucide-react';
+import { recordLicenseAudit } from '@/lib/license-audit';
 
 export default function CheckoutPage(props: { params: Promise<{ id: string }> }) {
     // Unwrap params using React.use()
@@ -22,12 +23,14 @@ function CheckoutContent({ productId }: { productId: string }) {
     const searchParams = useSearchParams();
 
     // Initial state from URL params
-    const initialPlan = (searchParams.get('plan') as 'monthly' | 'quarterly' | 'lifetime') || 'lifetime';
+    const rawPlan = searchParams.get('plan') || 'lifetime';
+    const initialPlan = (rawPlan === 'pro' ? 'monthly' : rawPlan) as 'monthly' | 'quarterly' | 'lifetime';
     const initialAccountNumber = searchParams.get('accountNumber') || '';
-    const isIbRequest = searchParams.get('isIbRequest') === 'true';
+    const rawIsIbRequest = searchParams.get('isIbRequest') === 'true';
     const ibBrokerName = searchParams.get('ibBrokerName') || '';
 
     const [product, setProduct] = useState<any>(null);
+    const isIbRequest = rawIsIbRequest && product?.allow_ib !== false && product?.product_key !== 'EZM-PRIME-V1';
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [planType, setPlanType] = useState<'monthly' | 'quarterly' | 'lifetime'>(initialPlan);
@@ -191,10 +194,15 @@ function CheckoutContent({ productId }: { productId: string }) {
                 .map(l => l.id);
 
             if (expiredIds.length > 0) {
-                supabase.from('licenses')
+                await supabase.from('licenses')
                     .update({ is_active: false })
-                    .in('id', expiredIds)
-                    .then();
+                    .in('id', expiredIds);
+                await recordLicenseAudit(
+                    supabase,
+                    expiredIds,
+                    'auto',
+                    'ระบบปิดการใช้งานอัตโนมัติ (ครบกำหนดวันหมดอายุ)'
+                );
             }
 
             const activeConflict = (globalLicenses || []).find(l => {
@@ -421,39 +429,43 @@ function CheckoutContent({ productId }: { productId: string }) {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-2 opacity-80 pointer-events-none grayscale-[0.2]">
-                                    <Label>แพ็กเกจที่เลือก</Label>
-                                    <RadioGroup value={planType} className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
+                                <div className="space-y-2">
+                                    <Label>เลือกแพ็กเกจที่ต้องการใช้งาน / ต่ออายุ</Label>
+                                    <RadioGroup
+                                        value={planType}
+                                        onValueChange={(val: any) => setPlanType(val)}
+                                        className={`grid gap-4 ${product.price_quarterly ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}
+                                    >
                                         <div>
-                                            <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" disabled />
+                                            <RadioGroupItem value="monthly" id="monthly" className="peer sr-only" />
                                             <Label
                                                 htmlFor="monthly"
-                                                className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
+                                                className={`cursor-pointer flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'monthly' ? 'border-primary bg-primary/5' : ''}`}
                                             >
                                                 <span className="mb-2 text-sm font-semibold">รายเดือน</span>
-                                                <span className="text-xl font-bold">฿{product.price_monthly.toLocaleString()}</span>
+                                                <span className="text-xl font-bold">฿{product.price_monthly?.toLocaleString()}</span>
                                             </Label>
                                         </div>
                                         {product.price_quarterly && (
                                             <div>
-                                                <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" disabled />
+                                                <RadioGroupItem value="quarterly" id="quarterly" className="peer sr-only" />
                                                 <Label
                                                     htmlFor="quarterly"
-                                                    className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
+                                                    className={`cursor-pointer flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'quarterly' ? 'border-primary bg-primary/5' : ''}`}
                                                 >
                                                     <span className="mb-2 text-sm font-semibold">3 เดือน</span>
-                                                    <span className="text-xl font-bold">฿{product.price_quarterly.toLocaleString()}</span>
+                                                    <span className="text-xl font-bold">฿{product.price_quarterly?.toLocaleString()}</span>
                                                 </Label>
                                             </div>
                                         )}
                                         <div className={product.price_quarterly ? "col-span-2 md:col-span-1" : ""}>
-                                            <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" disabled />
+                                            <RadioGroupItem value="lifetime" id="lifetime" className="peer sr-only" />
                                             <Label
                                                 htmlFor="lifetime"
-                                                className={`flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
+                                                className={`cursor-pointer flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${planType === 'lifetime' ? 'border-primary bg-primary/5' : ''}`}
                                             >
                                                 <span className="mb-2 text-sm font-semibold">ถาวร (Lifetime)</span>
-                                                <span className="text-xl font-bold">฿{product.price_lifetime.toLocaleString()}</span>
+                                                <span className="text-xl font-bold">฿{product.price_lifetime?.toLocaleString()}</span>
                                             </Label>
                                         </div>
                                     </RadioGroup>

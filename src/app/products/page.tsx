@@ -2,18 +2,24 @@ import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabaseClient';
+import { fetchStorefrontVisibilityConfig, isProductShownOnStore } from '@/lib/license-audit';
 
 export const revalidate = 0;
 
 export default async function ProductsPage() {
-    const { data: products } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+    const [{ data: rawProducts }, visibilityConfig] = await Promise.all([
+        supabase
+            .from('products')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
+        fetchStorefrontVisibilityConfig(supabase)
+    ]);
 
-    const monitorProduct = products?.find(p => p.product_key === 'EA-UNIMON-01');
-    const eaProducts = products?.filter(p => p.product_key !== 'EA-UNIMON-01') || [];
+    const products = (rawProducts || []).filter(p => isProductShownOnStore(p, visibilityConfig));
+
+    const monitorProduct = products.find(p => p.product_key === 'EA-UNIMON-01');
+    const eaProducts = products.filter(p => p.product_key !== 'EA-UNIMON-01');
 
     return (
         <main className="min-h-screen flex flex-col bg-background selection:bg-primary/30">

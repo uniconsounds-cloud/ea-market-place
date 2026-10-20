@@ -9,6 +9,7 @@ import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock,
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { sweepAndDeactivateExpiredLicenses } from '@/lib/license-audit';
 
 interface ProductItem {
     id: string; // license id or order id
@@ -133,6 +134,9 @@ export default function DashboardPage() {
                 return;
             }
             setUser(user);
+
+            // Auto-deactivate any expired licenses and record audit log ('auto')
+            await sweepAndDeactivateExpiredLicenses(supabase);
 
             // Check if user has joined demo challenge
             const { data: demoChallengeData } = await supabase
@@ -813,9 +817,12 @@ export default function DashboardPage() {
 
                                                             {!isOrder && (!item.is_active || !timeInfo?.isLifetime) ? (
                                                                 (() => {
-                                                                    const isIb = item.type === 'ib' || item.is_ib;
+                                                                    const isPrimeProduct = isPrime || item.type === 'pro';
+                                                                    const isIb = !isPrimeProduct && (item.type === 'ib' || item.is_ib);
                                                                     const brokerParam = item.ib_broker_name ? `&ibBrokerName=${encodeURIComponent(item.ib_broker_name)}` : '';
-                                                                    const planParam = item.type || (isIb ? 'lifetime' : 'monthly');
+                                                                    const planParam = isPrimeProduct
+                                                                        ? (item.type === 'quarterly' || item.type === 'lifetime' ? item.type : 'monthly')
+                                                                        : (item.type || (isIb ? 'lifetime' : 'monthly'));
                                                                     const renewCheckoutUrl = `/checkout/${group.productId}?accountNumber=${item.account_number}&plan=${planParam}${isIb ? '&isIbRequest=true' : ''}${brokerParam}`;
                                                                     return (
                                                                         <Link href={renewCheckoutUrl}>

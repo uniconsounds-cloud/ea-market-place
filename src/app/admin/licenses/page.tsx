@@ -1,6 +1,11 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
 import AdminLicensesClient from './admin-licenses-client';
+import {
+    sweepAndDeactivateExpiredLicenses,
+    fetchLicenseAuditMap,
+    resolveLicenseAuditInfo
+} from '@/lib/license-audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +24,9 @@ export default async function AdminLicensesPage() {
 
     if (profile?.role !== 'admin') redirect('/');
 
-    // Opportunistic Update: Auto-deactivate expired licenses before viewing
-    const nowISO = new Date().toISOString();
-    await supabase.from('licenses')
-        .update({ is_active: false })
-        .lt('expiry_date', nowISO)
-        .eq('is_active', true);
+    // Auto-deactivate expired licenses and log 'auto' in audit log before viewing
+    await sweepAndDeactivateExpiredLicenses(supabase);
+    const auditMap = await fetchLicenseAuditMap(supabase);
 
     // Fetch all licenses joined with products (with pagination for >1000 records)
     let rawLicenses: any[] = [];
@@ -125,11 +127,16 @@ export default async function AdminLicensesPage() {
 
         const isIbLicense = l.type === 'ib' || Boolean(l.is_ib_request) || Boolean(l.ib_broker_name) || Boolean(matchedIb) || (profilesMap[l.user_id]?.ib_account_number?.trim() === port);
 
-        return {
+        const merged = {
             ...l,
             profiles: l.user_id ? profilesMap[l.user_id] : null,
             is_ib: isIbLicense,
             ib_broker_name: finalBrokerName
+        };
+
+        return {
+            ...merged,
+            audit_info: resolveLicenseAuditInfo(merged, auditMap)
         };
     });
 

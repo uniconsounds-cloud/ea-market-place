@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { getPortControl } from '@/lib/farm-control/store';
+import { sweepAndDeactivateExpiredLicenses } from '@/lib/license-audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -167,6 +168,7 @@ function recordIncomingSyncTelemetry(
         void (async () => {
             try {
                 await hydrateTrafficStateIfNeeded();
+                await sweepAndDeactivateExpiredLicenses(supabase);
                 await supabase.from('fleet_capital_snapshots').upsert({
                     period_key: 'mt5_traffic_telemetry',
                     period_type: 'telemetry',
