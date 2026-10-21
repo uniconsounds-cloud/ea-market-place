@@ -2878,50 +2878,54 @@ export default function FarmClient({
                                                         {isActive && activePort ? (
                                                             <div
                                                                 style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                                className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-6 py-3 rounded-2xl bg-[#051811]/92 backdrop-blur-md border-2 transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
+                                                                className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-5 pt-3 pb-3 min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
                                                                     isCurrentPort
                                                                         ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white group-hover:scale-105'
                                                                         : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-200 group-hover:scale-105 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.95),0_0_32px_rgba(16,185,129,0.85)]'
                                                                 }`}
                                                             >
-                                                                {/* 🧪 หลอดแก้วแนวนอน 2 อันเรียงซ้อนขึ้นไปเหนือขอบกรอบป้าย (ไร้ตัวหนังสือรกตา) */}
-                                                                <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 flex flex-col gap-1.5 pointer-events-none">
+                                                                {/* 🧪 หลอดแก้วแนวนอน 2 อันวางเรียงซ้อนกันอยู่ด้านในกรอบเดียวกัน (ความหนา 2 เท่า มองเห็นปรอทชัดเจน) */}
+                                                                <div className="w-full flex flex-col gap-2 mb-2 pt-0.5">
                                                                     {/* หลอดที่ 2 (บน): ปรอทกำไรของพอร์ต (สีเขียวสีเดียว) */}
                                                                     <div className="flex items-center w-full">
-                                                                        <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-emerald-300 via-emerald-500 to-teal-700 border border-emerald-300 shadow-[0_0_6px_rgba(52,211,153,0.9)] flex-shrink-0 z-10 -mr-1 flex items-center justify-center">
-                                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5" />
+                                                                        <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-emerald-300 via-emerald-500 to-teal-700 border-2 border-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.95)] flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center">
+                                                                            <div className="w-1 h-1 rounded-full bg-white/95 -mt-0.5 -ml-0.5" />
                                                                         </div>
-                                                                        <div className="relative flex-1 h-2 rounded-r-full bg-black/85 border border-emerald-500/40 shadow-[0_2px_8px_rgba(0,0,0,0.8),inset_0_1px_3px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1px]">
-                                                                            <div className="absolute top-0 left-1 right-1 h-[1px] bg-white/40 rounded-full z-20 pointer-events-none" />
+                                                                        <div className="relative flex-1 h-3.5 rounded-r-full bg-black/90 border border-emerald-500/50 shadow-[0_2px_8px_rgba(0,0,0,0.9),inset_0_2px_4px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1.5px]">
+                                                                            <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/50 rounded-full z-20 pointer-events-none" />
                                                                             <div
-                                                                                className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_8px_rgba(52,211,153,0.9)] transition-all duration-700 ease-out relative"
+                                                                                className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_12px_rgba(52,211,153,0.95)] transition-all duration-700 ease-out relative"
                                                                                 style={{ width: `${profitFillPct}%` }}
                                                                             >
                                                                                 {profitFillPct > 0 && (
-                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/90 rounded-r-full shadow-[0_0_4px_#fff]" />
+                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-white/95 rounded-r-full shadow-[0_0_6px_#fff]" />
                                                                                 )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* หลอดที่ 1 (ล่าง - ชิดขอบกรอบป้ายที่สุด): ปรอท DD รวมของฟาร์ม (สีตามสถานะ DD) */}
+                                                                    {/* หลอดที่ 1 (ล่าง - ชิดด้านบนป้ายชื่อพอร์ต): ปรอท DD รวมของฟาร์ม (สีตามสถานะ DD) */}
                                                                     <div className="flex items-center w-full">
-                                                                        <div className={`w-2.5 h-2.5 rounded-full ${ddTheme.bulbBg} border ${ddTheme.bulbBorder} flex-shrink-0 z-10 -mr-1 flex items-center justify-center`}>
-                                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5" />
+                                                                        <div className={`w-3.5 h-3.5 rounded-full ${ddTheme.bulbBg} border-2 ${ddTheme.bulbBorder} flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center`}>
+                                                                            <div className="w-1 h-1 rounded-full bg-white/95 -mt-0.5 -ml-0.5" />
                                                                         </div>
-                                                                        <div className="relative flex-1 h-2 rounded-r-full bg-black/85 border border-white/25 shadow-[0_2px_8px_rgba(0,0,0,0.8),inset_0_1px_3px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1px]">
-                                                                            <div className="absolute top-0 left-1 right-1 h-[1px] bg-white/40 rounded-full z-20 pointer-events-none" />
+                                                                        <div className="relative flex-1 h-3.5 rounded-r-full bg-black/90 border border-white/30 shadow-[0_2px_8px_rgba(0,0,0,0.9),inset_0_2px_4px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1.5px]">
+                                                                            <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/50 rounded-full z-20 pointer-events-none" />
                                                                             <div
                                                                                 className={`h-full rounded-r-full ${ddTheme.fillGradient} transition-all duration-700 ease-out relative`}
                                                                                 style={{ width: `${ddFillPct}%` }}
                                                                             >
                                                                                 {ddFillPct > 0 && (
-                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/90 rounded-r-full shadow-[0_0_4px_#fff]" />
+                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-white/95 rounded-r-full shadow-[0_0_6px_#fff]" />
                                                                                 )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
+
+                                                                {/* เส้นคั่นแก้วคริสตัลบางๆ */}
+                                                                <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent mb-2" />
+
                                                                 <div className="flex items-center gap-2 mb-0.5">
                                                                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
                                                                     <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
