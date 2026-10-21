@@ -301,6 +301,28 @@ export function resolveLicenseAuditInfo(
         };
     }
 
+    // Intelligent fallback for Prime Upgraded accounts (e.g. upgraded from MAX to Prime):
+    // Accounts upgraded to Prime receive a 60-day trial ending at expiry_date.
+    // If calculated upgrade date (expiry - 60 days) is newer than original created_at,
+    // this port was upgraded to Prime and the upgrade date should be shown as the last edited date.
+    const isPrimeLicense = license?.products?.product_key?.toUpperCase().includes('PRIME') ||
+                           license?.products?.name?.toLowerCase().includes('prime') ||
+                           license?.type === 'pro';
+
+    if (isPrimeLicense && license?.expiry_date) {
+        const expiryMs = new Date(license.expiry_date).getTime();
+        const estimatedUpgradeMs = expiryMs - (60 * 24 * 60 * 60 * 1000);
+        const createdAtMs = license.created_at ? new Date(license.created_at).getTime() : 0;
+        if (estimatedUpgradeMs > createdAtMs) {
+            return {
+                updatedAt: new Date(estimatedUpgradeMs).toISOString(),
+                updatedBy: 'admin',
+                label: 'แอดมิน',
+                reason: 'แอดมินอนุมัติอัปเกรด EasyM Prime (60 วัน)'
+            };
+        }
+    }
+
     return {
         updatedAt: license?.created_at || null,
         updatedBy: 'admin',
