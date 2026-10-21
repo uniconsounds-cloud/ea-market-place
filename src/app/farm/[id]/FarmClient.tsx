@@ -2791,9 +2791,7 @@ export default function FarmClient({
 
                                 const portTodayPnl = Number(activePort?.portStatus?.today_pnl) || 0;
                                 const portAccProfit = Number(activePort?.portStatus?.accumulated_profit) || 0;
-                                const profitVal = portTodayPnl > 0 ? portTodayPnl : (portAccProfit > 0 ? portAccProfit : 0);
-                                const profitTarget = portBal > 0 ? Math.max(1000, portBal * 0.02) : 2000;
-                                const profitFillPct = Math.min(100, Math.max(profitVal > 0 ? 6 : 0, (profitVal / profitTarget) * 100));
+                                const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
 
                                 return (
                                     <div
@@ -2886,21 +2884,31 @@ export default function FarmClient({
                                                             >
                                                                 {/* 🧪 หลอดแก้วแนวนอน 2 อันวางเรียงซ้อนกันอยู่ด้านในกรอบเดียวกัน (ความหนา 2 เท่า มองเห็นปรอทชัดเจน) */}
                                                                 <div className="w-full flex flex-col gap-2 mb-2 pt-0.5">
-                                                                    {/* หลอดที่ 2 (บน): ปรอทกำไรของพอร์ต (สีเขียวสีเดียว) */}
+                                                                    {/* หลอดที่ 2 (บน): หลอดเรืองแสงสถานะกำไร (มีกำไร = เขียวเรืองแสงนีออนเต็มหลอด / ยังไม่มีกำไร = หลอดแก้วสแตนด์บาย) */}
                                                                     <div className="flex items-center w-full">
-                                                                        <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-emerald-300 via-emerald-500 to-teal-700 border-2 border-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.95)] flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center">
-                                                                            <div className="w-1 h-1 rounded-full bg-white/95 -mt-0.5 -ml-0.5" />
+                                                                        <div className={`w-3.5 h-3.5 rounded-full flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center transition-all duration-500 ${
+                                                                            hasProfit
+                                                                                ? 'bg-gradient-to-br from-emerald-200 via-emerald-400 to-teal-500 border-2 border-emerald-200 shadow-[0_0_12px_rgba(52,211,153,1),0_0_4px_#fff]'
+                                                                                : 'bg-slate-900 border-2 border-slate-700/60 shadow-none'
+                                                                        }`}>
+                                                                            <div className={`w-1 h-1 rounded-full -mt-0.5 -ml-0.5 transition-all duration-500 ${
+                                                                                hasProfit ? 'bg-white shadow-[0_0_4px_#fff]' : 'bg-slate-700'
+                                                                            }`} />
                                                                         </div>
-                                                                        <div className="relative flex-1 h-3.5 rounded-r-full bg-black/90 border border-emerald-500/50 shadow-[0_2px_8px_rgba(0,0,0,0.9),inset_0_2px_4px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1.5px]">
-                                                                            <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/50 rounded-full z-20 pointer-events-none" />
-                                                                            <div
-                                                                                className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_12px_rgba(52,211,153,0.95)] transition-all duration-700 ease-out relative"
-                                                                                style={{ width: `${profitFillPct}%` }}
-                                                                            >
-                                                                                {profitFillPct > 0 && (
-                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-white/95 rounded-r-full shadow-[0_0_6px_#fff]" />
-                                                                                )}
-                                                                            </div>
+                                                                        <div className={`relative flex-1 h-3.5 rounded-r-full overflow-hidden flex items-center p-[1.5px] transition-all duration-500 ${
+                                                                            hasProfit
+                                                                                ? 'bg-[#042115] border-2 border-emerald-400/90 shadow-[0_0_14px_rgba(16,185,129,0.7),inset_0_0_8px_rgba(52,211,153,0.4)]'
+                                                                                : 'bg-black/80 border border-slate-700/40 shadow-inner'
+                                                                        }`}>
+                                                                            {/* Glass Reflection Highlight */}
+                                                                            <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/40 rounded-full z-20 pointer-events-none" />
+                                                                            {hasProfit ? (
+                                                                                <div className="w-full h-full rounded-r-full bg-gradient-to-r from-emerald-500 via-emerald-300 to-teal-300 shadow-[0_0_12px_rgba(52,211,153,0.95)] relative flex items-center">
+                                                                                    <div className="w-full h-[2px] bg-white/80 rounded-full blur-[0.5px] mx-1" />
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="w-full h-full rounded-r-full bg-slate-900/40" />
+                                                                            )}
                                                                         </div>
                                                                     </div>
 
