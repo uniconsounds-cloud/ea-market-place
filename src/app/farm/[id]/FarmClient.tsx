@@ -2777,6 +2777,24 @@ export default function FarmClient({
                                 const isActive = Boolean(activePort);
                                 const isCurrentPort = isActive && String(activePort?.portNumber) === String(portNumber);
 
+                                // 📊 คำนวณค่า DD รวม และกำไรของพอร์ตสำหรับหลอดแก้วปรอทแนวนอน
+                                const portBal = Number(activePort?.portStatus?.balance) || 0;
+                                const portEq = Number(activePort?.portStatus?.equity) || 0;
+                                const rawDD = Number(activePort?.portStatus?.daily_max_drawdown) || Number(activePort?.portStatus?.max_drawdown) || 0;
+                                let calculatedDD = 0;
+                                if (portBal > 0 && portEq > 0 && portEq < portBal) {
+                                    calculatedDD = ((portBal - portEq) / portBal) * 100;
+                                }
+                                const portDDPct = Math.max(rawDD, calculatedDD);
+                                const ddTheme = getDDLevelTheme(portDDPct);
+                                const ddFillPct = Math.min(100, Math.max(portDDPct > 0 ? 5 : 0, (portDDPct / 35) * 100));
+
+                                const portTodayPnl = Number(activePort?.portStatus?.today_pnl) || 0;
+                                const portAccProfit = Number(activePort?.portStatus?.accumulated_profit) || 0;
+                                const profitVal = portTodayPnl > 0 ? portTodayPnl : (portAccProfit > 0 ? portAccProfit : 0);
+                                const profitTarget = portBal > 0 ? Math.max(1000, portBal * 0.02) : 2000;
+                                const profitFillPct = Math.min(100, Math.max(profitVal > 0 ? 6 : 0, (profitVal / profitTarget) * 100));
+
                                 return (
                                     <div
                                         key={`multi_farm_slot_${slotIdx}`}
@@ -2866,6 +2884,44 @@ export default function FarmClient({
                                                                         : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-200 group-hover:scale-105 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.95),0_0_32px_rgba(16,185,129,0.85)]'
                                                                 }`}
                                                             >
+                                                                {/* 🧪 หลอดแก้วแนวนอน 2 อันเรียงซ้อนขึ้นไปเหนือขอบกรอบป้าย (ไร้ตัวหนังสือรกตา) */}
+                                                                <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 flex flex-col gap-1.5 pointer-events-none">
+                                                                    {/* หลอดที่ 2 (บน): ปรอทกำไรของพอร์ต (สีเขียวสีเดียว) */}
+                                                                    <div className="flex items-center w-full">
+                                                                        <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-emerald-300 via-emerald-500 to-teal-700 border border-emerald-300 shadow-[0_0_6px_rgba(52,211,153,0.9)] flex-shrink-0 z-10 -mr-1 flex items-center justify-center">
+                                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5" />
+                                                                        </div>
+                                                                        <div className="relative flex-1 h-2 rounded-r-full bg-black/85 border border-emerald-500/40 shadow-[0_2px_8px_rgba(0,0,0,0.8),inset_0_1px_3px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1px]">
+                                                                            <div className="absolute top-0 left-1 right-1 h-[1px] bg-white/40 rounded-full z-20 pointer-events-none" />
+                                                                            <div
+                                                                                className="h-full rounded-r-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-300 shadow-[0_0_8px_rgba(52,211,153,0.9)] transition-all duration-700 ease-out relative"
+                                                                                style={{ width: `${profitFillPct}%` }}
+                                                                            >
+                                                                                {profitFillPct > 0 && (
+                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/90 rounded-r-full shadow-[0_0_4px_#fff]" />
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* หลอดที่ 1 (ล่าง - ชิดขอบกรอบป้ายที่สุด): ปรอท DD รวมของฟาร์ม (สีตามสถานะ DD) */}
+                                                                    <div className="flex items-center w-full">
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${ddTheme.bulbBg} border ${ddTheme.bulbBorder} flex-shrink-0 z-10 -mr-1 flex items-center justify-center`}>
+                                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5" />
+                                                                        </div>
+                                                                        <div className="relative flex-1 h-2 rounded-r-full bg-black/85 border border-white/25 shadow-[0_2px_8px_rgba(0,0,0,0.8),inset_0_1px_3px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1px]">
+                                                                            <div className="absolute top-0 left-1 right-1 h-[1px] bg-white/40 rounded-full z-20 pointer-events-none" />
+                                                                            <div
+                                                                                className={`h-full rounded-r-full ${ddTheme.fillGradient} transition-all duration-700 ease-out relative`}
+                                                                                style={{ width: `${ddFillPct}%` }}
+                                                                            >
+                                                                                {ddFillPct > 0 && (
+                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/90 rounded-r-full shadow-[0_0_4px_#fff]" />
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                                 <div className="flex items-center gap-2 mb-0.5">
                                                                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
                                                                     <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
