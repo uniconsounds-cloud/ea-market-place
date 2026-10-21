@@ -2818,43 +2818,33 @@ export default function FarmClient({
                                                     : ''
                                             }`}
                                         >
-                                            <div style={{ transform: 'scale(0.34)', transformOrigin: 'center center' }} className="relative">
+                                            <div style={{ transform: 'scale(0.52)', transformOrigin: 'center center' }} className="relative">
                                                 <div className={`relative transition-all duration-300 ${
                                                     isActive
                                                         ? 'animate-float-farm group-hover:drop-shadow-[0_26px_32px_rgba(16,185,129,0.55)]'
                                                         : 'grayscale contrast-75 brightness-75 opacity-35'
                                                 }`}>
-                                                    {/* 25 Isometric Trees of this Mini-Farm centered around (c=2, r=2) */}
-                                                    {Array.from({ length: 25 }).map((__, i) => {
-                                                        const c = i % 5;
-                                                        const r = Math.floor(i / 5);
-                                                        const tZIndex = (c + r) + 20;
-                                                        return (
-                                                            <div
-                                                                key={`mini_tile_${slotIdx}_${i}`}
-                                                                className="absolute"
-                                                                style={{
-                                                                    left: `${(c - r) * TILE_W - 140}px`,
-                                                                    top: `${(c + r - 4) * TILE_H_OFFSET - 185}px`,
-                                                                    zIndex: tZIndex,
-                                                                    width: '280px',
-                                                                    height: '280px'
-                                                                }}
-                                                            >
-                                                                {isClient && (
-                                                                    <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
-                                                                        <Image
-                                                                            src="/farm/base_tree_new.png"
-                                                                            alt="Farm Tree"
-                                                                            fill
-                                                                            className="object-contain object-bottom drop-shadow-2xl"
-                                                                            unoptimized
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                    {/* 🏝️ Single Pre-Rendered Isometric Mini-Farm Island (Optimized Single Image Asset) */}
+                                                    <div
+                                                        className="absolute"
+                                                        style={{
+                                                            left: '-280px',
+                                                            top: '-250px',
+                                                            width: '560px',
+                                                            height: '500px',
+                                                            zIndex: 25
+                                                        }}
+                                                    >
+                                                        {isClient && (
+                                                            <Image
+                                                                src="/farm/mini_farm_island.png"
+                                                                alt="Mini Farm Island"
+                                                                fill
+                                                                className="object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.7)]"
+                                                                priority={slotIdx === 0}
+                                                            />
+                                                        )}
+                                                    </div>
 
                                                     {/* 🏷️ Center Port Number Plaque on each of the 4 Farms */}
                                                     <div
