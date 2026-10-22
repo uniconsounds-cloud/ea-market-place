@@ -2876,44 +2876,34 @@ export default function FarmClient({
                                                         {isActive && activePort ? (
                                                             <div
                                                                 style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                                className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 px-5 pt-3 pb-3 min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
+                                                                className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 overflow-hidden transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
                                                                     isCurrentPort
                                                                         ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white group-hover:scale-105'
                                                                         : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-200 group-hover:scale-105 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.95),0_0_32px_rgba(16,185,129,0.85)]'
                                                                 }`}
                                                             >
-                                                                {/* 🧪 หลอดแก้วแนวนอน 2 อันวางเรียงซ้อนกันอยู่ด้านในกรอบเดียวกัน (ความหนา 2 เท่า มองเห็นปรอทชัดเจน) */}
-                                                                <div className="w-full flex flex-col gap-2 mb-2 pt-0.5">
-                                                                    {/* หลอดที่ 2 (บน): หลอดเรืองแสงสถานะกำไร (มีกำไร = เขียวเรืองแสงนีออนเต็มหลอด / ยังไม่มีกำไร = หลอดแก้วสแตนด์บาย) */}
-                                                                    <div className="flex items-center w-full">
-                                                                        <div className={`w-3.5 h-3.5 rounded-full flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center transition-all duration-500 ${
-                                                                            hasProfit
-                                                                                ? 'bg-gradient-to-br from-emerald-200 via-emerald-400 to-teal-500 border-2 border-emerald-200 shadow-[0_0_12px_rgba(52,211,153,1),0_0_4px_#fff]'
-                                                                                : 'bg-slate-900 border-2 border-slate-700/60 shadow-none'
-                                                                        }`}>
-                                                                            <div className={`w-1 h-1 rounded-full -mt-0.5 -ml-0.5 transition-all duration-500 ${
-                                                                                hasProfit ? 'bg-white shadow-[0_0_4px_#fff]' : 'bg-slate-700'
-                                                                            }`} />
-                                                                        </div>
-                                                                        <div className={`relative flex-1 h-3.5 rounded-r-full overflow-hidden flex items-center p-[1.5px] transition-all duration-500 ${
-                                                                            hasProfit
-                                                                                ? 'bg-[#042115] border-2 border-emerald-400/90 shadow-[0_0_14px_rgba(16,185,129,0.7),inset_0_0_8px_rgba(52,211,153,0.4)]'
-                                                                                : 'bg-black/80 border border-slate-700/40 shadow-inner'
-                                                                        }`}>
-                                                                            {/* Glass Reflection Highlight */}
-                                                                            <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/40 rounded-full z-20 pointer-events-none" />
-                                                                            {hasProfit ? (
-                                                                                <div className="w-full h-full rounded-r-full bg-gradient-to-r from-emerald-500 via-emerald-300 to-teal-300 shadow-[0_0_12px_rgba(52,211,153,0.95)] relative flex items-center">
-                                                                                    <div className="w-full h-[2px] bg-white/80 rounded-full blur-[0.5px] mx-1" />
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="w-full h-full rounded-r-full bg-slate-900/40" />
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
+                                                                {/* 💎 ขอบบนของกรอบแสดงเลขพอร์ต: แบบผลึกแก้วใสเรืองแสงเมื่อพอร์ตมีกำไร / สีพื้นเมื่อไม่มีกำไร (หนาลงมาใกล้ปรอท DD) */}
+                                                                <div className={`w-full h-5 relative overflow-hidden transition-all duration-500 flex items-center justify-center ${
+                                                                    hasProfit
+                                                                        ? 'bg-gradient-to-b from-emerald-200/40 via-emerald-400/25 to-teal-500/10 border-b border-emerald-300/50 shadow-[0_2px_12px_rgba(52,211,153,0.5),inset_0_1px_3px_rgba(255,255,255,0.7)]'
+                                                                        : 'bg-[#03150e]/95 border-b border-emerald-950/60 shadow-none'
+                                                                }`}>
+                                                                    {hasProfit && (
+                                                                        <>
+                                                                            {/* Crystal Glass Reflection & Beveled Highlight */}
+                                                                            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-white to-transparent opacity-95 shadow-[0_0_8px_#fff]" />
+                                                                            <div className="absolute top-[2px] inset-x-3 h-[1px] bg-emerald-200/70 blur-[0.5px]" />
+                                                                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-200/35 via-transparent to-transparent animate-pulse" />
+                                                                            {/* Prismatic Crystal Sheen */}
+                                                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                                                                        </>
+                                                                    )}
+                                                                </div>
 
-                                                                    {/* หลอดที่ 1 (ล่าง - ชิดด้านบนป้ายชื่อพอร์ต): ปรอท DD รวมของฟาร์ม (สีตามสถานะ DD) */}
-                                                                    <div className="flex items-center w-full">
+                                                                {/* 🧪 ปรอท DD รวมของฟาร์ม และข้อมูลพอร์ต (ลงมาอยู่ใต้ขอบผลึกแก้วใส) */}
+                                                                <div className="w-full px-5 pt-2 pb-3 flex flex-col items-center">
+                                                                    {/* หลอดแก้วแนวนอนแสดงค่า DD รวมของฟาร์ม (สีตามสถานะ DD) */}
+                                                                    <div className="flex items-center w-full mb-2">
                                                                         <div className={`w-3.5 h-3.5 rounded-full ${ddTheme.bulbBg} border-2 ${ddTheme.bulbBorder} flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center`}>
                                                                             <div className="w-1 h-1 rounded-full bg-white/95 -mt-0.5 -ml-0.5" />
                                                                         </div>
@@ -2929,19 +2919,19 @@ export default function FarmClient({
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
 
-                                                                {/* เส้นคั่นแก้วคริสตัลบางๆ */}
-                                                                <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent mb-2" />
+                                                                    {/* เส้นคั่นแก้วคริสตัลบางๆ */}
+                                                                    <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent mb-2" />
 
-                                                                <div className="flex items-center gap-2 mb-0.5">
-                                                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                                                                    <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
-                                                                        {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                                                                    {activePort.portNumber}
+                                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                                                                        <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
+                                                                            {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
+                                                                        {activePort.portNumber}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         ) : (
