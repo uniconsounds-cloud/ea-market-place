@@ -2763,9 +2763,9 @@ export default function FarmClient({
                         /* ═══════════════════════════════════════════════════════════════════ */
                         <div className="absolute left-1/2 top-1/2">
                             {Array.from({ length: 4 }).map((_, slotIdx) => {
-                                // 2.5D Isometric Diamond Grid (2:1 isometric ratio matching TILE_W=104, TILE_H_OFFSET=52)
-                                const FARM_STEP_X = 224;
-                                const FARM_STEP_Y = 112;
+                                // 2.5D Isometric Diamond Grid (ขยายขนาด 4 ฟาร์มลอยตัวให้เต็มความกว้างเท่ากับหน้าฟาร์มเดี่ยว)
+                                const FARM_STEP_X = 285;
+                                const FARM_STEP_Y = 142;
                                 const diamondCoords = [
                                     { fc: 0, fr: 0, offsetX: 0,            offsetY: -FARM_STEP_Y, baseZ: 30 }, // ฟาร์มที่ 1: ตรงกลางบน
                                     { fc: 0, fr: 1, offsetX: -FARM_STEP_X, offsetY: 0,            baseZ: 40 }, // ฟาร์มที่ 2: เยื้องมาทางซ้าย
@@ -2818,8 +2818,8 @@ export default function FarmClient({
                                         {isActive && (
                                             <div
                                                 style={{
-                                                    width: '250px',
-                                                    height: '250px',
+                                                    width: '320px',
+                                                    height: '320px',
                                                     transform: 'translate(-50%, -50%) scaleY(0.5) rotate(45deg)'
                                                 }}
                                                 className="absolute left-0 top-0 z-[200] bg-transparent"
@@ -2834,7 +2834,7 @@ export default function FarmClient({
                                                     : ''
                                             }`}
                                         >
-                                            <div style={{ transform: 'scale(0.52)', transformOrigin: 'center center' }} className="relative">
+                                            <div style={{ transform: 'scale(0.66)', transformOrigin: 'center center' }} className="relative">
                                                 <div className={`relative transition-all duration-300 ${
                                                     isActive
                                                         ? 'animate-float-farm group-hover:drop-shadow-[0_26px_32px_rgba(16,185,129,0.55)]'
