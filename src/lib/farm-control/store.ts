@@ -30,6 +30,7 @@ export interface PortControlConfig {
     pause_new_orders?: boolean;
     symbols?: Record<string, PortSymbolConfig>;
     max_dd_limit?: number;
+    command_seq?: number;
     updated_at: number; // Unix timestamp in seconds
 }
 
@@ -142,6 +143,7 @@ export function updatePortControl(
     const cleanPort = String(portNumber).trim();
     const current = getPortControl(cleanPort);
 
+    const nextSeq = partial.command_seq !== undefined ? partial.command_seq : ((current.command_seq || 0) + 1);
     const updated: PortControlConfig = {
         ...current,
         ...partial,
@@ -150,6 +152,7 @@ export function updatePortControl(
             ...(current.symbols || {}),
             ...(partial.symbols || {})
         },
+        command_seq: nextSeq,
         updated_at: partial.updated_at !== undefined ? partial.updated_at : Math.floor(Date.now() / 1000)
     };
 

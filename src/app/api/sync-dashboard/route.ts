@@ -424,14 +424,15 @@ export async function POST(req: Request) {
         // 8. Retrieve & Harmonize 2-Way Command & Web Control state for this port
         let webConfig = await getPortControlAsync(portNumber);
 
-        // Check if there is a pending fresh web command issued within the last 25 seconds
-        const nowSec = Math.floor(Date.now() / 1000);
-        const webCommandAgeSec = nowSec - (Number(webConfig.updated_at) || 0);
-        const isFreshWebCommandPending = webCommandAgeSec < 25;
+        // Check if MT5 has already acknowledged the latest web command sequence
+        const ackSeq = Number(incomingPrimeData?.ack_command_seq ?? payload.ack_command_seq ?? 0);
+        const latestCmdSeq = Number(webConfig.command_seq ?? 0);
+        // If web issued commands (latestCmdSeq > 0) and MT5 has not acknowledged yet, command is in flight!
+        const isCommandInFlight = latestCmdSeq > 0 && ackSeq < latestCmdSeq;
 
-        // If no fresh web command is currently in flight, synchronize any manual MT5 chart toggles back into webConfig
+        // If no web command is in flight, synchronize any manual MT5 chart toggles back into webConfig
         const incomingPairs = incomingPrimeData?.pairs || payload.pairs;
-        if (!isFreshWebCommandPending && incomingPairs && typeof incomingPairs === 'object') {
+        if (!isCommandInFlight && incomingPairs && typeof incomingPairs === 'object') {
             const currentSymbols = { ...(webConfig.symbols || {}) };
             let hasSymbolChanges = false;
 
@@ -451,10 +452,10 @@ export async function POST(req: Request) {
             }
 
             if (hasSymbolChanges) {
-                // Preserve original updated_at so this server-side MT5 reflection doesn't look like a new web command
+                // When harmonizing manual MT5 chart toggles, keep command_seq unchanged so MT5 doesn't re-apply
                 webConfig = await updatePortControlAsync(portNumber, { 
                     symbols: currentSymbols,
-                    updated_at: webConfig.updated_at
+                    command_seq: latestCmdSeq
                 });
             }
         }

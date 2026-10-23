@@ -402,6 +402,7 @@ export default function FarmClient({
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
     const lastDayRef = useRef('');
+    const pendingWebCommandsRef = useRef<Record<string, { target: boolean; expiryMs: number }>>({});
 
     // Determine product & asset types for default theme & behavior
     const prodKey = (licenseInfo?.productKey || '').toUpperCase();
@@ -1710,6 +1711,7 @@ export default function FarmClient({
             if (pendingPairAction.type === 'SINGLE' && pendingPairAction.pair) {
                 const pair = pendingPairAction.pair;
                 const target = Boolean(pendingPairAction.targetEnabled);
+                pendingWebCommandsRef.current[pair] = { target, expiryMs: Date.now() + 15000 };
 
                 // Update backend via /api/farm/control
                 await fetch('/api/farm/control', {
@@ -1743,6 +1745,7 @@ export default function FarmClient({
                 const updatedState: Record<string, { enabled: boolean }> = {};
 
                 PRIME_20_PAIRS.forEach(p => {
+                    pendingWebCommandsRef.current[p] = { target, expiryMs: Date.now() + 15000 };
                     symbolsPayload[p] = { enabled: target, close_only: !target };
                     updatedState[p] = { enabled: target };
                 });
@@ -2079,6 +2082,16 @@ export default function FarmClient({
                 let changed = false;
                 const next = { ...prev };
                 Object.entries(primeTelemetry.pairData).forEach(([p, d]) => {
+                    const pending = pendingWebCommandsRef.current[p];
+                    if (pending) {
+                        if (Date.now() < pending.expiryMs && d.enabled !== pending.target) {
+                            // Still waiting for MT5 to execute web command, do not overwrite with stale telemetry
+                            return;
+                        } else {
+                            // MT5 confirmed new state or lock expired
+                            delete pendingWebCommandsRef.current[p];
+                        }
+                    }
                     if (d.enabled !== undefined && (!next[p] || next[p].enabled !== d.enabled)) {
                         next[p] = { enabled: d.enabled };
                         changed = true;
@@ -2261,9 +2274,12 @@ export default function FarmClient({
 
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => {
+            const pending = pendingWebCommandsRef.current[p];
+            if (pending && Date.now() < pending.expiryMs) return pending.target;
+            if (pairControls[p]?.enabled !== undefined) return pairControls[p].enabled;
             const data = primeTelemetry?.pairData?.[p];
             if (data?.enabled !== undefined) return data.enabled;
-            return pairControls[p]?.enabled !== false;
+            return true;
         }).length;
     }, [pairControls, primeTelemetry?.pairData]);
     const closeOnlyCount = 20 - activeCount;
@@ -5124,7 +5140,17 @@ export default function FarmClient({
                                                     const data = primeTelemetry.pairData[pair] || {
                                                         count: 0, lot: 0, pnl: 0, buyCount: 0, sellCount: 0, buyLot: 0, sellLot: 0, side: '-', ddPct: 0
                                                     };
-                                                    const isEnabled = data.enabled !== undefined ? data.enabled : (pairControls[pair]?.enabled !== false);
+                                                    const isPending = pendingWebCommandsRef.current[pair];
+                                                    let isEnabled: boolean;
+                                                    if (isPending && Date.now() < isPending.expiryMs) {
+                                                        isEnabled = isPending.target;
+                                                    } else if (pairControls[pair]?.enabled !== undefined) {
+                                                        isEnabled = pairControls[pair].enabled;
+                                                    } else if (data.enabled !== undefined) {
+                                                        isEnabled = data.enabled;
+                                                    } else {
+                                                        isEnabled = true;
+                                                    }
                                                     const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
 
                                                     // Direction badge (B / S / - or **.**) - responsive width
