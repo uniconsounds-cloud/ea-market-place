@@ -1609,6 +1609,58 @@ export default function FarmClient({
         };
     }, [displayOrders, portStatus, orders, history, time]);
 
+    // 📡 Live Orders Streaming State & Dev Modal (Gated to isDevPort3088 defined above)
+    const [isLiveTerminalOpen, setIsLiveTerminalOpen] = useState(false);
+    const [liveOrdersData, setLiveOrdersData] = useState<{
+        orders: any[];
+        updated_at: number;
+        isLoading: boolean;
+    }>({ orders: [], updated_at: 0, isLoading: false });
+
+    // 👁️ Active Viewer Presence Heartbeat for Dev Port 3088 (Auto-triggers MT5 20s Live Streaming)
+    useEffect(() => {
+        if (!isDevPort3088) return;
+        const sendPing = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                fetch(`/api/farm/viewer-ping?port=${portNumber}`).catch(() => {});
+            }
+        };
+        sendPing();
+        const pingInterval = setInterval(sendPing, 25000); // Heartbeat every 25s
+        return () => clearInterval(pingInterval);
+    }, [isDevPort3088, portNumber]);
+
+    // 🔄 Live Orders Poller (Runs every 3s when Live Terminal is open on Dev Port 3088)
+    useEffect(() => {
+        if (!isDevPort3088 || !isLiveTerminalOpen) return;
+        let isMounted = true;
+
+        const fetchLive = async () => {
+            try {
+                const res = await fetch(`/api/farm/live-orders?port=${portNumber}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (isMounted && json.success) {
+                        setLiveOrdersData({
+                            orders: json.orders || [],
+                            updated_at: json.updated_at || Math.floor(Date.now() / 1000),
+                            isLoading: false
+                        });
+                    }
+                }
+            } catch (e) {
+                // Ignore network errors in polling
+            }
+        };
+
+        fetchLive();
+        const pollTimer = setInterval(fetchLive, 3000);
+        return () => {
+            isMounted = false;
+            clearInterval(pollTimer);
+        };
+    }, [isDevPort3088, isLiveTerminalOpen, portNumber]);
+
     // 🎛️ Prime 20-Pair Cockpit Matrix Controls (Persisted to localStorage)
     const [pairControls, setPairControls] = useState<Record<string, { enabled: boolean }>>(() => {
         const initial: Record<string, { enabled: boolean }> = {};
@@ -1757,6 +1809,7 @@ export default function FarmClient({
             sellLot: number;
             side: 'B' | 'S' | '-';
             ddPct: number;
+            enabled?: boolean;
         }> = {};
         PRIME_20_PAIRS.forEach(p => { 
             pairData[p] = { count: 0, lot: 0, pnl: 0, buyCount: 0, sellCount: 0, buyLot: 0, sellLot: 0, side: '-', ddPct: 0 }; 
@@ -1910,6 +1963,7 @@ export default function FarmClient({
                     if (pInfo.sell_count !== undefined) pairData[cleanSym].sellCount = Number(pInfo.sell_count);
                     if (pInfo.dd_pct !== undefined) pairData[cleanSym].ddPct = Number(pInfo.dd_pct);
                     else if (pairData[cleanSym].pnl < 0) pairData[cleanSym].ddPct = Number(((Math.abs(pairData[cleanSym].pnl) / bal) * 100).toFixed(2));
+                    if (pInfo.enabled !== undefined) pairData[cleanSym].enabled = Boolean(pInfo.enabled);
                 }
             });
         }
@@ -2186,8 +2240,12 @@ export default function FarmClient({
     }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, isPrime, isFallback1Url]);
 
     const activeCount = useMemo(() => {
-        return PRIME_20_PAIRS.filter(p => pairControls[p]?.enabled !== false).length;
-    }, [pairControls]);
+        return PRIME_20_PAIRS.filter(p => {
+            const data = primeTelemetry?.pairData?.[p];
+            if (data?.enabled !== undefined) return data.enabled;
+            return pairControls[p]?.enabled !== false;
+        }).length;
+    }, [pairControls, primeTelemetry?.pairData]);
     const closeOnlyCount = 20 - activeCount;
 
     const treePriority = useMemo(() => {
@@ -5016,10 +5074,23 @@ export default function FarmClient({
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono text-cyan-300/80 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20 shrink-0">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
-                                                <span className="sm:hidden">LIVE</span>
-                                                <span className="hidden sm:inline">LIVE TELEMETRY</span>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {isDevPort3088 && (
+                                                    <button
+                                                        onClick={() => setIsLiveTerminalOpen(true)}
+                                                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[9px] sm:text-[10px] font-bold bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400/50 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all cursor-pointer active:scale-95"
+                                                        title="ดูไม้สดที่เปิดอยู่ตรงจาก MT5 (Dev Gated 3088 Only)"
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse shrink-0" />
+                                                        <span>🔍 ดูไม้สด</span>
+                                                        <span className="hidden sm:inline text-cyan-300/70 font-normal">({liveOrdersData.orders.length})</span>
+                                                    </button>
+                                                )}
+                                                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono text-cyan-300/80 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20 shrink-0">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                                                    <span className="sm:hidden">LIVE</span>
+                                                    <span className="hidden sm:inline">LIVE TELEMETRY</span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -5030,10 +5101,10 @@ export default function FarmClient({
                                                 const rightPair = PRIME_RIGHT_PAIRS[idx];
 
                                                 const renderPairCard = (pair: string) => {
-                                                    const isEnabled = pairControls[pair]?.enabled !== false;
                                                     const data = primeTelemetry.pairData[pair] || {
                                                         count: 0, lot: 0, pnl: 0, buyCount: 0, sellCount: 0, buyLot: 0, sellLot: 0, side: '-', ddPct: 0
                                                     };
+                                                    const isEnabled = data.enabled !== undefined ? data.enabled : (pairControls[pair]?.enabled !== false);
                                                     const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
 
                                                     // Direction badge (B / S / - or **.**) - responsive width
@@ -5111,7 +5182,49 @@ export default function FarmClient({
                                                                             </div>
 
                                                                             {/* Desktop version: Keeps regular ACTIVE/CLOSE-ONLY next to QUARANTINED badge */}
-                                                                            <div className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border select-none items-center gap-1 ${
+                                                                            {isDevPort3088 ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => requestTogglePair(pair, isEnabled)}
+                                                                                    title={`คลิกเพื่อสลับโหมด ${pair} เป็น ${isEnabled ? 'CLOSE-ONLY' : 'ACTIVE'} (Dev Port 3088)`}
+                                                                                    className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border items-center gap-1 transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${
+                                                                                        isEnabled
+                                                                                            ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+                                                                                            : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                                                                                    }`}
+                                                                                >
+                                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                                    <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                                </button>
+                                                                            ) : (
+                                                                                <div className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border select-none items-center gap-1 ${
+                                                                                    isEnabled
+                                                                                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
+                                                                                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
+                                                                                }`}>
+                                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                                    <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        /* Non-quarantined: Normal ACTIVE / CLOSE-ONLY on both mobile & desktop */
+                                                                        isDevPort3088 ? (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => requestTogglePair(pair, isEnabled)}
+                                                                                title={`คลิกเพื่อสลับโหมด ${pair} เป็น ${isEnabled ? 'CLOSE-ONLY' : 'ACTIVE'} (Dev Port 3088)`}
+                                                                                className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border flex items-center gap-1 transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${
+                                                                                    isEnabled
+                                                                                        ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+                                                                                        : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                                                                                }`}
+                                                                            >
+                                                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                                <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                            </button>
+                                                                        ) : (
+                                                                            <div className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border select-none flex items-center gap-1 ${
                                                                                 isEnabled
                                                                                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
                                                                                     : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
@@ -5119,17 +5232,7 @@ export default function FarmClient({
                                                                                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                                                                                 <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
                                                                             </div>
-                                                                        </>
-                                                                    ) : (
-                                                                        /* Non-quarantined: Normal ACTIVE / CLOSE-ONLY on both mobile & desktop */
-                                                                        <div className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border select-none flex items-center gap-1 ${
-                                                                            isEnabled
-                                                                                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
-                                                                                : 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.15)]'
-                                                                        }`}>
-                                                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                                                                            <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
-                                                                        </div>
+                                                                        )
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -5338,6 +5441,147 @@ export default function FarmClient({
                                             </>
                                         )}
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📡 MT5 Live Orders Streaming Terminal Modal (Gated to Dev Port 3088 Only) */}
+                    {isDevPort3088 && isLiveTerminalOpen && (
+                        <div 
+                            className="fixed inset-0 bg-black/85 backdrop-blur-md z-[210] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
+                            onClick={() => setIsLiveTerminalOpen(false)}
+                        >
+                            <div 
+                                className="bg-[#060d15] border-2 border-cyan-500/60 rounded-3xl p-4 sm:p-6 max-w-4xl w-full shadow-[0_0_80px_rgba(6,182,212,0.4)] max-h-[90vh] flex flex-col gap-4 animate-scale-up"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Terminal Header */}
+                                <div className="flex items-center justify-between pb-3 border-b border-cyan-500/30 shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+                                            <Activity className="w-5 h-5 animate-pulse text-cyan-300" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-sm sm:text-base font-mono font-black text-white tracking-wider">
+                                                    MT5 LIVE TRADES TERMINAL
+                                                </h3>
+                                                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300">
+                                                    PORT 3088 DEV
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-white/50 font-sans flex items-center gap-2">
+                                                <span>สตรีมคำสั่งสดตรงจาก MT5 แบบ On-Demand (อัปเดตทุก 3 วินาที)</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsLiveTerminalOpen(false)}
+                                        className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Summary Bar */}
+                                {(() => {
+                                    const orders = liveOrdersData.orders || [];
+                                    const totalOrders = orders.length;
+                                    const totalLots = orders.reduce((sum, o) => sum + Number(o.lots || o.raw_lot_size || 0), 0);
+                                    const totalPnl = orders.reduce((sum, o) => sum + Number(o.profit || o.current_pnl || 0), 0);
+                                    return (
+                                        <div className="grid grid-cols-3 gap-2 sm:gap-4 shrink-0">
+                                            <div className="p-2.5 sm:p-3 rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col">
+                                                <span className="text-[10px] sm:text-xs text-white/40 font-mono">จำนวนออเดอร์เปิด</span>
+                                                <span className="text-sm sm:text-lg font-mono font-black text-white">{totalOrders} <span className="text-xs font-normal text-white/50">ไม้</span></span>
+                                            </div>
+                                            <div className="p-2.5 sm:p-3 rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col">
+                                                <span className="text-[10px] sm:text-xs text-white/40 font-mono">ขนาดล็อตสุทธิ</span>
+                                                <span className="text-sm sm:text-lg font-mono font-black text-cyan-300">{totalLots.toFixed(2)} <span className="text-xs font-normal text-white/50">Lots</span></span>
+                                            </div>
+                                            <div className="p-2.5 sm:p-3 rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col">
+                                                <span className="text-[10px] sm:text-xs text-white/40 font-mono">กำไร/ขาดทุนลอยตัว</span>
+                                                <span className={`text-sm sm:text-lg font-mono font-black ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {totalPnl >= 0 ? `+${totalPnl.toFixed(2)}` : totalPnl.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Orders Table */}
+                                <div className="flex-1 overflow-y-auto overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                                    {liveOrdersData.orders && liveOrdersData.orders.length > 0 ? (
+                                        <table className="w-full text-left font-mono text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-white/[0.04] border-b border-white/10 text-white/50 text-[10px] uppercase">
+                                                    <th className="py-2.5 px-3">Ticket</th>
+                                                    <th className="py-2.5 px-3">Symbol</th>
+                                                    <th className="py-2.5 px-3">Type</th>
+                                                    <th className="py-2.5 px-3 text-right">Lots</th>
+                                                    <th className="py-2.5 px-3 text-right">Open Price</th>
+                                                    <th className="py-2.5 px-3 text-right">Current Price</th>
+                                                    <th className="py-2.5 px-3 text-right">SL / TP</th>
+                                                    <th className="py-2.5 px-3 text-right">Floating P/L</th>
+                                                    <th className="py-2.5 px-3">Comment</th>
+                                                    <th className="py-2.5 px-3">Magic</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5 text-[11px]">
+                                                {liveOrdersData.orders.map((ord: any) => {
+                                                    const isBuy = String(ord.type).toUpperCase() === 'BUY';
+                                                    const pnl = Number(ord.profit || ord.current_pnl || 0);
+                                                    return (
+                                                        <tr key={ord.ticket || ord.ticket_id} className="hover:bg-cyan-500/[0.04] transition-colors">
+                                                            <td className="py-2 px-3 text-white/70">#{ord.ticket || ord.ticket_id}</td>
+                                                            <td className="py-2 px-3 font-bold text-white">{ord.symbol}</td>
+                                                            <td className="py-2 px-3">
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${
+                                                                    isBuy 
+                                                                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40' 
+                                                                        : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
+                                                                }`}>
+                                                                    {ord.type}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2 px-3 text-right text-cyan-200">{Number(ord.lots || ord.raw_lot_size || 0).toFixed(2)}</td>
+                                                            <td className="py-2 px-3 text-right text-white/70">{ord.open_price}</td>
+                                                            <td className="py-2 px-3 text-right text-white">{ord.current_price || '-'}</td>
+                                                            <td className="py-2 px-3 text-right text-white/40">{ord.sl || 0} / {ord.tp || 0}</td>
+                                                            <td className={`py-2 px-3 text-right font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                {pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2)}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-white/50 text-[10px] max-w-[140px] truncate" title={ord.comment}>
+                                                                {ord.comment || '-'}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-white/40 text-[10px]">{ord.magic || '-'}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <div className="py-16 text-center text-white/40 font-mono text-xs space-y-2">
+                                            <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/30">
+                                                <Layers className="w-6 h-6" />
+                                            </div>
+                                            <p className="font-bold text-white/70">ไม่มีออเดอร์เปิดอยู่ในขณะนี้</p>
+                                            <p className="text-[11px] text-white/40">หรือกำลังรอรอบสัญญาณสตรีมจาก MT5 (เมื่อมีไม้เปิดจะปรากฏที่นี่ทันที)</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Terminal Footer */}
+                                <div className="flex items-center justify-between text-[10px] font-mono text-white/40 pt-1 shrink-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                        <span>On-Demand Streaming (ประหยัดแบนด์วิธและทรัพยากร 100%)</span>
+                                    </div>
+                                    <div>
+                                        อัปเดตล่าสุด: {liveOrdersData.updated_at ? new Date(liveOrdersData.updated_at * 1000).toLocaleTimeString() : 'รอดาต้า'}
+                                    </div>
                                 </div>
                             </div>
                         </div>

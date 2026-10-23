@@ -7,6 +7,21 @@ export interface PortSymbolConfig {
     quarantined?: boolean;   // true = quarantined
 }
 
+export interface LiveOrder {
+    ticket: number;
+    symbol: string;
+    type: 'BUY' | 'SELL';
+    lots: number;
+    open_price: number;
+    current_price: number;
+    sl: number;
+    tp: number;
+    profit: number;
+    comment: string;
+    magic: number;
+    open_time?: string;
+}
+
 export interface PortControlConfig {
     port_number: string;
     control_mode: 'web' | 'manual';
@@ -19,6 +34,8 @@ export interface PortControlConfig {
 
 // Global in-memory cache for ultra-fast response
 const memoryCache: Record<string, PortControlConfig> = {};
+const memoryLiveOrders: Record<string, { orders: LiveOrder[]; updated_at: number }> = {};
+const memoryViewerPings: Record<string, number> = {};
 
 const DATA_DIR = path.join(process.cwd(), '.farm_data');
 const DATA_FILE = path.join(DATA_DIR, 'port_controls.json');
@@ -107,4 +124,60 @@ export function updatePortControl(
     saveAllToDisk(all);
 
     return updated;
+}
+
+// ==========================================
+// 📡 ON-DEMAND LIVE ORDERS STREAMING STORE
+// ==========================================
+
+export function saveLiveOrders(portNumber: string, orders: LiveOrder[]) {
+    const cleanPort = String(portNumber).trim();
+    const payload = {
+        orders: Array.isArray(orders) ? orders : [],
+        updated_at: Math.floor(Date.now() / 1000)
+    };
+    memoryLiveOrders[cleanPort] = payload;
+
+    // Optional disk backup for persistence between server reloads
+    try {
+        ensureDataFile();
+        const liveFile = path.join(DATA_DIR, `live_orders_${cleanPort}.json`);
+        fs.writeFileSync(liveFile, JSON.stringify(payload), 'utf-8');
+    } catch (e) {
+        // Non-blocking disk write
+    }
+}
+
+export function getLiveOrders(portNumber: string): { orders: LiveOrder[]; updated_at: number } {
+    const cleanPort = String(portNumber).trim();
+    if (memoryLiveOrders[cleanPort]) {
+        return memoryLiveOrders[cleanPort];
+    }
+    try {
+        const liveFile = path.join(DATA_DIR, `live_orders_${cleanPort}.json`);
+        if (fs.existsSync(liveFile)) {
+            const raw = fs.readFileSync(liveFile, 'utf-8');
+            const parsed = JSON.parse(raw);
+            memoryLiveOrders[cleanPort] = parsed;
+            return parsed;
+        }
+    } catch (e) {
+        // Fallback
+    }
+    return { orders: [], updated_at: 0 };
+}
+
+// ==========================================
+// 👁️ VIEWER PRESENCE TRACKING
+// ==========================================
+
+export function recordViewerPing(portNumber: string) {
+    const cleanPort = String(portNumber).trim();
+    memoryViewerPings[cleanPort] = Date.now();
+}
+
+export function isViewerActiveForPort(portNumber: string, maxInactiveMs: number = 120000): boolean {
+    const cleanPort = String(portNumber).trim();
+    const lastPing = memoryViewerPings[cleanPort] || 0;
+    return (Date.now() - lastPing) < maxInactiveMs;
 }

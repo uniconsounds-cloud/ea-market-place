@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { getPortControl } from '@/lib/farm-control/store';
+import { getPortControl, saveLiveOrders, isViewerActiveForPort } from '@/lib/farm-control/store';
 import { sweepAndDeactivateExpiredLicenses } from '@/lib/license-audit';
 
 export const dynamic = 'force-dynamic';
@@ -327,7 +327,12 @@ export async function POST(req: Request) {
             }
         }
 
-        // 4. Process Active Orders
+        // 4. Process Active Orders & On-Demand Live Trades Stream
+        const liveOrders = payload.live_orders || rawData.live_orders || payload.prime_data?.live_orders;
+        if (Array.isArray(liveOrders)) {
+            saveLiveOrders(portNumber, liveOrders);
+        }
+
         if (isFallback1UrlEA) {
             // New 1-URL Fallback mode does not stream live Farm orders to conserve Vercel bandwidth
             await supabase.from('farm_active_orders').delete().eq('port_number', portNumber);
@@ -397,8 +402,8 @@ export async function POST(req: Request) {
 
         const nowMs = Date.now();
         const lastViewedMs = lastViewedAtStr ? new Date(lastViewedAtStr).getTime() : 0;
-        // Viewer is active if the web farm page sent a ping within the last 120 seconds (2 minutes)
-        const isViewerActive = !isFallback1UrlEA && ((nowMs - lastViewedMs) < 120000);
+        // Viewer is active if in-memory ping was recorded or last_viewed_at was within 120s
+        const isViewerActive = !isFallback1UrlEA && (isViewerActiveForPort(portNumber) || ((nowMs - lastViewedMs) < 120000));
 
         // Fallback 1-URL = 600s, Live viewer = 20s, Sleep standby = 180s (3 minutes)
         const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? 20 : 180);
