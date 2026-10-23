@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { getPortControlAsync, saveLiveOrders, isViewerActiveForPort } from '@/lib/farm-control/store';
+import { getPortControlAsync, updatePortControlAsync, saveLiveOrders, isViewerActiveForPort } from '@/lib/farm-control/store';
 import { sweepAndDeactivateExpiredLicenses } from '@/lib/license-audit';
 
 export const dynamic = 'force-dynamic';
@@ -256,10 +256,20 @@ export async function POST(req: Request) {
         // 2. Legacy Classic EAs (older MAX, Farm, Mini, Gold) that natively run on 1-URL without the 2-URL architecture
         const isFallback1UrlEA = payload.sync_mode === 'FALLBACK_1URL' || rawSystemCode.includes('FALLBACK_1URL');
 
+        let incomingPrimeData: any = payload.prime_data || rawData.p_payload?.prime_data;
+        if (!incomingPrimeData && rawSystemCode.includes(':::')) {
+            try {
+                const parts = rawSystemCode.split(':::');
+                incomingPrimeData = JSON.parse(parts.slice(1).join(':::'));
+            } catch (e) {
+                // Ignore parse error
+            }
+        }
+
         const primeData = isFallback1UrlEA ? {
             sync_mode: 'FALLBACK_1URL',
             last_10m_sync: nowIso
-        } : null;
+        } : incomingPrimeData;
 
         let lastViewedAtStr: string | null = null;
 
@@ -285,8 +295,8 @@ export async function POST(req: Request) {
             const accountType = (snapshot?.account?.currency === 'USC' || payload.account_type === 'USC') ? 'USC' : 'USD';
             const assetType = snapshot?.identity?.product_family || payload.asset_type || 'FOREX';
 
-            // Only encode FALLBACK_1URL into system_code for new EAs in fallback mode; legacy EAs retain clean system_code
-            const finalSystemCode = isFallback1UrlEA ? `${systemCode}:::${JSON.stringify(primeData)}` : systemCode;
+            // Preserve full prime_data inside system_code for real-time farm UI decoding
+            const finalSystemCode = primeData ? `${systemCode}:::${JSON.stringify(primeData)}` : rawSystemCode;
 
             const statusPayload: any = {
                 port_number: portNumber,
@@ -411,8 +421,34 @@ export async function POST(req: Request) {
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
         recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
 
-        // 8. Retrieve 2-Way Command & Web Control state for this port
-        const webConfig = await getPortControlAsync(portNumber);
+        // 8. Retrieve & Harmonize 2-Way Command & Web Control state for this port
+        let webConfig = await getPortControlAsync(portNumber);
+
+        // If MT5 transmitted live pair telemetry with manual toggle states, synchronize back to web control
+        const incomingPairs = incomingPrimeData?.pairs || payload.pairs;
+        if (incomingPairs && typeof incomingPairs === 'object') {
+            const currentSymbols = { ...(webConfig.symbols || {}) };
+            let hasSymbolChanges = false;
+
+            for (const [sym, pInfo] of Object.entries(incomingPairs as Record<string, any>)) {
+                if (pInfo && pInfo.enabled !== undefined) {
+                    const cleanSym = sym.toUpperCase().replace(/[^A-Z]/g, '');
+                    const isEn = Boolean(pInfo.enabled);
+                    const existing = currentSymbols[cleanSym];
+                    if (!existing || existing.enabled !== isEn) {
+                        currentSymbols[cleanSym] = {
+                            enabled: isEn,
+                            close_only: !isEn
+                        };
+                        hasSymbolChanges = true;
+                    }
+                }
+            }
+
+            if (hasSymbolChanges) {
+                webConfig = await updatePortControlAsync(portNumber, { symbols: currentSymbols });
+            }
+        }
 
         return NextResponse.json({
             status: 'success',

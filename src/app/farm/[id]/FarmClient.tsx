@@ -2072,6 +2072,26 @@ export default function FarmClient({
         };
     }, [stats, orders, licenseInfo, portStatus, isFallback1Url]);
 
+    // Symmetrical 2-Way Sync: If MT5 EA transmits live pair states (e.g. toggled on MT5 dashboard), sync pairControls
+    useEffect(() => {
+        if (primeTelemetry?.pairData) {
+            setPairControls(prev => {
+                let changed = false;
+                const next = { ...prev };
+                Object.entries(primeTelemetry.pairData).forEach(([p, d]) => {
+                    if (d.enabled !== undefined && (!next[p] || next[p].enabled !== d.enabled)) {
+                        next[p] = { enabled: d.enabled };
+                        changed = true;
+                    }
+                });
+                if (changed && typeof window !== 'undefined') {
+                    localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(next));
+                }
+                return changed ? next : prev;
+            });
+        }
+    }, [primeTelemetry?.pairData, portNumber]);
+
     // Top 4 Worst Drawdown pairs for vertical dropdown under Active Farm DD
     // EXCLUDES all quarantined pairs, exactly matching Table D on the EA dashboard!
     const top4WorstPairs = useMemo(() => {
