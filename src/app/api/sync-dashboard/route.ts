@@ -424,9 +424,14 @@ export async function POST(req: Request) {
         // 8. Retrieve & Harmonize 2-Way Command & Web Control state for this port
         let webConfig = await getPortControlAsync(portNumber);
 
-        // If MT5 transmitted live pair telemetry with manual toggle states, synchronize back to web control
+        // Check if there is a pending fresh web command issued within the last 25 seconds
+        const nowSec = Math.floor(Date.now() / 1000);
+        const webCommandAgeSec = nowSec - (Number(webConfig.updated_at) || 0);
+        const isFreshWebCommandPending = webCommandAgeSec < 25;
+
+        // If no fresh web command is currently in flight, synchronize any manual MT5 chart toggles back into webConfig
         const incomingPairs = incomingPrimeData?.pairs || payload.pairs;
-        if (incomingPairs && typeof incomingPairs === 'object') {
+        if (!isFreshWebCommandPending && incomingPairs && typeof incomingPairs === 'object') {
             const currentSymbols = { ...(webConfig.symbols || {}) };
             let hasSymbolChanges = false;
 
@@ -446,7 +451,11 @@ export async function POST(req: Request) {
             }
 
             if (hasSymbolChanges) {
-                webConfig = await updatePortControlAsync(portNumber, { symbols: currentSymbols });
+                // Preserve original updated_at so this server-side MT5 reflection doesn't look like a new web command
+                webConfig = await updatePortControlAsync(portNumber, { 
+                    symbols: currentSymbols,
+                    updated_at: webConfig.updated_at
+                });
             }
         }
 

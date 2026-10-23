@@ -150,7 +150,7 @@ export function updatePortControl(
             ...(current.symbols || {}),
             ...(partial.symbols || {})
         },
-        updated_at: Math.floor(Date.now() / 1000)
+        updated_at: partial.updated_at !== undefined ? partial.updated_at : Math.floor(Date.now() / 1000)
     };
 
     memoryCache[cleanPort] = updated;
