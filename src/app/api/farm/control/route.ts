@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPortControl, updatePortControl } from '@/lib/farm-control/store';
+import { getPortControlAsync, updatePortControlAsync } from '@/lib/farm-control/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
             return NextResponse.json({ success: false, message: 'Missing port parameter' }, { status: 400 });
         }
 
-        const control = getPortControl(port);
+        const control = await getPortControlAsync(port);
         return NextResponse.json({
             success: true,
             port_number: port,
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         if (typeof body.max_dd_limit === 'number') partialUpdate.max_dd_limit = body.max_dd_limit;
         if (body.symbols && typeof body.symbols === 'object') partialUpdate.symbols = body.symbols;
 
-        const updated = updatePortControl(port, partialUpdate);
+        const updated = await updatePortControlAsync(port, partialUpdate);
 
         return NextResponse.json({
             success: true,

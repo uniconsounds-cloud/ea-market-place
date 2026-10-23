@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { supabase } from '@/lib/supabaseClient';
 
 export interface PortSymbolConfig {
     enabled?: boolean;       // true = active, false = disabled (close-only)
@@ -99,6 +100,41 @@ export function getPortControl(portNumber: string): PortControlConfig {
     return defaultConfig;
 }
 
+export async function getPortControlAsync(portNumber: string): Promise<PortControlConfig> {
+    const cleanPort = String(portNumber).trim();
+    if (memoryCache[cleanPort] && (Date.now() / 1000 - memoryCache[cleanPort].updated_at < 5)) {
+        return memoryCache[cleanPort];
+    }
+
+    try {
+        const { data } = await supabase
+            .from('farm_port_status')
+            .select('system_code')
+            .eq('port_number', `cmd_${cleanPort}`)
+            .maybeSingle();
+
+        if (data?.system_code) {
+            try {
+                const parsed = JSON.parse(data.system_code);
+                if (parsed && typeof parsed === 'object') {
+                    memoryCache[cleanPort] = {
+                        ...getPortControl(cleanPort),
+                        ...parsed,
+                        port_number: cleanPort
+                    };
+                    return memoryCache[cleanPort];
+                }
+            } catch (err) {
+                console.warn('[FarmControl] Failed to parse cmd JSON:', err);
+            }
+        }
+    } catch (e) {
+        console.warn('[FarmControl] Supabase load error:', e);
+    }
+
+    return getPortControl(cleanPort);
+}
+
 export function updatePortControl(
     portNumber: string, 
     partial: Partial<PortControlConfig>
@@ -122,6 +158,28 @@ export function updatePortControl(
     const all = loadAllFromDisk();
     all[cleanPort] = updated;
     saveAllToDisk(all);
+
+    return updated;
+}
+
+export async function updatePortControlAsync(
+    portNumber: string,
+    partial: Partial<PortControlConfig>
+): Promise<PortControlConfig> {
+    const cleanPort = String(portNumber).trim();
+    const updated = updatePortControl(cleanPort, partial);
+
+    try {
+        await supabase
+            .from('farm_port_status')
+            .upsert({
+                port_number: `cmd_${cleanPort}`,
+                system_code: JSON.stringify(updated),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'port_number' });
+    } catch (e) {
+        console.warn('[FarmControl] Failed to persist cmd to Supabase:', e);
+    }
 
     return updated;
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { getPortControl, saveLiveOrders, isViewerActiveForPort } from '@/lib/farm-control/store';
+import { getPortControlAsync, saveLiveOrders, isViewerActiveForPort } from '@/lib/farm-control/store';
 import { sweepAndDeactivateExpiredLicenses } from '@/lib/license-audit';
 
 export const dynamic = 'force-dynamic';
@@ -405,14 +405,14 @@ export async function POST(req: Request) {
         // Viewer is active if in-memory ping was recorded or last_viewed_at was within 120s
         const isViewerActive = !isFallback1UrlEA && (isViewerActiveForPort(portNumber) || ((nowMs - lastViewedMs) < 120000));
 
-        // Fallback 1-URL = 600s, Live viewer = 20s, Sleep standby = 180s (3 minutes)
-        const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? 20 : 180);
+        // Fallback 1-URL = 600s, Live viewer = 20s (10s on dev port 97053088), Sleep standby = 180s (3 minutes)
+        const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? (portNumber === '97053088' ? 10 : 20) : 180);
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
         recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
 
         // 8. Retrieve 2-Way Command & Web Control state for this port
-        const webConfig = getPortControl(portNumber);
+        const webConfig = await getPortControlAsync(portNumber);
 
         return NextResponse.json({
             status: 'success',
