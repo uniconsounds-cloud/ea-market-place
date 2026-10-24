@@ -13,7 +13,7 @@ import {
     Gauge, Activity, AlertTriangle, CheckCircle2, 
     Lock, Unlock, Power, RefreshCw, TrendingDown, ArrowUpRight,
     Coins, Sparkles, ShieldAlert, ShieldCheck,
-    HelpCircle, Info
+    HelpCircle, Info, Loader2
 } from 'lucide-react';
 
 // --- Utilities ---
@@ -1688,6 +1688,29 @@ export default function FarmClient({
         targetEnabled?: boolean;
     } | null>(null);
     const [isDispatchingCommand, setIsDispatchingCommand] = useState(false);
+    // Real-time Pending State with MT5 Acknowledgment Indicator (Gated to Dev Port 3088)
+    const [pendingPairs, setPendingPairs] = useState<Record<string, { target: boolean; expiryMs: number }>>({});
+
+    // Auto-cleanup timer for expired pending commands (e.g. if MT5 is offline > 25s)
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setPendingPairs(prev => {
+                const now = Date.now();
+                let changed = false;
+                const next = { ...prev };
+                for (const [p, pend] of Object.entries(next)) {
+                    if (now >= pend.expiryMs) {
+                        delete next[p];
+                        delete pendingWebCommandsRef.current[p];
+                        changed = true;
+                        toast.error(`⚠️ ไม่ได้รับการตอบกลับจาก MT5 สำหรับ [${p}] โปรดตรวจสอบการเชื่อมต่อ EA`, { duration: 4000 });
+                    }
+                }
+                return changed ? next : prev;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     const requestTogglePair = (pair: string, currentEnabled: boolean) => {
         setPendingPairAction({
@@ -1711,7 +1734,9 @@ export default function FarmClient({
             if (pendingPairAction.type === 'SINGLE' && pendingPairAction.pair) {
                 const pair = pendingPairAction.pair;
                 const target = Boolean(pendingPairAction.targetEnabled);
-                pendingWebCommandsRef.current[pair] = { target, expiryMs: Date.now() + 15000 };
+                const expiry = Date.now() + 25000;
+                pendingWebCommandsRef.current[pair] = { target, expiryMs: expiry };
+                setPendingPairs(prev => ({ ...prev, [pair]: { target, expiryMs: expiry } }));
 
                 // Update backend via /api/farm/control
                 await fetch('/api/farm/control', {
@@ -1725,30 +1750,25 @@ export default function FarmClient({
                     })
                 }).catch(err => console.warn('Control API error:', err));
 
-                setPairControls(prev => {
-                    const updated = { ...prev, [pair]: { enabled: target } };
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updated));
-                    }
-                    return updated;
-                });
-
-                toast.success(
+                toast.info(
                     target 
-                        ? `🟢 ส่งคำสั่งเปิด [${pair}: ACTIVE] ไปยัง EA สำเร็จแล้ว` 
-                        : `⛔ ส่งคำสั่งปิด [${pair}: CLOSE-ONLY] ไปยัง EA สำเร็จแล้ว`,
-                    { duration: 3000 }
+                        ? `📡 ส่งคำสั่งเปิด [${pair}: ACTIVE] แล้ว... รอ MT5 ยืนยัน` 
+                        : `📡 ส่งคำสั่งปิด [${pair}: CLOSE-ONLY] แล้ว... รอ MT5 ยืนยัน`,
+                    { duration: 4000 }
                 );
             } else if (pendingPairAction.type === 'ALL_ACTIVE' || pendingPairAction.type === 'ALL_CLOSE_ONLY') {
                 const target = pendingPairAction.targetEnabled ?? true;
                 const symbolsPayload: Record<string, { enabled: boolean; close_only: boolean }> = {};
-                const updatedState: Record<string, { enabled: boolean }> = {};
+                const updatedPending: Record<string, { target: boolean; expiryMs: number }> = {};
+                const expiry = Date.now() + 25000;
 
                 PRIME_20_PAIRS.forEach(p => {
-                    pendingWebCommandsRef.current[p] = { target, expiryMs: Date.now() + 15000 };
+                    pendingWebCommandsRef.current[p] = { target, expiryMs: expiry };
+                    updatedPending[p] = { target, expiryMs: expiry };
                     symbolsPayload[p] = { enabled: target, close_only: !target };
-                    updatedState[p] = { enabled: target };
                 });
+
+                setPendingPairs(prev => ({ ...prev, ...updatedPending }));
 
                 await fetch('/api/farm/control', {
                     method: 'POST',
@@ -1759,16 +1779,11 @@ export default function FarmClient({
                     })
                 }).catch(err => console.warn('Control API error:', err));
 
-                setPairControls(updatedState);
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem(`prime_pairs_${portNumber}`, JSON.stringify(updatedState));
-                }
-
-                toast.success(
+                toast.info(
                     target 
-                        ? `🟢 ส่งคำสั่งเปิดทุกคู่เงิน (20 Pairs ACTIVE) ไปยัง EA เรียบร้อยแล้ว` 
-                        : `⛔ ส่งคำสั่งปิดทุกคู่เงิน (20 Pairs CLOSE-ONLY) ไปยัง EA เรียบร้อยแล้ว`,
-                    { duration: 3500 }
+                        ? `📡 ส่งคำสั่งเปิดทุกคู่เงิน (20 Pairs ACTIVE) แล้ว... รอ MT5 ยืนยัน` 
+                        : `📡 ส่งคำสั่งปิดทุกคู่เงิน (20 Pairs CLOSE-ONLY) แล้ว... รอ MT5 ยืนยัน`,
+                    { duration: 4000 }
                 );
             }
         } catch (err: any) {
@@ -2075,9 +2090,34 @@ export default function FarmClient({
         };
     }, [stats, orders, licenseInfo, portStatus, isFallback1Url]);
 
-    // Symmetrical 2-Way Sync: If MT5 EA transmits live pair states (e.g. toggled on MT5 dashboard), sync pairControls
+    // Symmetrical 2-Way Sync: If MT5 EA transmits live pair states (e.g. toggled on MT5 dashboard), sync pairControls & resolve pending states
     useEffect(() => {
         if (primeTelemetry?.pairData) {
+            // Resolve pending states upon MT5 confirmation
+            setPendingPairs(prev => {
+                let changed = false;
+                const next = { ...prev };
+                Object.entries(primeTelemetry.pairData).forEach(([p, d]) => {
+                    const pend = next[p];
+                    if (pend) {
+                        if (d.enabled === pend.target) {
+                            delete next[p];
+                            changed = true;
+                            toast.success(
+                                d.enabled 
+                                    ? `✅ MT5 ยืนยันเปิด [${p}: ACTIVE] เรียบร้อยแล้ว` 
+                                    : `⛔ MT5 ยืนยันปิด [${p}: CLOSE-ONLY] เรียบร้อยแล้ว`,
+                                { duration: 3500 }
+                            );
+                        } else if (Date.now() >= pend.expiryMs) {
+                            delete next[p];
+                            changed = true;
+                        }
+                    }
+                });
+                return changed ? next : prev;
+            });
+
             setPairControls(prev => {
                 let changed = false;
                 const next = { ...prev };
@@ -5152,6 +5192,8 @@ export default function FarmClient({
                                                         isEnabled = true;
                                                     }
                                                     const isQuarantined = primeTelemetry.quarantinedList.includes(pair);
+                                                    const isPairPending = isDevPort3088 && Boolean(pendingPairs[pair] && Date.now() < pendingPairs[pair].expiryMs);
+                                                    const pendingTarget = isPairPending ? pendingPairs[pair].target : isEnabled;
 
                                                     // Direction badge (B / S / - or **.**) - responsive width
                                                     const dirBadge = isFallback1Url ? (
@@ -5229,19 +5271,35 @@ export default function FarmClient({
 
                                                                             {/* Desktop version: Keeps regular ACTIVE/CLOSE-ONLY next to QUARANTINED badge */}
                                                                             {isDevPort3088 ? (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => requestTogglePair(pair, isEnabled)}
-                                                                                    title={`คลิกเพื่อสลับโหมด ${pair} เป็น ${isEnabled ? 'CLOSE-ONLY' : 'ACTIVE'} (Dev Port 3088)`}
-                                                                                    className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border items-center gap-1 transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${
-                                                                                        isEnabled
-                                                                                            ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
-                                                                                            : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
-                                                                                    }`}
-                                                                                >
-                                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                                                                                    <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
-                                                                                </button>
+                                                                                isPairPending ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        disabled
+                                                                                        title={`กำลังส่งคำสั่งไปยัง MT5... รอการยืนยันสถานะ [${pendingTarget ? 'ACTIVE' : 'CLOSE-ONLY'}] (Dev Port 3088)`}
+                                                                                        className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border items-center gap-1.5 transition-all duration-200 cursor-wait animate-pulse ${
+                                                                                            pendingTarget
+                                                                                                ? 'bg-emerald-500/25 border-emerald-400/80 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.35)]'
+                                                                                                : 'bg-amber-500/25 border-amber-400/80 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <Loader2 className={`w-2.5 h-2.5 animate-spin shrink-0 ${pendingTarget ? 'text-emerald-300' : 'text-amber-300'}`} />
+                                                                                        <span>WAIT MT5</span>
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => requestTogglePair(pair, isEnabled)}
+                                                                                        title={`คลิกเพื่อสลับโหมด ${pair} เป็น ${isEnabled ? 'CLOSE-ONLY' : 'ACTIVE'} (Dev Port 3088)`}
+                                                                                        className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border items-center gap-1 transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${
+                                                                                            isEnabled
+                                                                                                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+                                                                                                : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                                        <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                                    </button>
+                                                                                )
                                                                             ) : (
                                                                                 <div className={`hidden sm:flex px-2 py-0.5 rounded-md font-mono text-[10px] font-bold tracking-tight border select-none items-center gap-1 ${
                                                                                     isEnabled
@@ -5256,19 +5314,36 @@ export default function FarmClient({
                                                                     ) : (
                                                                         /* Non-quarantined: Normal ACTIVE / CLOSE-ONLY on both mobile & desktop */
                                                                         isDevPort3088 ? (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => requestTogglePair(pair, isEnabled)}
-                                                                                title={`คลิกเพื่อสลับโหมด ${pair} เป็น ${isEnabled ? 'CLOSE-ONLY' : 'ACTIVE'} (Dev Port 3088)`}
-                                                                                className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border flex items-center gap-1 transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${
-                                                                                    isEnabled
-                                                                                        ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
-                                                                                        : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
-                                                                                }`}
-                                                                            >
-                                                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                                                                                <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
-                                                                            </button>
+                                                                            isPairPending ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled
+                                                                                    title={`กำลังส่งคำสั่งไปยัง MT5... รอการยืนยันสถานะ [${pendingTarget ? 'ACTIVE' : 'CLOSE-ONLY'}] (Dev Port 3088)`}
+                                                                                    className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border flex items-center gap-1 transition-all duration-200 cursor-wait animate-pulse ${
+                                                                                        pendingTarget
+                                                                                            ? 'bg-emerald-500/25 border-emerald-400/80 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.35)]'
+                                                                                            : 'bg-amber-500/25 border-amber-400/80 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
+                                                                                    }`}
+                                                                                >
+                                                                                    <Loader2 className={`w-2 sm:w-2.5 h-2 sm:h-2.5 animate-spin shrink-0 ${pendingTarget ? 'text-emerald-300' : 'text-amber-300'}`} />
+                                                                                    <span className="hidden sm:inline">WAIT MT5</span>
+                                                                                    <span className="sm:hidden">WAIT</span>
+                                                                                </button>
+                                                                            ) : (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => requestTogglePair(pair, isEnabled)}
+                                                                                    title={`คลิกเพื่อสลับโหมด ${pair} เป็น ${isEnabled ? 'CLOSE-ONLY' : 'ACTIVE'} (Dev Port 3088)`}
+                                                                                    className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border flex items-center gap-1 transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95 ${
+                                                                                        isEnabled
+                                                                                            ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/50 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+                                                                                            : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                                                                                    }`}
+                                                                                >
+                                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                                                                    <span>{isEnabled ? 'ACTIVE' : 'CLOSE-ONLY'}</span>
+                                                                                </button>
+                                                                            )
                                                                         ) : (
                                                                             <div className={`px-1.5 sm:px-2 py-0.5 rounded-md font-mono text-[8px] sm:text-[10px] font-bold tracking-tight border select-none flex items-center gap-1 ${
                                                                                 isEnabled
