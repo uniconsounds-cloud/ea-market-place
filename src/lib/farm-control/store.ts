@@ -21,6 +21,7 @@ export interface LiveOrder {
     comment: string;
     magic: number;
     open_time?: string;
+    is_external?: boolean;
 }
 
 export interface PortControlConfig {
