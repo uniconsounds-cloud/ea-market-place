@@ -415,8 +415,8 @@ export async function POST(req: Request) {
         // Viewer is active if in-memory ping was recorded or last_viewed_at was within 120s
         const isViewerActive = !isFallback1UrlEA && (isViewerActiveForPort(portNumber) || ((nowMs - lastViewedMs) < 120000));
 
-        // Fallback 1-URL = 600s, Live viewer = 20s (10s on dev port 97053088), Sleep standby = 180s (3 minutes)
-        const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? (portNumber === '97053088' ? 10 : 20) : 180);
+        // Fallback 1-URL = 600s, Live viewer = 20s, Sleep standby = 600s (10 minutes)
+        const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? 20 : 600);
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
         recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);

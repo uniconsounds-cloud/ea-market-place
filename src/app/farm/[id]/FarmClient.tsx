@@ -186,9 +186,10 @@ const GlowingDdOrb = ({
     onMouseEnter,
     onMouseLeave,
     displayText,
-    isSlowBlink
+    isSlowBlink,
+    showWarning
 }: {
-    type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE';
+    type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE' | 'MANUAL';
     value: number;
     onClick?: () => void;
     className?: string;
@@ -199,6 +200,7 @@ const GlowingDdOrb = ({
     onMouseLeave?: () => void;
     displayText?: string;
     isSlowBlink?: boolean;
+    showWarning?: boolean;
 }) => {
     // ระดับสีของค่า DD (ต่ำกว่า 18% เขียว, 18-28% เหลืองส้ม, เกิน 28% แดง)
     const levelTheme = getDDLevelTheme(value);
@@ -227,6 +229,14 @@ const GlowingDdOrb = ({
             pingBg: 'bg-amber-400',
             pingDot: 'bg-amber-500',
             tooltip: `DD คู่ที่ถูกขัง: -${value.toFixed(2)}%`
+        },
+        MANUAL: {
+            container: 'border-amber-400/90 bg-gradient-to-b from-[#2e1a05]/95 via-[#1c0f02]/95 to-[#0c0601]/95 shadow-[0_0_20px_rgba(245,158,11,0.6),inset_0_0_12px_rgba(245,158,11,0.35)] hover:shadow-[0_0_35px_rgba(245,158,11,0.9)] animate-pulse',
+            label: 'MANUAL',
+            labelColor: 'text-amber-300 font-bold',
+            pingBg: 'bg-amber-400',
+            pingDot: 'bg-amber-500',
+            tooltip: `✋ ไม้แปลกปลอม / เทรดมือนอกระบบ: ${value <= 0 ? `กำไร +${Math.abs(value).toFixed(2)}%` : `DD -${value.toFixed(2)}%`}`
         }
     }[type];
 
@@ -316,10 +326,17 @@ const GlowingDdOrb = ({
                 <span className={`text-[5px] sm:text-[6px] font-black tracking-widest uppercase mb-0.5 ${config.labelColor}`}>
                     {config.label}
                 </span>
-                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${levelTheme.textColor} ${isSlowBlink ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
-                    {displayText !== undefined ? displayText : `-${value.toFixed(1)}%`}
+                <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${type === 'MANUAL' && value <= 0 ? 'text-cyan-300' : levelTheme.textColor} ${(isSlowBlink || type === 'MANUAL') ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
+                    {displayText !== undefined ? displayText : (value <= 0 ? `+${Math.abs(value).toFixed(1)}%` : `-${value.toFixed(1)}%`)}
                 </span>
             </div>
+
+            {/* ⚠️ Warning Exclamation Badge for Manual/Abnormal Trades */}
+            {(type === 'MANUAL' || showWarning) && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-amber-500 border border-amber-300 text-slate-950 font-black text-[9px] sm:text-[10px] shadow-[0_0_10px_rgba(245,158,11,0.95)] pointer-events-none z-30 animate-bounce" title="ตรวจพบออเดอร์แปลกปลอมนอกระบบ EasyM!">
+                    !
+                </span>
+            )}
 
             {/* 🚨 Pulse Ping Indicator */}
             {showPing && (
@@ -2314,23 +2331,33 @@ export default function FarmClient({
 
     // Definitions of DD at each location:
     // 1. Top Orb (ลูกแก้วบนสุด) = DD รวมของพอร์ต (Total Port DD)
-    // 2. Badge above Farm (กรอบ DD เหนือฟาร์ม) = DD ของฟาร์มที่ทำงานอยู่ปัจจุบันโดยหัก DD ที่ถูกกักขังออกแล้ว (Active Farm DD = Total Port DD - Quarantine Total DD)
+    // 2. Badge above Farm (กรอบ DD เหนือฟาร์ม) = DD ของฟาร์มที่ทำงานอยู่ปัจจุบันโดยหัก DD ที่ถูกกักขังและเทรดมือออกแล้ว (Active Farm DD = Total Port DD - Quarantine Total DD - Manual DD)
     // 3. Badge on Quarantined Trees (บนต้นไม้ที่ถูกขัง) = DD ของคู่เงินที่ถูกขังทั้งหมด (Quarantine Total DD)
+    // 4. 4th Orb (ลูกแก้วที่ 4) = DD หรือสัดส่วนกำไรของไม้แปลกปลอม/เทรดมือ (Manual DD)
     const rawPortDD = primeTelemetry ? primeTelemetry.ddPct : stats.drawdownPercent;
+
+    // ✋ External / Manual Trades Telemetry & Signed DD%
+    // If extPnl is profit (+1330.14), manualDDPct is negative (-0.73%), meaning profit!
+    // If extPnl is loss (-2000), manualDDPct is positive (+1.10%), meaning DD!
+    const extTrades = primeTelemetry?.externalTrades || { count: 0, lots: 0, pnl: 0, ddPct: 0 };
+    const hasExternalTrades = extTrades.count > 0;
+    const manualDDPct = useMemo(() => {
+        if (!hasExternalTrades || !stats.balance || stats.balance <= 0) return 0;
+        return Number((-extTrades.pnl / stats.balance * 100).toFixed(2));
+    }, [extTrades.pnl, hasExternalTrades, stats.balance]);
+
+    // Active Farm DD (pure active EasyM pairs):
+    // Perfectly reconciled: totalPortDDPct = totalQuarantineDD + activeFarmDDPct + manualDDPct
     const activeFarmDDPct = useMemo(() => {
         if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
-        if (primeTelemetry?.modeDDPct !== undefined && primeTelemetry.modeDDPct >= 0) {
-            return Number(primeTelemetry.modeDDPct.toFixed(2));
-        }
-        return rawPortDD >= totalQuarantineDD 
-            ? Number((rawPortDD - totalQuarantineDD).toFixed(2)) 
-            : Number(rawPortDD.toFixed(2));
-    }, [primeTelemetry, rawPortDD, totalQuarantineDD, isPrime, isFallback1Url]);
+        const computedActive = rawPortDD - totalQuarantineDD - manualDDPct;
+        return Number(Math.max(0, computedActive).toFixed(2));
+    }, [rawPortDD, totalQuarantineDD, manualDDPct, isPrime, isFallback1Url]);
 
     const totalPortDDPct = useMemo(() => {
         if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
-        return Number(Math.max(rawPortDD, (activeFarmDDPct + totalQuarantineDD)).toFixed(2));
-    }, [rawPortDD, activeFarmDDPct, totalQuarantineDD, isPrime, isFallback1Url]);
+        return Number(rawPortDD.toFixed(2));
+    }, [rawPortDD, isPrime, isFallback1Url]);
 
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => {
@@ -4391,7 +4418,7 @@ export default function FarmClient({
                                         />
                                     </div>
 
-                                    {/* 2. Middle Orb: Active Farm DD (ฟาร์มที่ทำงานปัจจุบัน) */}
+                                    {/* 2. Middle-Left Orb: Active Farm DD (ฟาร์มที่ทำงานปัจจุบัน) */}
                                     <div className="animate-orb-disperse-mid">
                                         <GlowingDdOrb
                                             type="ACTIVE"
@@ -4403,6 +4430,19 @@ export default function FarmClient({
                                             title={isFallback1Url ? '🌾 DD ฟาร์มปัจจุบัน: **.** (โหมด 10 นาที)' : `🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}% (เชื่อมโยงกับกล่อง DD เหนือฟาร์ม)`}
                                         />
                                     </div>
+
+                                    {/* 3. Middle-Right Orb: 4th Orb for Manual / External Orders DD (ไม้แปลกปลอม / นอกระบบ) */}
+                                    {(hasExternalTrades || portNumber === '97053088') && (
+                                        <div className="animate-orb-disperse-mid">
+                                            <GlowingDdOrb
+                                                type="MANUAL"
+                                                value={manualDDPct}
+                                                showWarning
+                                                displayText={manualDDPct <= 0 ? `+${Math.abs(manualDDPct).toFixed(1)}%` : `-${manualDDPct.toFixed(1)}%`}
+                                                title={`✋ ออเดอร์นอกระบบ EasyM (เทรดมือ/ทองคำ): ${extTrades.count} ไม้ (${extTrades.lots.toFixed(2)} Lots | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC | ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`})`}
+                                            />
+                                        </div>
+                                    )}
                                 </>
                             )}
 
