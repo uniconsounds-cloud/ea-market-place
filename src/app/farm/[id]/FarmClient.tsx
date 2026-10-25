@@ -4439,7 +4439,11 @@ export default function FarmClient({
                                                 value={manualDDPct}
                                                 showWarning
                                                 displayText={manualDDPct <= 0 ? `+${Math.abs(manualDDPct).toFixed(1)}%` : `-${manualDDPct.toFixed(1)}%`}
-                                                title={`✋ ออเดอร์นอกระบบ EasyM (เทรดมือ/ทองคำ): ${extTrades.count} ไม้ (${extTrades.lots.toFixed(2)} Lots | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC | ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`})`}
+                                                onClick={() => {
+                                                    setLiveTerminalFilter('EXTERNAL');
+                                                    setIsLiveTerminalOpen(true);
+                                                }}
+                                                title={`✋ ออเดอร์นอกระบบ EasyM (เทรดมือ/ทองคำ): ${extTrades.count} ไม้ (${extTrades.lots.toFixed(2)} Lots | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC | ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`}) - คลิกเพื่อเปิดดูไม้แปลกปลอมใน MT5 Live Trades`}
                                             />
                                         </div>
                                     )}
@@ -4452,6 +4456,7 @@ export default function FarmClient({
                                 value={totalPortDDPct}
                                 isSlowBlink={isFallback1Url}
                                 showPing
+                                isHighlighted={isDdOrbExpanded}
                                 onClick={() => setIsDdOrbExpanded(prev => !prev)}
                                 title={isDdOrbExpanded ? "คลิกเพื่อพับเก็บลูกแก้วย่อย" : `📊 DD รวมของพอร์ต: -${totalPortDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดู DD ฟาร์ม / DD ถูกขัง)`}
                             />
@@ -5219,18 +5224,27 @@ export default function FarmClient({
                                             )}
                                         </div>
 
-                                        {/* Row 2: Full-width External Orders Warning Bar (Same height as Row 1) */}
+                                        {/* Row 2: Full-width External Orders Warning Bar (Clickable to open Live Terminal filtered to External) */}
                                         {primeTelemetry.externalTrades.count > 0 && (() => {
                                             const extCount = primeTelemetry.externalTrades.count;
                                             const extLots = primeTelemetry.externalTrades.lots.toFixed(2);
                                             const extPnl = primeTelemetry.externalTrades.pnl;
                                             const pnlStr = extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2);
-                                            const extDDStr = stats.balance > 0 
-                                                ? (extPnl < 0 ? `-${((Math.abs(extPnl) / stats.balance) * 100).toFixed(2)}%` : '0.00%')
-                                                : '0.00%';
+                                            const effectiveBal = stats.balance > 0 ? stats.balance : (stats.equity > 0 ? stats.equity : (Number(portStatus?.balance) || 100000));
+                                            const extDDPct = effectiveBal > 0 ? (extPnl / effectiveBal * 100) : 0;
+                                            const extDDStr = extDDPct > 0 
+                                                ? `+${extDDPct.toFixed(2)}%` 
+                                                : (extDDPct < 0 ? `-${Math.abs(extDDPct).toFixed(2)}%` : '0.00%');
 
                                             return (
-                                                <div className="min-h-[44px] h-[44px] sm:h-12 flex items-center bg-amber-500/10 border border-amber-500/35 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden">
+                                                <div 
+                                                    onClick={() => {
+                                                        setLiveTerminalFilter('EXTERNAL');
+                                                        setIsLiveTerminalOpen(true);
+                                                    }}
+                                                    className="min-h-[44px] h-[44px] sm:h-12 flex items-center bg-amber-500/10 hover:bg-amber-500/20 active:scale-[0.99] border border-amber-500/35 hover:border-amber-400/60 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden cursor-pointer transition-all shadow-[0_0_12px_rgba(251,191,36,0.15)] group"
+                                                    title="คลิกเพื่อเปิดดูรายละเอียดไม้แปลกปลอมใน MT5 Live Trades Terminal"
+                                                >
                                                     {/* Mobile View: Compact Single-Line Full Metrics */}
                                                     <div className="sm:hidden flex items-center justify-between w-full gap-1 whitespace-nowrap overflow-x-auto no-scrollbar">
                                                         <div className="flex items-center gap-1.5">
@@ -5239,14 +5253,15 @@ export default function FarmClient({
                                                             <span className="text-amber-300 font-bold">{extCount} ไม้</span>
                                                             <span className="text-amber-300/80">({extLots}L)</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5 text-right">
+                                                        <div className="flex items-center gap-1.5 text-right shrink-0">
                                                             <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                                                                 {pnlStr}
                                                             </span>
                                                             <span className="text-white/20">|</span>
-                                                            <span className="text-amber-300 font-bold">
+                                                            <span className={extDDPct >= 0 ? 'text-emerald-400 font-bold' : 'text-amber-300 font-bold'}>
                                                                 DD: {extDDStr}
                                                             </span>
+                                                            <span className="text-[10px] text-amber-300/60 group-hover:text-amber-200 group-hover:translate-x-0.5 transition-all font-sans ml-0.5">➔</span>
                                                         </div>
                                                     </div>
 
@@ -5262,11 +5277,14 @@ export default function FarmClient({
                                                                 {pnlStr}
                                                             </span>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <span className="text-white/60 mr-1.5">Drawdown:</span>
-                                                            <span className="text-amber-300 font-black">
-                                                                {extDDStr}
-                                                            </span>
+                                                        <div className="text-right flex items-center gap-2">
+                                                            <div>
+                                                                <span className="text-white/60 mr-1.5">Drawdown:</span>
+                                                                <span className={`font-black ${extDDPct >= 0 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                                                                    {extDDStr}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs text-amber-300/60 group-hover:text-amber-200 group-hover:translate-x-0.5 transition-all font-sans">➔</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -5879,17 +5897,23 @@ export default function FarmClient({
                                                 </div>
                                             </div>
 
-                                            {/* External Orders Warning Banner (Identical to 20-Pair Farm Matrix Sleek Single-Line) */}
+                                            {/* External Orders Warning Banner (Clickable to switch tab to External) */}
                                             {extOrders.length > 0 && (() => {
                                                 const extCount = extOrders.length;
                                                 const extLotsStr = extLots.toFixed(2);
                                                 const pnlStr = extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2);
-                                                const extDDStr = stats.balance > 0 
-                                                    ? (extPnl < 0 ? `-${((Math.abs(extPnl) / stats.balance) * 100).toFixed(2)}%` : '0.00%')
-                                                    : '0.00%';
+                                                const effectiveBal = stats.balance > 0 ? stats.balance : (stats.equity > 0 ? stats.equity : (Number(portStatus?.balance) || 100000));
+                                                const extDDPct = effectiveBal > 0 ? (extPnl / effectiveBal * 100) : 0;
+                                                const extDDStr = extDDPct > 0 
+                                                    ? `+${extDDPct.toFixed(2)}%` 
+                                                    : (extDDPct < 0 ? `-${Math.abs(extDDPct).toFixed(2)}%` : '0.00%');
 
                                                 return (
-                                                    <div className="min-h-[40px] sm:min-h-[44px] h-[40px] sm:h-11 flex items-center bg-amber-500/10 border border-amber-500/35 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden">
+                                                    <div 
+                                                        onClick={() => setLiveTerminalFilter('EXTERNAL')}
+                                                        className="min-h-[40px] sm:min-h-[44px] h-[40px] sm:h-11 flex items-center bg-amber-500/10 hover:bg-amber-500/20 active:scale-[0.99] border border-amber-500/35 hover:border-amber-400/60 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden cursor-pointer transition-all shadow-[0_0_12px_rgba(251,191,36,0.15)] group"
+                                                        title="คลิกเพื่อกรองดูเฉพาะไม้แปลกปลอม"
+                                                    >
                                                         {/* Mobile View: Compact Single-Line Full Metrics */}
                                                         <div className="sm:hidden flex items-center justify-between w-full gap-1 whitespace-nowrap overflow-x-auto no-scrollbar">
                                                             <div className="flex items-center gap-1.5">
@@ -5898,14 +5922,15 @@ export default function FarmClient({
                                                                 <span className="text-amber-300 font-bold">{extCount} ไม้</span>
                                                                 <span className="text-amber-300/80">({extLotsStr}L)</span>
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 text-right">
+                                                            <div className="flex items-center gap-1.5 text-right shrink-0">
                                                                 <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                                                                     {pnlStr}
                                                                 </span>
                                                                 <span className="text-white/20">|</span>
-                                                                <span className="text-amber-300 font-bold">
+                                                                <span className={extDDPct >= 0 ? 'text-emerald-400 font-bold' : 'text-amber-300 font-bold'}>
                                                                     DD: {extDDStr}
                                                                 </span>
+                                                                <span className="text-[10px] text-amber-300/60 group-hover:text-amber-200 group-hover:translate-x-0.5 transition-all font-sans ml-0.5">➔</span>
                                                             </div>
                                                         </div>
 
@@ -5921,11 +5946,14 @@ export default function FarmClient({
                                                                     {pnlStr}
                                                                 </span>
                                                             </div>
-                                                            <div className="text-right">
-                                                                <span className="text-white/60 mr-1.5">Drawdown:</span>
-                                                                <span className="text-amber-300 font-black">
-                                                                    {extDDStr}
-                                                                </span>
+                                                            <div className="text-right flex items-center gap-2">
+                                                                <div>
+                                                                    <span className="text-white/60 mr-1.5">Drawdown:</span>
+                                                                    <span className={`font-black ${extDDPct >= 0 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                                                                        {extDDStr}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-xs text-amber-300/60 group-hover:text-amber-200 group-hover:translate-x-0.5 transition-all font-sans">➔</span>
                                                             </div>
                                                         </div>
                                                     </div>
