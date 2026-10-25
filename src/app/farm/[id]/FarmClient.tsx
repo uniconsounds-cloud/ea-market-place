@@ -1967,8 +1967,9 @@ export default function FarmClient({
                 rescueOrders: Number(q.rescue_count || q.rescue_orders || 0)
             }));
             quarantinedList = quarantinedDetails.map(q => q.sym);
+            const totalQuarSum = quarantinedDetails.reduce((sum, q) => sum + (q.ddPct || 0), 0);
             quarantineSummary = quarantinedDetails.length > 0 
-                ? ('QT: ' + quarantinedDetails.map(q => `${q.abbr} ${q.ddPct.toFixed(2)}%`).join(' : ')) 
+                ? (`QT: ${totalQuarSum.toFixed(2)}% | ` + quarantinedDetails.map(q => `${q.abbr}${q.rescueOrders && q.rescueOrders > 0 ? ` [R${q.rescueOrders}]` : ''} ${q.ddPct.toFixed(2)}%`).join(' | ')) 
                 : 'QT: -';
         } else {
             quarantinedList = [];
@@ -3887,7 +3888,7 @@ export default function FarmClient({
                                                 <div className="absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-[#160e03]/95 border border-amber-500/70 shadow-[0_4px_12px_rgba(0,0,0,0.85)] flex items-center gap-1.5 pointer-events-none select-none z-30">
                                                     <span className={`w-1.5 h-1.5 rounded-full ${qTree.isRescue ? 'bg-cyan-400 animate-pulse' : 'bg-amber-400'}`} />
                                                     <span className="font-mono font-black text-[9px] text-amber-200 tracking-wider">
-                                                        {qTree.sym}
+                                                        {qTree.sym}{qTree.rescueOrders && qTree.rescueOrders > 0 ? ` [R${qTree.rescueOrders}]` : ''}
                                                     </span>
                                                 </div>
                                     </div>
@@ -4196,7 +4197,7 @@ export default function FarmClient({
                                                             : 'bg-[#160e03]/95 border-amber-500/70 shadow-lg'
                                                     }`}>
                                                         <span className={`tracking-wider ${isTreeCritical ? 'text-rose-300' : 'text-amber-300'}`}>
-                                                            {qTree.sym}
+                                                            {qTree.sym}{qTree.rescueOrders && qTree.rescueOrders > 0 ? ` [R${qTree.rescueOrders}]` : ''}
                                                         </span>
                                                         <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
                                                             isTreeCritical 
@@ -4485,7 +4486,7 @@ export default function FarmClient({
                                             }}
                                             onMouseEnter={() => setHighlightTarget('QUARANTINE')}
                                             onMouseLeave={() => setHighlightTarget(null)}
-                                            title={isFallback1Url ? '🔒 DD คู่ที่ถูกขัง: **.** (โหมด 10 นาที)' : `🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}% (เชื่อมโยงกับกล่องต้นไม้ที่ขัง)`}
+                                            title={isFallback1Url ? '🔒 DD คู่ที่ถูกขัง: **.** (โหมด 10 นาที)' : `🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมดรวมไม้กู้ภัย: -${totalQuarantineDD.toFixed(2)}% (เชื่อมโยงกับกล่องต้นไม้ที่ขัง)`}
                                         />
                                     </div>
 
@@ -5032,9 +5033,9 @@ export default function FarmClient({
 
                                                 {/* Col 2: Alert, Rescue & Quarantine */}
                                                 <div className="md:col-span-5 flex items-center gap-2 px-2 py-1 bg-amber-950/30 rounded-lg border border-amber-500/30 overflow-x-auto no-scrollbar text-amber-300 font-medium text-[11px]">
-                                                    <span className="text-white/70 shrink-0">{isFallback1Url ? 'R: **.**' : `R${primeTelemetry.rescueOrdersCount}: ${primeTelemetry.rescueDDPct.toFixed(2)}%`}</span>
-                                                    <span className="text-white/30">|</span>
-                                                    <span className="text-amber-300 shrink-0 font-bold">{primeTelemetry.quarantineSummary}</span>
+                                                    <span className="text-amber-300 shrink-0 font-bold">
+                                                        {isFallback1Url ? 'QT: **.**' : primeTelemetry.quarantineSummary}
+                                                    </span>
                                                     <span className="text-white/30">|</span>
                                                     <span className="text-rose-400 font-black uppercase shrink-0 px-1 py-0.2 rounded bg-rose-500/20 border border-rose-500/40 animate-pulse">
                                                         {primeTelemetry.alertAction}
@@ -5281,7 +5282,7 @@ export default function FarmClient({
                                                             <span className="text-amber-300 font-mono font-black text-xs">**.**</span>
                                                         ) : primeTelemetry.quarantinedDetails.map(q => (
                                                             <div key={q.sym} className="px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1.5">
-                                                                <span>{q.abbr} ({q.sym})</span>
+                                                                <span>{q.abbr} ({q.sym}){q.rescueOrders && q.rescueOrders > 0 ? ` [R${q.rescueOrders}]` : ''}</span>
                                                                 <span className="text-white font-mono">{q.ddPct.toFixed(2)}%</span>
                                                             </div>
                                                         ))}
