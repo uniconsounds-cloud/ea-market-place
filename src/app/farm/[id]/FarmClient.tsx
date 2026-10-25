@@ -1959,13 +1959,35 @@ export default function FarmClient({
             quarantinedList = [];
             quarantineSummary = 'QT: **.**';
         } else if (primeData?.quarantined && Array.isArray(primeData.quarantined)) {
-            quarantinedDetails = primeData.quarantined.map((q: any) => ({
+            const rawQuarList = primeData.quarantined.map((q: any) => ({
                 sym: q.sym,
                 abbr: q.abbr || q.sym.substring(0, 2),
                 ddPct: Number(q.loss_pct || 0),
                 isHedged: Boolean(q.is_hedged),
                 rescueOrders: Number(q.rescue_count || q.rescue_orders || 0)
             }));
+
+            // Check if rescue DD was sent separately by older EA telemetry (e.g. B261023.10 where loss_pct excluded rescue_dd)
+            const rawQuarSum = rawQuarList.reduce((s: number, q: any) => s + q.ddPct, 0);
+            const separateRescueDD = Number(primeData.rescue_dd || 0);
+            const totalRescueOrdersCount = rawQuarList.reduce((s: number, q: any) => s + (q.rescueOrders || 0), 0);
+
+            // If rawQuarSum is around 38.6% and separateRescueDD is 3.28%, distribute rescue DD proportionally to each quarantined pair
+            const needsRescueInclusion = separateRescueDD > 0 && 
+                totalRescueOrdersCount > 0 && 
+                Math.abs((rawQuarSum + separateRescueDD) - liveTotalDD) < Math.abs(rawQuarSum - liveTotalDD);
+
+            quarantinedDetails = rawQuarList.map((q: any) => {
+                if (needsRescueInclusion && q.rescueOrders > 0 && totalRescueOrdersCount > 0) {
+                    const pairRescueShare = (q.rescueOrders / totalRescueOrdersCount) * separateRescueDD;
+                    return {
+                        ...q,
+                        ddPct: Number((q.ddPct + pairRescueShare).toFixed(2))
+                    };
+                }
+                return q;
+            });
+
             quarantinedList = quarantinedDetails.map(q => q.sym);
             const totalQuarSum = quarantinedDetails.reduce((sum, q) => sum + (q.ddPct || 0), 0);
             quarantineSummary = quarantinedDetails.length > 0 
