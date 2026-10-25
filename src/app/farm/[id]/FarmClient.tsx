@@ -4584,17 +4584,17 @@ export default function FarmClient({
                                             <div className="flex items-center gap-2">
                                                 <h2 className="text-sm sm:text-base font-mono font-black text-white tracking-wider">
                                                     {primeActiveOrb === 1 ? 'SAFETY & RESILIENCE HUD' :
-                                                     primeActiveOrb === 2 ? '20-PAIR COCKPIT MATRIX' :
+                                                     primeActiveOrb === 2 ? '20-PAIR FARM MATRIX' :
                                                      `PRIME MENU ${primeActiveOrb}`}
                                                 </h2>
-                                                <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border font-bold ${
-                                                    primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' :
-                                                    primeActiveOrb === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' :
-                                                    'bg-white/10 border-white/20 text-white/60'
-                                                }`}>
-                                                    {primeActiveOrb === 1 ? 'TABLE D & E' :
-                                                     primeActiveOrb === 2 ? 'TELEMETRY' : 'COMING SOON'}
-                                                </span>
+                                                {primeActiveOrb !== 2 && (
+                                                    <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border font-bold ${
+                                                        primeActiveOrb === 1 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' :
+                                                        'bg-white/10 border-white/20 text-white/60'
+                                                    }`}>
+                                                        {primeActiveOrb === 1 ? 'TABLE D & E' : 'COMING SOON'}
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-[10px] sm:text-[11px] text-white/50 font-sans">
                                                 {primeActiveOrb === 1 ? 'มาตรวัดและสเกลความปลอดภัยพอร์ต Real-time' :
@@ -5192,56 +5192,86 @@ export default function FarmClient({
                                     </div>
                                 )}
 
-                                {/* 🎛️ ORB 2: 20-PAIR COCKPIT MATRIX (MT5 EA DASHBOARD MIRROR) */}
+                                {/* 🎛️ ORB 2: 20-PAIR FARM MATRIX (MT5 EA DASHBOARD MIRROR) */}
                                 {primeActiveOrb === 2 && (
-                                    <div className="overflow-y-auto py-2 sm:py-3 space-y-2 sm:space-y-3 pr-0.5 sm:pr-1 no-scrollbar flex-1 flex flex-col">
-                                        {/* Quick Telemetry Summary Bar (Clean, Display-only, Responsive) */}
-                                        <div className="flex items-center justify-between gap-1.5 sm:gap-2 bg-black/60 border border-cyan-500/30 rounded-xl sm:rounded-2xl p-2 sm:p-3.5 backdrop-blur-md shrink-0">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)] shrink-0" />
-                                                <div className="text-[11px] sm:text-xs font-mono">
-                                                    <span className="text-white/50 font-bold">
-                                                        <span>FARM: </span>
-                                                    </span>
-                                                    <span className="text-emerald-400 font-black font-mono">{activeCount} ACTIVE</span>
-                                                    <span className="text-white/30 mx-1.5">|</span>
-                                                    <span className="text-amber-400 font-black font-mono">{closeOnlyCount} CLOSE-ONLY</span>
-                                                </div>
+                                    <div className="overflow-y-auto py-2 sm:py-3 space-y-2 sm:space-y-2.5 pr-0.5 sm:pr-1 no-scrollbar flex-1 flex flex-col">
+                                        {/* Row 1: Farm Active / Close-Only Summary Bar with View Order Live Button */}
+                                        <div className="min-h-[44px] h-[44px] sm:h-12 flex items-center justify-between gap-1.5 sm:gap-2 bg-black/60 border border-cyan-500/30 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 backdrop-blur-md shrink-0">
+                                            <div className="text-[11px] sm:text-xs font-mono">
+                                                <span className="text-white/50 font-bold">FARM: </span>
+                                                <span className="text-emerald-400 font-black">{activeCount} ACTIVE</span>
+                                                <span className="text-white/30 mx-1.5">|</span>
+                                                <span className="text-amber-400 font-black">{closeOnlyCount} CLOSE-ONLY</span>
                                             </div>
 
-                                            <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono text-cyan-300/80 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20 shrink-0">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
-                                                <span className="sm:hidden">LIVE</span>
-                                                <span className="hidden sm:inline">LIVE TELEMETRY</span>
-                                            </div>
-                                        </div>
-
-                                        {/* ⚠️ External Orders Warning Banner (Phase 2 Data Integrity) */}
-                                        {primeTelemetry.externalTrades.count > 0 && (
-                                            <div className="mx-0.5 sm:mx-1 p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/35 flex items-center justify-between gap-2 text-[10px] sm:text-xs font-mono shrink-0">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
-                                                    <span className="text-amber-200 font-bold truncate">
-                                                        <span className="sm:hidden">
-                                                            ⚠️ เทรดมือ: <span className="text-amber-300">{primeTelemetry.externalTrades.count} ไม้ ({primeTelemetry.externalTrades.lots.toFixed(2)}L | {primeTelemetry.externalTrades.pnl >= 0 ? `+${primeTelemetry.externalTrades.pnl.toFixed(2)}` : primeTelemetry.externalTrades.pnl.toFixed(2)})</span>
-                                                        </span>
-                                                        <span className="hidden sm:inline">
-                                                            ⚠️ ตรวจพบออเดอร์เทรดมือใน MT5: <span className="text-amber-300">{primeTelemetry.externalTrades.count} ไม้ ({primeTelemetry.externalTrades.lots.toFixed(2)} Lots | {primeTelemetry.externalTrades.pnl >= 0 ? `+${primeTelemetry.externalTrades.pnl.toFixed(2)}` : primeTelemetry.externalTrades.pnl.toFixed(2)})</span>
-                                                        </span>
-                                                    </span>
-                                                </div>
+                                            {isDevPort3088 && (
                                                 <button
                                                     onClick={() => {
-                                                        setLiveTerminalFilter('EXTERNAL');
+                                                        setLiveTerminalFilter('ALL');
                                                         setIsLiveTerminalOpen(true);
                                                     }}
-                                                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 border border-amber-400/50 text-amber-200 font-bold text-[10px] sm:text-xs shrink-0 transition-all cursor-pointer whitespace-nowrap active:scale-95"
-                                                    title="เปิดดูรายการออเดอร์เทรดมือใน MT5 แบบ On-Demand"
+                                                    className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg font-mono text-[10px] sm:text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400/50 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+                                                    title="เปิดดูรายการออเดอร์สดใน MT5 แบบ On-Demand"
                                                 >
-                                                    View Order
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                                                    <span>View Order</span>
                                                 </button>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
+
+                                        {/* Row 2: Full-width External Orders Warning Bar (Same height as Row 1) */}
+                                        {primeTelemetry.externalTrades.count > 0 && (() => {
+                                            const extCount = primeTelemetry.externalTrades.count;
+                                            const extLots = primeTelemetry.externalTrades.lots.toFixed(2);
+                                            const extPnl = primeTelemetry.externalTrades.pnl;
+                                            const pnlStr = extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2);
+                                            const extDDStr = stats.balance > 0 
+                                                ? (extPnl < 0 ? `-${((Math.abs(extPnl) / stats.balance) * 100).toFixed(2)}%` : '0.00%')
+                                                : '0.00%';
+
+                                            return (
+                                                <div className="min-h-[44px] h-[44px] sm:h-12 flex items-center bg-amber-500/10 border border-amber-500/35 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden">
+                                                    {/* Mobile View: Compact Single-Line Full Metrics */}
+                                                    <div className="sm:hidden flex items-center justify-between w-full gap-1 whitespace-nowrap overflow-x-auto no-scrollbar">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="animate-pulse shrink-0 text-xs">⚠️</span>
+                                                            <span className="text-amber-200 font-bold">เทรดมือ:</span>
+                                                            <span className="text-amber-300 font-bold">{extCount} ไม้</span>
+                                                            <span className="text-amber-300/80">({extLots}L)</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 text-right">
+                                                            <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                                {pnlStr}
+                                                            </span>
+                                                            <span className="text-white/20">|</span>
+                                                            <span className="text-amber-300 font-bold">
+                                                                DD: {extDDStr}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Desktop View: Full Descriptions */}
+                                                    <div className="hidden sm:flex items-center justify-between w-full gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="animate-pulse shrink-0 text-sm">⚠️</span>
+                                                            <span className="text-amber-200 font-bold">ตรวจพบออเดอร์เทรดมือ:</span>
+                                                            <span className="text-amber-300 font-black">{extCount} ไม้ ({extLots} Lots)</span>
+                                                            <span className="text-white/30">|</span>
+                                                            <span className="text-white/60">กำไร/ขาดทุน:</span>
+                                                            <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                                {pnlStr}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="text-white/60 mr-1.5">Drawdown:</span>
+                                                            <span className="text-amber-300 font-black">
+                                                                {extDDStr}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
 
                                         {/* 20 PAIRS TWO-COLUMN CARDS MATRIX (10 ROWS x 2 CARDS) */}
                                         <div className="grid grid-cols-2 gap-1.5 sm:gap-3 overflow-y-auto max-h-[58vh] sm:max-h-[62vh] pr-0.5 sm:pr-1 no-scrollbar overflow-x-hidden">
