@@ -955,7 +955,26 @@ export default function FarmClient({
     const [isQuarantineEnlarged, setIsQuarantineEnlarged] = useState(false);
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
     const [isDdOrbExpanded, setIsDdOrbExpanded] = useState(false);
-    const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | null>(null);
+    const [selectedDdOrb, setSelectedDdOrb] = useState<'TOTAL' | 'QUARANTINE' | 'ACTIVE' | null>(null);
+    const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | 'TOTAL' | null>(null);
+    const ddOrbsRef = useRef<HTMLDivElement>(null);
+
+    // 🚪 Auto-collapse DD Orbs when user clicks outside the DD Orbs cluster
+    useEffect(() => {
+        if (!isDdOrbExpanded) return;
+        const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+            if (ddOrbsRef.current && !ddOrbsRef.current.contains(e.target as Node)) {
+                setIsDdOrbExpanded(false);
+                setSelectedDdOrb(null);
+                setHighlightTarget(null);
+            }
+        };
+        document.addEventListener('pointerdown', handleClickOutside);
+        return () => {
+            document.removeEventListener('pointerdown', handleClickOutside);
+        };
+    }, [isDdOrbExpanded]);
+
     const [expandedActivePair, setExpandedActivePair] = useState<string | null>(null);
     const [isFallbackBannerMinimized, setIsFallbackBannerMinimized] = useState(false);
 
@@ -1637,6 +1656,15 @@ export default function FarmClient({
 
     // 📡 Live Orders Streaming State & Dev Modal (Gated to isDevPort3088 defined above)
     const [isLiveTerminalOpen, setIsLiveTerminalOpen] = useState(false);
+
+    // 🚪 Auto-collapse DD Orbs when any modal popup opens
+    useEffect(() => {
+        if (primeActiveOrb !== null || isLiveTerminalOpen || expandedActivePair !== null) {
+            setIsDdOrbExpanded(false);
+            setSelectedDdOrb(null);
+            setHighlightTarget(null);
+        }
+    }, [primeActiveOrb, isLiveTerminalOpen, expandedActivePair]);
     const [liveTerminalFilter, setLiveTerminalFilter] = useState<'ALL' | 'EASYM' | 'EXTERNAL'>('ALL');
     const [liveOrdersData, setLiveOrdersData] = useState<{
         orders: any[];
@@ -3357,7 +3385,7 @@ export default function FarmClient({
                                                         });
                                                     }}
                                                     className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
-                                                        highlightTarget === 'FARM'
+                                                        (highlightTarget === 'FARM' || (isDdOrbExpanded && selectedDdOrb === 'ACTIVE'))
                                                             ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
                                                             : ''
                                                     } ${
@@ -3858,7 +3886,7 @@ export default function FarmClient({
                                                             ? 'border sm:border-2 border-emerald-500/80 shadow-[0_0_15px_rgba(16,185,129,0.45)] bg-[#041a12]/95 hover:bg-[#062419]/95'
                                                             : 'border sm:border-2 border-amber-500/90 shadow-[0_0_15px_rgba(245,158,11,0.55)] bg-[#1c1204]/95 hover:bg-[#2a1b06]/95')
                                                 } ${
-                                                    highlightTarget === 'QUARANTINE'
+                                                    (highlightTarget === 'QUARANTINE' || (isDdOrbExpanded && selectedDdOrb === 'QUARANTINE'))
                                                         ? (isBufferCritical ? 'ring-1 ring-red-400 border-red-400 shadow-[0_0_20px_rgba(220,38,38,0.6)] scale-105' : 'ring-2 ring-amber-400 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.95)] scale-110')
                                                         : ''
                                                 } ${
@@ -4369,8 +4397,8 @@ export default function FarmClient({
             {(isPrime || userFarmPorts.some(p => p.eaType === 'PRIME')) && (
                 <>
                     <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto items-end">
-                        {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 ลูก) */}
-                        <div className="relative flex items-center gap-2 sm:gap-3">
+                        {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 หรือ 4 ลูก) */}
+                        <div ref={ddOrbsRef} className="relative flex items-center gap-2 sm:gap-3">
                             {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต (ขยับชิดลูกแก้วเมนูที่ 1 เยื้องขึ้นด้านบนซ้าย + เส้นทแยงชี้ลงขวา ↘) */}
                             {isOrb4Unlocked && isFarmGuideActive && !isMultiFarmView && (
                                 <div 
@@ -4411,7 +4439,10 @@ export default function FarmClient({
                                             type="QUARANTINE"
                                             value={totalQuarantineDD}
                                             displayText={isFallback1Url ? '**.**' : undefined}
-                                            isHighlighted={highlightTarget === 'QUARANTINE'}
+                                            isHighlighted={highlightTarget ? highlightTarget === 'QUARANTINE' : selectedDdOrb === 'QUARANTINE'}
+                                            onClick={() => {
+                                                setSelectedDdOrb(prev => prev === 'QUARANTINE' ? 'TOTAL' : 'QUARANTINE');
+                                            }}
                                             onMouseEnter={() => setHighlightTarget('QUARANTINE')}
                                             onMouseLeave={() => setHighlightTarget(null)}
                                             title={isFallback1Url ? '🔒 DD คู่ที่ถูกขัง: **.** (โหมด 10 นาที)' : `🔒 DD รวมของคู่เงินที่ถูกขังทั้งหมด: -${totalQuarantineDD.toFixed(2)}% (เชื่อมโยงกับกล่องต้นไม้ที่ขัง)`}
@@ -4424,15 +4455,18 @@ export default function FarmClient({
                                             type="ACTIVE"
                                             value={isFallback1Url ? 0 : activeFarmDDPct}
                                             displayText={isFallback1Url ? '**.**' : undefined}
-                                            isHighlighted={highlightTarget === 'FARM'}
+                                            isHighlighted={highlightTarget ? highlightTarget === 'FARM' : selectedDdOrb === 'ACTIVE'}
+                                            onClick={() => {
+                                                setSelectedDdOrb(prev => prev === 'ACTIVE' ? 'TOTAL' : 'ACTIVE');
+                                            }}
                                             onMouseEnter={() => setHighlightTarget('FARM')}
                                             onMouseLeave={() => setHighlightTarget(null)}
                                             title={isFallback1Url ? '🌾 DD ฟาร์มปัจจุบัน: **.** (โหมด 10 นาที)' : `🌾 DD ของฟาร์มที่ทำงานอยู่ปัจจุบัน: -${activeFarmDDPct.toFixed(2)}% (เชื่อมโยงกับกล่อง DD เหนือฟาร์ม)`}
                                         />
                                     </div>
 
-                                    {/* 3. Middle-Right Orb: 4th Orb for Manual / External Orders DD (ไม้แปลกปลอม / นอกระบบ) */}
-                                    {(hasExternalTrades || portNumber === '97053088') && (
+                                    {/* 3. Middle-Right Orb: 4th Orb for Manual / External Orders DD (แสดงเฉพาะเมื่อมีไม้แปลกปลอมจริงเท่านั้น) */}
+                                    {hasExternalTrades && (
                                         <div className="animate-orb-disperse-mid">
                                             <GlowingDdOrb
                                                 type="MANUAL"
@@ -4442,6 +4476,9 @@ export default function FarmClient({
                                                 onClick={() => {
                                                     setLiveTerminalFilter('EXTERNAL');
                                                     setIsLiveTerminalOpen(true);
+                                                    setIsDdOrbExpanded(false);
+                                                    setSelectedDdOrb(null);
+                                                    setHighlightTarget(null);
                                                 }}
                                                 title={`✋ ออเดอร์นอกระบบ EasyM (เทรดมือ/ทองคำ): ${extTrades.count} ไม้ (${extTrades.lots.toFixed(2)} Lots | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC | ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`}) - คลิกเพื่อเปิดดูไม้แปลกปลอมใน MT5 Live Trades`}
                                             />
@@ -4456,15 +4493,34 @@ export default function FarmClient({
                                 value={totalPortDDPct}
                                 isSlowBlink={isFallback1Url}
                                 showPing
-                                isHighlighted={isDdOrbExpanded}
-                                onClick={() => setIsDdOrbExpanded(prev => !prev)}
+                                isHighlighted={isDdOrbExpanded && (highlightTarget ? highlightTarget === 'TOTAL' : (selectedDdOrb === 'TOTAL' || selectedDdOrb === null))}
+                                onClick={() => {
+                                    if (!isDdOrbExpanded) {
+                                        setIsDdOrbExpanded(true);
+                                        setSelectedDdOrb('TOTAL');
+                                    } else {
+                                        if (selectedDdOrb !== 'TOTAL' && selectedDdOrb !== null) {
+                                            setSelectedDdOrb('TOTAL');
+                                            setHighlightTarget(null);
+                                        } else {
+                                            setIsDdOrbExpanded(false);
+                                            setSelectedDdOrb(null);
+                                            setHighlightTarget(null);
+                                        }
+                                    }
+                                }}
                                 title={isDdOrbExpanded ? "คลิกเพื่อพับเก็บลูกแก้วย่อย" : `📊 DD รวมของพอร์ต: -${totalPortDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดู DD ฟาร์ม / DD ถูกขัง)`}
                             />
                         </div>
 
                         {/* Orb 2: Cyan/Blue Glow (Cockpit Matrix - 20-Pair Telemetry) */}
                         <button
-                            onClick={() => setPrimeActiveOrb(2)}
+                            onClick={() => {
+                                setIsDdOrbExpanded(false);
+                                setSelectedDdOrb(null);
+                                setHighlightTarget(null);
+                                setPrimeActiveOrb(2);
+                            }}
                             className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
                             title="20-Pair Cockpit Matrix (รายงานสถานะ 20 คู่เงิน)"
                         >
