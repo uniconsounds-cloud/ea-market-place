@@ -3202,12 +3202,12 @@ export default function FarmClient({
                                                         className="absolute pointer-events-none"
                                                     >
                                                         {isActive && activePort ? (
-                                                            <>
-                                                                {/* 🔮 ตัวเลขกำไรปัจจุบันลอยเด่นอยู่เหนือกรอบพอร์ต (มีหมอกฟุ้งๆ ด้านหลัง ชัดเจนตามภาพตัวอย่าง) */}
-                                                                <div
-                                                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                                    className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-full -mt-16 flex flex-col items-center pointer-events-none select-none z-[160] whitespace-nowrap animate-fade-in"
-                                                                >
+                                                            <div
+                                                                style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                                className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none"
+                                                            >
+                                                                {/* 🔮 ตัวเลขกำไรปัจจุบันลอยเด่นอยู่เหนือกรอบพอร์ต (มีหมอกฟุ้งๆ ด้านหลัง ชัดเจนตามภาพตัวอย่างที่ 2) */}
+                                                                <div className="absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none select-none z-[160] whitespace-nowrap animate-fade-in">
                                                                     {/* 🌫️ หมอกฟุ้งๆ ด้านหลังตัวเลขกำไร (Foggy Glow Backdrop) */}
                                                                     <div className="absolute inset-0 -inset-x-10 -inset-y-5 bg-black/75 rounded-full blur-xl pointer-events-none -z-10" />
                                                                     <div className="absolute inset-0 -inset-x-8 -inset-y-4 bg-[#02130b]/85 rounded-full blur-md pointer-events-none -z-10" />
@@ -3266,8 +3266,7 @@ export default function FarmClient({
 
                                                                 {/* กรอบแสดงเลขพอร์ต */}
                                                                 <div
-                                                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                                    className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 overflow-hidden transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
+                                                                    className={`min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 overflow-hidden transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
                                                                         isExpired48H
                                                                             ? 'border-rose-500 ring-4 ring-rose-500/70 shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_35px_rgba(225,29,72,0.9)] animate-pulse'
                                                                             : isExpired12H
@@ -3375,7 +3374,7 @@ export default function FarmClient({
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </>
+                                                            </div>
                                                         ) : (
                                                             <div
                                                                 style={{ marginTop: `${TREE_Y_OFFSET}px` }}
