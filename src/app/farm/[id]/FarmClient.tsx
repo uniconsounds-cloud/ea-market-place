@@ -1873,12 +1873,52 @@ export default function FarmClient({
         const ddPct = liveTotalDD;
 
         // External Trades Telemetry (Non-EasyM / Manual trades placed on MT5)
-        const externalTrades = primeData?.external ? {
+        // 1. Direct Telemetry transmitted from newer EasyM Prime EA
+        let externalTrades: { count: number; lots: number; pnl: number; ddPct: number; isInferred?: boolean } = primeData?.external ? {
             count: Number(primeData.external.count) || 0,
             lots: Number(primeData.external.lots) || 0,
             pnl: Number(primeData.external.pnl) || 0,
-            ddPct: Number(primeData.external.dd_pct) || 0
-        } : { count: 0, lots: 0, pnl: 0, ddPct: 0 };
+            ddPct: Number(primeData.external.dd_pct) || 0,
+            isInferred: false
+        } : { count: 0, lots: 0, pnl: 0, ddPct: 0, isInferred: false };
+
+        // 2. Fallback for older EasyM Prime EAs: Check known active orders outside 20 pairs
+        if (!primeData?.external && orders && orders.length > 0) {
+            const extOrdersFromProps = orders.filter(o => {
+                const sym = (o.symbol || o.pair || '').toUpperCase().replace(/[^A-Z]/g, '');
+                return sym && !PRIME_20_PAIRS.includes(sym as any);
+            });
+            if (extOrdersFromProps.length > 0) {
+                const extLots = extOrdersFromProps.reduce((s, o) => s + (Number(o.raw_lot_size) || 0) / 100, 0);
+                const extPnl = extOrdersFromProps.reduce((s, o) => s + (Number(o.current_pnl) || 0), 0);
+                externalTrades = {
+                    count: extOrdersFromProps.length,
+                    lots: Number(extLots.toFixed(2)),
+                    pnl: Number(extPnl.toFixed(2)),
+                    ddPct: bal > 0 ? Number((-extPnl / bal * 100).toFixed(2)) : 0,
+                    isInferred: false
+                };
+            }
+        }
+
+        // 3. Fallback for older EasyM Prime EAs: Infer from Account Balance vs Equity discrepancy
+        if (!primeData?.external && externalTrades.count === 0) {
+            const botFloatingPnl = portStatus?.floating_pnl !== undefined ? Number(portStatus.floating_pnl) : 0;
+            const accountFloatingPnl = eq - bal;
+            const diffPnl = accountFloatingPnl - botFloatingPnl;
+            const diffPct = bal > 0 ? (diffPnl / bal) * 100 : 0;
+
+            // If discrepancy is meaningful (>= 0.08% or >= 1.0 currency unit)
+            if (Math.abs(diffPct) >= 0.08 && Math.abs(diffPnl) >= 1.0) {
+                externalTrades = {
+                    count: 0,
+                    lots: 0,
+                    pnl: Number(diffPnl.toFixed(2)),
+                    ddPct: Number((-diffPnl / bal * 100).toFixed(2)),
+                    isInferred: true
+                };
+            }
+        }
 
         // Group active orders per pair (Enriched for Table & MT5 Cockpit)
         const pairData: Record<string, {
@@ -2367,8 +2407,8 @@ export default function FarmClient({
     // ✋ External / Manual Trades Telemetry & Signed DD%
     // If extPnl is profit (+1330.14), manualDDPct is negative (-0.73%), meaning profit!
     // If extPnl is loss (-2000), manualDDPct is positive (+1.10%), meaning DD!
-    const extTrades = primeTelemetry?.externalTrades || { count: 0, lots: 0, pnl: 0, ddPct: 0 };
-    const hasExternalTrades = extTrades.count > 0;
+    const extTrades = primeTelemetry?.externalTrades || { count: 0, lots: 0, pnl: 0, ddPct: 0, isInferred: false };
+    const hasExternalTrades = extTrades.count > 0 || (Boolean(extTrades.isInferred) && Math.abs(extTrades.pnl) >= 1.0);
     const manualDDPct = useMemo(() => {
         if (!hasExternalTrades || !stats.balance || stats.balance <= 0) return 0;
         return Number((-extTrades.pnl / stats.balance * 100).toFixed(2));
@@ -4480,7 +4520,9 @@ export default function FarmClient({
                                                     setSelectedDdOrb(null);
                                                     setHighlightTarget(null);
                                                 }}
-                                                title={`✋ ออเดอร์นอกระบบ EasyM (เทรดมือ/ทองคำ): ${extTrades.count} ไม้ (${extTrades.lots.toFixed(2)} Lots | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC | ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`}) - คลิกเพื่อเปิดดูไม้แปลกปลอมใน MT5 Live Trades`}
+                                                title={extTrades.isInferred
+                                                    ? `✋ ตรวจพบออเดอร์นอกระบบ EasyM (คำนวณจากส่วนต่างพอร์ต ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`} | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC) - คลิกเพื่อเปิดดูไม้แปลกปลอมใน MT5 Live Trades`
+                                                    : `✋ ออเดอร์นอกระบบ EasyM (เทรดมือ/ทองคำ): ${extTrades.count} ไม้ (${extTrades.lots.toFixed(2)} Lots | ${extTrades.pnl >= 0 ? `+${extTrades.pnl.toFixed(2)}` : extTrades.pnl.toFixed(2)} USC | ${manualDDPct <= 0 ? `กำไร +${Math.abs(manualDDPct).toFixed(2)}%` : `DD -${manualDDPct.toFixed(2)}%`}) - คลิกเพื่อเปิดดูไม้แปลกปลอมใน MT5 Live Trades`}
                                             />
                                         </div>
                                     )}
@@ -5281,10 +5323,10 @@ export default function FarmClient({
                                         </div>
 
                                         {/* Row 2: Full-width External Orders Warning Bar (Clickable to open Live Terminal filtered to External) */}
-                                        {primeTelemetry.externalTrades.count > 0 && (() => {
-                                            const extCount = primeTelemetry.externalTrades.count;
-                                            const extLots = primeTelemetry.externalTrades.lots.toFixed(2);
-                                            const extPnl = primeTelemetry.externalTrades.pnl;
+                                        {hasExternalTrades && (() => {
+                                            const extCount = extTrades.count;
+                                            const extLots = extTrades.lots.toFixed(2);
+                                            const extPnl = extTrades.pnl;
                                             const pnlStr = extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2);
                                             const effectiveBal = stats.balance > 0 ? stats.balance : (stats.equity > 0 ? stats.equity : (Number(portStatus?.balance) || 100000));
                                             const extDDPct = effectiveBal > 0 ? (extPnl / effectiveBal * 100) : 0;
@@ -5305,9 +5347,17 @@ export default function FarmClient({
                                                     <div className="sm:hidden flex items-center justify-between w-full gap-1 whitespace-nowrap overflow-x-auto no-scrollbar">
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="animate-pulse shrink-0 text-xs">⚠️</span>
-                                                            <span className="text-amber-200 font-bold">ไม้แปลกปลอม:</span>
-                                                            <span className="text-amber-300 font-bold">{extCount} ไม้</span>
-                                                            <span className="text-amber-300/80">({extLots}L)</span>
+                                                            <span className="text-amber-200 font-bold">
+                                                                {extTrades.isInferred ? 'ออเดอร์นอกระบบ:' : 'ไม้แปลกปลอม:'}
+                                                            </span>
+                                                            {extTrades.isInferred ? (
+                                                                <span className="text-amber-300 font-semibold">ตรวจพบจากส่วนต่าง</span>
+                                                            ) : (
+                                                                <>
+                                                                    <span className="text-amber-300 font-bold">{extCount} ไม้</span>
+                                                                    <span className="text-amber-300/80">({extLots}L)</span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 text-right shrink-0">
                                                             <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
@@ -5325,8 +5375,14 @@ export default function FarmClient({
                                                     <div className="hidden sm:flex items-center justify-between w-full gap-2">
                                                         <div className="flex items-center gap-2">
                                                             <span className="animate-pulse shrink-0 text-sm">⚠️</span>
-                                                            <span className="text-amber-200 font-bold">ตรวจพบไม้แปลกปลอม:</span>
-                                                            <span className="text-amber-300 font-black">{extCount} ไม้ ({extLots} Lots)</span>
+                                                            <span className="text-amber-200 font-bold">
+                                                                {extTrades.isInferred ? 'ตรวจพบออเดอร์นอกระบบ EasyM:' : 'ตรวจพบไม้แปลกปลอม:'}
+                                                            </span>
+                                                            {extTrades.isInferred ? (
+                                                                <span className="text-amber-300 font-normal">คำนวณจากส่วนต่าง Balance/Equity ของพอร์ต</span>
+                                                            ) : (
+                                                                <span className="text-amber-300 font-black">{extCount} ไม้ ({extLots} Lots)</span>
+                                                            )}
                                                             <span className="text-white/30">|</span>
                                                             <span className="text-white/60">กำไร/ขาดทุน:</span>
                                                             <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
