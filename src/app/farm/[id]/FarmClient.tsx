@@ -4229,22 +4229,22 @@ export default function FarmClient({
                                                     title={isTreeExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายหลอดปรอท"}
                                                 >
                                                     {/* Status Header Badge: แดงดำเมื่อวิกฤต (Rescue Grid) / ส้มเมื่อเตือน (Quarantine) */}
-                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg backdrop-blur-md border-t border-x text-[10px] font-mono font-bold transition-colors ${
+                                                    <div className={`flex items-center justify-between w-full px-2 py-0.5 rounded-t-lg backdrop-blur-md border-t border-x text-[10px] font-mono font-bold transition-colors whitespace-nowrap ${
                                                         isTreeCritical
                                                             ? 'bg-[#150204]/98 border-rose-600/80 shadow-[0_0_15px_rgba(225,29,72,0.5)]'
                                                             : 'bg-[#160e03]/95 border-amber-500/70 shadow-lg'
                                                     }`}>
-                                                        <span className={`tracking-wider ${isTreeCritical ? 'text-rose-300' : 'text-amber-300'}`}>
-                                                            {qTree.sym}{qTree.rescueOrders && qTree.rescueOrders > 0 ? ` [R${qTree.rescueOrders}]` : ''}
+                                                        <span className={`tracking-wider whitespace-nowrap ${isTreeCritical ? 'text-rose-300' : 'text-amber-300'}`}>
+                                                            {qTree.sym}
                                                         </span>
-                                                        <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${
+                                                        <span className={`text-[8px] px-1 py-0.2 rounded font-semibold whitespace-nowrap ${
                                                             isTreeCritical 
                                                                 ? 'bg-rose-950/80 text-rose-300 border border-rose-500/70' 
                                                                 : 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
                                                         }`}>
                                                             {qTree.label}
                                                         </span>
-                                                        <span className={`font-black ${isTreeCritical ? 'text-rose-400' : 'text-amber-400'}`}>
+                                                        <span className={`font-black whitespace-nowrap ${isTreeCritical ? 'text-rose-400' : 'text-amber-400'}`}>
                                                             -{qTree.ddPct.toFixed(1)}%
                                                         </span>
                                                     </div>
