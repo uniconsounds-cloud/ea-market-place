@@ -1968,14 +1968,27 @@ export default function FarmClient({
             }));
 
             // Check if rescue DD was sent separately by older EA telemetry (e.g. B261023.10 where loss_pct excluded rescue_dd)
+            // In B261025.1 and newer, loss_pct already includes each pair's rescue DD.
             const rawQuarSum = rawQuarList.reduce((s: number, q: any) => s + q.ddPct, 0);
             const separateRescueDD = Number(primeData.rescue_dd || 0);
             const totalRescueOrdersCount = rawQuarList.reduce((s: number, q: any) => s + (q.rescueOrders || 0), 0);
+            const buildId = String(primeData?.build_id || '');
+            const isModernEABuild = Boolean(buildId && buildId >= 'B261025');
 
-            // If rawQuarSum is around 38.6% and separateRescueDD is 3.28%, distribute rescue DD proportionally to each quarantined pair
-            const needsRescueInclusion = separateRescueDD > 0 && 
+            // Expected quarantine DD from the master equation: LiveTotalDD = ActiveModeDD + QuarantineDD + ManualDD
+            const easymModeDD = Number(primeData?.mode_dd || 0);
+            const manualDDFromExt = bal > 0 ? (-externalTrades.pnl / bal * 100) : 0;
+            const expectedQuarDD = (easymModeDD > 0) ? Math.max(0, liveTotalDD - easymModeDD - manualDDFromExt) : 0;
+
+            // Only add separate rescue DD if this is an older EA build AND rawQuarSum does NOT already include rescue DD
+            const alreadyHasRescueIncluded = isModernEABuild || 
+                (expectedQuarDD > 0 && Math.abs(rawQuarSum - expectedQuarDD) < Math.abs((rawQuarSum + separateRescueDD) - expectedQuarDD));
+
+            const needsRescueInclusion = !alreadyHasRescueIncluded && 
+                separateRescueDD > 0 && 
                 totalRescueOrdersCount > 0 && 
-                Math.abs((rawQuarSum + separateRescueDD) - liveTotalDD) < Math.abs(rawQuarSum - liveTotalDD);
+                expectedQuarDD > 0 && 
+                Math.abs((rawQuarSum + separateRescueDD) - expectedQuarDD) < 0.8;
 
             quarantinedDetails = rawQuarList.map((q: any) => {
                 if (needsRescueInclusion && q.rescueOrders > 0 && totalRescueOrdersCount > 0) {
@@ -2441,9 +2454,12 @@ export default function FarmClient({
     // Perfectly reconciled: totalPortDDPct = totalQuarantineDD + activeFarmDDPct + manualDDPct
     const activeFarmDDPct = useMemo(() => {
         if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
+        if (primeTelemetry?.modeDDPct !== undefined && primeTelemetry.modeDDPct > 0) {
+            return Number(primeTelemetry.modeDDPct.toFixed(2));
+        }
         const computedActive = rawPortDD - totalQuarantineDD - manualDDPct;
         return Number(Math.max(0, computedActive).toFixed(2));
-    }, [rawPortDD, totalQuarantineDD, manualDDPct, isPrime, isFallback1Url]);
+    }, [rawPortDD, totalQuarantineDD, manualDDPct, isPrime, isFallback1Url, primeTelemetry?.modeDDPct]);
 
     const totalPortDDPct = useMemo(() => {
         if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
