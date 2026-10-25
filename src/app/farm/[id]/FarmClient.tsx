@@ -485,6 +485,7 @@ export default function FarmClient({
     // 🧪 Simulated Buffer & Threshold for testing dome buffer aura (Dev testing)
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
+    const [simulatedFarmStatus, setSimulatedFarmStatus] = useState<Record<number, 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H'>>({});
 
     // 🧭 Interactive Farm Guide & Multi-Port Farm View (ปลดล็อกเฉพาะพอร์ตพัฒนา 3088 และ 2434 เท่านั้น)
     const isOrb4Unlocked = isAllowedDevMenuPort && isOwnerDevUser;
@@ -3081,6 +3082,28 @@ export default function FarmClient({
                                 const portAccProfit = Number(activePort?.portStatus?.accumulated_profit) || 0;
                                 const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
 
+                                // ⏰ คำนวณสถานะการตรวจสิทธิ์ (Heartbeat / Auth Timeout) เกิน 12 ชม. หรือ 48 ชม.
+                                const simOverride = simulatedFarmStatus?.[slotIdx];
+                                const lastPingTime = activePort?.portStatus?.updated_at || activePort?.portStatus?.last_ping;
+                                const elapsedHours = lastPingTime ? (Date.now() - new Date(lastPingTime).getTime()) / (1000 * 60 * 60) : 0;
+
+                                let farmStatus: 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H' = 'NORMAL';
+                                if (simOverride) {
+                                    farmStatus = simOverride;
+                                } else if (isActive && lastPingTime) {
+                                    if (elapsedHours >= 48) farmStatus = 'EXPIRED_48H';
+                                    else if (elapsedHours >= 12) farmStatus = 'EXPIRED_12H';
+                                }
+
+                                const isExpired12H = farmStatus === 'EXPIRED_12H';
+                                const isExpired48H = farmStatus === 'EXPIRED_48H';
+                                const isOfflineAlert = isExpired12H || isExpired48H;
+
+                                // 💰 คำนวณตัวเลขกำไรปัจจุบัน (Today Profit / Profit %)
+                                const isUSC = String(activePort?.portStatus?.account_type || '').toUpperCase().includes('CENT') || 
+                                              String(activePort?.portStatus?.account_type || '').toUpperCase().includes('USC');
+                                const portProfitPct = portBal > 0 ? (portTodayPnl / portBal) * 100 : 0;
+
                                 return (
                                     <div
                                         key={`multi_farm_slot_${slotIdx}`}
@@ -3091,6 +3114,11 @@ export default function FarmClient({
                                         }}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            if (isExpired48H) {
+                                                toast.error('พอร์ตขาดการตรวจสิทธิ์เกิน 48 ชม. กำลังนำท่านไปยัง LINE OA เพื่อติดต่อแอดมิน...');
+                                                window.open('https://lin.ee/U8DdhPj', '_blank');
+                                                return;
+                                            }
                                             if (activePort) {
                                                 handleSelectMultiFarmPort(activePort);
                                             }
@@ -3100,7 +3128,15 @@ export default function FarmClient({
                                                 ? 'cursor-pointer group hover:z-[90]'
                                                 : 'pointer-events-none'
                                         }`}
-                                        title={isActive ? `คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${activePort?.portNumber}` : 'พอร์ตยังไม่ได้เปิดใช้งาน (Inactive)'}
+                                        title={
+                                            !isActive
+                                                ? 'พอร์ตยังไม่ได้เปิดใช้งาน (Inactive)'
+                                                : isExpired48H
+                                                    ? '⚠️ ขาดการตรวจสิทธิ์เกิน 48 ชม. คลิกเพื่อติดต่อ Admin ผ่าน LINE OA'
+                                                    : isExpired12H
+                                                        ? '⚠️ แจ้งเตือน: พอร์ตขาดการตรวจสิทธิ์เกิน 12 ชม.'
+                                                        : `คลิกเพื่อเปิดดูหน้าฟาร์มพอร์ต ${activePort?.portNumber}`
+                                        }
                                     >
                                         {/* Stationary isometric hit-area so hovering anywhere on the farm lifts smoothly without edge-jitter */}
                                         {isActive && (
@@ -3125,18 +3161,22 @@ export default function FarmClient({
                                             <div style={{ transform: 'scale(0.66)', transformOrigin: 'center center' }} className="relative">
                                                 <div className={`relative transition-all duration-300 ${
                                                     isActive
-                                                        ? 'animate-float-farm group-hover:drop-shadow-[0_26px_32px_rgba(16,185,129,0.55)]'
+                                                        ? isExpired48H
+                                                            ? 'animate-float-farm sepia-[0.6] hue-rotate-[315deg] saturate-200 contrast-110 drop-shadow-[0_26px_40px_rgba(225,29,72,0.85)]'
+                                                            : isExpired12H
+                                                                ? 'animate-float-farm sepia-[0.45] hue-rotate-[-30deg] saturate-150 brightness-105 drop-shadow-[0_26px_36px_rgba(245,158,11,0.75)]'
+                                                                : 'animate-float-farm group-hover:drop-shadow-[0_26px_32px_rgba(16,185,129,0.55)]'
                                                         : 'grayscale contrast-75 brightness-75 opacity-35'
                                                 }`}>
                                                     {/* 🏝️ Single Pre-Rendered Isometric Mini-Farm Island (Optimized Single Image Asset) */}
                                                     <div
                                                         className="absolute"
                                                         style={{
-                                                            left: '-280px',
-                                                            top: '-250px',
-                                                            width: '560px',
-                                                            height: '500px',
-                                                            zIndex: 25
+                                                             left: '-280px',
+                                                             top: '-250px',
+                                                             width: '560px',
+                                                             height: '500px',
+                                                             zIndex: 25
                                                         }}
                                                     >
                                                         {isClient && (
@@ -3162,66 +3202,180 @@ export default function FarmClient({
                                                         className="absolute pointer-events-none"
                                                     >
                                                         {isActive && activePort ? (
-                                                            <div
-                                                                style={{ marginTop: `${TREE_Y_OFFSET}px` }}
-                                                                className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 overflow-hidden transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
-                                                                    isCurrentPort
-                                                                        ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white group-hover:scale-105'
-                                                                        : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-200 group-hover:scale-105 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.95),0_0_32px_rgba(16,185,129,0.85)]'
-                                                                }`}
-                                                            >
-                                                                {/* 💎 ขอบบนของกรอบแสดงเลขพอร์ต: แบบผลึกแก้วใสเรืองแสงเมื่อพอร์ตมีกำไร / สีพื้นเมื่อไม่มีกำไร (หนาลงมาใกล้ปรอท DD) */}
-                                                                <div className={`w-full h-5 relative overflow-hidden transition-all duration-500 flex items-center justify-center ${
-                                                                    hasProfit
-                                                                        ? 'bg-gradient-to-b from-emerald-200/40 via-emerald-400/25 to-teal-500/10 border-b border-emerald-300/50 shadow-[0_2px_12px_rgba(52,211,153,0.5),inset_0_1px_3px_rgba(255,255,255,0.7)]'
-                                                                        : 'bg-[#03150e]/95 border-b border-emerald-950/60 shadow-none'
-                                                                }`}>
-                                                                    {hasProfit && (
-                                                                        <>
-                                                                            {/* Crystal Glass Reflection & Beveled Highlight */}
-                                                                            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-white to-transparent opacity-95 shadow-[0_0_8px_#fff]" />
-                                                                            <div className="absolute top-[2px] inset-x-3 h-[1px] bg-emerald-200/70 blur-[0.5px]" />
-                                                                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-200/35 via-transparent to-transparent animate-pulse" />
-                                                                            {/* Prismatic Crystal Sheen */}
-                                                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-                                                                        </>
-                                                                    )}
-                                                                </div>
+                                                            <>
+                                                                {/* 🔮 ตัวเลขกำไรปัจจุบันลอยเด่นอยู่เหนือกรอบพอร์ต (มีหมอกฟุ้งๆ ด้านหลัง ชัดเจนตามภาพตัวอย่าง) */}
+                                                                <div
+                                                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                                    className="absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-full -mt-16 flex flex-col items-center pointer-events-none select-none z-[160] whitespace-nowrap animate-fade-in"
+                                                                >
+                                                                    {/* 🌫️ หมอกฟุ้งๆ ด้านหลังตัวเลขกำไร (Foggy Glow Backdrop) */}
+                                                                    <div className="absolute inset-0 -inset-x-10 -inset-y-5 bg-black/75 rounded-full blur-xl pointer-events-none -z-10" />
+                                                                    <div className="absolute inset-0 -inset-x-8 -inset-y-4 bg-[#02130b]/85 rounded-full blur-md pointer-events-none -z-10" />
+                                                                    <div className={`absolute inset-0 -inset-x-12 -inset-y-6 rounded-full blur-2xl pointer-events-none -z-10 ${
+                                                                        isExpired48H
+                                                                            ? 'bg-rose-600/35'
+                                                                            : isExpired12H
+                                                                                ? 'bg-amber-500/30'
+                                                                                : (portTodayPnl >= 0 ? 'bg-emerald-400/25' : 'bg-rose-500/25')
+                                                                    }`} />
 
-                                                                {/* 🧪 ปรอท DD รวมของฟาร์ม และข้อมูลพอร์ต (ลงมาอยู่ใต้ขอบผลึกแก้วใส) */}
-                                                                <div className="w-full px-5 pt-2 pb-3 flex flex-col items-center">
-                                                                    {/* หลอดแก้วแนวนอนแสดงค่า DD รวมของฟาร์ม (สีตามสถานะ DD) */}
-                                                                    <div className="flex items-center w-full mb-2">
-                                                                        <div className={`w-3.5 h-3.5 rounded-full ${ddTheme.bulbBg} border-2 ${ddTheme.bulbBorder} flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center`}>
-                                                                            <div className="w-1 h-1 rounded-full bg-white/95 -mt-0.5 -ml-0.5" />
-                                                                        </div>
-                                                                        <div className="relative flex-1 h-3.5 rounded-r-full bg-black/90 border border-white/30 shadow-[0_2px_8px_rgba(0,0,0,0.9),inset_0_2px_4px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1.5px]">
-                                                                            <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/50 rounded-full z-20 pointer-events-none" />
-                                                                            <div
-                                                                                className={`h-full rounded-r-full ${ddTheme.fillGradient} transition-all duration-700 ease-out relative`}
-                                                                                style={{ width: `${ddFillPct}%` }}
-                                                                            >
-                                                                                {ddFillPct > 0 && (
-                                                                                    <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-white/95 rounded-r-full shadow-[0_0_6px_#fff]" />
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
+                                                                    {/* ป้ายกำกับเล็กด้านบน (Subtitle Tag เหมือน • BUFFER (1.8x)) */}
+                                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                                        <span className={`w-2 h-2 rounded-full ${
+                                                                            isExpired48H
+                                                                                ? 'bg-rose-500 animate-ping shadow-[0_0_8px_#f43f5e]'
+                                                                                : isExpired12H
+                                                                                    ? 'bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]'
+                                                                                    : (portTodayPnl >= 0 ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]' : 'bg-rose-400 animate-pulse shadow-[0_0_8px_#f43f5e]')
+                                                                        }`} />
+                                                                        <span className={`text-[10px] sm:text-[11px] font-black tracking-widest uppercase font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] ${
+                                                                            isExpired48H
+                                                                                ? 'text-rose-300'
+                                                                                : isExpired12H
+                                                                                    ? 'text-amber-300'
+                                                                                    : (portTodayPnl >= 0 ? 'text-emerald-300' : 'text-rose-300')
+                                                                        }`}>
+                                                                            TODAY PROFIT
+                                                                        </span>
+                                                                        {portBal > 0 && Math.abs(portTodayPnl) > 0 && (
+                                                                            <span className="text-[10px] font-mono font-bold text-white/80 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                                                                                ({portTodayPnl >= 0 ? '+' : ''}{isUSC ? `${Math.round(portTodayPnl).toLocaleString()} USC` : `$${portTodayPnl.toFixed(2)}`})
+                                                                            </span>
+                                                                        )}
                                                                     </div>
 
-                                                                    {/* เส้นคั่นแก้วคริสตัลบางๆ */}
-                                                                    <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent mb-2" />
-
-                                                                    <div className="flex items-center gap-2 mb-0.5">
-                                                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                                                                        <span className="text-[13px] font-mono font-black tracking-[0.2em] text-emerald-300 uppercase">
-                                                                            {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
+                                                                    {/* ตัวเลขกำไรขนาดใหญ่ สว่างชัดเจนแบบภาพตัวอย่าง (+82.3%) */}
+                                                                    <div className="flex items-center justify-center">
+                                                                        <span className={`font-mono font-black text-2xl sm:text-3xl leading-none tracking-tight whitespace-nowrap drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] ${
+                                                                            isExpired48H
+                                                                                ? 'text-rose-300 drop-shadow-[0_0_22px_rgba(244,63,94,0.95)]'
+                                                                                : isExpired12H
+                                                                                    ? 'text-amber-300 drop-shadow-[0_0_20px_rgba(251,191,36,0.9)]'
+                                                                                    : (portTodayPnl > 0
+                                                                                        ? 'text-emerald-300 drop-shadow-[0_0_22px_rgba(52,211,153,0.95)]'
+                                                                                        : portTodayPnl < 0
+                                                                                            ? 'text-rose-400 drop-shadow-[0_0_22px_rgba(244,63,94,0.95)]'
+                                                                                            : 'text-slate-300 drop-shadow-[0_0_15px_rgba(148,163,184,0.5)]')
+                                                                        }`}>
+                                                                            {portBal > 0
+                                                                                ? `${portProfitPct >= 0 ? '+' : ''}${portProfitPct.toFixed(1)}%`
+                                                                                : `${portTodayPnl >= 0 ? '+' : ''}${isUSC ? '' : '$'}${portTodayPnl.toFixed(2)}`}
                                                                         </span>
                                                                     </div>
-                                                                    <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                                                                        {activePort.portNumber}
+                                                                </div>
+
+                                                                {/* กรอบแสดงเลขพอร์ต */}
+                                                                <div
+                                                                    style={{ marginTop: `${TREE_Y_OFFSET}px` }}
+                                                                    className={`absolute left-1/2 top-[54%] -translate-x-1/2 -translate-y-1/2 min-w-[220px] rounded-2xl bg-[#051811]/95 backdrop-blur-md border-2 overflow-hidden transition-all duration-300 flex flex-col items-center justify-center text-center whitespace-nowrap ${
+                                                                        isExpired48H
+                                                                            ? 'border-rose-500 ring-4 ring-rose-500/70 shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_35px_rgba(225,29,72,0.9)] animate-pulse'
+                                                                            : isExpired12H
+                                                                                ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_25px_rgba(245,158,11,0.7)]'
+                                                                                : isCurrentPort
+                                                                                    ? 'border-emerald-300 ring-4 ring-emerald-400/50 shadow-[0_14px_35px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.75)] group-hover:border-white group-hover:scale-105'
+                                                                                    : 'border-emerald-400/80 shadow-[0_12px_30px_rgba(0,0,0,0.95),0_0_20px_rgba(16,185,129,0.45)] group-hover:border-emerald-200 group-hover:scale-105 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.95),0_0_32px_rgba(16,185,129,0.85)]'
+                                                                    }`}
+                                                                >
+                                                                    {/* 💎 ขอบบนของกรอบแสดงเลขพอร์ต */}
+                                                                    <div className={`w-full h-5 relative overflow-hidden transition-all duration-500 flex items-center justify-center ${
+                                                                        isExpired48H
+                                                                            ? 'bg-gradient-to-b from-rose-400/40 via-rose-600/30 to-red-950/20 border-b border-rose-500/60 shadow-[0_2px_12px_rgba(244,63,94,0.6)]'
+                                                                            : isExpired12H
+                                                                                ? 'bg-gradient-to-b from-amber-300/40 via-amber-500/30 to-amber-950/20 border-b border-amber-400/60 shadow-[0_2px_12px_rgba(245,158,11,0.6)]'
+                                                                                : hasProfit
+                                                                                    ? 'bg-gradient-to-b from-emerald-200/40 via-emerald-400/25 to-teal-500/10 border-b border-emerald-300/50 shadow-[0_2px_12px_rgba(52,211,153,0.5),inset_0_1px_3px_rgba(255,255,255,0.7)]'
+                                                                                    : 'bg-[#03150e]/95 border-b border-emerald-950/60 shadow-none'
+                                                                    }`}>
+                                                                        {hasProfit && !isOfflineAlert && (
+                                                                            <>
+                                                                                {/* Crystal Glass Reflection & Beveled Highlight */}
+                                                                                <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-white to-transparent opacity-95 shadow-[0_0_8px_#fff]" />
+                                                                                <div className="absolute top-[2px] inset-x-3 h-[1px] bg-emerald-200/70 blur-[0.5px]" />
+                                                                                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-200/35 via-transparent to-transparent animate-pulse" />
+                                                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                                                                            </>
+                                                                        )}
+                                                                        {isExpired48H && (
+                                                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* ข้อมูลในกรอบพอร์ต */}
+                                                                    <div className="w-full px-5 pt-2 pb-3 flex flex-col items-center">
+                                                                        {/* ถ้าขาดการตรวจสิทธิ์: แสดงแจ้งเตือนแทนปรอท DD */}
+                                                                        {isExpired48H ? (
+                                                                            <div className="w-full py-1.5 px-2 rounded-lg bg-rose-600/30 border border-rose-400/80 shadow-[0_0_18px_rgba(225,29,72,0.6)] flex flex-col items-center justify-center gap-0.5 mb-2 animate-pulse">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping flex-shrink-0" />
+                                                                                    <span className="text-[10px] font-mono font-black tracking-wider text-rose-200 uppercase">
+                                                                                        EXPIRED &gt; 48H: CONTACT ADMIN
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-white underline decoration-rose-300">
+                                                                                    <span>CLICK FARM TO LINE OA ↗</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : isExpired12H ? (
+                                                                            <div className="w-full py-1.5 px-2.5 rounded-lg bg-amber-500/20 border border-amber-400/70 shadow-[0_0_14px_rgba(245,158,11,0.45)] flex items-center justify-center gap-1.5 mb-2 animate-pulse">
+                                                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" />
+                                                                                <span className="text-[11px] font-mono font-black tracking-wider text-amber-200 uppercase">
+                                                                                    AUTH TIMEOUT &gt; 12H
+                                                                                </span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            /* หลอดแก้วแนวนอนแสดงค่า DD รวมของฟาร์ม (สีตามสถานะ DD) */
+                                                                            <div className="flex items-center w-full mb-2">
+                                                                                <div className={`w-3.5 h-3.5 rounded-full ${ddTheme.bulbBg} border-2 ${ddTheme.bulbBorder} flex-shrink-0 z-10 -mr-1.5 flex items-center justify-center`}>
+                                                                                    <div className="w-1 h-1 rounded-full bg-white/95 -mt-0.5 -ml-0.5" />
+                                                                                </div>
+                                                                                <div className="relative flex-1 h-3.5 rounded-r-full bg-black/90 border border-white/30 shadow-[0_2px_8px_rgba(0,0,0,0.9),inset_0_2px_4px_rgba(0,0,0,0.9)] overflow-hidden flex items-center p-[1.5px]">
+                                                                                    <div className="absolute top-0.5 left-1.5 right-1.5 h-[1.5px] bg-white/50 rounded-full z-20 pointer-events-none" />
+                                                                                    <div
+                                                                                        className={`h-full rounded-r-full ${ddTheme.fillGradient} transition-all duration-700 ease-out relative`}
+                                                                                        style={{ width: `${ddFillPct}%` }}
+                                                                                    >
+                                                                                        {ddFillPct > 0 && (
+                                                                                            <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-white/95 rounded-r-full shadow-[0_0_6px_#fff]" />
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* เส้นคั่นแก้วคริสตัลบางๆ */}
+                                                                        <div className={`w-full h-[1px] mb-2 ${
+                                                                            isExpired48H
+                                                                                ? 'bg-gradient-to-r from-transparent via-rose-500/50 to-transparent'
+                                                                                : isExpired12H
+                                                                                    ? 'bg-gradient-to-r from-transparent via-amber-500/50 to-transparent'
+                                                                                    : 'bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent'
+                                                                        }`} />
+
+                                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                                            <span className={`w-2.5 h-2.5 rounded-full ${
+                                                                                isExpired48H
+                                                                                    ? 'bg-rose-500 animate-ping shadow-[0_0_8px_#f43f5e]'
+                                                                                    : isExpired12H
+                                                                                        ? 'bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]'
+                                                                                        : 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]'
+                                                                            }`} />
+                                                                            <span className={`text-[13px] font-mono font-black tracking-[0.2em] uppercase ${
+                                                                                isExpired48H
+                                                                                    ? 'text-rose-300'
+                                                                                    : isExpired12H
+                                                                                        ? 'text-amber-300'
+                                                                                        : 'text-emerald-300'
+                                                                            }`}>
+                                                                                {activePort.eaType === 'PRIME' ? 'EASYM PRIME' : 'EASYM MAX'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
+                                                                            {activePort.portNumber}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
+                                                            </>
                                                         ) : (
                                                             <div
                                                                 style={{ marginTop: `${TREE_Y_OFFSET}px` }}
@@ -3262,7 +3416,7 @@ export default function FarmClient({
 
                         {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, SUBTLY RECEDING WHEN QUARANTINE IS FOCUSED) */}
                         <div className={`relative animate-float-farm transition-all duration-500 ease-out ${
-                            isDdExpanded ? 'z-[200]' : 'z-[20]'
+                            isDdExpanded ? 'z-[500]' : 'z-[20]'
                         } ${
                             (isQuarantineExpanded || isQuarantineEnlarged)
                                 ? 'opacity-70 brightness-95 scale-[0.99]'
@@ -6493,6 +6647,8 @@ export default function FarmClient({
                     actualRecommendedBuffer={actualRecommendedBuffer}
                     simulatedThreshold={simulatedThreshold}
                     onSetSimulatedThreshold={setSimulatedThreshold}
+                    simulatedFarmStatus={simulatedFarmStatus}
+                    onSetSimulatedFarmStatus={setSimulatedFarmStatus}
                 />
             )}
         </div>
