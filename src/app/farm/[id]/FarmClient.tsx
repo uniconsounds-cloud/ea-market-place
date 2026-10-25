@@ -5235,7 +5235,7 @@ export default function FarmClient({
                                                     <div className="sm:hidden flex items-center justify-between w-full gap-1 whitespace-nowrap overflow-x-auto no-scrollbar">
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="animate-pulse shrink-0 text-xs">⚠️</span>
-                                                            <span className="text-amber-200 font-bold">เทรดมือ:</span>
+                                                            <span className="text-amber-200 font-bold">ไม้แปลกปลอม:</span>
                                                             <span className="text-amber-300 font-bold">{extCount} ไม้</span>
                                                             <span className="text-amber-300/80">({extLots}L)</span>
                                                         </div>
@@ -5254,7 +5254,7 @@ export default function FarmClient({
                                                     <div className="hidden sm:flex items-center justify-between w-full gap-2">
                                                         <div className="flex items-center gap-2">
                                                             <span className="animate-pulse shrink-0 text-sm">⚠️</span>
-                                                            <span className="text-amber-200 font-bold">ตรวจพบออเดอร์เทรดมือ:</span>
+                                                            <span className="text-amber-200 font-bold">ตรวจพบไม้แปลกปลอม:</span>
                                                             <span className="text-amber-300 font-black">{extCount} ไม้ ({extLots} Lots)</span>
                                                             <span className="text-white/30">|</span>
                                                             <span className="text-white/60">กำไร/ขาดทุน:</span>
@@ -5688,16 +5688,13 @@ export default function FarmClient({
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h3 className="text-sm sm:text-base font-mono font-black text-white tracking-wider">
+                                                <h3 className="text-sm sm:text-base font-mono font-black text-white tracking-wider whitespace-nowrap">
                                                     MT5 LIVE TRADES TERMINAL
                                                 </h3>
-                                                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300">
-                                                    PORT 3088 DEV
-                                                </span>
                                             </div>
-                                            <p className="text-[10px] sm:text-[11px] text-white/50 font-sans flex items-center gap-2">
-                                                <span className="sm:hidden">คำสั่งสด MT5 On-Demand (อัปเดตทุก 3 วิ)</span>
-                                                <span className="hidden sm:inline">สตรีมคำสั่งสดตรงจาก MT5 แบบ On-Demand (อัปเดตทุก 3 วินาที)</span>
+                                            <p className="text-[10px] sm:text-[11px] text-white/50 font-sans flex items-center gap-2 whitespace-nowrap">
+                                                <span className="sm:hidden">คำสั่งสด MT5 On-Demand</span>
+                                                <span className="hidden sm:inline">สตรีมคำสั่งสดตรงจาก MT5 แบบ On-Demand</span>
                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
                                             </p>
                                         </div>
@@ -5732,95 +5729,208 @@ export default function FarmClient({
 
                                     return (
                                         <>
-                                            <div className="grid grid-cols-3 gap-1.5 sm:gap-4 shrink-0">
-                                                <div className="p-1.5 sm:p-3 rounded-xl sm:rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col justify-between overflow-hidden">
-                                                    <span className="text-[9px] sm:text-xs text-white/40 font-mono truncate">
+                                            {/* 3 Stat Cards with Synchronized 3-Row Alignment & Active Tab Highlighting */}
+                                            <div className="grid grid-cols-3 gap-1.5 sm:gap-3 shrink-0">
+                                                {/* Card 1: ออเดอร์เปิด */}
+                                                <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col justify-between overflow-hidden">
+                                                    <div className="text-[9.5px] sm:text-xs font-mono font-bold text-white/50 pb-1 sm:pb-1.5 border-b border-white/10 truncate mb-1 flex items-center justify-between">
                                                         <span className="sm:hidden">ออเดอร์เปิด</span>
                                                         <span className="hidden sm:inline">จำนวนออเดอร์เปิด</span>
-                                                    </span>
-                                                    <span className="text-xs sm:text-lg font-mono font-black text-white truncate my-0.5">
-                                                        {totalOrders} <span className="text-[9px] sm:text-xs font-normal text-white/50">ไม้</span>
-                                                    </span>
-                                                    <div className="text-[8px] sm:text-[10px] font-mono text-white/50 flex items-center gap-1 flex-wrap">
-                                                        <span className="text-cyan-300 whitespace-nowrap">
-                                                            <span className="sm:hidden">🤖 {eaOrders.length}</span>
-                                                            <span className="hidden sm:inline">🤖 EasyM: {eaOrders.length}</span>
-                                                        </span>
-                                                        <span className="text-white/20 hidden sm:inline">|</span>
-                                                        <span className={`whitespace-nowrap ${extOrders.length > 0 ? 'text-amber-400 font-bold' : 'text-white/40'}`}>
-                                                            <span className="sm:hidden">✋ {extOrders.length}</span>
-                                                            <span className="hidden sm:inline">✋ เทรดมือ: {extOrders.length}</span>
-                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5 sm:gap-1">
+                                                        {/* Row 1: ALL */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'ALL'
+                                                                ? 'bg-cyan-500/25 border border-cyan-400/50 text-cyan-200 font-bold shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                                                                : 'text-white/40 border border-transparent'
+                                                        }`}>
+                                                            <span className="truncate">ทั้งหมด</span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${liveTerminalFilter === 'ALL' ? 'text-white' : 'text-white/60'}`}>
+                                                                {totalOrders} <span className="text-[8px] sm:text-[10px] font-normal text-white/50">ไม้</span>
+                                                            </span>
+                                                        </div>
+                                                        {/* Row 2: EASYM */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'EASYM'
+                                                                ? 'bg-cyan-500/25 border border-cyan-400/50 text-cyan-200 font-bold shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                                                                : 'text-white/40 border border-transparent'
+                                                        }`}>
+                                                            <span className="truncate">
+                                                                <span className="sm:hidden">EasyM</span>
+                                                                <span className="hidden sm:inline">🤖 EasyM</span>
+                                                            </span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${liveTerminalFilter === 'EASYM' ? 'text-cyan-300' : 'text-white/60'}`}>
+                                                                {eaOrders.length} <span className="text-[8px] sm:text-[10px] font-normal text-white/50">ไม้</span>
+                                                            </span>
+                                                        </div>
+                                                        {/* Row 3: EXTERNAL */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'EXTERNAL'
+                                                                ? 'bg-amber-500/25 border border-amber-400/50 text-amber-200 font-bold shadow-[0_0_8px_rgba(251,191,36,0.25)]'
+                                                                : 'text-white/40 border border-transparent'
+                                                        }`}>
+                                                            <span className="truncate">
+                                                                <span className="sm:hidden">แปลกปลอม</span>
+                                                                <span className="hidden sm:inline">✋ แปลกปลอม</span>
+                                                            </span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${liveTerminalFilter === 'EXTERNAL' ? 'text-amber-300' : (extOrders.length > 0 ? 'text-amber-400/70' : 'text-white/40')}`}>
+                                                                {extOrders.length} <span className="text-[8px] sm:text-[10px] font-normal text-white/50">ไม้</span>
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="p-1.5 sm:p-3 rounded-xl sm:rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col justify-between overflow-hidden">
-                                                    <span className="text-[9px] sm:text-xs text-white/40 font-mono truncate">
+                                                {/* Card 2: ล็อตสุทธิ */}
+                                                <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col justify-between overflow-hidden">
+                                                    <div className="text-[9.5px] sm:text-xs font-mono font-bold text-white/50 pb-1 sm:pb-1.5 border-b border-white/10 truncate mb-1 flex items-center justify-between">
                                                         <span className="sm:hidden">ล็อตสุทธิ</span>
                                                         <span className="hidden sm:inline">ขนาดล็อตสุทธิ</span>
-                                                    </span>
-                                                    <span className="text-xs sm:text-lg font-mono font-black text-cyan-300 truncate my-0.5">
-                                                        {totalLots.toFixed(2)} <span className="text-[9px] sm:text-xs font-normal text-white/50"><span className="sm:hidden">L</span><span className="hidden sm:inline">Lots</span></span>
-                                                    </span>
-                                                    <div className="text-[8px] sm:text-[10px] font-mono text-white/50 flex items-center gap-1 flex-wrap">
-                                                        <span className="text-cyan-300 whitespace-nowrap">🤖 {eaLots.toFixed(2)}<span className="hidden sm:inline"> L</span></span>
-                                                        <span className="text-white/20 hidden sm:inline">|</span>
-                                                        <span className={`whitespace-nowrap ${extOrders.length > 0 ? 'text-amber-400 font-bold' : 'text-white/40'}`}>✋ {extLots.toFixed(2)}<span className="hidden sm:inline"> L</span></span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5 sm:gap-1">
+                                                        {/* Row 1: ALL */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'ALL'
+                                                                ? 'bg-cyan-500/25 border border-cyan-400/50 text-cyan-200 font-bold shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                                                                : 'text-white/40 border border-transparent'
+                                                        }`}>
+                                                            <span className="truncate">ทั้งหมด</span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${liveTerminalFilter === 'ALL' ? 'text-cyan-300' : 'text-white/60'}`}>
+                                                                {totalLots.toFixed(2)} <span className="text-[8px] sm:text-[10px] font-normal text-white/50"><span className="sm:hidden">L</span><span className="hidden sm:inline">Lots</span></span>
+                                                            </span>
+                                                        </div>
+                                                        {/* Row 2: EASYM */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'EASYM'
+                                                                ? 'bg-cyan-500/25 border border-cyan-400/50 text-cyan-200 font-bold shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                                                                : 'text-white/40 border border-transparent'
+                                                        }`}>
+                                                            <span className="truncate">
+                                                                <span className="sm:hidden">EasyM</span>
+                                                                <span className="hidden sm:inline">🤖 EasyM</span>
+                                                            </span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${liveTerminalFilter === 'EASYM' ? 'text-cyan-300' : 'text-white/60'}`}>
+                                                                {eaLots.toFixed(2)} <span className="text-[8px] sm:text-[10px] font-normal text-white/50"><span className="sm:hidden">L</span><span className="hidden sm:inline">Lots</span></span>
+                                                            </span>
+                                                        </div>
+                                                        {/* Row 3: EXTERNAL */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'EXTERNAL'
+                                                                ? 'bg-amber-500/25 border border-amber-400/50 text-amber-200 font-bold shadow-[0_0_8px_rgba(251,191,36,0.25)]'
+                                                                : 'text-white/40 border border-transparent'
+                                                        }`}>
+                                                            <span className="truncate">
+                                                                <span className="sm:hidden">แปลกปลอม</span>
+                                                                <span className="hidden sm:inline">✋ แปลกปลอม</span>
+                                                            </span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${liveTerminalFilter === 'EXTERNAL' ? 'text-amber-300' : (extOrders.length > 0 ? 'text-amber-400/70' : 'text-white/40')}`}>
+                                                                {extLots.toFixed(2)} <span className="text-[8px] sm:text-[10px] font-normal text-white/50"><span className="sm:hidden">L</span><span className="hidden sm:inline">Lots</span></span>
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="p-1.5 sm:p-3 rounded-xl sm:rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col justify-between overflow-hidden">
-                                                    <span className="text-[9px] sm:text-xs text-white/40 font-mono truncate">
+                                                {/* Card 3: P/L ลอยตัว */}
+                                                <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-black/60 border border-cyan-500/25 flex flex-col justify-between overflow-hidden">
+                                                    <div className="text-[9.5px] sm:text-xs font-mono font-bold text-white/50 pb-1 sm:pb-1.5 border-b border-white/10 truncate mb-1 flex items-center justify-between">
                                                         <span className="sm:hidden">P/L ลอยตัว</span>
                                                         <span className="hidden sm:inline">กำไร/ขาดทุนลอยตัว</span>
-                                                    </span>
-                                                    <span className={`text-xs sm:text-lg font-mono font-black truncate my-0.5 ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                        {totalPnl >= 0 ? `+${totalPnl.toFixed(2)}` : totalPnl.toFixed(2)}
-                                                    </span>
-                                                    <div className="text-[8px] sm:text-[10px] font-mono text-white/50 flex items-center gap-1 flex-wrap">
-                                                        <span className={`whitespace-nowrap ${eaPnl >= 0 ? 'text-emerald-400' : 'text-rose-300'}`}>
-                                                            🤖 {eaPnl >= 0 ? `+${eaPnl.toFixed(1)}` : eaPnl.toFixed(1)}
-                                                        </span>
-                                                        <span className="text-white/20 hidden sm:inline">|</span>
-                                                        <span className={`whitespace-nowrap ${extOrders.length > 0 ? (extPnl >= 0 ? 'text-emerald-300' : 'text-amber-400 font-bold') : 'text-white/40'}`}>
-                                                            ✋ {extPnl >= 0 ? `+${extPnl.toFixed(1)}` : extPnl.toFixed(1)}
-                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5 sm:gap-1">
+                                                        {/* Row 1: ALL */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'ALL'
+                                                                ? 'bg-cyan-500/25 border border-cyan-400/50 font-bold shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                                                                : 'border border-transparent'
+                                                        }`}>
+                                                            <span className={`truncate ${liveTerminalFilter === 'ALL' ? 'text-cyan-200' : 'text-white/40'}`}>ทั้งหมด</span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'} ${liveTerminalFilter === 'ALL' ? 'opacity-100' : 'opacity-65'}`}>
+                                                                {totalPnl >= 0 ? `+${totalPnl.toFixed(2)}` : totalPnl.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                        {/* Row 2: EASYM */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'EASYM'
+                                                                ? 'bg-cyan-500/25 border border-cyan-400/50 font-bold shadow-[0_0_8px_rgba(6,182,212,0.25)]'
+                                                                : 'border border-transparent'
+                                                        }`}>
+                                                            <span className={`truncate ${liveTerminalFilter === 'EASYM' ? 'text-cyan-200' : 'text-white/40'}`}>
+                                                                <span className="sm:hidden">EasyM</span>
+                                                                <span className="hidden sm:inline">🤖 EasyM</span>
+                                                            </span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${eaPnl >= 0 ? 'text-emerald-400' : 'text-rose-300'} ${liveTerminalFilter === 'EASYM' ? 'opacity-100' : 'opacity-65'}`}>
+                                                                {eaPnl >= 0 ? `+${eaPnl.toFixed(2)}` : eaPnl.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                        {/* Row 3: EXTERNAL */}
+                                                        <div className={`px-1.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-mono text-[9px] sm:text-xs flex items-center justify-between transition-all duration-200 ${
+                                                            liveTerminalFilter === 'EXTERNAL'
+                                                                ? 'bg-amber-500/25 border border-amber-400/50 font-bold shadow-[0_0_8px_rgba(251,191,36,0.25)]'
+                                                                : 'border border-transparent'
+                                                        }`}>
+                                                            <span className={`truncate ${liveTerminalFilter === 'EXTERNAL' ? 'text-amber-200' : 'text-white/40'}`}>
+                                                                <span className="sm:hidden">แปลกปลอม</span>
+                                                                <span className="hidden sm:inline">✋ แปลกปลอม</span>
+                                                            </span>
+                                                            <span className={`font-black shrink-0 whitespace-nowrap ${extOrders.length > 0 ? (extPnl >= 0 ? 'text-emerald-300' : 'text-amber-400') : 'text-white/40'} ${liveTerminalFilter === 'EXTERNAL' ? 'opacity-100' : 'opacity-65'}`}>
+                                                                {extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2)}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* External Orders Warning Banner (if detected) */}
-                                            {extOrders.length > 0 && (
-                                                <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-amber-500/10 border border-amber-500/35 flex items-center justify-between gap-2 sm:gap-3 text-xs font-mono shrink-0">
-                                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                                                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0">
-                                                            <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 animate-pulse" />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <div className="text-amber-200 font-bold flex items-center gap-1.5 sm:gap-2 flex-wrap text-[11px] sm:text-xs">
-                                                                <span className="sm:hidden">⚠️ พบไม้เทรดมือ:</span>
-                                                                <span className="hidden sm:inline">ตรวจพบสิ่งแปลกปลอม (ออเดอร์เทรดมือ):</span>
-                                                                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-black">
-                                                                    {extOrders.length} ไม้ ({extLots.toFixed(2)} <span className="sm:hidden">L</span><span className="hidden sm:inline">Lots</span>)
+                                            {/* External Orders Warning Banner (Identical to 20-Pair Farm Matrix Sleek Single-Line) */}
+                                            {extOrders.length > 0 && (() => {
+                                                const extCount = extOrders.length;
+                                                const extLotsStr = extLots.toFixed(2);
+                                                const pnlStr = extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2);
+                                                const extDDStr = stats.balance > 0 
+                                                    ? (extPnl < 0 ? `-${((Math.abs(extPnl) / stats.balance) * 100).toFixed(2)}%` : '0.00%')
+                                                    : '0.00%';
+
+                                                return (
+                                                    <div className="min-h-[40px] sm:min-h-[44px] h-[40px] sm:h-11 flex items-center bg-amber-500/10 border border-amber-500/35 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden">
+                                                        {/* Mobile View: Compact Single-Line Full Metrics */}
+                                                        <div className="sm:hidden flex items-center justify-between w-full gap-1 whitespace-nowrap overflow-x-auto no-scrollbar">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="animate-pulse shrink-0 text-xs">⚠️</span>
+                                                                <span className="text-amber-200 font-bold">ไม้แปลกปลอม:</span>
+                                                                <span className="text-amber-300 font-bold">{extCount} ไม้</span>
+                                                                <span className="text-amber-300/80">({extLotsStr}L)</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 text-right">
+                                                                <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                                    {pnlStr}
+                                                                </span>
+                                                                <span className="text-white/20">|</span>
+                                                                <span className="text-amber-300 font-bold">
+                                                                    DD: {extDDStr}
                                                                 </span>
                                                             </div>
-                                                            <p className="text-[10px] sm:text-[11px] text-amber-300/70 font-sans truncate mt-0.5">
-                                                                <span className="sm:hidden">แยกจาก EasyM แต่รวมใน Drawdown รวม MT5</span>
-                                                                <span className="hidden sm:inline">ออเดอร์ชุดนี้ถูกแยกออกจาก EasyM Prime แต่รวมอยู่ในยอด Drawdown รวมของพอร์ต MT5 ({extPnl >= 0 ? `+${extPnl.toFixed(2)}` : extPnl.toFixed(2)})</span>
-                                                            </p>
+                                                        </div>
+
+                                                        {/* Desktop View: Full Descriptions */}
+                                                        <div className="hidden sm:flex items-center justify-between w-full gap-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="animate-pulse shrink-0 text-sm">⚠️</span>
+                                                                <span className="text-amber-200 font-bold">ตรวจพบไม้แปลกปลอม:</span>
+                                                                <span className="text-amber-300 font-black">{extCount} ไม้ ({extLotsStr} Lots)</span>
+                                                                <span className="text-white/30">|</span>
+                                                                <span className="text-white/60">กำไร/ขาดทุน:</span>
+                                                                <span className={extPnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                                    {pnlStr}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className="text-white/60 mr-1.5">Drawdown:</span>
+                                                                <span className="text-amber-300 font-black">
+                                                                    {extDDStr}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right shrink-0">
-                                                        <span className="text-[9px] sm:text-[10px] text-amber-300/60 block">
-                                                            <span className="sm:hidden">DD มือ</span>
-                                                            <span className="hidden sm:inline">DD จากเทรดมือ</span>
-                                                        </span>
-                                                        <span className="text-xs sm:text-sm font-bold text-amber-400 font-mono">
-                                                            {stats.balance > 0 && extPnl < 0 ? `-${((Math.abs(extPnl) / stats.balance) * 100).toFixed(2)}%` : '0.00%'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
+                                                );
+                                            })()}
 
                                             {/* Filter Tabs Bar */}
                                             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 border-b border-white/10 pb-2 overflow-x-auto no-scrollbar">
@@ -5859,28 +5969,28 @@ export default function FarmClient({
                                                                 : 'bg-white/5 hover:bg-white/10 text-white/40 border border-white/10'
                                                     }`}
                                                 >
-                                                    <span>✋ <span className="sm:hidden">เทรดมือ</span><span className="hidden sm:inline">สิ่งแปลกปลอม / ไม้เทรดมือ</span></span>
+                                                    <span>✋ <span className="sm:hidden">แปลกปลอม</span><span className="hidden sm:inline">ไม้แปลกปลอม</span></span>
                                                     <span className="text-[10px] opacity-90">({extOrders.length})</span>
                                                 </button>
                                             </div>
 
-                                            {/* Orders Table */}
+                                            {/* Orders Table - Single-line Cells, Compact Auto Columns */}
                                             <div className="flex-1 overflow-y-auto overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
                                                 {displayedOrders && displayedOrders.length > 0 ? (
-                                                    <table className="w-full text-left font-mono text-xs border-collapse">
+                                                    <table className="w-auto min-w-full text-left font-mono text-xs border-collapse">
                                                         <thead>
                                                             <tr className="bg-white/[0.04] border-b border-white/10 text-white/50 text-[10px] uppercase">
-                                                                <th className="py-2.5 px-3">Ticket</th>
-                                                                <th className="py-2.5 px-3">แหล่งที่มา</th>
-                                                                <th className="py-2.5 px-3">Symbol</th>
-                                                                <th className="py-2.5 px-3">Type</th>
-                                                                <th className="py-2.5 px-3 text-right">Lots</th>
-                                                                <th className="py-2.5 px-3 text-right">Open Price</th>
-                                                                <th className="py-2.5 px-3 text-right">Current Price</th>
-                                                                <th className="py-2.5 px-3 text-right">SL / TP</th>
-                                                                <th className="py-2.5 px-3 text-right">Floating P/L</th>
-                                                                <th className="py-2.5 px-3">Comment</th>
-                                                                <th className="py-2.5 px-3">Magic</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap">Ticket</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap">แหล่งที่มา</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap">Symbol</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap">Type</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap text-right">Lots</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap text-right">Open Price</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap text-right">Current Price</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap text-right">SL / TP</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap text-right">Floating P/L</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap">Comment</th>
+                                                                <th className="py-2 px-2.5 whitespace-nowrap">Magic</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-white/5 text-[11px]">
@@ -5897,21 +6007,21 @@ export default function FarmClient({
                                                                                 : 'hover:bg-cyan-500/[0.04]'
                                                                         }`}
                                                                     >
-                                                                        <td className="py-2 px-3 text-white/70">#{ord.ticket || ord.ticket_id}</td>
-                                                                        <td className="py-2 px-3">
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-white/70">#{ord.ticket || ord.ticket_id}</td>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap">
                                                                             {isExt ? (
-                                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/40">
-                                                                                    ✋ MANUAL
+                                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/40 whitespace-nowrap">
+                                                                                    ✋ แปลกปลอม
                                                                                 </span>
                                                                             ) : (
-                                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+                                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 whitespace-nowrap">
                                                                                     🤖 EASYM
                                                                                 </span>
                                                                             )}
                                                                         </td>
-                                                                        <td className="py-2 px-3 font-bold text-white">{ord.symbol}</td>
-                                                                        <td className="py-2 px-3">
-                                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap font-bold text-white">{ord.symbol}</td>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap">
+                                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black whitespace-nowrap ${
                                                                                 isBuy 
                                                                                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40' 
                                                                                     : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
@@ -5919,18 +6029,18 @@ export default function FarmClient({
                                                                                 {ord.type}
                                                                             </span>
                                                                         </td>
-                                                                        <td className="py-2 px-3 text-right text-cyan-200">{Number(ord.lots || ord.raw_lot_size || 0).toFixed(2)}</td>
-                                                                        <td className="py-2 px-3 text-right text-white/70">{ord.open_price}</td>
-                                                                        <td className="py-2 px-3 text-right text-white">{ord.current_price || '-'}</td>
-                                                                        <td className="py-2 px-3 text-right text-white/40">{ord.sl || 0} / {ord.tp || 0}</td>
-                                                                        <td className={`py-2 px-3 text-right font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-right text-cyan-200">{Number(ord.lots || ord.raw_lot_size || 0).toFixed(2)}</td>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-right text-white/70">{ord.open_price}</td>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-right text-white">{ord.current_price || '-'}</td>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-right text-white/40">{ord.sl || 0} / {ord.tp || 0}</td>
+                                                                        <td className={`py-1.5 px-2.5 whitespace-nowrap text-right font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                                                             {pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2)}
                                                                         </td>
-                                                                        <td className="py-2 px-3 text-white/50 text-[10px] max-w-[140px] truncate" title={ord.comment}>
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-white/50 text-[10px]" title={ord.comment}>
                                                                             {ord.comment || (isExt ? 'Manual Trade' : '-')}
                                                                         </td>
-                                                                        <td className="py-2 px-3 text-white/40 text-[10px]">
-                                                                            {isExt ? <span className="text-amber-300 font-bold">{ord.magic || '0 (Hand)'}</span> : (ord.magic || '-')}
+                                                                        <td className="py-1.5 px-2.5 whitespace-nowrap text-white/40 text-[10px]">
+                                                                            {isExt ? <span className="text-amber-300 font-bold whitespace-nowrap">{ord.magic || '0 (Hand)'}</span> : (ord.magic || '-')}
                                                                         </td>
                                                                     </tr>
                                                                 );
@@ -5944,7 +6054,7 @@ export default function FarmClient({
                                                         </div>
                                                         <p className="font-bold text-white/70">
                                                             {liveTerminalFilter === 'EXTERNAL' 
-                                                                ? 'ไม่พบสิ่งแปลกปลอมหรือออเดอร์เทรดมือ' 
+                                                                ? 'ไม่พบไม้แปลกปลอม' 
                                                                 : 'ไม่มีออเดอร์เปิดอยู่ในขณะนี้'}
                                                         </p>
                                                         <p className="text-[11px] text-white/40">
