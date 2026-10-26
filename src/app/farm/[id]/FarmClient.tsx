@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
@@ -493,157 +493,151 @@ export default function FarmClient({
     const [expandedGuideBox, setExpandedGuideBox] = useState<number | null>(null);
 
     // 🌾 Multi-Port 2x2 Farm View: ดึงข้อมูลพอร์ต EasyM MAX และ EasyM Prime ที่เปิดใช้งานของลูกค้าคนนี้
-    useEffect(() => {
-        if (!isMultiFarmView || !ownerUserId) return;
-        let isMounted = true;
+    const refreshUserFarmPorts = useCallback(async () => {
+        if (!ownerUserId) return;
+        try {
+            const { data: ownerLicensesRaw } = await supabase
+                .from('licenses')
+                .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
+                .eq('user_id', ownerUserId)
+                .eq('is_active', true)
+                .order('created_at', { ascending: true });
 
-        const refreshUserFarmPorts = async () => {
-            try {
-                const { data: ownerLicensesRaw } = await supabase
+            let ownerLicenses = ownerLicensesRaw || [];
+            if (isAllowedDevMenuPort) {
+                const { data: devPairLicenses } = await supabase
                     .from('licenses')
                     .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
-                    .eq('user_id', ownerUserId)
-                    .eq('is_active', true)
+                    .in('account_number', ['97053088', '21692434'])
                     .order('created_at', { ascending: true });
-
-                if (!isMounted) return;
-
-                let ownerLicenses = ownerLicensesRaw || [];
-                if (isAllowedDevMenuPort) {
-                    const { data: devPairLicenses } = await supabase
-                        .from('licenses')
-                        .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
-                        .in('account_number', ['97053088', '21692434'])
-                        .order('created_at', { ascending: true });
-                    if (devPairLicenses && devPairLicenses.length > 0) {
-                        const existingIds = new Set(ownerLicenses.map((l: any) => l.id));
-                        for (const dl of devPairLicenses) {
-                            if (!existingIds.has(dl.id)) {
-                                ownerLicenses.push(dl);
-                            }
+                if (devPairLicenses && devPairLicenses.length > 0) {
+                    const existingIds = new Set(ownerLicenses.map((l: any) => l.id));
+                    for (const dl of devPairLicenses) {
+                        if (!existingIds.has(dl.id)) {
+                            ownerLicenses.push(dl);
                         }
                     }
                 }
-
-                const accNums = Array.from(new Set([
-                    ...ownerLicenses.map((l: any) => String(l.account_number || '').trim()).filter(Boolean),
-                    ...(isAllowedDevMenuPort ? ['97053088', '21692434'] : [])
-                ]));
-
-                const { data: statuses } = accNums.length > 0
-                    ? await supabase.from('farm_port_status').select('*').in('port_number', accNums)
-                    : { data: [] as any[] };
-
-                if (!isMounted) return;
-
-                const statusMap = new Map((statuses || []).map((ps: any) => [String(ps.port_number).trim(), ps]));
-                const nowMs = Date.now();
-                const seen = new Set<string>();
-                const nextPorts: Array<{
-                    portNumber: string;
-                    portName: string | null;
-                    eaType: 'PRIME' | 'MAX';
-                    createdAt: string | null;
-                    portStatus: any | null;
-                    licenseInfo: any;
-                }> = [];
-
-                for (const lic of ownerLicenses) {
-                    const accNum = String(lic.account_number || '').trim();
-                    if (!accNum || seen.has(accNum)) continue;
-                    if (lic.is_active === false && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
-                    if (lic.type !== 'lifetime' && lic.expiry_date) {
-                        const expMs = new Date(lic.expiry_date).getTime();
-                        if (expMs <= nowMs && accNum !== String(portNumber).trim() && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
-                    }
-
-                    const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
-                    const pKey = String(prod?.product_key || '').toUpperCase();
-                    const pName = String(prod?.name || '').toLowerCase();
-                    const ps = statusMap.get(accNum) || (accNum === String(portNumber).trim() ? portStatus : null);
-                    const rawSys = String(ps?.system_code || '');
-                    const sys = rawSys.split(':::')[0].toLowerCase();
-                    const eaVerStr = String(ps?.ea_version || '').toLowerCase();
-
-                    if (
-                        pName.includes('gold') || pKey.includes('GOLD') || pKey.includes('EZG') || sys.includes('gold') ||
-                        pName.includes('mini') || pKey.includes('MINI') || sys.includes('mini') ||
-                        sys.includes('turbo')
-                    ) {
-                        continue;
-                    }
-
-                    const isPrimePort =
-                        pName.includes('prime') ||
-                        pKey.includes('PRIME') ||
-                        sys.includes('prime') ||
-                        rawSys.includes(':::') ||
-                        eaVerStr.startsWith('2.') ||
-                        eaVerStr.startsWith('v2.');
-
-                    const isMaxPort =
-                        pName.includes('max') ||
-                        pKey.includes('MAX') ||
-                        sys.includes('max') ||
-                        ((pKey.startsWith('EZM') || pName.includes('easym') || pName.includes('easy m')) && !pName.includes('farm') && !sys.includes('farm'));
-
-                    if (!isPrimePort && !isMaxPort) continue;
-
-                    seen.add(accNum);
-                    nextPorts.push({
-                        portNumber: accNum,
-                        portName: lic.port_name || null,
-                        eaType: isPrimePort ? 'PRIME' : 'MAX',
-                        createdAt: lic.created_at || null,
-                        portStatus: ps || null,
-                        licenseInfo: {
-                            isActive: true,
-                            productName: prod?.name || (isPrimePort ? 'EasyM Prime' : 'EasyM MAX'),
-                            productKey: prod?.product_key || '',
-                            minBalance: prod?.min_balance || 0,
-                            currency: prod?.currency || 'USC',
-                            createdAt: lic.created_at || null
-                        }
-                    });
-                }
-
-                if (isAllowedDevMenuPort) {
-                    for (const devAcc of ['97053088', '21692434']) {
-                        if (!seen.has(devAcc)) {
-                            const ps = statusMap.get(devAcc) || (devAcc === String(portNumber).trim() ? portStatus : null);
-                            const rawSys = String(ps?.system_code || '');
-                            const isPrimeDev = rawSys.toLowerCase().includes('prime') || rawSys.includes(':::') || devAcc === '97053088';
-                            nextPorts.push({
-                                portNumber: devAcc,
-                                portName: null,
-                                eaType: isPrimeDev ? 'PRIME' : 'MAX',
-                                createdAt: null,
-                                portStatus: ps || null,
-                                licenseInfo: {
-                                    isActive: true,
-                                    productName: isPrimeDev ? 'EasyM Prime' : 'EasyM MAX',
-                                    productKey: isPrimeDev ? 'EZM_PRIME' : 'EZM_MAX',
-                                    minBalance: 0,
-                                    currency: 'USC',
-                                    createdAt: null
-                                }
-                            });
-                            seen.add(devAcc);
-                        }
-                    }
-                }
-
-                if (nextPorts.length > 0 && isMounted) {
-                    setUserFarmPorts(nextPorts);
-                }
-            } catch (err) {
-                console.warn('Refresh user farm ports error:', err);
             }
-        };
 
+            const accNums = Array.from(new Set([
+                ...ownerLicenses.map((l: any) => String(l.account_number || '').trim()).filter(Boolean),
+                ...(isAllowedDevMenuPort ? ['97053088', '21692434'] : [])
+            ]));
+
+            const { data: statuses } = accNums.length > 0
+                ? await supabase.from('farm_port_status').select('*').in('port_number', accNums)
+                : { data: [] as any[] };
+
+            const statusMap = new Map((statuses || []).map((ps: any) => [String(ps.port_number).trim(), ps]));
+            const nowMs = Date.now();
+            const seen = new Set<string>();
+            const nextPorts: Array<{
+                portNumber: string;
+                portName: string | null;
+                eaType: 'PRIME' | 'MAX';
+                createdAt: string | null;
+                portStatus: any | null;
+                licenseInfo: any;
+            }> = [];
+
+            for (const lic of ownerLicenses) {
+                const accNum = String(lic.account_number || '').trim();
+                if (!accNum || seen.has(accNum)) continue;
+                if (lic.is_active === false && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
+                if (lic.type !== 'lifetime' && lic.expiry_date) {
+                    const expMs = new Date(lic.expiry_date).getTime();
+                    if (expMs <= nowMs && accNum !== String(portNumber).trim() && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
+                }
+
+                const prod = Array.isArray(lic.products) ? lic.products[0] : (lic.products as any);
+                const pKey = String(prod?.product_key || '').toUpperCase();
+                const pName = String(prod?.name || '').toLowerCase();
+                const ps = statusMap.get(accNum) || (accNum === String(portNumber).trim() ? portStatus : null);
+                const rawSys = String(ps?.system_code || '');
+                const sys = rawSys.split(':::')[0].toLowerCase();
+                const eaVerStr = String(ps?.ea_version || '').toLowerCase();
+
+                if (
+                    pName.includes('gold') || pKey.includes('GOLD') || pKey.includes('EZG') || sys.includes('gold') ||
+                    pName.includes('mini') || pKey.includes('MINI') || sys.includes('mini') ||
+                    sys.includes('turbo')
+                ) {
+                    continue;
+                }
+
+                const isPrimePort =
+                    pName.includes('prime') ||
+                    pKey.includes('PRIME') ||
+                    sys.includes('prime') ||
+                    rawSys.includes(':::') ||
+                    eaVerStr.startsWith('2.') ||
+                    eaVerStr.startsWith('v2.');
+
+                const isMaxPort =
+                    pName.includes('max') ||
+                    pKey.includes('MAX') ||
+                    sys.includes('max') ||
+                    ((pKey.startsWith('EZM') || pName.includes('easym') || pName.includes('easy m')) && !pName.includes('farm') && !sys.includes('farm'));
+
+                if (!isPrimePort && !isMaxPort) continue;
+
+                seen.add(accNum);
+                nextPorts.push({
+                    portNumber: accNum,
+                    portName: lic.port_name || null,
+                    eaType: isPrimePort ? 'PRIME' : 'MAX',
+                    createdAt: lic.created_at || null,
+                    portStatus: ps || null,
+                    licenseInfo: {
+                        isActive: true,
+                        productName: prod?.name || (isPrimePort ? 'EasyM Prime' : 'EasyM MAX'),
+                        productKey: prod?.product_key || '',
+                        minBalance: prod?.min_balance || 0,
+                        currency: prod?.currency || 'USC',
+                        createdAt: lic.created_at || null
+                    }
+                });
+            }
+
+            if (isAllowedDevMenuPort) {
+                for (const devAcc of ['97053088', '21692434']) {
+                    if (!seen.has(devAcc)) {
+                        const ps = statusMap.get(devAcc) || (devAcc === String(portNumber).trim() ? portStatus : null);
+                        const rawSys = String(ps?.system_code || '');
+                        const isPrimeDev = rawSys.toLowerCase().includes('prime') || rawSys.includes(':::') || devAcc === '97053088';
+                        nextPorts.push({
+                            portNumber: devAcc,
+                            portName: null,
+                            eaType: isPrimeDev ? 'PRIME' : 'MAX',
+                            createdAt: null,
+                            portStatus: ps || null,
+                            licenseInfo: {
+                                isActive: true,
+                                productName: isPrimeDev ? 'EasyM Prime' : 'EasyM MAX',
+                                productKey: isPrimeDev ? 'EZM_PRIME' : 'EZM_MAX',
+                                minBalance: 0,
+                                currency: 'USC',
+                                createdAt: null
+                            }
+                        });
+                        seen.add(devAcc);
+                    }
+                }
+            }
+
+            if (nextPorts.length > 0) {
+                setUserFarmPorts(nextPorts);
+            }
+        } catch (err) {
+            console.warn('Refresh user farm ports error:', err);
+        }
+    }, [ownerUserId, isAllowedDevMenuPort, portNumber, portStatus]);
+
+    useEffect(() => {
+        if (!isMultiFarmView || !ownerUserId) return;
         refreshUserFarmPorts();
-        return () => { isMounted = false; };
-    }, [isMultiFarmView, ownerUserId, portNumber, portStatus, isAllowedDevMenuPort]);
+    }, [isMultiFarmView, ownerUserId, refreshUserFarmPorts]);
 
     const handleSelectMultiFarmPort = async (target: {
         portNumber: string;
@@ -3086,16 +3080,22 @@ export default function FarmClient({
                                 const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
 
                                 // ⏰ คำนวณสถานะการตรวจสิทธิ์ (Heartbeat / Auth Timeout) เกิน 12 ชม. หรือ 48 ชม.
+                                // ใช้ last_ping หรือ last_license_check ซึ่งเป็นเวลาที่ EA ส่งข้อมูล/ตรวจสิทธิ์จริง (ไม่ใช้ updated_at ซึ่งถูกอัปเดตเมื่อคนเปิดดูเว็บ)
                                 const simOverride = simulatedFarmStatus?.[slotIdx];
-                                const lastPingTime = activePort?.portStatus?.updated_at || activePort?.portStatus?.last_ping;
-                                const elapsedHours = lastPingTime ? (Date.now() - new Date(lastPingTime).getTime()) / (1000 * 60 * 60) : 0;
+                                const authHeartbeatTime = activePort?.portStatus?.last_ping || activePort?.portStatus?.last_license_check;
+                                const elapsedHours = authHeartbeatTime 
+                                    ? (Date.now() - new Date(authHeartbeatTime).getTime()) / (1000 * 60 * 60) 
+                                    : 999999;
 
                                 let farmStatus: 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H' = 'NORMAL';
                                 if (simOverride) {
                                     farmStatus = simOverride;
-                                } else if (isActive && lastPingTime) {
-                                    if (elapsedHours >= 48) farmStatus = 'EXPIRED_48H';
-                                    else if (elapsedHours >= 12) farmStatus = 'EXPIRED_12H';
+                                } else if (isActive) {
+                                    if (!authHeartbeatTime || isNaN(elapsedHours) || elapsedHours >= 48) {
+                                        farmStatus = 'EXPIRED_48H';
+                                    } else if (elapsedHours >= 12) {
+                                        farmStatus = 'EXPIRED_12H';
+                                    }
                                 }
 
                                 const isExpired12H = farmStatus === 'EXPIRED_12H';
@@ -3299,24 +3299,19 @@ export default function FarmClient({
 
                                                                     {/* ข้อมูลในกรอบพอร์ต */}
                                                                     <div className="w-full px-5 pt-2 pb-3 flex flex-col items-center">
-                                                                        {/* ถ้าขาดการตรวจสิทธิ์: แสดงแจ้งเตือนแทนปรอท DD */}
+                                                                        {/* ถ้าขาดการตรวจสิทธิ์: แสดงแจ้งเตือนแทนปรอท DD (ตัวอักษรใหญ่ชัดเจน ไม่มีกรอบ) */}
                                                                         {isExpired48H ? (
-                                                                            <div className="w-full py-1.5 px-2 rounded-lg bg-rose-600/30 border border-rose-400/80 shadow-[0_0_18px_rgba(225,29,72,0.6)] flex flex-col items-center justify-center gap-0.5 mb-2 animate-pulse">
-                                                                                <div className="flex items-center gap-1.5">
-                                                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping flex-shrink-0" />
-                                                                                    <span className="text-[10px] font-mono font-black tracking-wider text-rose-200 uppercase">
-                                                                                        EXPIRED &gt; 48H: CONTACT ADMIN
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-white underline decoration-rose-300">
-                                                                                    <span>CLICK FARM TO LINE OA ↗</span>
-                                                                                </div>
+                                                                            <div className="w-full flex items-center justify-center gap-1.5 my-1.5 animate-pulse">
+                                                                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shadow-[0_0_10px_#f43f5e] flex-shrink-0" />
+                                                                                <span className="text-[17px] sm:text-[19px] font-mono font-black tracking-wider text-rose-300 drop-shadow-[0_0_16px_rgba(244,63,94,0.95)] whitespace-nowrap">
+                                                                                    Contact Admin
+                                                                                </span>
                                                                             </div>
                                                                         ) : isExpired12H ? (
-                                                                            <div className="w-full py-1.5 px-2.5 rounded-lg bg-amber-500/20 border border-amber-400/70 shadow-[0_0_14px_rgba(245,158,11,0.45)] flex items-center justify-center gap-1.5 mb-2 animate-pulse">
-                                                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" />
-                                                                                <span className="text-[11px] font-mono font-black tracking-wider text-amber-200 uppercase">
-                                                                                    AUTH TIMEOUT &gt; 12H
+                                                                            <div className="w-full flex items-center justify-center gap-1.5 my-1.5 animate-pulse">
+                                                                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_10px_#fbbf24] flex-shrink-0" />
+                                                                                <span className="text-[17px] sm:text-[19px] font-mono font-black tracking-wider text-amber-300 drop-shadow-[0_0_14px_rgba(251,191,36,0.9)] whitespace-nowrap">
+                                                                                    Check EA
                                                                                 </span>
                                                                             </div>
                                                                         ) : (
@@ -3411,9 +3406,7 @@ export default function FarmClient({
                         />
 
                         {/* 🌾 THE ENTIRE MAIN FARM AREA (GENTLY FLOATING SLOWLY, SUBTLY RECEDING WHEN QUARANTINE IS FOCUSED) */}
-                        <div className={`relative animate-float-farm transition-all duration-500 ease-out ${
-                            isDdExpanded ? 'z-[500]' : 'z-[20]'
-                        } ${
+                        <div className={`relative animate-float-farm transition-all duration-500 ease-out z-[20] ${
                             (isQuarantineExpanded || isQuarantineEnlarged)
                                 ? 'opacity-70 brightness-95 scale-[0.99]'
                                 : 'opacity-100 brightness-100 scale-100'
@@ -3486,289 +3479,6 @@ export default function FarmClient({
                                 </div>
                             );
                         })}
-
-                        {/* 🔻 Floating Drawdown Badge (Classic Red Badge when !isPrime, Prime Mercury Badge when isPrime) */}
-                        {(() => {
-                            const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
-                            const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
-                            const hasDrawdown = stats.drawdownPercent > 0 || stats.floatingPnl < 0;
-                            if (!hasDrawdown || !isClient) return null;
-
-                            const targetC = targetIdx % 5;
-                            const targetR = Math.floor(targetIdx / 5);
-                            const badgeLeft = (targetC - targetR) * TILE_W;
-                            const badgeTop = (targetC + targetR) * TILE_H_OFFSET;
-                            const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
-                            const portDDPct = activeFarmDDPct;
-                            const portMercuryFill = Math.min(100, Math.max(10, (portDDPct / 40) * 100));
-
-                            // Classic Farm View (Non-Prime: EasyM MAX, Farm, Mini, Gold): Original Red 2-line DD Badge
-                            if (!isPrime) {
-                                const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
-                                const currPrefix = isUSC ? '' : '$';
-                                const currSuffix = isUSC ? ' USC' : '';
-                                return (
-                                    <div
-                                        className="absolute pointer-events-none"
-                                        style={{
-                                            left: `${badgeLeft}px`,
-                                            top: `${badgeTop}px`,
-                                            zIndex: 99999,
-                                            width: '280px',
-                                            height: '280px'
-                                        }}
-                                    >
-                                        <div 
-                                            className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
-                                            style={{
-                                                transform: `translateX(-50%) scale(${badgeCounterScale})`,
-                                                transformOrigin: 'bottom center'
-                                            }}
-                                        >
-                                            <div className={`bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
-                                                {/* Line 1: Percentage */}
-                                                <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
-                                                    -{stats.drawdownPercent.toFixed(2)}%
-                                                </div>
-                                                {/* Line 2: DD Amount */}
-                                                <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
-                                                    -{currPrefix}{stats.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{currSuffix}
-                                                </div>
-                                            </div>
-                                            <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            return (
-                                <div
-                                    className="absolute pointer-events-none"
-                                    style={{
-                                        left: `${badgeLeft}px`,
-                                        top: `${badgeTop}px`,
-                                        zIndex: isDdExpanded ? 999999 : 99999,
-                                        width: '280px',
-                                        height: '280px'
-                                    }}
-                                >
-                                    <div 
-                                        className="absolute -top-14 left-1/2 flex flex-col items-center animate-fade-in pointer-events-auto"
-                                        style={{
-                                            transform: `translateX(-50%) scale(${badgeCounterScale})`,
-                                            transformOrigin: 'bottom center'
-                                        }}
-                                    >
-                                        {/* 🏷️ กล่องอธิบายที่ 2: ชี้เยื้องไปที่กรอบแสดง Active DD (เยื้องขึ้นทางขวาบน + เส้นทแยงชี้ลงซ้าย ↙) */}
-                                        {isOrb4Unlocked && isFarmGuideActive && (
-                                            <div 
-                                                data-farm-guide="true"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setExpandedGuideBox(prev => prev === 2 ? null : 2);
-                                                }}
-                                                style={{
-                                                    transform: `scale(${(scale > 0 ? 1 / (scale * badgeCounterScale) : 1) * (expandedGuideBox === 2 ? 1.3 : 1)})`,
-                                                    transformOrigin: 'bottom left'
-                                                }}
-                                                className={`absolute left-[64%] bottom-[88%] cursor-pointer select-none transition-all duration-300 ${
-                                                    expandedGuideBox === 2 ? 'z-[99999]' : 'hover:brightness-110 z-[9999]'
-                                                }`}
-                                            >
-                                                <div className="relative flex flex-col items-start">
-                                                    <div className={`ml-[14px] px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
-                                                        expandedGuideBox === 2
-                                                            ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
-                                                            : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
-                                                    }`}>
-                                                        <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
-                                                            Active DD : แสดง DD ของพอร์ตที่กำลังทำงาน
-                                                        </div>
-                                                        <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
-                                                            คลิกเพื่อแยกดู DD แต่ละส่วน
-                                                        </div>
-                                                    </div>
-                                                    {/* เส้นทแยงเยื้องจากมุมซ้ายล่างของกล่อง ชี้ลงซ้ายไปยังมุมขวาบนของกรอบ Active DD */}
-                                                    <svg width="20" height="16" viewBox="0 0 20 16" className="overflow-visible pointer-events-none -mt-[1px]">
-                                                        <line x1="16" y1="0" x2="3" y2="13" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" className="drop-shadow-[0_0_4px_#fbbf24]" />
-                                                        <circle cx="3" cy="13" r="2.8" fill="#fcd34d" className="drop-shadow-[0_0_8px_#fbbf24]" />
-                                                    </svg>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Main DD Badge Container (Step 1: Expands width & height proportionally, enlarges number) */}
-                                        {(() => {
-                                            const activeTheme = getDDLevelTheme(portDDPct);
-                                            return (
-                                                <div 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setIsDdExpanded(prev => {
-                                                            const next = !prev;
-                                                            if (next) {
-                                                                setIsQuarantineExpanded(false);
-                                                                setIsQuarantineEnlarged(false);
-                                                            }
-                                                            return next;
-                                                        });
-                                                    }}
-                                                    className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
-                                                        (highlightTarget === 'FARM' || (isDdOrbExpanded && selectedDdOrb === 'ACTIVE'))
-                                                            ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
-                                                            : ''
-                                                    } ${
-                                                        isDdExpanded 
-                                                            ? 'w-72 sm:w-80 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
-                                                            : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.55)]'
-                                                    }`}
-                                                    title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุดในโหมด Active"}
-                                                >
-                                                    {/* Mini Subtitle Tag linking to Active Farm */}
-                                                    <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                                        <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-emerald-400 uppercase">
-                                                            {isFallback1Url ? 'PORT DD (10m)' : 'ACTIVE FARM'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
-                                                    <div className={`flex items-center gap-2 ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
-                                                        <span className={`font-mono font-black ${activeTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
-                                                            isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
-                                                        }`}>
-                                                            -{portDDPct.toFixed(2)}%
-                                                        </span>
-                                                        <span className={`${activeTheme.arrowColor} transition-all duration-300 ${
-                                                            isDdExpanded ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
-                                                        }`}>
-                                                            ▼
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
-                                                    <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
-                                                        isDdExpanded ? 'w-56 sm:w-64 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
-                                                    } ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
-                                                        {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
-                                                        <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${activeTheme.bulbBorder} ${activeTheme.bulbBg} transition-all duration-300 ${
-                                                            isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
-                                                        }`}>
-                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
-                                                        </div>
-
-                                                        {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
-                                                        <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
-                                                            isDdExpanded ? 'h-2 sm:h-2.5' : 'h-1.5'
-                                                        }`}>
-                                                            <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
-                                                            <div 
-                                                                className={`h-full rounded-r-full ${activeTheme.fillGradient} transition-all duration-700 relative`}
-                                                                style={{ width: `${portMercuryFill}%` }}
-                                                            >
-                                                                <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-
-                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs: สัดส่วนและขนาดตัวอักษรเหมือนของกักขัง ไม่มี #1,2,3,4) */}
-                                        {isDdExpanded && (
-                                            <div 
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[999999] pointer-events-auto select-none drop-shadow-[0_20px_50px_rgba(0,0,0,0.95)]"
-                                            >
-                                                {isFallback1Url && (
-                                                    <div className="w-full bg-[#1a1003]/95 border-2 border-amber-500/80 rounded-xl px-3.5 py-2.5 text-center font-mono text-xs font-black text-amber-300 shadow-xl">
-                                                        รายคู่เงิน: **.** (โหมด 10 นาที ไม่ส่งข้อมูลสด)
-                                                    </div>
-                                                )}
-                                                {top4WorstPairs.map((p, idx) => {
-                                                    const isPairExpanded = expandedActivePair === p.sym;
-                                                    const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
-                                                    const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
-                                                                        idx === 1 ? 'animate-unfold-bar-2' :
-                                                                        idx === 2 ? 'animate-unfold-bar-3' : 'animate-unfold-bar-4';
-                                                    const pTheme = getActivePairTheme(p.ddPct);
-                                                    return (
-                                                        <div 
-                                                            key={p.sym}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setExpandedActivePair(prev => prev === p.sym ? null : p.sym);
-                                                            }}
-                                                            className={`w-full bg-[#02140d]/95 border-2 rounded-xl sm:rounded-2xl transition-all duration-300 cursor-pointer select-none backdrop-blur-xl flex flex-col gap-1.5 sm:gap-2 ${
-                                                                isPairExpanded 
-                                                                    ? 'scale-[1.10] sm:scale-[1.14] px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-[0_20px_45px_rgba(0,0,0,0.95),0_0_25px_rgba(16,185,129,0.7)] border-emerald-300 ring-2 ring-emerald-400/80 z-50 my-1' 
-                                                                    : 'border-emerald-500/80 px-3 py-2 sm:px-3.5 sm:py-2.5 hover:scale-[1.02] shadow-[0_10px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)]'
-                                                            } ${unfoldClass}`}
-                                                            title={isPairExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายดูรายละเอียดปรอท"}
-                                                        >
-                                                            {/* Top Row: Symbol, Status Badge, DD % (ไม่มีตัวเลขลำดับ #1,2,3,4) */}
-                                                            <div className="flex items-center justify-between font-mono">
-                                                                <span className={`font-black tracking-wider transition-all ${pTheme.textColor} ${
-                                                                    isPairExpanded ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
-                                                                }`}>
-                                                                    {p.sym}
-                                                                </span>
-                                                                <span className={`rounded-md font-bold uppercase tracking-wider border transition-all ${pTheme.badgeBg} ${
-                                                                    isPairExpanded ? 'text-[11px] sm:text-xs px-2.5 py-0.5' : 'text-[10px] sm:text-[11px] px-2 py-0.5'
-                                                                }`}>
-                                                                    {pTheme.status}
-                                                                </span>
-                                                                <span className={`font-black font-mono transition-all ${pTheme.textColor} ${
-                                                                    isPairExpanded ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
-                                                                }`}>
-                                                                    -{p.ddPct.toFixed(1)}%
-                                                                </span>
-                                                            </div>
-
-                                                            {/* Bottom Row: หลอดปรอทสัดส่วนเหมือนชุดของกักขัง (Bulb ทรงกลม + Glass Tube สเกล 4 ขีด) */}
-                                                            <div className="flex items-center w-full">
-                                                                {/* Mercury Bulb (กระเปาะปรอททรงกลมพร้อมจุดสะท้อนแสง) */}
-                                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border-2 ${pTheme.bulbBorder} ${pTheme.bulbBg} transition-all duration-300 z-10 ${
-                                                                    isPairExpanded ? 'w-5 h-5 sm:w-6 sm:h-6 shadow-[0_0_12px_rgba(16,185,129,0.95)]' : 'w-4 h-4 sm:w-4.5 sm:h-4.5'
-                                                                }`}>
-                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5 pointer-events-none"></div>
-                                                                </div>
-
-                                                                {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอนพร้อมขีดสเกล 4 เส้น) */}
-                                                                <div className={`relative flex-1 -ml-1 rounded-r-full bg-slate-950/90 border border-white/25 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
-                                                                    isPairExpanded ? 'h-3.5 sm:h-4' : 'h-3 sm:h-3.5'
-                                                                }`}>
-                                                                    {/* Graduation tick marks (ขีดสเกล 4 ขีด) */}
-                                                                    <div className="absolute inset-0 flex justify-between px-2 pointer-events-none z-10 opacity-30">
-                                                                        <div className="w-[1px] h-full bg-white"></div>
-                                                                        <div className="w-[1px] h-full bg-white"></div>
-                                                                        <div className="w-[1px] h-full bg-white"></div>
-                                                                        <div className="w-[1px] h-full bg-white"></div>
-                                                                    </div>
-
-                                                                    {/* Specular top reflection line (เส้นสะท้อนแสงด้านบน) */}
-                                                                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/40 z-20 pointer-events-none"></div>
-
-                                                                    {/* Mercury Fill Bar */}
-                                                                    <div 
-                                                                        className={`h-full rounded-r-full ${pTheme.fillGradient} transition-all duration-700 relative`}
-                                                                        style={{ width: `${fillWidth}%` }}
-                                                                    >
-                                                                        <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/80 rounded-r-full shadow-[0_0_4px_white]"></div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-emerald-500 via-emerald-500/60 to-transparent"></div>
-                                    </div>
-                                </div>
-                            );
-                        })()}
 
                         {/* 🎬 CENTER FARM CREDITS PLAQUE (รวมคำอธิบายแปลงสุขภาพไว้ตอนบน ต่อด้วยชื่อ EA และเลข Build กระชับตัวอักษรพอดี ขยับพร้อมฟาร์ม) */}
                         {isClient && isPrime && isOrb4Unlocked && isFarmGuideActive && (
@@ -4500,6 +4210,291 @@ export default function FarmClient({
                                 </div>
                             );
                         })()}
+
+                        {/* 🔻 Floating Drawdown Badge (Classic Red Badge when !isPrime, Prime Mercury Badge when isPrime) - Layer Front (z-500) */}
+                        {(() => {
+                            const firstWitheredIdx = plot.trees.findIndex(t => t.level < 4);
+                            const targetIdx = firstWitheredIdx >= 0 ? firstWitheredIdx : 0;
+                            const hasDrawdown = stats.drawdownPercent > 0 || stats.floatingPnl < 0;
+                            if (!hasDrawdown || !isClient) return null;
+
+                            const targetC = targetIdx % 5;
+                            const targetR = Math.floor(targetIdx / 5);
+                            const badgeLeft = (targetC - targetR) * TILE_W;
+                            const badgeTop = (targetC + targetR) * TILE_H_OFFSET;
+                            const badgeCounterScale = (scale > 0 && scale < 0.38) ? (0.38 / scale) : 1;
+                            const portDDPct = activeFarmDDPct;
+                            const portMercuryFill = Math.min(100, Math.max(10, (portDDPct / 40) * 100));
+
+                            // Classic Farm View (Non-Prime: EasyM MAX, Farm, Mini, Gold): Original Red 2-line DD Badge
+                            if (!isPrime) {
+                                const isUSC = (portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT');
+                                const currPrefix = isUSC ? '' : '$';
+                                const currSuffix = isUSC ? ' USC' : '';
+                                return (
+                                    <div
+                                        key="farm_classic_dd_badge"
+                                        className="absolute pointer-events-none animate-float-farm"
+                                        style={{
+                                            left: `${badgeLeft}px`,
+                                            top: `${badgeTop}px`,
+                                            zIndex: 500,
+                                            width: '280px',
+                                            height: '280px'
+                                        }}
+                                    >
+                                        <div 
+                                            className="absolute -top-14 left-1/2 z-[90] flex flex-col items-center animate-fade-in pointer-events-none"
+                                            style={{
+                                                transform: `translateX(-50%) scale(${badgeCounterScale})`,
+                                                transformOrigin: 'bottom center'
+                                            }}
+                                        >
+                                            <div className={`bg-[#1a0505]/95 border sm:border-2 border-red-500/90 rounded-md sm:rounded-xl px-2 py-0.5 sm:px-5 sm:py-2.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] sm:shadow-[0_0_35px_rgba(239,68,68,0.75)] text-center backdrop-blur-md flex flex-col items-center justify-center ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
+                                                {/* Line 1: Percentage */}
+                                                <div className="text-[17px] sm:text-xl font-mono font-black text-red-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+                                                    -{stats.drawdownPercent.toFixed(2)}%
+                                                </div>
+                                                {/* Line 2: DD Amount */}
+                                                <div className="text-[11px] sm:text-xs font-mono font-bold text-red-300/80 leading-tight whitespace-nowrap mt-0.5">
+                                                    -{currPrefix}{stats.drawdownAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{currSuffix}
+                                                </div>
+                                            </div>
+                                            <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-red-500 via-red-500/60 to-transparent"></div>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div
+                                    key="farm_prime_dd_badge"
+                                    className="absolute pointer-events-none animate-float-farm"
+                                    style={{
+                                        left: `${badgeLeft}px`,
+                                        top: `${badgeTop}px`,
+                                        zIndex: isDdExpanded ? 999999 : 500,
+                                        width: '280px',
+                                        height: '280px'
+                                    }}
+                                >
+                                    <div 
+                                        className="absolute -top-14 left-1/2 flex flex-col items-center animate-fade-in pointer-events-auto"
+                                        style={{
+                                            transform: `translateX(-50%) scale(${badgeCounterScale})`,
+                                            transformOrigin: 'bottom center'
+                                        }}
+                                    >
+                                        {/* 🏷️ กล่องอธิบายที่ 2: ชี้เยื้องไปที่กรอบแสดง Active DD (เยื้องขึ้นทางขวาบน + เส้นทแยงชี้ลงซ้าย ↙) */}
+                                        {isOrb4Unlocked && isFarmGuideActive && (
+                                            <div 
+                                                data-farm-guide="true"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setExpandedGuideBox(prev => prev === 2 ? null : 2);
+                                                }}
+                                                style={{
+                                                    transform: `scale(${(scale > 0 ? 1 / (scale * badgeCounterScale) : 1) * (expandedGuideBox === 2 ? 1.3 : 1)})`,
+                                                    transformOrigin: 'bottom left'
+                                                }}
+                                                className={`absolute left-[64%] bottom-[88%] cursor-pointer select-none transition-all duration-300 ${
+                                                    expandedGuideBox === 2 ? 'z-[99999]' : 'hover:brightness-110 z-[9999]'
+                                                }`}
+                                            >
+                                                <div className="relative flex flex-col items-start">
+                                                    <div className={`ml-[14px] px-2 py-1 rounded-md bg-[#080d18]/92 backdrop-blur-md border transition-all text-left ${
+                                                        expandedGuideBox === 2
+                                                            ? 'border-amber-300 ring-1 ring-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.95),0_0_16px_rgba(251,191,36,0.3)]'
+                                                            : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
+                                                    }`}>
+                                                        <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
+                                                            Active DD : แสดง DD ของพอร์ตที่กำลังทำงาน
+                                                        </div>
+                                                        <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
+                                                            คลิกเพื่อแยกดู DD แต่ละส่วน
+                                                        </div>
+                                                    </div>
+                                                    {/* เส้นทแยงเยื้องจากมุมซ้ายล่างของกล่อง ชี้ลงซ้ายไปยังมุมขวาบนของกรอบ Active DD */}
+                                                    <svg width="20" height="16" viewBox="0 0 20 16" className="overflow-visible pointer-events-none -mt-[1px]">
+                                                        <line x1="16" y1="0" x2="3" y2="13" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" className="drop-shadow-[0_0_4px_#fbbf24]" />
+                                                        <circle cx="3" cy="13" r="2.8" fill="#fcd34d" className="drop-shadow-[0_0_8px_#fbbf24]" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Main DD Badge Container (Step 1: Expands width & height proportionally, enlarges number) */}
+                                        {(() => {
+                                            const activeTheme = getDDLevelTheme(portDDPct);
+                                            return (
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsDdExpanded(prev => {
+                                                            const next = !prev;
+                                                            if (next) {
+                                                                setIsQuarantineExpanded(false);
+                                                                setIsQuarantineEnlarged(false);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    }}
+                                                    className={`bg-[#041c14]/95 hover:bg-[#06241a]/95 border sm:border-2 border-emerald-500/90 rounded-xl text-center backdrop-blur-md flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out select-none ${
+                                                        (highlightTarget === 'FARM' || (isDdOrbExpanded && selectedDdOrb === 'ACTIVE'))
+                                                            ? 'ring-2 ring-emerald-400 border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.95)] scale-110'
+                                                            : ''
+                                                    } ${
+                                                        isDdExpanded 
+                                                            ? 'w-72 sm:w-80 py-3 px-4 sm:py-3.5 sm:px-5 shadow-[0_0_30px_rgba(16,185,129,0.85)]' 
+                                                            : 'w-32 sm:w-36 py-1.5 px-2.5 sm:py-2 sm:px-4 hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.55)]'
+                                                    }`}
+                                                    title={isDdExpanded ? "คลิกเพื่อพับเก็บ" : "คลิกเพื่อคลี่ดู Top 4 คู่เงินที่ DD สูงสุดในโหมด Active"}
+                                                >
+                                                    {/* Mini Subtitle Tag linking to Active Farm */}
+                                                    <div className="flex items-center gap-1 mb-0.5 pointer-events-none">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                        <span className="text-[7px] sm:text-[8px] font-black tracking-widest text-emerald-400 uppercase">
+                                                            {isFallback1Url ? 'PORT DD (10m)' : 'ACTIVE FARM'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Line 1: Main DD Number (สีเปลี่ยนตามระดับ DD: <18% เขียว, 18-28% เหลืองส้ม, >28% แดง) */}
+                                                    <div className={`flex items-center gap-2 ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
+                                                        <span className={`font-mono font-black ${activeTheme.textColor} leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap transition-all duration-300 ${
+                                                            isDdExpanded ? 'text-2xl sm:text-3xl' : 'text-[17px] sm:text-xl'
+                                                        }`}>
+                                                            -{portDDPct.toFixed(2)}%
+                                                        </span>
+                                                        <span className={`${activeTheme.arrowColor} transition-all duration-300 ${
+                                                            isDdExpanded ? 'rotate-180 text-xs sm:text-sm' : 'text-[9px]'
+                                                        }`}>
+                                                            ▼
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Line 2: ปรอทแนวนอน ขยายตามความกว้างและความสูง (สีปรอทเปลี่ยนตามระดับ DD) */}
+                                                    <div className={`transition-all duration-300 ease-out flex items-center rounded-full bg-black/80 border border-emerald-500/30 shadow-inner ${
+                                                        isDdExpanded ? 'w-56 sm:w-64 px-1.5 py-1 mt-2' : 'w-24 sm:w-28 px-1 py-0.5 mt-1'
+                                                    } ${isFallback1Url ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
+                                                        {/* Mercury Bulb (กระเปาะปรอททรงกลมเรืองแสงตามระดับ DD) */}
+                                                        <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border ${activeTheme.bulbBorder} ${activeTheme.bulbBg} transition-all duration-300 ${
+                                                            isDdExpanded ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'
+                                                        }`}>
+                                                            <div className="w-0.5 h-0.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5"></div>
+                                                        </div>
+
+                                                        {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอน) */}
+                                                        <div className={`relative flex-1 -ml-0.5 rounded-r-full bg-slate-950/80 border border-white/20 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                            isDdExpanded ? 'h-2 sm:h-2.5' : 'h-1.5'
+                                                        }`}>
+                                                            <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-white/40 z-20 pointer-events-none"></div>
+                                                            <div 
+                                                                className={`h-full rounded-r-full ${activeTheme.fillGradient} transition-all duration-700 relative`}
+                                                                style={{ width: `${portMercuryFill}%` }}
+                                                            >
+                                                                <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/70 rounded-r-full"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Step 2: ค่อยๆ คลี่แถบปรอทลงในแนวตั้งทีละตัว (Top 4 Active Pairs: สัดส่วนและขนาดตัวอักษรเหมือนของกักขัง ไม่มี #1,2,3,4) */}
+                                        {isDdExpanded && (
+                                            <div 
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="mt-2.5 w-72 sm:w-80 flex flex-col gap-2 z-[999999] pointer-events-auto select-none drop-shadow-[0_20px_50px_rgba(0,0,0,0.95)]"
+                                            >
+                                                {isFallback1Url && (
+                                                    <div className="w-full bg-[#1a1003]/95 border-2 border-amber-500/80 rounded-xl px-3.5 py-2.5 text-center font-mono text-xs font-black text-amber-300 shadow-xl">
+                                                        รายคู่เงิน: **.** (โหมด 10 นาที ไม่ส่งข้อมูลสด)
+                                                    </div>
+                                                )}
+                                                {top4WorstPairs.map((p, idx) => {
+                                                    const isPairExpanded = expandedActivePair === p.sym;
+                                                    const fillWidth = Math.min(100, Math.max(12, (p.ddPct / 25) * 100));
+                                                    const unfoldClass = idx === 0 ? 'animate-unfold-bar-1' :
+                                                                        idx === 1 ? 'animate-unfold-bar-2' :
+                                                                        idx === 2 ? 'animate-unfold-bar-3' : 'animate-unfold-bar-4';
+                                                    const pTheme = getActivePairTheme(p.ddPct);
+                                                    return (
+                                                        <div 
+                                                            key={p.sym}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setExpandedActivePair(prev => prev === p.sym ? null : p.sym);
+                                                            }}
+                                                            className={`w-full bg-[#02140d]/95 border-2 rounded-xl sm:rounded-2xl transition-all duration-300 cursor-pointer select-none backdrop-blur-xl flex flex-col gap-1.5 sm:gap-2 ${
+                                                                isPairExpanded 
+                                                                    ? 'scale-[1.10] sm:scale-[1.14] px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-[0_20px_45px_rgba(0,0,0,0.95),0_0_25px_rgba(16,185,129,0.7)] border-emerald-300 ring-2 ring-emerald-400/80 z-50 my-1' 
+                                                                    : 'border-emerald-500/80 px-3 py-2 sm:px-3.5 sm:py-2.5 hover:scale-[1.02] shadow-[0_10px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(16,185,129,0.35)]'
+                                                            } ${unfoldClass}`}
+                                                            title={isPairExpanded ? "แตะเพื่อย่อกลับขนาดปกติ" : "แตะเพื่อขยายดูรายละเอียดปรอท"}
+                                                        >
+                                                            {/* Top Row: Symbol, Status Badge, DD % (ไม่มีตัวเลขลำดับ #1,2,3,4) */}
+                                                            <div className="flex items-center justify-between font-mono">
+                                                                <span className={`font-black tracking-wider transition-all ${pTheme.textColor} ${
+                                                                    isPairExpanded ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
+                                                                }`}>
+                                                                    {p.sym}
+                                                                </span>
+                                                                <span className={`rounded-md font-bold uppercase tracking-wider border transition-all ${pTheme.badgeBg} ${
+                                                                    isPairExpanded ? 'text-[11px] sm:text-xs px-2.5 py-0.5' : 'text-[10px] sm:text-[11px] px-2 py-0.5'
+                                                                }`}>
+                                                                    {pTheme.status}
+                                                                </span>
+                                                                <span className={`font-black font-mono transition-all ${pTheme.textColor} ${
+                                                                    isPairExpanded ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
+                                                                }`}>
+                                                                    -{p.ddPct.toFixed(1)}%
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Bottom Row: หลอดปรอทสัดส่วนเหมือนชุดของกักขัง (Bulb ทรงกลม + Glass Tube สเกล 4 ขีด) */}
+                                                            <div className="flex items-center w-full">
+                                                                {/* Mercury Bulb (กระเปาะปรอททรงกลมพร้อมจุดสะท้อนแสง) */}
+                                                                <div className={`relative rounded-full flex-shrink-0 flex items-center justify-center border-2 ${pTheme.bulbBorder} ${pTheme.bulbBg} transition-all duration-300 z-10 ${
+                                                                    isPairExpanded ? 'w-5 h-5 sm:w-6 sm:h-6 shadow-[0_0_12px_rgba(16,185,129,0.95)]' : 'w-4 h-4 sm:w-4.5 sm:h-4.5'
+                                                                }`}>
+                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/90 -mt-0.5 -ml-0.5 pointer-events-none"></div>
+                                                                </div>
+
+                                                                {/* Horizontal Glass Stem Tube (หลอดแก้วแนวนอนพร้อมขีดสเกล 4 เส้น) */}
+                                                                <div className={`relative flex-1 -ml-1 rounded-r-full bg-slate-950/90 border border-white/25 overflow-hidden shadow-inner flex items-center transition-all duration-300 ${
+                                                                    isPairExpanded ? 'h-3.5 sm:h-4' : 'h-3 sm:h-3.5'
+                                                                }`}>
+                                                                    {/* Graduation tick marks (ขีดสเกล 4 ขีด) */}
+                                                                    <div className="absolute inset-0 flex justify-between px-2 pointer-events-none z-10 opacity-30">
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                        <div className="w-[1px] h-full bg-white"></div>
+                                                                    </div>
+
+                                                                    {/* Specular top reflection line (เส้นสะท้อนแสงด้านบน) */}
+                                                                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/40 z-20 pointer-events-none"></div>
+
+                                                                    {/* Mercury Fill Bar */}
+                                                                    <div 
+                                                                        className={`h-full rounded-r-full ${pTheme.fillGradient} transition-all duration-700 relative`}
+                                                                        style={{ width: `${fillWidth}%` }}
+                                                                    >
+                                                                        <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/80 rounded-r-full shadow-[0_0_4px_white]"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        <div className="w-0.5 sm:w-1 h-3 sm:h-6 bg-gradient-to-b from-emerald-500 via-emerald-500/60 to-transparent"></div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                     )}
                 </div>
@@ -4766,6 +4761,7 @@ export default function FarmClient({
                                     setIsMultiFarmView(prev => {
                                         const next = !prev;
                                         if (next) {
+                                            refreshUserFarmPorts();
                                             setIsFarmGuideActive(false);
                                             setExpandedGuideBox(null);
                                             setIsDdExpanded(false);
