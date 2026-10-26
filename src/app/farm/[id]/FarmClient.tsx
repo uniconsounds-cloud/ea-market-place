@@ -3078,7 +3078,10 @@ export default function FarmClient({
                                 const ddTheme = getDDLevelTheme(portDDPct);
                                 const ddFillPct = Math.min(100, Math.max(portDDPct > 0 ? 5 : 0, (portDDPct / 35) * 100));
 
-                                const portTodayPnl = Number(activePort?.portStatus?.today_pnl) || 0;
+                                const rawProfit = isCurrentPort 
+                                    ? (smoothedTodayProfit !== undefined ? smoothedTodayProfit : (Number(portStatus?.today_pnl) || 0))
+                                    : (Number(activePort?.portStatus?.today_pnl) || 0);
+                                const portTodayPnl = rawProfit;
                                 const portAccProfit = Number(activePort?.portStatus?.accumulated_profit) || 0;
                                 const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
 
@@ -3099,10 +3102,11 @@ export default function FarmClient({
                                 const isExpired48H = farmStatus === 'EXPIRED_48H';
                                 const isOfflineAlert = isExpired12H || isExpired48H;
 
-                                // 💰 คำนวณตัวเลขกำไรปัจจุบัน (Today Profit / Profit %)
-                                const isUSC = String(activePort?.portStatus?.account_type || '').toUpperCase().includes('CENT') || 
-                                              String(activePort?.portStatus?.account_type || '').toUpperCase().includes('USC');
-                                const portProfitPct = portBal > 0 ? (portTodayPnl / portBal) * 100 : 0;
+                                // 💰 ตัวเลขกำไรปัจจุบัน ณ ตอนนั้น (ค่าเดียวกับที่แสดงบนลังไม้กำไรมุมขวาบนหน้าฟาร์ม ไม่ต้องคำนวณใหม่)
+                                const portAccType = String(activePort?.portStatus?.account_type || '').toUpperCase().trim();
+                                const isUSC = portAccType === 'USC' || portAccType === 'CENT';
+                                const currencyPrefix = isUSC ? '' : '$';
+                                const formattedTodayProfit = `${portTodayPnl >= 0 ? '+' : ''}${currencyPrefix}${portTodayPnl.toFixed(2)}`;
 
                                 return (
                                     <div
@@ -3220,7 +3224,7 @@ export default function FarmClient({
                                                                     }`} />
 
                                                                     {/* ป้ายกำกับเล็กด้านบน (Subtitle Tag เหมือน • BUFFER (1.8x)) */}
-                                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                                    <div className="flex items-center gap-1.5 mb-1">
                                                                         <span className={`w-2 h-2 rounded-full ${
                                                                             isExpired48H
                                                                                 ? 'bg-rose-500 animate-ping shadow-[0_0_8px_#f43f5e]'
@@ -3237,16 +3241,11 @@ export default function FarmClient({
                                                                         }`}>
                                                                             TODAY PROFIT
                                                                         </span>
-                                                                        {portBal > 0 && Math.abs(portTodayPnl) > 0 && (
-                                                                            <span className="text-[10px] font-mono font-bold text-white/80 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
-                                                                                ({portTodayPnl >= 0 ? '+' : ''}{isUSC ? `${Math.round(portTodayPnl).toLocaleString()} USC` : `$${portTodayPnl.toFixed(2)}`})
-                                                                            </span>
-                                                                        )}
                                                                     </div>
 
-                                                                    {/* ตัวเลขกำไรขนาดใหญ่ สว่างชัดเจนแบบภาพตัวอย่าง (+82.3%) */}
+                                                                    {/* ตัวเลขกำไรปัจจุบัน ณ ตอนนั้น (ค่าเดียวกับบนลังไม้กำไรมุมขวาบนหน้าฟาร์ม ขนาดเท่าเลขพอร์ต [32px] เสมอ) */}
                                                                     <div className="flex items-center justify-center">
-                                                                        <span className={`font-mono font-black text-2xl sm:text-3xl leading-none tracking-tight whitespace-nowrap drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] ${
+                                                                        <span className={`text-[32px] font-mono font-black tracking-wider leading-tight whitespace-nowrap drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] ${
                                                                             isExpired48H
                                                                                 ? 'text-rose-300 drop-shadow-[0_0_22px_rgba(244,63,94,0.95)]'
                                                                                 : isExpired12H
@@ -3257,9 +3256,7 @@ export default function FarmClient({
                                                                                             ? 'text-rose-400 drop-shadow-[0_0_22px_rgba(244,63,94,0.95)]'
                                                                                             : 'text-slate-300 drop-shadow-[0_0_15px_rgba(148,163,184,0.5)]')
                                                                         }`}>
-                                                                            {portBal > 0
-                                                                                ? `${portProfitPct >= 0 ? '+' : ''}${portProfitPct.toFixed(1)}%`
-                                                                                : `${portTodayPnl >= 0 ? '+' : ''}${isUSC ? '' : '$'}${portTodayPnl.toFixed(2)}`}
+                                                                            {formattedTodayProfit}
                                                                         </span>
                                                                     </div>
                                                                 </div>
