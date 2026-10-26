@@ -95,6 +95,16 @@ export async function POST(req: Request) {
             .maybeSingle();
 
         if (testPort || isAdminSuperPort) {
+            const nowIso = new Date().toISOString();
+            try {
+                await supabase
+                    .from('farm_port_status')
+                    .update({ last_ping: nowIso, updated_at: nowIso, is_online: true })
+                    .eq('port_number', String(account_number));
+            } catch (e) {
+                console.warn('SuperPort last_ping update notice:', e);
+            }
+
             return NextResponse.json({
                 status: 'active',
                 message: 'License Verified (Admin Test Port)',

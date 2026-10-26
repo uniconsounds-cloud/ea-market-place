@@ -3080,18 +3080,27 @@ export default function FarmClient({
                                 const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
 
                                 // ⏰ คำนวณสถานะการตรวจสิทธิ์ (Heartbeat / Auth Timeout) เกิน 12 ชม. หรือ 48 ชม.
-                                // ใช้ last_ping หรือ last_license_check ซึ่งเป็นเวลาที่ EA ส่งข้อมูล/ตรวจสิทธิ์จริง (ไม่ใช้ updated_at ซึ่งถูกอัปเดตเมื่อคนเปิดดูเว็บ)
+                                // อิงจากเวลาที่ EA ส่งข้อมูลจริง: last_ping, last_license_check หรือ server_time ของ MT5 broker
                                 const simOverride = simulatedFarmStatus?.[slotIdx];
-                                const authHeartbeatTime = activePort?.portStatus?.last_ping || activePort?.portStatus?.last_license_check;
-                                const elapsedHours = authHeartbeatTime 
-                                    ? (Date.now() - new Date(authHeartbeatTime).getTime()) / (1000 * 60 * 60) 
+                                const pingTime = activePort?.portStatus?.last_ping ? new Date(activePort.portStatus.last_ping).getTime() : 0;
+                                const licCheckTime = activePort?.portStatus?.last_license_check ? new Date(activePort.portStatus.last_license_check).getTime() : 0;
+                                const serverTimeMs = activePort?.portStatus?.server_time ? Number(activePort.portStatus.server_time) * 1000 : 0;
+                                
+                                // หากมี server_time สดจากโบรกเกอร์ (ไม่เกิน 48 ชม.) ให้ใช้เป็นสัญญาณชีพจรของ EA ด้วย (สำหรับ EA ที่ส่งตรงผ่าน RPC sync_ea_data)
+                                const hasRecentServerTime = serverTimeMs > 0 && Math.abs(Date.now() - serverTimeMs) < 48 * 60 * 60 * 1000;
+                                const effectiveAuthTimeMs = hasRecentServerTime 
+                                    ? Math.max(pingTime, licCheckTime, serverTimeMs) 
+                                    : Math.max(pingTime, licCheckTime);
+                                
+                                const elapsedHours = effectiveAuthTimeMs > 0 
+                                    ? (Date.now() - effectiveAuthTimeMs) / (1000 * 60 * 60) 
                                     : 999999;
 
                                 let farmStatus: 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H' = 'NORMAL';
                                 if (simOverride) {
                                     farmStatus = simOverride;
                                 } else if (isActive) {
-                                    if (!authHeartbeatTime || isNaN(elapsedHours) || elapsedHours >= 48) {
+                                    if (effectiveAuthTimeMs <= 0 || isNaN(elapsedHours) || elapsedHours >= 48) {
                                         farmStatus = 'EXPIRED_48H';
                                     } else if (elapsedHours >= 12) {
                                         farmStatus = 'EXPIRED_12H';
