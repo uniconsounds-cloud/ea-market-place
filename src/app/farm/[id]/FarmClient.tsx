@@ -1680,7 +1680,7 @@ export default function FarmClient({
         return () => clearInterval(pingInterval);
     }, [isDevPort3088, portNumber]);
 
-    // 🔄 Live Orders Poller (Runs every 3s when Live Terminal is open on Dev Port 3088)
+    // 🔄 Live Orders Poller (Runs every 15s when Live Terminal is open to balance freshness & bandwidth)
     useEffect(() => {
         if (!isDevPort3088 || !isLiveTerminalOpen) return;
         let isMounted = true;
@@ -1704,7 +1704,7 @@ export default function FarmClient({
         };
 
         fetchLive();
-        const pollTimer = setInterval(fetchLive, 3000);
+        const pollTimer = setInterval(fetchLive, 15000);
         return () => {
             isMounted = false;
             clearInterval(pollTimer);

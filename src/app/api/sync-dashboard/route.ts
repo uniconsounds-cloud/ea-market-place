@@ -365,16 +365,31 @@ export async function POST(req: Request) {
             }
         }
 
-        // 5. Process Batch Closure Events (History Data)
+        // 5. Process Batch Closure Events (History Data & Rich Telemetry)
         if (type === 'BATCH_CLOSE' || payload.event?.type === 'BATCH_CLOSE') {
             const ev = payload.event || payload;
-            await supabase.from('farm_batch_events').insert({
+            const baseData: any = {
                 port_number: portNumber,
                 total_orders: ev.total_orders || 0,
                 total_lots: ev.total_lots || 0,
                 total_profit: ev.total_profit || 0,
                 event_timestamp: nowIso
-            });
+            };
+            const richData: any = {
+                ...baseData,
+                symbol: ev.symbol || null,
+                side: ev.side || null,
+                exit_type: ev.exit_type || null,
+                duration_sec: ev.duration_sec || 0,
+                ea_name: ev.ea_name || null,
+                ea_build: ev.ea_build || null,
+                max_dd_pct: ev.max_dd_pct || 0
+            };
+            const { error: richErr } = await supabase.from('farm_batch_events').insert(richData);
+            if (richErr) {
+                // Graceful fallback to basic columns if migration is pending
+                await supabase.from('farm_batch_events').insert(baseData);
+            }
         }
 
         // 6. Process Batch Daily History (From p_history_array)
