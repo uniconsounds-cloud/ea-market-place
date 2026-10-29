@@ -189,7 +189,7 @@ const GlowingDdOrb = ({
     isSlowBlink,
     showWarning
 }: {
-    type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE' | 'MANUAL';
+    type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE' | 'MANUAL' | 'EA';
     value: number;
     onClick?: () => void;
     className?: string;
@@ -213,6 +213,14 @@ const GlowingDdOrb = ({
             pingBg: 'bg-rose-400',
             pingDot: 'bg-rose-500',
             tooltip: `DD รวมของพอร์ต: -${value.toFixed(2)}%`
+        },
+        EA: {
+            container: 'border-cyan-400/80 bg-gradient-to-b from-[#051c24]/95 via-[#021218]/95 to-[#01080d]/95 shadow-[0_0_20px_rgba(6,182,212,0.6),inset_0_0_12px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(6,182,212,0.9)]',
+            label: 'EA',
+            labelColor: 'text-cyan-300/90 font-bold',
+            pingBg: 'bg-cyan-400',
+            pingDot: 'bg-cyan-500',
+            tooltip: `🌾 DD ของระบบ EasyM EA: -${value.toFixed(2)}%`
         },
         ACTIVE: {
             container: 'border-emerald-400/80 bg-gradient-to-b from-[#06241a]/95 via-[#031710]/95 to-[#010906]/95 shadow-[0_0_20px_rgba(16,185,129,0.55),inset_0_0_12px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.85)]',
@@ -900,9 +908,51 @@ export default function FarmClient({
     const [isQuarantineEnlarged, setIsQuarantineEnlarged] = useState(false);
     const [isQuarantineExpanded, setIsQuarantineExpanded] = useState(false);
     const [isDdOrbExpanded, setIsDdOrbExpanded] = useState(false);
-    const [selectedDdOrb, setSelectedDdOrb] = useState<'TOTAL' | 'QUARANTINE' | 'ACTIVE' | null>(null);
-    const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | 'TOTAL' | null>(null);
+    const [selectedDdOrb, setSelectedDdOrb] = useState<'TOTAL' | 'QUARANTINE' | 'ACTIVE' | 'EA' | 'MANUAL' | null>(null);
+    const [highlightTarget, setHighlightTarget] = useState<'FARM' | 'QUARANTINE' | 'TOTAL' | 'EA' | null>(null);
+    const [mainOrbMode, setMainOrbMode] = useState<'TOTAL' | 'EA'>('TOTAL');
     const ddOrbsRef = useRef<HTMLDivElement>(null);
+    const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 🪙 Auto-flip main DD orb between TOTAL and EA every 3 seconds when folded (like a coin)
+    useEffect(() => {
+        if (isDdOrbExpanded) return;
+        const interval = setInterval(() => {
+            setMainOrbMode(prev => (prev === 'TOTAL' ? 'EA' : 'TOTAL'));
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [isDdOrbExpanded]);
+
+    // ⏱️ 20-second Inactivity Auto-collapse Timer (ค้างไว้ 20 วิ หากไม่มีการคลิก ให้พับกลับเป็นปกติ)
+    const resetAutoCloseTimer = useCallback(() => {
+        if (autoCloseTimerRef.current) {
+            clearTimeout(autoCloseTimerRef.current);
+            autoCloseTimerRef.current = null;
+        }
+        autoCloseTimerRef.current = setTimeout(() => {
+            setIsDdOrbExpanded(false);
+            setSelectedDdOrb(null);
+            setHighlightTarget(null);
+        }, 20000);
+    }, []);
+
+    // Start/Clear 20-second timer when expansion state changes
+    useEffect(() => {
+        if (!isDdOrbExpanded) {
+            if (autoCloseTimerRef.current) {
+                clearTimeout(autoCloseTimerRef.current);
+                autoCloseTimerRef.current = null;
+            }
+            return;
+        }
+        resetAutoCloseTimer();
+        return () => {
+            if (autoCloseTimerRef.current) {
+                clearTimeout(autoCloseTimerRef.current);
+                autoCloseTimerRef.current = null;
+            }
+        };
+    }, [isDdOrbExpanded, resetAutoCloseTimer]);
 
     // 🚪 Auto-collapse DD Orbs when user clicks outside the DD Orbs cluster
     useEffect(() => {
@@ -1806,6 +1856,11 @@ export default function FarmClient({
         setIsDdOrbExpanded(false);
         setSelectedDdOrb(null);
         setHighlightTarget(null);
+        setMainOrbMode('TOTAL');
+        if (autoCloseTimerRef.current) {
+            clearTimeout(autoCloseTimerRef.current);
+            autoCloseTimerRef.current = null;
+        }
         setExpandedActivePair(null);
         setIsLiveTerminalOpen(false);
         setSelectedTreeModal(null);
@@ -2481,6 +2536,13 @@ export default function FarmClient({
         if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
         return Number(rawPortDD.toFixed(2));
     }, [rawPortDD, isPrime, isFallback1Url]);
+
+    // 🤖 Pure EasyM EA DD (ไม่รวมไม้เทรดมือนอกระบบ: EA DD = Active Farm DD + Quarantine Total DD)
+    const eaDDPct = useMemo(() => {
+        if (!isPrime || isFallback1Url) return totalPortDDPct;
+        const pureEaDD = totalQuarantineDD + activeFarmDDPct;
+        return Number(Math.max(0, pureEaDD).toFixed(2));
+    }, [isPrime, isFallback1Url, totalPortDDPct, totalQuarantineDD, activeFarmDDPct]);
 
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => {
@@ -4653,7 +4715,7 @@ export default function FarmClient({
                     <div className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[90] flex flex-col gap-3 pointer-events-auto items-end">
                         {/* 🔮 Orb 1 Row: Glowing DD Dial Sphere & Horizontal Dispersal (กระจายออกมาทางซ้ายเรียงกัน 3 หรือ 4 ลูก) */}
                         <div ref={ddOrbsRef} className="relative flex items-center gap-2 sm:gap-3">
-                            {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต (ขยับชิดลูกแก้วเมนูที่ 1 เยื้องขึ้นด้านบนซ้าย + เส้นทแยงชี้ลงขวา ↘) */}
+                            {/* 🏷️ กล่องอธิบายที่ 1: ลูกแก้ว DD รวมพอร์ต / DD ของ EA (ขยับชิดลูกแก้วเมนูที่ 1 เยื้องขึ้นด้านบนซ้าย + เส้นทแยงชี้ลงขวา ↘) */}
                             {isOrb4Unlocked && isFarmGuideActive && !isMultiFarmView && (
                                 <div 
                                     data-farm-guide="true"
@@ -4671,10 +4733,10 @@ export default function FarmClient({
                                             : 'border-amber-400/45 shadow-[0_4px_14px_rgba(0,0,0,0.85)]'
                                     }`}>
                                         <div className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-300 leading-tight whitespace-nowrap">
-                                            Total DD : แสดง DD ของพอร์ต
+                                            {mainOrbMode === 'EA' ? 'EA DD : แสดง DD ของระบบ EA' : 'Total DD : แสดง DD รวมของพอร์ต'}
                                         </div>
                                         <div className="text-[7.5px] sm:text-[8.5px] text-white/80 leading-tight whitespace-nowrap mt-0.5">
-                                            คลิกเพื่อแยกดู DD แต่ละส่วน
+                                            {mainOrbMode === 'EA' ? 'คลิกเพื่อดู DD เฉพาะส่วนของ EA' : 'คลิกเพื่อแยกดู DD แต่ละส่วน'}
                                         </div>
                                     </div>
                                     {/* เส้นทแยงเยื้องจากด้านขวาล่างของกรอบ ชี้ลงขวามายังขอบซ้ายบนของลูกแก้วที่ 1 */}
@@ -4686,16 +4748,17 @@ export default function FarmClient({
                             )}
 
                             {isDdOrbExpanded && (
-                                <>
+                                <div className="flex items-center gap-2 sm:gap-3 transition-all duration-500">
                                     {/* 1. Leftmost Orb: Quarantine Total DD (คู่เงินที่ถูกขังทั้งหมด) */}
-                                    <div className="animate-orb-disperse-left">
+                                    <div className="animate-orb-disperse-left shrink-0">
                                         <GlowingDdOrb
                                             type="QUARANTINE"
                                             value={totalQuarantineDD}
                                             displayText={isFallback1Url ? '**.**' : undefined}
                                             isHighlighted={highlightTarget ? highlightTarget === 'QUARANTINE' : selectedDdOrb === 'QUARANTINE'}
                                             onClick={() => {
-                                                setSelectedDdOrb(prev => prev === 'QUARANTINE' ? 'TOTAL' : 'QUARANTINE');
+                                                resetAutoCloseTimer();
+                                                setSelectedDdOrb(prev => prev === 'QUARANTINE' ? (mainOrbMode === 'EA' ? 'EA' : 'TOTAL') : 'QUARANTINE');
                                             }}
                                             onMouseEnter={() => setHighlightTarget('QUARANTINE')}
                                             onMouseLeave={() => setHighlightTarget(null)}
@@ -4704,14 +4767,15 @@ export default function FarmClient({
                                     </div>
 
                                     {/* 2. Middle-Left Orb: Active Farm DD (ฟาร์มที่ทำงานปัจจุบัน) */}
-                                    <div className="animate-orb-disperse-mid">
+                                    <div className="animate-orb-disperse-mid shrink-0">
                                         <GlowingDdOrb
                                             type="ACTIVE"
                                             value={isFallback1Url ? 0 : activeFarmDDPct}
                                             displayText={isFallback1Url ? '**.**' : undefined}
                                             isHighlighted={highlightTarget ? highlightTarget === 'FARM' : selectedDdOrb === 'ACTIVE'}
                                             onClick={() => {
-                                                setSelectedDdOrb(prev => prev === 'ACTIVE' ? 'TOTAL' : 'ACTIVE');
+                                                resetAutoCloseTimer();
+                                                setSelectedDdOrb(prev => prev === 'ACTIVE' ? (mainOrbMode === 'EA' ? 'EA' : 'TOTAL') : 'ACTIVE');
                                             }}
                                             onMouseEnter={() => setHighlightTarget('FARM')}
                                             onMouseLeave={() => setHighlightTarget(null)}
@@ -4719,15 +4783,22 @@ export default function FarmClient({
                                         />
                                     </div>
 
-                                    {/* 3. Middle-Right Orb: 4th Orb for Manual / External Orders DD (แสดงเฉพาะเมื่อมีไม้แปลกปลอมจริงเท่านั้น) */}
+                                    {/* 3. Middle-Right Orb: 4th Orb for Manual Trades (เลื่อนและหดตัวเมื่อสลับเป็น EA และขยายออกเมื่อเป็น Total) */}
                                     {hasExternalTrades && (
-                                        <div className="animate-orb-disperse-mid">
+                                        <div 
+                                            className={`transition-all duration-500 ease-in-out transform origin-center flex items-center justify-center shrink-0 ${
+                                                mainOrbMode === 'TOTAL'
+                                                    ? 'w-11 sm:w-14 scale-100 opacity-100 mr-0 pointer-events-auto'
+                                                    : 'w-0 scale-0 opacity-0 -mr-2 sm:-mr-3 overflow-hidden pointer-events-none'
+                                            }`}
+                                        >
                                             <GlowingDdOrb
                                                 type="MANUAL"
                                                 value={manualDDPct}
                                                 showWarning
                                                 displayText={manualDDPct <= 0 ? `+${Math.abs(manualDDPct).toFixed(1)}%` : `-${manualDDPct.toFixed(1)}%`}
                                                 onClick={() => {
+                                                    resetAutoCloseTimer();
                                                     setLiveTerminalFilter('EXTERNAL');
                                                     setIsLiveTerminalOpen(true);
                                                     setIsDdOrbExpanded(false);
@@ -4740,33 +4811,68 @@ export default function FarmClient({
                                             />
                                         </div>
                                     )}
-                                </>
+                                </div>
                             )}
 
-                            {/* 3. Rightmost Orb: Original Orb 1 (Total Port DD รวมของพอร์ต) */}
-                            <GlowingDdOrb
-                                type="TOTAL"
-                                value={totalPortDDPct}
-                                isSlowBlink={isFallback1Url}
-                                showPing
-                                isHighlighted={isDdOrbExpanded && (highlightTarget ? highlightTarget === 'TOTAL' : (selectedDdOrb === 'TOTAL' || selectedDdOrb === null))}
-                                onClick={() => {
-                                    if (!isDdOrbExpanded) {
-                                        setIsDdOrbExpanded(true);
-                                        setSelectedDdOrb('TOTAL');
-                                    } else {
-                                        if (selectedDdOrb !== 'TOTAL' && selectedDdOrb !== null) {
-                                            setSelectedDdOrb('TOTAL');
-                                            setHighlightTarget(null);
-                                        } else {
-                                            setIsDdOrbExpanded(false);
-                                            setSelectedDdOrb(null);
-                                            setHighlightTarget(null);
-                                        }
-                                    }
-                                }}
-                                title={isDdOrbExpanded ? "คลิกเพื่อพับเก็บลูกแก้วย่อย" : `📊 DD รวมของพอร์ต: -${totalPortDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดู DD ฟาร์ม / DD ถูกขัง)`}
-                            />
+                            {/* 3. Rightmost Orb: 3D Coin-Flip Main Orb (สลับเหรียญสองด้าน TOTAL <-> EA ทุก 3 วินาที) */}
+                            <div className="relative [perspective:1000px] w-11 h-11 sm:w-14 sm:h-14 shrink-0">
+                                <div 
+                                    className="w-full h-full relative transition-transform duration-700 [transform-style:preserve-3d]"
+                                    style={{
+                                        transform: mainOrbMode === 'EA' ? 'rotateY(180deg)' : 'rotateY(0deg)'
+                                    }}
+                                >
+                                    {/* ด้านหน้า: TOTAL DD รวมพอร์ต */}
+                                    <div className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(0deg)] ${mainOrbMode === 'TOTAL' ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+                                        <GlowingDdOrb
+                                            type="TOTAL"
+                                            value={totalPortDDPct}
+                                            isSlowBlink={isFallback1Url}
+                                            showPing
+                                            isHighlighted={isDdOrbExpanded && (highlightTarget ? highlightTarget === 'TOTAL' : (selectedDdOrb === 'TOTAL' || selectedDdOrb === null))}
+                                            onClick={() => {
+                                                if (!isDdOrbExpanded) {
+                                                    setIsDdOrbExpanded(true);
+                                                    setSelectedDdOrb('TOTAL');
+                                                    resetAutoCloseTimer();
+                                                } else {
+                                                    // เมื่อกางออกอยู่แล้ว การคลิกที่ลูกแก้วหลักให้สลับเป็น EA พร้อมอนิเมชัน Flip
+                                                    setMainOrbMode('EA');
+                                                    setSelectedDdOrb('EA');
+                                                    setHighlightTarget(null);
+                                                    resetAutoCloseTimer();
+                                                }
+                                            }}
+                                            title={isDdOrbExpanded ? "📊 DD รวมพอร์ต (คลิกเพื่อสลับเป็น DD ของ EA)" : `📊 DD รวมของพอร์ต: -${totalPortDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดูรายละเอียด)`}
+                                        />
+                                    </div>
+
+                                    {/* ด้านหลัง: EA DD ของระบบอีเอ */}
+                                    <div className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] ${mainOrbMode === 'EA' ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+                                        <GlowingDdOrb
+                                            type="EA"
+                                            value={eaDDPct}
+                                            isSlowBlink={isFallback1Url}
+                                            showPing
+                                            isHighlighted={isDdOrbExpanded && (highlightTarget ? highlightTarget === 'EA' : selectedDdOrb === 'EA')}
+                                            onClick={() => {
+                                                if (!isDdOrbExpanded) {
+                                                    setIsDdOrbExpanded(true);
+                                                    setSelectedDdOrb('EA');
+                                                    resetAutoCloseTimer();
+                                                } else {
+                                                    // เมื่อกางออกอยู่แล้ว การคลิกที่ลูกแก้วหลักให้สลับเป็น TOTAL พร้อมอนิเมชัน Flip
+                                                    setMainOrbMode('TOTAL');
+                                                    setSelectedDdOrb('TOTAL');
+                                                    setHighlightTarget(null);
+                                                    resetAutoCloseTimer();
+                                                }
+                                            }}
+                                            title={isDdOrbExpanded ? "🌾 DD ระบบ EasyM EA (คลิกเพื่อสลับเป็น DD รวมพอร์ต)" : `🌾 DD ของระบบ EasyM EA: -${eaDDPct.toFixed(2)}% (คลิกเพื่อคลี่ดูรายละเอียด)`}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Orb 2: Cyan/Blue Glow (Cockpit Matrix - 20-Pair Telemetry) */}
