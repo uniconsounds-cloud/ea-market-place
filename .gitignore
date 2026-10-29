@@ -47,4 +47,5 @@ scratch/
 *.ex5
 graphify-out/
 .graphify*
+public/farm_originals/
 

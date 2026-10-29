@@ -820,7 +820,7 @@ interface QuarantineTreeItem {
                 ddPct: idx === 0 ? 14.20 : 16.80,
                 isRescue: idx === 1,
                 rescueOrders: idx === 1 ? 1 : 0,
-                src: idx === 1 ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                src: idx === 1 ? '/farm/Tree_aura.webp?v=3' : '/farm/Tree_fence.webp?v=3',
                 alt: idx === 1 ? 'Rescue Active Tree' : 'Quarantined Tree',
                 label: idx === 1 ? 'RESCUE GRID' : 'QUARANTINE',
                 delayMs: idx * 150
@@ -845,7 +845,7 @@ interface QuarantineTreeItem {
                 ddPct: ddPct,
                 isRescue: isRescue,
                 rescueOrders: rescueOrders,
-                src: isRescue ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                src: isRescue ? '/farm/Tree_aura.webp?v=3' : '/farm/Tree_fence.webp?v=3',
                 alt: isRescue ? 'Rescue Active Tree' : 'Quarantined Tree',
                 label: isRescue ? 'RESCUE GRID' : 'QUARANTINE',
                 delayMs: idx * 150
@@ -1015,11 +1015,11 @@ interface QuarantineTreeItem {
             // (e.g. 1000 USC -> $10, 2000 USC -> $20)
             const pnlInDollars = pnl / 100;
             
-            let asset = '/farm/base_farmbox_empty.png';
-            if (pnlInDollars < 0) asset = '/farm/base_farmbox_lose.png';
-            else if (pnlInDollars > 20) asset = '/farm/base_farmbox_full.png'; // > $20 (2000 USC)
-            else if (pnlInDollars > 10) asset = '/farm/base_farmbox_mid.png';  // > $10 (1000 USC)
-            else if (pnlInDollars > 0) asset = '/farm/base_farmbox_min.png';   // > $0 (1-1000 USC)
+            let asset = '/farm/base_farmbox_empty.webp';
+            if (pnlInDollars < 0) asset = '/farm/base_farmbox_lose.webp';
+            else if (pnlInDollars > 20) asset = '/farm/base_farmbox_full.webp'; // > $20 (2000 USC)
+            else if (pnlInDollars > 10) asset = '/farm/base_farmbox_mid.webp';  // > $10 (1000 USC)
+            else if (pnlInDollars > 0) asset = '/farm/base_farmbox_min.webp';   // > $0 (1-1000 USC)
 
             // Market holiday check
             const dateMD = item.date.substring(5);
@@ -1432,10 +1432,10 @@ interface QuarantineTreeItem {
                                         <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <Image
                                                 src={
-                                                    tree.level === 4 ? '/farm/base_tree_new.png' :
-                                                    tree.level === 3 ? '/farm/base_tree_state2.png' :
-                                                    tree.level === 2 ? '/farm/base_tree_state3.png' :
-                                                    '/farm/base_tree_state4.png'
+                                                    tree.level === 4 ? '/farm/base_tree_new.webp' :
+                                                    tree.level === 3 ? '/farm/base_tree_state2.webp' :
+                                                    tree.level === 2 ? '/farm/base_tree_state3.webp' :
+                                                    '/farm/base_tree_state4.webp'
                                                 }
                                                 alt="T"
                                                 fill
@@ -1456,7 +1456,7 @@ interface QuarantineTreeItem {
                                                         style={{ left: `${slot.x}%`, top: `${slot.y}%`, zIndex: tZIndex + 1 }}
                                                     >
                                                         <Image
-                                                            src={asset.type === 'PROFIT_FRUIT' ? '/farm/asset_b_orange.png' : '/farm/asset_a_lily.png'}
+                                                            src={asset.type === 'PROFIT_FRUIT' ? '/farm/asset_b_orange.webp' : '/farm/asset_a_lily.webp'}
                                                             alt="Asset"
                                                             fill
                                                             className="object-contain"
@@ -1716,7 +1716,7 @@ interface QuarantineTreeItem {
                                     style={{ marginTop: `${TREE_Y_OFFSET}px` }}
                                 >
                                     <Image
-                                        src="/farm/Greenhouse_dome.png"
+                                        src="/farm/Greenhouse_dome.webp"
                                         alt="Quarantine Greenhouse Dome"
                                         fill
                                         className="object-contain object-bottom"

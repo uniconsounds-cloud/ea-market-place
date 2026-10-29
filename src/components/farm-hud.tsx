@@ -146,11 +146,11 @@ export default function FarmHud({
     const isUSD = accountType?.toUpperCase().trim() === 'USD' || accountType?.toUpperCase().trim() === 'STANDARD';
     const centsValue = isUSD ? todayProfit * 100 : todayProfit;
 
-    let todayHarvestAsset = '/farm/base_farmbox_empty.png';
-    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
-    else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.png';
-    else if (centsValue > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.png';
-    else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+    let todayHarvestAsset = '/farm/base_farmbox_empty.webp';
+    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
+    else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
+    else if (centsValue > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
+    else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
 
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isUSC ? '' : '$';
@@ -492,11 +492,11 @@ export function FarmMobileStatsOverlay({
     const isUSD_Mobile = !isUSC;
     const centsValue_Mobile = isUSD_Mobile ? todayProfit * 100 : todayProfit;
 
-    let todayHarvestAsset = '/farm/base_farmbox_empty.png';
-    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.png';
-    else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.png';
-    else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.png';
-    else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/base_farmbox_min.png';
+    let todayHarvestAsset = '/farm/base_farmbox_empty.webp';
+    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
+    else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
+    else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
+    else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
 
     return (
         <div className="sm:hidden fixed top-[94px] left-0 w-full h-[88px] bg-black/5 backdrop-blur-[2px] z-[90] flex justify-between items-center px-1.5 pt-1 border-b border-amber-900/10 pointer-events-auto">

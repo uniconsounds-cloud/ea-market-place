@@ -1388,9 +1388,9 @@ export default function FarmClient({
 
     // --- Dynamic Theming ---
     const theme = useMemo(() => ({
-        open: assetType === 'FOREX' ? '/farm/asset_a_lily.png' : '/farm/asset_a_lotus.png',
-        profit: assetType === 'FOREX' ? '/farm/asset_b_orange.png' : '/farm/asset_b_apple.png',
-        dead: assetType === 'FOREX' ? '/farm/asset_c_dead_forex.png' : '/farm/asset_c_dead.png'
+        open: assetType === 'FOREX' ? '/farm/asset_a_lily.webp' : '/farm/asset_a_lotus.webp',
+        profit: assetType === 'FOREX' ? '/farm/asset_b_orange.webp' : '/farm/asset_b_apple.webp',
+        dead: assetType === 'FOREX' ? '/farm/asset_c_dead_forex.webp' : '/farm/asset_c_dead.webp'
     }), [assetType]);
 
     // Cleanup recently closed orders
@@ -2378,7 +2378,7 @@ export default function FarmClient({
                 ddPct: ddPct,
                 isRescue: isRescue,
                 rescueOrders: rescueOrders,
-                src: isRescue ? '/farm/Tree_aura.png?v=2' : '/farm/Tree_fence.png?v=2',
+                src: isRescue ? '/farm/Tree_aura.webp?v=3' : '/farm/Tree_fence.webp?v=3',
                 alt: isRescue ? 'Rescue Active Tree' : 'Quarantined Tree',
                 label: isRescue ? 'RESCUE GRID' : 'QUARANTINE',
                 delayMs: idx * 150
@@ -2658,11 +2658,11 @@ export default function FarmClient({
             const pnl = Number(item.profit || 0);
             const cents = isUSC ? pnl : pnl * 100;
             
-            let asset = '/farm/base_farmbox_empty.png';
-            if (pnl < 0) asset = '/farm/base_farmbox_lose.png';
-            else if (cents > 2000) asset = '/farm/base_farmbox_full.png';
-            else if (cents > 1000) asset = '/farm/base_farmbox_mid.png';
-            else if (cents > 0) asset = '/farm/base_farmbox_min.png';
+            let asset = '/farm/base_farmbox_empty.webp';
+            if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
+            else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
+            else if (cents > 1000) asset = '/farm/base_farmbox_mid.webp';
+            else if (cents > 0) asset = '/farm/base_farmbox_min.webp';
             
             // Check if this date is a market holiday and profit is 0
             const dateMD = item.date.substring(5); // 'MM-DD'
@@ -3194,7 +3194,7 @@ export default function FarmClient({
                                                     >
                                                         {isClient && (
                                                             <Image
-                                                                src="/farm/mini_farm_island.png"
+                                                                src="/farm/mini_farm_island.webp"
                                                                 alt="Mini Farm Island"
                                                                 fill
                                                                 className="object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.7)]"
@@ -3436,10 +3436,10 @@ export default function FarmClient({
                                         <div className="absolute inset-0" style={{ marginTop: `${TREE_Y_OFFSET}px` }}>
                                             <Image
                                                 src={
-                                                    tree.level === 4 ? '/farm/base_tree_new.png' :
-                                                        tree.level === 3 ? '/farm/base_tree_state2.png' :
-                                                            tree.level === 2 ? '/farm/base_tree_state3.png' :
-                                                                '/farm/base_tree_state4.png'
+                                                    tree.level === 4 ? '/farm/base_tree_new.webp' :
+                                                        tree.level === 3 ? '/farm/base_tree_state2.webp' :
+                                                            tree.level === 2 ? '/farm/base_tree_state3.webp' :
+                                                                '/farm/base_tree_state4.webp'
                                                 }
                                                 alt="T" fill className="object-contain object-bottom drop-shadow-2xl" unoptimized priority={true}
                                             />
@@ -3582,7 +3582,7 @@ export default function FarmClient({
                                     style={{ marginTop: `${TREE_Y_OFFSET}px` }}
                                 >
                                     <Image
-                                        src="/farm/Greenhouse_dome.png"
+                                        src="/farm/Greenhouse_dome.webp"
                                         alt="Quarantine Greenhouse Dome"
                                         fill
                                         className="object-contain object-bottom"
