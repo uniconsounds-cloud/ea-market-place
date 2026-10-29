@@ -133,6 +133,22 @@ interface EasyMPortItem {
     lastViewedAt?: string | null;
     state?: EasyMPortState;
     externalActivity?: ExternalActivityInfo;
+    primeDetails?: {
+        buildId?: string;
+        mode?: 'NORMAL' | 'SLOW' | 'FREEZE';
+        modeDD?: number;
+        totalDD?: number;
+        quarantinedCount?: number;
+        quarantinedList?: string[];
+        rescueOrders?: number;
+        rescueDD?: number;
+        reliefBudget?: number;
+        reliefCap?: number;
+        reliefUsed?: number;
+        activePairsCount?: number;
+        closeOnlyPairsCount?: number;
+        isTwoWayReady?: boolean;
+    };
 }
 
 export type EasyMPortState =
@@ -566,6 +582,9 @@ export interface FleetDailyStat {
     minProfitPort: string;
     totalProfit: number;
     avgProfit: number;
+    netProfit?: number;
+    negativeCount?: number;
+    totalLoss?: number;
     maxDD: number;
     maxDDPort: string;
     minDD: number;
@@ -574,6 +593,19 @@ export interface FleetDailyStat {
     activeCount: number;
     positiveCount: number;
     contributingPorts: { port: string; profit: number; dd: number }[];
+}
+
+export function formatFleetProfit(val: number, unit = 'USC'): string {
+    if (val === 0) return `0 ${unit}`;
+    const sign = val > 0 ? '+' : '-';
+    return `${sign}${Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} ${unit}`;
+}
+
+export function formatFleetProfitUsd(val: number): string {
+    const usd = val / 100;
+    if (Math.abs(usd) < 0.005) return '≈ $0.00 USD';
+    const sign = usd > 0 ? '+' : '-';
+    return `≈ ${sign}$${Math.abs(usd).toFixed(2)} USD`;
 }
 
 export interface FleetDailyComparison {
@@ -897,10 +929,14 @@ export default function EasyMMasterDashboardPage() {
             const easymLicenses: any[] = [];
 
             for (const [acc, lic] of latestLicenseByAcc.entries()) {
+                // Must be an active license
+                if (lic.is_active === false) continue;
+
                 const prod = Array.isArray(lic.products) ? lic.products[0] : lic.products;
                 const pKey = ((prod as any)?.product_key || '').toUpperCase();
                 const pName = ((prod as any)?.name || '').toLowerCase();
-                const isEasyM = pKey.includes('EZM') || pName.includes('easym') || pName.includes('easy m');
+                const isGold = pKey.includes('EZG') || pName.includes('gold') || pKey.includes('GOLD');
+                const isEasyM = !isGold && (pKey.includes('EZM') || pName.includes('easym') || pName.includes('easy m'));
 
                 if (isEasyM) {
                     easymAccountSet.add(acc);
@@ -1149,11 +1185,11 @@ export default function EasyMMasterDashboardPage() {
             // Helper: Detect if a daily history row is contaminated by external/manual/Gold trading or balance deposit delta
             const evaluateDailyRecordContamination = (port: string, profitVal: number, closedLotsVal: number, dateStr: string): string | null => {
                 const st = statusMap.get(port);
-                const isGoldMismatchPort = (port === '97072259') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
-                if (isGoldMismatchPort) {
-                    return 'พอร์ตรัน EA ทองคำ (EasyGold) ทั้งระบบ';
-                }
+                const isGoldMismatchPort = (port === '97072259') || (port === '97115162') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
                 const isGoldChart = String(st?.asset_type || '').toUpperCase() === 'GOLD';
+                if (isGoldMismatchPort || isGoldChart) {
+                    return 'พอร์ตรัน EA ทองคำ (EasyGold) ทั้งระบบ ไม่นำมารวมในสถิติ EasyM';
+                }
                 // 1. Massive closed lots in a single day (> 15.0 lots) — e.g. #97130324 (52.91 lots, +15,178.84 USC), #97115162 (23.5 lots on GOLD chart)
                 if (closedLotsVal > 15.0) {
                     return `ปิดล็อตสูงผิดปกติ (${closedLotsVal.toFixed(2)} Lots ในวันเดียว${isGoldChart ? ' บนชาร์ต GOLD' : ''}) คาดว่ามีออเดอร์เทรดมือ/ทองคำ/EA อื่นปะปน`;
@@ -1317,7 +1353,10 @@ export default function EasyMMasterDashboardPage() {
                 let topR: any = null;
                 let minP = Infinity;
                 let minPR: any = null;
-                let totalP = 0;
+                let positiveProfitSum = 0;
+                let negativeLossSum = 0;
+                let negativeCount = 0;
+                let netProfitSum = 0;
                 const dds: { port: string; dd: number }[] = [];
                 let positiveCount = 0;
                 const contributingPorts: { port: string; profit: number; dd: number }[] = [];
@@ -1326,7 +1365,7 @@ export default function EasyMMasterDashboardPage() {
                     const p = Number(r.profit) || 0;
                     const dd = Number(r.max_dd || r.max_drawdown) || 0;
                     const portStr = String(r.port_number || '');
-                    totalP += p;
+                    netProfitSum += p;
 
                     if (p > maxP) {
                         maxP = p;
@@ -1334,6 +1373,7 @@ export default function EasyMMasterDashboardPage() {
                     }
                     if (p > 0) {
                         positiveCount++;
+                        positiveProfitSum += p;
                         if (p < minP) {
                             minP = p;
                             minPR = r;
@@ -1343,6 +1383,9 @@ export default function EasyMMasterDashboardPage() {
                             profit: Number(p.toFixed(2)),
                             dd: Number(dd.toFixed(1))
                         });
+                    } else if (p < 0) {
+                        negativeCount++;
+                        negativeLossSum += p;
                     }
                     if (portStr) {
                         dds.push({ port: portStr, dd });
@@ -1379,7 +1422,8 @@ export default function EasyMMasterDashboardPage() {
 
                 const dt = new Date(dateStr + 'T00:00:00');
                 const dayThai = dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-                const avgP = positiveCount > 0 ? (totalP / positiveCount) : (records.length ? totalP / records.length : 0);
+                // Average of ports that successfully closed with profit
+                const avgPositiveP = positiveCount > 0 ? (positiveProfitSum / positiveCount) : 0;
                 const avgDD = dds.length ? (sumDD / dds.length) : 0;
 
                 return {
@@ -1390,8 +1434,11 @@ export default function EasyMMasterDashboardPage() {
                     topDD: Number(topR?.max_dd || topR?.max_drawdown || 0),
                     minProfit: minP !== Infinity ? Number(minP.toFixed(2)) : 0,
                     minProfitPort: minPR?.port_number ? String(minPR.port_number) : '-',
-                    totalProfit: Number(totalP.toFixed(2)),
-                    avgProfit: Number(avgP.toFixed(2)),
+                    totalProfit: Number(positiveProfitSum.toFixed(2)),
+                    avgProfit: Number(avgPositiveP.toFixed(2)),
+                    netProfit: Number(netProfitSum.toFixed(2)),
+                    negativeCount,
+                    totalLoss: Number(negativeLossSum.toFixed(2)),
                     maxDD: Number(maxDD.toFixed(1)),
                     maxDDPort: maxDDPort !== '-' ? maxDDPort : (topR?.port_number ? String(topR.port_number) : '-'),
                     minDD: Number(minDD.toFixed(1)),
@@ -1727,6 +1774,42 @@ export default function EasyMMasterDashboardPage() {
                     const endMs = (endDateDisplay && lastActiveDateStr) ? new Date(lastActiveDateStr).getTime() : now.getTime();
                     const durationDays = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)));
 
+                    // 🌟 Parse EasyM Prime v2.10 / v2.00 Real-Time Cockpit JSON & Rescue Telemetry
+                    let primeDetails: EasyMPortItem['primeDetails'] = undefined;
+                    if (status?.system_code && status.system_code.includes(':::')) {
+                        try {
+                            const jsonStr = status.system_code.split(':::')[1];
+                            const parsed = JSON.parse(jsonStr);
+                            if (parsed && typeof parsed === 'object') {
+                                const quarantinedArr = Array.isArray(parsed.quarantined) ? parsed.quarantined : [];
+                                const pairsObj = parsed.pairs && typeof parsed.pairs === 'object' ? parsed.pairs : {};
+                                let activePairsCount = 0;
+                                let closeOnlyPairsCount = 0;
+                                Object.values(pairsObj).forEach((p: any) => {
+                                    if (p && p.enabled === false) closeOnlyPairsCount++;
+                                    else if (p && p.enabled === true) activePairsCount++;
+                                });
+                                const buildMatch = String(status.ea_version || '').match(/B\d+(\.\d+)?/);
+                                primeDetails = {
+                                    buildId: parsed.build_id || (buildMatch ? buildMatch[0] : undefined),
+                                    mode: parsed.mode || 'NORMAL',
+                                    modeDD: Number(parsed.mode_dd ?? parsed.total_dd ?? 0),
+                                    totalDD: Number(parsed.total_dd ?? 0),
+                                    quarantinedCount: quarantinedArr.length,
+                                    quarantinedList: quarantinedArr.map((q: any) => `${q.sym || q.abbr || ''} (${Number(q.loss_pct || 0).toFixed(1)}%)`),
+                                    rescueOrders: Number(parsed.rescue_orders ?? 0),
+                                    rescueDD: Number(parsed.rescue_dd ?? 0),
+                                    reliefBudget: Number(parsed.relief_budget ?? 0),
+                                    reliefCap: Number(parsed.relief_cap ?? 0),
+                                    reliefUsed: Number(parsed.relief_used ?? 0),
+                                    activePairsCount,
+                                    closeOnlyPairsCount,
+                                    isTwoWayReady: true,
+                                };
+                            }
+                        } catch (e) {}
+                    }
+
                     const item: EasyMPortItem = {
                         portNumber: accNum,
                         portName: lic.port_name || null,
@@ -1781,6 +1864,7 @@ export default function EasyMMasterDashboardPage() {
                         telemetryType,
                         engineTier,
                         runStatus,
+                        primeDetails,
                         state: resolvePortState({
                             hoursSinceLastPing,
                             balance: status?.balance || 0,
@@ -2117,8 +2201,10 @@ export default function EasyMMasterDashboardPage() {
             const reqsHours = Array(24).fill(0);
             const unthrottledSpikeReqsHours = Array(24).fill(0);
 
-            // Categorize ports by activity window
+            // Categorize ports by activity window (strictly EasyM fleet only)
             const continuouslyActivePorts = (portStatuses || []).filter(s => {
+                const portNum = String(s.port_number);
+                if (!easymPortSet.has(portNum)) return false;
                 const pingTime = s.last_ping || s.updated_at;
                 if (!pingTime) return false;
                 return (nowMs - new Date(pingTime).getTime()) <= 2 * 3600 * 1000; // Active within last 2h (24/7 VPS fleet)
@@ -2149,8 +2235,10 @@ export default function EasyMMasterDashboardPage() {
             });
 
             for (let h = 0; h < 24; h++) {
-                // Ports that specifically had their last ping in hour h (e.g. went offline at hour h)
+                // Ports that specifically had their last ping in hour h (strictly EasyM fleet only)
                 const stoppedAtHour = (portStatuses || []).filter(s => {
+                    const portNum = String(s.port_number);
+                    if (!easymPortSet.has(portNum)) return false;
                     const pingTime = s.last_ping || s.updated_at;
                     if (!pingTime) return false;
                     const ageMs = nowMs - new Date(pingTime).getTime();
@@ -2267,8 +2355,10 @@ export default function EasyMMasterDashboardPage() {
     // 3. Search & Scope Filtered Ports (Powers the Fleet Matrix view)
     const searchFilteredPorts = useMemo(() => {
         return ports.filter(p => {
-            // Strictly exclude tester ports from the Fleet Matrix & dashboard view
+            // Strictly exclude tester ports, gold charts and non-EasyM ports from EasyM Dashboard
             if (p.isTester && p.portNumber !== '21692434') return false;
+            if (p.isGoldMismatch) return false;
+            if (String(p.actualAssetType).toUpperCase() === 'GOLD') return false;
 
             // Search query (matches portNumber, customerName, customerEmail, portName)
             if (searchQuery.trim()) {
@@ -2336,12 +2426,14 @@ export default function EasyMMasterDashboardPage() {
                     if (p.engineTier !== 'legacy_2url_minus') return false;
                 } else if (selectedStateFilter === 'legacy_1url') {
                     if (p.engineTier !== 'legacy_1url') return false;
-                } else if (selectedStateFilter === 'prime') {
+                } else if (selectedStateFilter === 'prime_v210') {
+                    if (!p.primeDetails || !p.primeDetails.buildId) return false;
+                } else if (selectedStateFilter === 'prime' || selectedStateFilter === 'prime_all') {
                     const prodKey = (p.productKey || '').toUpperCase();
                     const prodName = (p.productName || '').toLowerCase();
                     const actualSys = (p.actualSystemCode || '').toLowerCase();
                     const eaVer = (p.eaVersion || '').toLowerCase();
-                    const isP = prodKey.includes('PRIME') || prodName.includes('prime') || actualSys.includes('prime') || eaVer.includes('prime');
+                    const isP = prodKey.includes('PRIME') || prodName.includes('prime') || actualSys.includes('prime') || eaVer.includes('prime') || !!p.primeDetails;
                     if (!isP) return false;
                 } else if (selectedStateFilter === 'external_activity') {
                     if (!p.externalActivity?.hasExternalActivity) return false;
@@ -2355,6 +2447,8 @@ export default function EasyMMasterDashboardPage() {
                 const isWk = fleetStats?.isWeekend ?? checkIsMarketWeekend();
                 const portSt = resolvePortState(p, isWk, currentTime);
                 if (selectedStatus === 'real_running' && !p.isRealRunning) return false;
+                if (selectedStatus === 'prime_v210' && (!p.primeDetails || !p.primeDetails.buildId)) return false;
+                if (selectedStatus === 'prime_all' && (!p.productName.toLowerCase().includes('prime') && !p.primeDetails)) return false;
                 if (selectedStatus === 'external_activity' && !p.externalActivity?.hasExternalActivity) return false;
                 if (selectedStatus === 'mismatch_gold' && p.runStatus !== 'mismatch_gold') return false;
                 if (selectedStatus === 'offline_48h' && p.runStatus !== 'offline_48h') return false;
@@ -3538,7 +3632,7 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="sm:hidden">Avg PnL:</span>
                                         </div>
                                         <div className="font-mono font-bold text-emerald-400 truncate">
-                                            +{fleetStats.today.avgProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                            {formatFleetProfit(fleetStats.today.avgProfit)}
                                         </div>
                                     </div>
 
@@ -3562,7 +3656,7 @@ export default function EasyMMasterDashboardPage() {
                                             )}
                                         </div>
                                         <div className="font-mono font-bold text-emerald-400/90 truncate">
-                                            +{fleetStats.today.minProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                            {formatFleetProfit(fleetStats.today.minProfit)}
                                         </div>
                                     </div>
 
@@ -3702,7 +3796,7 @@ export default function EasyMMasterDashboardPage() {
                                             <span className="sm:hidden">Avg PnL:</span>
                                         </div>
                                         <div className="font-mono font-bold text-emerald-400/90 truncate">
-                                            +{fleetStats.yesterday.avgProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                            {formatFleetProfit(fleetStats.yesterday.avgProfit)}
                                         </div>
                                     </div>
 
@@ -3726,7 +3820,7 @@ export default function EasyMMasterDashboardPage() {
                                             )}
                                         </div>
                                         <div className="font-mono font-bold text-emerald-400/80 truncate">
-                                            +{fleetStats.yesterday.minProfit.toLocaleString()} <span className="text-[8px] text-muted-foreground font-normal">USC</span>
+                                            {formatFleetProfit(fleetStats.yesterday.minProfit)}
                                         </div>
                                     </div>
 
@@ -3920,18 +4014,18 @@ export default function EasyMMasterDashboardPage() {
                                 </div>
                                 <div className="flex items-baseline justify-between">
                                     <div>
-                                        <div className="text-2xl sm:text-3xl font-black font-mono text-[#4de180]">
-                                            +{fleetStats.today.totalProfit.toLocaleString()} USC
+                                        <div className={`text-2xl sm:text-3xl font-black font-mono ${fleetStats.today.totalProfit >= 0 ? 'text-[#4de180]' : 'text-rose-400'}`}>
+                                            {formatFleetProfit(fleetStats.today.totalProfit)}
                                         </div>
                                         <div className="text-xs font-mono text-emerald-400/70">
-                                            ≈ +${(fleetStats.today.totalProfit / 100).toFixed(2)} USD
+                                            {formatFleetProfitUsd(fleetStats.today.totalProfit)}
                                         </div>
                                     </div>
                                     <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
                                         <div>
                                             <span className="hidden sm:inline">เฉลี่ยพอร์ตที่ปิด: </span>
                                             <span className="sm:hidden">เฉลี่ย: </span>
-                                            <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.today.avgProfit.toLocaleString()} USC</span>
+                                            <span className="text-emerald-400 font-mono font-semibold">{formatFleetProfit(fleetStats.today.avgProfit)}</span>
                                         </div>
                                         <div>
                                             <span className="hidden sm:inline">DD เฉลี่ยทั้งฟาร์ม: </span>
@@ -3940,6 +4034,20 @@ export default function EasyMMasterDashboardPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {Boolean(fleetStats.today.negativeCount && fleetStats.today.negativeCount > 0) && (
+                                    <div className="pt-1.5 border-t border-emerald-500/20 flex flex-wrap items-center justify-between gap-1 text-[11px] font-mono">
+                                        <span className="text-rose-400/90">
+                                            🔻 หักคัตลอส {fleetStats.today.negativeCount} พอร์ต: <strong>{formatFleetProfit(fleetStats.today.totalLoss || 0)}</strong>
+                                        </span>
+                                        <span>
+                                            <span className="text-muted-foreground mr-1">สุทธิทั้งฟาร์ม:</span>
+                                            <strong className={Number(fleetStats.today.netProfit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                                {formatFleetProfit(fleetStats.today.netProfit || 0)}
+                                            </strong>
+                                        </span>
+                                    </div>
+                                )}
 
                                 {/* Mini Bar Chart */}
                                 <FleetProfitBarChart ports={fleetStats.today.contributingPorts} theme="emerald" />
@@ -3959,18 +4067,18 @@ export default function EasyMMasterDashboardPage() {
                                 </div>
                                 <div className="flex items-baseline justify-between">
                                     <div>
-                                        <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400/90">
-                                            +{fleetStats.yesterday.totalProfit.toLocaleString()} USC
+                                        <div className={`text-2xl sm:text-3xl font-black font-mono ${fleetStats.yesterday.totalProfit >= 0 ? 'text-emerald-400/90' : 'text-rose-400'}`}>
+                                            {formatFleetProfit(fleetStats.yesterday.totalProfit)}
                                         </div>
                                         <div className="text-xs font-mono text-emerald-400/60">
-                                            ≈ +${(fleetStats.yesterday.totalProfit / 100).toFixed(2)} USD
+                                            {formatFleetProfitUsd(fleetStats.yesterday.totalProfit)}
                                         </div>
                                     </div>
                                     <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
                                         <div>
                                             <span className="hidden sm:inline">เฉลี่ยพอร์ตที่ปิด: </span>
                                             <span className="sm:hidden">เฉลี่ย: </span>
-                                            <span className="text-emerald-400 font-mono font-semibold">+{fleetStats.yesterday.avgProfit.toLocaleString()} USC</span>
+                                            <span className="text-emerald-400 font-mono font-semibold">{formatFleetProfit(fleetStats.yesterday.avgProfit)}</span>
                                         </div>
                                         <div>
                                             <span className="hidden sm:inline">DD เฉลี่ยทั้งฟาร์ม: </span>
@@ -3979,6 +4087,20 @@ export default function EasyMMasterDashboardPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {Boolean(fleetStats.yesterday.negativeCount && fleetStats.yesterday.negativeCount > 0) && (
+                                    <div className="pt-1.5 border-t border-border/30 flex flex-wrap items-center justify-between gap-1 text-[11px] font-mono">
+                                        <span className="text-rose-400/90">
+                                            🔻 หักคัตลอส {fleetStats.yesterday.negativeCount} พอร์ต: <strong>{formatFleetProfit(fleetStats.yesterday.totalLoss || 0)}</strong>
+                                        </span>
+                                        <span>
+                                            <span className="text-muted-foreground mr-1">สุทธิทั้งฟาร์ม:</span>
+                                            <strong className={Number(fleetStats.yesterday.netProfit || 0) >= 0 ? 'text-emerald-400' : 'text-amber-300'}>
+                                                {formatFleetProfit(fleetStats.yesterday.netProfit || 0)}
+                                            </strong>
+                                        </span>
+                                    </div>
+                                )}
 
                                 {/* Mini Bar Chart */}
                                 <FleetProfitBarChart ports={fleetStats.yesterday.contributingPorts} theme="amber" />
@@ -5435,6 +5557,8 @@ export default function EasyMMasterDashboardPage() {
                                             <SelectItem value="state_9">🔲 S9: ยังไม่เคยสื่อสาร (0 ครั้ง)</SelectItem>
                                             <SelectItem value="weekend">🟣 Weekend: ตลาดปิดเสาร์-อาทิตย์</SelectItem>
                                             <SelectItem value="real_running">⚡ รันจริง (EasyM &le; 48h &amp; ทุนถึง)</SelectItem>
+                                            <SelectItem value="prime_v210">🌟 EasyM Prime v2.10 (B261028+)</SelectItem>
+                                            <SelectItem value="prime_all">⚡ EasyM Prime ทุกรุ่น</SelectItem>
                                             <SelectItem value="v2_3tier">⚡ v2.00 (Single Domain 3-Tier)</SelectItem>
                                             <SelectItem value="legacy_2url">📡 2U (ส่งข้อมูลสดครบ 2 URLs)</SelectItem>
                                             <SelectItem value="legacy_2url_minus">📡 2U- (รอบตรวจ 12h ขาด URL 2)</SelectItem>
@@ -5473,6 +5597,24 @@ export default function EasyMMasterDashboardPage() {
                                     className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'real_running' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'}`}
                                 >
                                     ⚡ รันจริง ({searchFilteredPorts.filter(p => p.isRealRunning).length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'prime_v210' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus(selectedStatus === 'prime_v210' ? 'all' : 'prime_v210')}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'prime_v210' ? 'bg-purple-600 hover:bg-purple-700 text-white font-bold' : 'text-purple-300 border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20'}`}
+                                    title="EasyM Prime v2.10 รุ่นล่าสุดพร้อมระบบ Dynamic Rescue & 2-Way Web Control"
+                                >
+                                    🌟 Prime v2.10 ({searchFilteredPorts.filter(p => p.primeDetails && p.primeDetails.buildId).length})
+                                </Button>
+                                <Button 
+                                    variant={selectedStatus === 'prime_all' ? 'default' : 'outline'} 
+                                    size="sm" 
+                                    onClick={() => setSelectedStatus(selectedStatus === 'prime_all' ? 'all' : 'prime_all')}
+                                    className={`h-7 text-xs px-2.5 rounded-full shrink-0 whitespace-nowrap ${selectedStatus === 'prime_all' ? 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold' : 'text-indigo-300 border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20'}`}
+                                    title="พอร์ต EasyM Prime ทั้งหมดในระบบ"
+                                >
+                                    ⚡ Prime ทั้งหมด ({searchFilteredPorts.filter(p => p.productName.toLowerCase().includes('prime') || p.primeDetails).length})
                                 </Button>
                                 <Button 
                                     variant={selectedStatus === 'external_activity' ? 'default' : 'outline'} 
@@ -5803,9 +5945,34 @@ export default function EasyMMasterDashboardPage() {
                                                                     </>
                                                                 );
                                                             })()}
-                                                            {port.engineTier === 'v2_3tier' ? (
+                                                            {port.primeDetails ? (
+                                                                <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                                                    <span className="inline-flex items-center gap-1 text-[8px] text-purple-300 font-mono bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/40 shadow-sm" title={`EasyM Prime (Build ${port.primeDetails.buildId || 'v2.10'}) โหมด ${port.primeDetails.mode} (DD: ${port.primeDetails.modeDD?.toFixed(1)}%)`}>
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block animate-pulse"></span> 🌟 Prime {port.primeDetails.buildId ? port.primeDetails.buildId.replace('EasyM_Prime_', '') : 'v2.10'}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1 text-[8px] font-mono">
+                                                                        <span className={`px-1 rounded font-bold ${
+                                                                            port.primeDetails.mode === 'NORMAL' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                                                            port.primeDetails.mode === 'SLOW' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                                                            'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                                                        }`}>
+                                                                            {port.primeDetails.mode}
+                                                                        </span>
+                                                                        {Boolean(port.primeDetails.quarantinedCount && port.primeDetails.quarantinedCount > 0) && (
+                                                                            <span className="px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30" title={`ขังคู่เงิน: ${port.primeDetails.quarantinedList?.join(', ')}`}>
+                                                                                🔒 {port.primeDetails.quarantinedCount} ขัง
+                                                                            </span>
+                                                                        )}
+                                                                        {Boolean(port.primeDetails.rescueOrders && port.primeDetails.rescueOrders > 0) && (
+                                                                            <span className="px-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30" title={`ไม้กู้ภัยทำงาน: ${port.primeDetails.rescueOrders} ไม้`}>
+                                                                                🛡️ {port.primeDetails.rescueOrders} กู้ภัย
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ) : port.engineTier === 'v2_3tier' ? (
                                                                 <span className="inline-flex items-center gap-1 text-[8px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 (3-Tier)
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 Max
                                                                 </span>
                                                             ) : port.engineTier === 'legacy_2url' ? (
                                                                 <span className="inline-flex items-center gap-1 text-[8px] text-sky-400 font-mono bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
@@ -6045,9 +6212,34 @@ export default function EasyMMasterDashboardPage() {
                                                         </>
                                                     );
                                                 })()}
-                                                {port.engineTier === 'v2_3tier' ? (
+                                                {port.primeDetails ? (
+                                                    <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                                        <span className="inline-flex items-center gap-1 text-[8px] text-purple-300 font-mono bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/40 shadow-sm" title={`EasyM Prime (Build ${port.primeDetails.buildId || 'v2.10'}) โหมด ${port.primeDetails.mode} (DD: ${port.primeDetails.modeDD?.toFixed(1)}%)`}>
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block animate-pulse"></span> 🌟 Prime {port.primeDetails.buildId ? port.primeDetails.buildId.replace('EasyM_Prime_', '') : 'v2.10'}
+                                                        </span>
+                                                        <div className="flex items-center gap-1 text-[8px] font-mono">
+                                                            <span className={`px-1 rounded font-bold ${
+                                                                port.primeDetails.mode === 'NORMAL' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                                                port.primeDetails.mode === 'SLOW' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                                                'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                                            }`}>
+                                                                {port.primeDetails.mode}
+                                                            </span>
+                                                            {Boolean(port.primeDetails.quarantinedCount && port.primeDetails.quarantinedCount > 0) && (
+                                                                <span className="px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30" title={`ขังคู่เงิน: ${port.primeDetails.quarantinedList?.join(', ')}`}>
+                                                                    🔒 {port.primeDetails.quarantinedCount} ขัง
+                                                                </span>
+                                                            )}
+                                                            {Boolean(port.primeDetails.rescueOrders && port.primeDetails.rescueOrders > 0) && (
+                                                                <span className="px-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30" title={`ไม้กู้ภัยทำงาน: ${port.primeDetails.rescueOrders} ไม้`}>
+                                                                    🛡️ {port.primeDetails.rescueOrders} กู้ภัย
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : port.engineTier === 'v2_3tier' ? (
                                                     <span className="inline-flex items-center gap-1 text-[8px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30" title="สถาปัตยกรรม Single Domain 3-Tier (v2.00): ตั้งค่าโดเมน eaeze.com โดเมนเดียว">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 (3-Tier)
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> ⚡ v2.00 Max
                                                     </span>
                                                 ) : port.engineTier === 'legacy_2url' ? (
                                                     <span className="inline-flex items-center gap-1 text-[8px] text-sky-400 font-mono bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20" title="เชื่อมต่อสมบูรณ์ (2 URLs): ส่งข้อมูลคำสั่ง, กำไร และ DD ครบถ้วน">
