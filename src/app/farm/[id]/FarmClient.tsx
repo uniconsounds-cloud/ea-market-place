@@ -639,56 +639,6 @@ export default function FarmClient({
         refreshUserFarmPorts();
     }, [isMultiFarmView, ownerUserId, refreshUserFarmPorts]);
 
-    const handleSelectMultiFarmPort = async (target: {
-        portNumber: string;
-        portName: string | null;
-        eaType: 'PRIME' | 'MAX';
-        createdAt: string | null;
-        portStatus: any | null;
-        licenseInfo: any;
-    }) => {
-        setIsMultiFarmView(false);
-        setIsFarmGuideActive(false);
-        setExpandedGuideBox(null);
-        setIsDdExpanded(false);
-        setIsQuarantineExpanded(false);
-        setIsQuarantineEnlarged(false);
-
-        if (String(target.portNumber) === String(portNumber)) {
-            return;
-        }
-
-        // สลับข้อมูลหน้าฟาร์มไปยังพอร์ตที่คลิกทันที
-        setPortNumber(target.portNumber);
-        setCurrentCustomName(target.portName || '');
-        setLicenseCreatedAt(target.createdAt || null);
-        if (target.licenseInfo) {
-            setLicenseInfo(target.licenseInfo);
-        }
-        if (target.portStatus) {
-            setPortStatus(target.portStatus);
-        }
-        setOrders([]);
-        setRecentlyClosed([]);
-
-        if (typeof window !== 'undefined') {
-            window.history.pushState(null, '', `/farm/${target.portNumber}`);
-        }
-
-        try {
-            const [statusRes, ordersRes, histRes] = await Promise.all([
-                supabase.from('farm_port_status').select('*').eq('port_number', target.portNumber).maybeSingle(),
-                supabase.from('farm_active_orders').select('*').eq('port_number', target.portNumber),
-                supabase.from('farm_daily_history').select('*').eq('port_number', target.portNumber).order('date', { ascending: false }).limit(120)
-            ]);
-            if (statusRes.data) setPortStatus(statusRes.data);
-            if (ordersRes.data) setOrders(ordersRes.data);
-            if (histRes.data) setHistory([...histRes.data].reverse());
-        } catch (e) {
-            console.warn('Switch farm port fetch error:', e);
-        }
-    };
-
     // คลิกพื้นที่อื่นที่ไม่ได้อยู่ในกรอบอธิบาย (หรือปุ่มลูกแก้วที่ 4) ให้ซ่อนกรอบอธิบายทั้งหมดทันที
     useEffect(() => {
         if (!isFarmGuideActive) return;
@@ -1841,6 +1791,77 @@ export default function FarmClient({
         } finally {
             setIsDispatchingCommand(false);
             setPendingPairAction(null);
+        }
+    };
+
+    // 🧹 รีเซ็ต UI เมนู ป๊อปอัป และหน้าต่างย่อยทั้งหมดให้กลับเป็นหน้าฟาร์มเริ่มต้นที่คลีน 100%
+    const resetFarmCleanState = useCallback(() => {
+        setIsMultiFarmView(false);
+        setPrimeActiveOrb(null);
+        setIsFarmGuideActive(false);
+        setExpandedGuideBox(null);
+        setIsDdExpanded(false);
+        setIsQuarantineExpanded(false);
+        setIsQuarantineEnlarged(false);
+        setIsDdOrbExpanded(false);
+        setSelectedDdOrb(null);
+        setHighlightTarget(null);
+        setExpandedActivePair(null);
+        setIsLiveTerminalOpen(false);
+        setSelectedTreeModal(null);
+        setExpandedTreeId(null);
+        setPendingPairAction(null);
+        setViewMode('farm');
+    }, []);
+
+    // เมื่อสลับพอร์ต (portNumber เปลี่ยนแปลง) ให้รีเซ็ต UI state ทุกอย่างกลับเป็นหน้าฟาร์มคลีนเริ่มต้นเสมอ
+    useEffect(() => {
+        resetFarmCleanState();
+    }, [portNumber, resetFarmCleanState]);
+
+    const handleSelectMultiFarmPort = async (target: {
+        portNumber: string;
+        portName: string | null;
+        eaType: 'PRIME' | 'MAX';
+        createdAt: string | null;
+        portStatus: any | null;
+        licenseInfo: any;
+    }) => {
+        // เคลียร์ UI ทุกเมนูและป๊อปอัปให้เป็นหน้าฟาร์มคลีนเริ่มต้นทันทีก่อนสลับ
+        resetFarmCleanState();
+
+        if (String(target.portNumber) === String(portNumber)) {
+            return;
+        }
+
+        // สลับข้อมูลหน้าฟาร์มไปยังพอร์ตที่คลิกทันที
+        setPortNumber(target.portNumber);
+        setCurrentCustomName(target.portName || '');
+        setLicenseCreatedAt(target.createdAt || null);
+        if (target.licenseInfo) {
+            setLicenseInfo(target.licenseInfo);
+        }
+        if (target.portStatus) {
+            setPortStatus(target.portStatus);
+        }
+        setOrders([]);
+        setRecentlyClosed([]);
+
+        if (typeof window !== 'undefined') {
+            window.history.pushState(null, '', `/farm/${target.portNumber}`);
+        }
+
+        try {
+            const [statusRes, ordersRes, histRes] = await Promise.all([
+                supabase.from('farm_port_status').select('*').eq('port_number', target.portNumber).maybeSingle(),
+                supabase.from('farm_active_orders').select('*').eq('port_number', target.portNumber),
+                supabase.from('farm_daily_history').select('*').eq('port_number', target.portNumber).order('date', { ascending: false }).limit(120)
+            ]);
+            if (statusRes.data) setPortStatus(statusRes.data);
+            if (ordersRes.data) setOrders(ordersRes.data);
+            if (histRes.data) setHistory([...histRes.data].reverse());
+        } catch (e) {
+            console.warn('Switch farm port fetch error:', e);
         }
     };
 
@@ -4751,10 +4772,11 @@ export default function FarmClient({
                         {/* Orb 2: Cyan/Blue Glow (Cockpit Matrix - 20-Pair Telemetry) */}
                         <button
                             onClick={() => {
-                                setIsDdOrbExpanded(false);
-                                setSelectedDdOrb(null);
-                                setHighlightTarget(null);
-                                setPrimeActiveOrb(2);
+                                const next = primeActiveOrb === 2 ? null : 2;
+                                resetFarmCleanState();
+                                if (next !== null) {
+                                    setPrimeActiveOrb(2);
+                                }
                             }}
                             className="group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.75)] hover:scale-110 active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
                             title="20-Pair Cockpit Matrix (รายงานสถานะ 20 คู่เงิน)"
@@ -4767,19 +4789,12 @@ export default function FarmClient({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setIsMultiFarmView(prev => {
-                                        const next = !prev;
-                                        if (next) {
-                                            refreshUserFarmPorts();
-                                            setIsFarmGuideActive(false);
-                                            setExpandedGuideBox(null);
-                                            setIsDdExpanded(false);
-                                            setIsQuarantineExpanded(false);
-                                            setIsQuarantineEnlarged(false);
-                                            setPrimeActiveOrb(null);
-                                        }
-                                        return next;
-                                    });
+                                    const next = !isMultiFarmView;
+                                    resetFarmCleanState();
+                                    if (next) {
+                                        setIsMultiFarmView(true);
+                                        refreshUserFarmPorts();
+                                    }
                                 }}
                                 className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
                                     isMultiFarmView
@@ -4813,9 +4828,11 @@ export default function FarmClient({
                                 data-farm-guide="true"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setIsMultiFarmView(false);
-                                    setIsFarmGuideActive(prev => !prev);
-                                    setExpandedGuideBox(null);
+                                    const next = !isFarmGuideActive;
+                                    resetFarmCleanState();
+                                    if (next) {
+                                        setIsFarmGuideActive(true);
+                                    }
                                 }}
                                 className={`group relative flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#0f172a]/90 border transition-all duration-300 backdrop-blur-md cursor-pointer ${
                                     isFarmGuideActive
