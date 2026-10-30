@@ -88,6 +88,7 @@ type FarmHudProps = {
     customName?: string;
     adminMessage?: string | null;
     isNonLive10m?: boolean;
+    onHarvestClick?: () => void;
 };
 
 export default function FarmHud({
@@ -114,6 +115,7 @@ export default function FarmHud({
     customName,
     adminMessage,
     isNonLive10m = false,
+    onHarvestClick,
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
@@ -399,12 +401,29 @@ export default function FarmHud({
                 </div>
 
                 {/* Right: Today Harvest Icon & Result */}
-                <div className={`hidden sm:flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24 ${slowBlinkClass}`}>
-                    <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''}`}>
+                <div 
+                    onClick={(e) => {
+                        if (onHarvestClick) {
+                            e.stopPropagation();
+                            onHarvestClick();
+                        }
+                    }}
+                    className={`hidden sm:flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24 ${slowBlinkClass} ${onHarvestClick ? 'cursor-pointer hover:border-amber-400/60 hover:bg-amber-950/30 hover:scale-[1.02] active:scale-[0.98] transition-all group' : ''}`}
+                    title={onHarvestClick ? "📦 คลิกเพื่อดูสรุปการปิดรวบกำไรวันนี้ (Today Harvest Breakdown)" : undefined}
+                >
+                    <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''} ${onHarvestClick ? 'group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(251,191,36,0.7)]' : ''}`}>
                         <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
+                        {onHarvestClick && (
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3 sm:h-3.5 sm:w-3.5 items-center justify-center rounded-full bg-amber-400 text-black text-[8px] sm:text-[9px] font-black shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse pointer-events-none">
+                                ✦
+                            </span>
+                        )}
                     </div>
                     <div className="flex flex-col pr-1 justify-center">
-                        <span className="hidden sm:block text-[8px] lg:text-[10px] text-amber-200/40 uppercase font-black tracking-widest leading-none mb-1">Today Result</span>
+                        <span className={`hidden sm:flex items-center gap-1 text-[8px] lg:text-[10px] uppercase font-black tracking-widest leading-none mb-1 ${onHarvestClick ? 'text-amber-300 group-hover:text-amber-200' : 'text-amber-200/40'}`}>
+                            <span>Today Result</span>
+                            {onHarvestClick && <span className="text-[7.5px] font-bold text-amber-400/80 bg-amber-400/10 px-1 py-0.2 rounded border border-amber-400/30">REPORT ↗</span>}
+                        </span>
                         <span className={`text-[11px] sm:text-sm lg:text-xl font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm leading-none`}>
                             <AnimatedNumber
                                 value={todayProfit}
@@ -456,6 +475,7 @@ export function FarmMobileStatsOverlay({
     customName,
     adminMessage,
     isNonLive10m = false,
+    onHarvestClick,
 }: {
     portNumber: string;
     buyCount: number;
@@ -474,6 +494,7 @@ export function FarmMobileStatsOverlay({
     customName?: string;
     adminMessage?: string | null;
     isNonLive10m?: boolean;
+    onHarvestClick?: () => void;
 }) {
     const [messageIndex, setMessageIndex] = useState(0);
     const slowBlinkClass = isNonLive10m ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : '';
@@ -575,7 +596,10 @@ export function FarmMobileStatsOverlay({
             </div>
 
             {/* Right side Today Result Box */}
-            <div className={`bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start p-[2px] ${slowBlinkClass}`}>
+            <div 
+                onClick={onHarvestClick}
+                className={`bg-[#110e0b]/90 border border-amber-900/40 rounded-xl relative h-[80px] min-w-[130px] flex items-start p-[2px] ${slowBlinkClass} ${onHarvestClick ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
+            >
                 {/* Profit Text on Top-Left */}
                 <div className="relative z-20 flex-1 pl-[2px] pt-[2px]">
                     <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>

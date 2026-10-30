@@ -7,6 +7,7 @@ import Image from 'next/image';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 import AdminFarmDiagnosticOverlay from '@/components/AdminFarmDiagnosticOverlay';
 import OwnerDevFarmController from '@/components/OwnerDevFarmController';
+import TodayHarvestModal from '@/components/TodayHarvestModal';
 import { toast } from 'sonner';
 import { 
     Shield, Layers, Zap, Crosshair, X, 
@@ -1651,15 +1652,17 @@ export default function FarmClient({
 
     // 📡 Live Orders Streaming State & Dev Modal (Gated to isDevPort3088 defined above)
     const [isLiveTerminalOpen, setIsLiveTerminalOpen] = useState(false);
+    // 🌾 Today Harvest Basket Closures Modal State (Gated to isDevPort3088)
+    const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
 
     // 🚪 Auto-collapse DD Orbs when any modal popup opens
     useEffect(() => {
-        if (primeActiveOrb !== null || isLiveTerminalOpen || expandedActivePair !== null) {
+        if (primeActiveOrb !== null || isLiveTerminalOpen || isHarvestModalOpen || expandedActivePair !== null) {
             setIsDdOrbExpanded(false);
             setSelectedDdOrb(null);
             setHighlightTarget(null);
         }
-    }, [primeActiveOrb, isLiveTerminalOpen, expandedActivePair]);
+    }, [primeActiveOrb, isLiveTerminalOpen, isHarvestModalOpen, expandedActivePair]);
     const [liveTerminalFilter, setLiveTerminalFilter] = useState<'ALL' | 'EASYM' | 'EXTERNAL'>('ALL');
     const [liveOrdersData, setLiveOrdersData] = useState<{
         orders: any[];
@@ -1863,6 +1866,7 @@ export default function FarmClient({
         }
         setExpandedActivePair(null);
         setIsLiveTerminalOpen(false);
+        setIsHarvestModalOpen(false);
         setSelectedTreeModal(null);
         setExpandedTreeId(null);
         setPendingPairAction(null);
@@ -2941,6 +2945,7 @@ export default function FarmClient({
                     systemCode={portStatus?.system_code?.split(':::')[0]}
                     onClick={handleSecretToggle}
                     isNonLive10m={isFallback1Url}
+                    onHarvestClick={isDevPort3088 ? () => setIsHarvestModalOpen(true) : undefined}
                 />
                 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -2988,6 +2993,7 @@ export default function FarmClient({
                 isShaking={isShaking}
                 customName={currentCustomName || undefined}
                 isNonLive10m={isFallback1Url}
+                onHarvestClick={isDevPort3088 ? () => setIsHarvestModalOpen(true) : undefined}
             />
 
             {/* ⚠️ CENTERED NON-LIVE SETUP GUIDE MODAL (WHEN URL #2 IS MISSING IN MT5) */}
@@ -6773,6 +6779,18 @@ export default function FarmClient({
                     onSetSimulatedThreshold={setSimulatedThreshold}
                     simulatedFarmStatus={simulatedFarmStatus}
                     onSetSimulatedFarmStatus={setSimulatedFarmStatus}
+                />
+            )}
+            {/* 🌾 Today Harvest Basket Closures Modal (Gated to Dev Port 3088 Only) */}
+            {isDevPort3088 && (
+                <TodayHarvestModal
+                    isOpen={isHarvestModalOpen}
+                    onClose={() => setIsHarvestModalOpen(false)}
+                    portNumber={portNumber}
+                    initialTodayProfit={smoothedTodayProfit}
+                    initialTodayLots={Number(portStatus?.today_closed_lots) || 0}
+                    initialMaxDd={Number(portStatus?.daily_max_drawdown) || 0}
+                    accountType={portStatus?.account_type || 'USC'}
                 />
             )}
         </div>

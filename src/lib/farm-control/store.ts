@@ -24,6 +24,22 @@ export interface LiveOrder {
     is_external?: boolean;
 }
 
+export interface BasketEvent {
+    id?: string;
+    port_number: string;
+    symbol: string;
+    side: 'BUY' | 'SELL' | 'CUT' | string;
+    exit_type: 'FULL_BASKET_TP' | 'RESCUE_T1_SCALP_TP' | 'RESCUE_T2_SCALP_TP' | 'RESCUE_T3_SCALP_TP' | 'RESCUE_ALL_SCALP_TP' | 'QUARANTINE_FULL_EXIT' | 'RELIEF_TRIM' | string;
+    orders: number;
+    lots: number;
+    profit: number;
+    duration_sec?: number;
+    max_dd_pct?: number;
+    closed_at: number; // Unix timestamp in seconds
+    ea_name?: string;
+    ea_build?: string;
+}
+
 export interface PortControlConfig {
     port_number: string;
     control_mode: 'web' | 'manual';
@@ -39,6 +55,7 @@ export interface PortControlConfig {
 const memoryCache: Record<string, PortControlConfig> = {};
 const memoryLiveOrders: Record<string, { orders: LiveOrder[]; updated_at: number }> = {};
 const memoryViewerPings: Record<string, number> = {};
+const memoryBasketEvents: Record<string, BasketEvent[]> = {};
 
 const DATA_DIR = path.join(process.cwd(), '.farm_data');
 const DATA_FILE = path.join(DATA_DIR, 'port_controls.json');
@@ -242,4 +259,71 @@ export function isViewerActiveForPort(portNumber: string, maxInactiveMs: number 
     const cleanPort = String(portNumber).trim();
     const lastPing = memoryViewerPings[cleanPort] || 0;
     return (Date.now() - lastPing) < maxInactiveMs;
+}
+
+// ==========================================
+// 📦 BASKET CLOSURE & HARVEST TELEMETRY STORE
+// ==========================================
+
+export function recordBasketEvent(portNumber: string, event: BasketEvent): boolean {
+    const cleanPort = String(portNumber).trim();
+    if (!cleanPort || !event.symbol) return false;
+
+    if (!memoryBasketEvents[cleanPort]) {
+        memoryBasketEvents[cleanPort] = getBasketEvents(cleanPort);
+    }
+
+    const events = memoryBasketEvents[cleanPort];
+    // Deduplication check: same symbol, closed_at (within 2s), and profit
+    const isDup = events.some(e => 
+        e.symbol === event.symbol && 
+        Math.abs((e.closed_at || 0) - (event.closed_at || 0)) <= 3 && 
+        Math.abs((e.profit || 0) - (event.profit || 0)) < 0.01
+    );
+
+    if (isDup) return false;
+
+    // Prepend latest event
+    events.unshift({
+        ...event,
+        port_number: cleanPort,
+        id: event.id || `b_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    });
+
+    // Keep at most 200 recent events
+    if (events.length > 200) {
+        events.length = 200;
+    }
+
+    // Disk persistence
+    try {
+        ensureDataFile();
+        const basketFile = path.join(DATA_DIR, `basket_events_${cleanPort}.json`);
+        fs.writeFileSync(basketFile, JSON.stringify(events), 'utf-8');
+    } catch (e) {
+        // Non-blocking disk write
+    }
+
+    return true;
+}
+
+export function getBasketEvents(portNumber: string): BasketEvent[] {
+    const cleanPort = String(portNumber).trim();
+    if (memoryBasketEvents[cleanPort] && memoryBasketEvents[cleanPort].length > 0) {
+        return memoryBasketEvents[cleanPort];
+    }
+    try {
+        const basketFile = path.join(DATA_DIR, `basket_events_${cleanPort}.json`);
+        if (fs.existsSync(basketFile)) {
+            const raw = fs.readFileSync(basketFile, 'utf-8');
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                memoryBasketEvents[cleanPort] = parsed;
+                return parsed;
+            }
+        }
+    } catch (e) {
+        // Fallback
+    }
+    return [];
 }

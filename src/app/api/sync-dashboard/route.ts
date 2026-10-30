@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { getPortControlAsync, updatePortControlAsync, saveLiveOrders, isViewerActiveForPort } from '@/lib/farm-control/store';
+import { getPortControlAsync, updatePortControlAsync, saveLiveOrders, isViewerActiveForPort, recordBasketEvent } from '@/lib/farm-control/store';
 import { sweepAndDeactivateExpiredLicenses } from '@/lib/license-audit';
 
 export const dynamic = 'force-dynamic';
@@ -266,6 +266,27 @@ export async function POST(req: Request) {
             }
         }
 
+        // Cache last basket closure from prime_data if present
+        if (incomingPrimeData?.last_basket && typeof incomingPrimeData.last_basket === 'object') {
+            const lb = incomingPrimeData.last_basket;
+            if (lb.symbol && lb.closed_at) {
+                recordBasketEvent(portNumber, {
+                    port_number: portNumber,
+                    symbol: String(lb.symbol),
+                    side: String(lb.side || 'BUY'),
+                    exit_type: String(lb.exit_type || 'FULL_BASKET_TP'),
+                    orders: Number(lb.orders || 1),
+                    lots: Number(lb.lots || 0),
+                    profit: Number(lb.profit || 0),
+                    duration_sec: Number(lb.duration_sec || 0),
+                    max_dd_pct: Number(lb.max_dd || 0),
+                    closed_at: Number(lb.closed_at),
+                    ea_name: 'EasyM Prime',
+                    ea_build: String(incomingPrimeData.build_id || 'B261028.2')
+                });
+            }
+        }
+
         const primeData = isFallback1UrlEA ? {
             sync_mode: 'FALLBACK_1URL',
             last_10m_sync: nowIso
@@ -385,6 +406,25 @@ export async function POST(req: Request) {
                 ea_build: ev.ea_build || null,
                 max_dd_pct: ev.max_dd_pct || 0
             };
+
+            // Fast local & memory store
+            if (richData.symbol) {
+                recordBasketEvent(portNumber, {
+                    port_number: portNumber,
+                    symbol: String(richData.symbol),
+                    side: String(richData.side || 'BUY'),
+                    exit_type: String(richData.exit_type || 'FULL_BASKET_TP'),
+                    orders: Number(richData.total_orders || 1),
+                    lots: Number(richData.total_lots || 0),
+                    profit: Number(richData.total_profit || 0),
+                    duration_sec: Number(richData.duration_sec || 0),
+                    max_dd_pct: Number(richData.max_dd_pct || 0),
+                    closed_at: Math.floor(Date.now() / 1000),
+                    ea_name: richData.ea_name || 'EasyM Prime',
+                    ea_build: richData.ea_build || 'B261028.2'
+                });
+            }
+
             const { error: richErr } = await supabase.from('farm_batch_events').insert(richData);
             if (richErr) {
                 // Graceful fallback to basic columns if migration is pending
