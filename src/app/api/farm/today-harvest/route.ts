@@ -99,8 +99,44 @@ export async function GET(req: Request) {
             }
         }
 
-        // 3. Read events from store
+        // 3. Read events: Query persistent farm_batch_events from Supabase first
         let events = getBasketEvents(portNumber);
+
+        try {
+            // Check past 24 hours of events for this port
+            const past24hIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+            const { data: dbBatchEvents } = await supabase
+                .from('farm_batch_events')
+                .select('*')
+                .eq('port_number', portNumber)
+                .gte('event_timestamp', past24hIso)
+                .order('event_timestamp', { ascending: false })
+                .limit(100);
+
+            if (dbBatchEvents && dbBatchEvents.length > 0) {
+                const dbMapped: BasketEvent[] = dbBatchEvents.map((row: any) => ({
+                    id: row.event_id || row.id || `ev_${row.port_number}_${row.event_timestamp}`,
+                    port_number: row.port_number,
+                    symbol: String(row.symbol || 'UNKNOWN').toUpperCase(),
+                    side: (row.side || 'BUY') as 'BUY' | 'SELL',
+                    exit_type: row.exit_type || 'FULL_BASKET_TP',
+                    orders: Number(row.total_orders || 1),
+                    lots: Number(row.total_lots || 0),
+                    profit: Number(row.total_profit || 0),
+                    duration_sec: Number(row.duration_sec || 0),
+                    max_dd_pct: Number(row.max_dd_pct || 0),
+                    closed_at: Math.floor(new Date(row.event_timestamp).getTime() / 1000),
+                    ea_name: row.ea_name || 'EasyM Prime',
+                    ea_build: row.ea_build || 'B261028.2'
+                }));
+
+                const existingIds = new Set(dbMapped.map(e => e.id));
+                const extraMemory = events.filter(e => !existingIds.has(e.id));
+                events = [...dbMapped, ...extraMemory];
+            }
+        } catch (dbErr) {
+            console.error('Error fetching farm_batch_events:', dbErr);
+        }
 
         // If for dev port 3088, we need a complete reconciled breakdown for today matching the real numbers
         if (isDevPort) {

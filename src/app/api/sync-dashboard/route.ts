@@ -434,49 +434,93 @@ export async function POST(req: Request) {
             }
         }
 
-        // 5. Process Batch Closure Events (History Data & Rich Telemetry)
-        if (type === 'BATCH_CLOSE' || payload.event?.type === 'BATCH_CLOSE') {
-            const ev = payload.event || payload;
-            const baseData: any = {
-                port_number: portNumber,
-                total_orders: ev.total_orders || 0,
-                total_lots: ev.total_lots || 0,
-                total_profit: ev.total_profit || 0,
-                event_timestamp: nowIso
-            };
-            const richData: any = {
-                ...baseData,
-                symbol: ev.symbol || null,
-                side: ev.side || null,
-                exit_type: ev.exit_type || null,
-                duration_sec: ev.duration_sec || 0,
-                ea_name: ev.ea_name || null,
-                ea_build: ev.ea_build || null,
-                max_dd_pct: ev.max_dd_pct || 0
-            };
+        // 5. Process Batch Closure Events (History Data & Rich Telemetry with Anti-Duplicate Protection)
+        const incomingHarvestList = Array.isArray(payload.harvest_events)
+            ? payload.harvest_events
+            : (Array.isArray(incomingPrimeData?.harvest_events)
+                ? incomingPrimeData.harvest_events
+                : ((type === 'BATCH_CLOSE' || payload.event?.type === 'BATCH_CLOSE') ? [payload.event || payload] : []));
 
-            // Fast local & memory store
-            if (richData.symbol) {
-                recordBasketEvent(portNumber, {
-                    port_number: portNumber,
-                    symbol: String(richData.symbol),
-                    side: String(richData.side || 'BUY'),
-                    exit_type: String(richData.exit_type || 'FULL_BASKET_TP'),
-                    orders: Number(richData.total_orders || 1),
-                    lots: Number(richData.total_lots || 0),
-                    profit: Number(richData.total_profit || 0),
-                    duration_sec: Number(richData.duration_sec || 0),
-                    max_dd_pct: Number(richData.max_dd_pct || 0),
-                    closed_at: Math.floor(Date.now() / 1000),
-                    ea_name: richData.ea_name || 'EasyM Prime',
-                    ea_build: richData.ea_build || 'B261028.2'
-                });
+        // Also include last_basket as a potential event if not already present
+        if (incomingPrimeData?.last_basket && typeof incomingPrimeData.last_basket === 'object' && incomingPrimeData.last_basket.symbol) {
+            const lb = incomingPrimeData.last_basket;
+            const alreadyInList = incomingHarvestList.some((e: any) => e.symbol === lb.symbol && Number(e.closed_at) === Number(lb.closed_at));
+            if (!alreadyInList) {
+                incomingHarvestList.push(lb);
             }
+        }
 
-            const { error: richErr } = await supabase.from('farm_batch_events').insert(richData);
-            if (richErr) {
-                // Graceful fallback to basic columns if migration is pending
-                await supabase.from('farm_batch_events').insert(baseData);
+        const processedHarvestIds: string[] = [];
+
+        if (incomingHarvestList.length > 0) {
+            for (const ev of incomingHarvestList) {
+                if (!ev || !ev.symbol) continue;
+                const sym = String(ev.symbol).toUpperCase().trim();
+                const totalOrders = Number(ev.total_orders || ev.orders || 1);
+                const totalLots = Number(ev.total_lots || ev.lots || 0);
+                const totalProfit = Number(ev.total_profit || ev.profit || 0);
+                const closedAtSec = Number(ev.closed_at || Math.floor(Date.now() / 1000));
+                const evTimestamp = new Date(closedAtSec * 1000).toISOString();
+                const exitType = String(ev.exit_type || 'FULL_BASKET_TP');
+                const side = String(ev.side || 'BUY');
+                const durationSec = Number(ev.duration_sec || 0);
+                const maxDdPct = Number(ev.max_dd_pct || ev.max_dd || 0);
+                const eaName = ev.ea_name || 'EasyM Prime';
+                const eaBuild = ev.ea_build || incomingPrimeData?.build_id || 'B261028.2';
+
+                // Deterministic Unique ID: port_symbol_closedAt_orders_profitCents
+                const eventId = String(ev.event_id || `${portNumber}_${sym}_${closedAtSec}_${totalOrders}_${Math.round(totalProfit * 100)}`);
+                processedHarvestIds.push(eventId);
+
+                // 1. Fast local in-memory store for instant zero-latency UI rendering
+                recordBasketEvent(portNumber, {
+                    id: eventId,
+                    port_number: portNumber,
+                    symbol: sym,
+                    side: side,
+                    exit_type: exitType,
+                    orders: totalOrders,
+                    lots: totalLots,
+                    profit: totalProfit,
+                    duration_sec: durationSec,
+                    max_dd_pct: maxDdPct,
+                    closed_at: closedAtSec,
+                    ea_name: eaName,
+                    ea_build: eaBuild
+                });
+
+                // 2. Persistent Supabase DB write with de-duplication
+                const richData: any = {
+                    event_id: eventId,
+                    port_number: portNumber,
+                    total_orders: totalOrders,
+                    total_lots: totalLots,
+                    total_profit: totalProfit,
+                    symbol: sym,
+                    side: side,
+                    exit_type: exitType,
+                    duration_sec: durationSec,
+                    ea_name: eaName,
+                    ea_build: eaBuild,
+                    max_dd_pct: maxDdPct,
+                    event_timestamp: evTimestamp
+                };
+
+                try {
+                    // Try Upsert with event_id uniqueness to prevent duplicates
+                    const { error: upErr } = await supabase
+                        .from('farm_batch_events')
+                        .upsert(richData, { onConflict: 'event_id', ignoreDuplicates: true });
+
+                    if (upErr) {
+                        // Fallback without event_id column if table migration pending
+                        delete richData.event_id;
+                        await supabase.from('farm_batch_events').insert(richData);
+                    }
+                } catch (dbErr) {
+                    // Non-blocking log
+                    console.error('Failed to write farm_batch_events:', dbErr);
+                }
             }
         }
 
@@ -573,7 +617,8 @@ export async function POST(req: Request) {
             license_tier: isFallback1UrlEA ? 'free' : 'pro',
             is_trial: false,
             timestamp: nowIso,
-            web_config: webConfig
+            web_config: webConfig,
+            ack_harvest_ids: processedHarvestIds
         });
 
     } catch (err: any) {
