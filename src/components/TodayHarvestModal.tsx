@@ -110,49 +110,49 @@ export default function TodayHarvestModal({
         switch (exitType) {
             case 'FULL_BASKET_TP':
                 return {
-                    label: 'ปิดรวบทั้งพวง (Full Basket TP)',
+                    label: 'FULL BASKET TP',
                     badge: 'bg-emerald-500/15 border-emerald-400/50 text-emerald-300',
                     dot: 'bg-emerald-400',
                     tag: 'TP'
                 };
             case 'RESCUE_T1_SCALP_TP':
                 return {
-                    label: 'สแคปกู้ภัย Tier 1 (Rescue Scalp)',
+                    label: 'RESCUE T1 TP',
                     badge: 'bg-cyan-500/15 border-cyan-400/50 text-cyan-300',
                     dot: 'bg-cyan-400',
                     tag: 'RESCUE T1'
                 };
             case 'RESCUE_T2_SCALP_TP':
                 return {
-                    label: 'สแคปกู้ภัย Tier 2 (Rescue Scalp)',
+                    label: 'RESCUE T2 TP',
                     badge: 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200',
                     dot: 'bg-cyan-400',
                     tag: 'RESCUE T2'
                 };
             case 'RESCUE_ALL_SCALP_TP':
                 return {
-                    label: 'สแคปกู้ภัยรวบทั้งหมด (Rescue Scalp All)',
+                    label: 'RESCUE ALL TP',
                     badge: 'bg-sky-500/20 border-sky-400/60 text-sky-200',
                     dot: 'bg-sky-400',
                     tag: 'RESCUE ALL'
                 };
             case 'QUARANTINE_FULL_EXIT':
                 return {
-                    label: 'ปลดล็อกจากห้องขัง (Quarantine Exit)',
+                    label: 'QUAR EXIT',
                     badge: 'bg-amber-500/15 border-amber-400/50 text-amber-300',
                     dot: 'bg-amber-400',
                     tag: 'QUAR EXIT'
                 };
             case 'RELIEF_TRIM':
                 return {
-                    label: 'กองทุนตัดไม้ภาระ (Relief Trim)',
+                    label: 'RELIEF TRIM',
                     badge: 'bg-purple-500/15 border-purple-400/50 text-purple-300',
                     dot: 'bg-purple-400',
                     tag: 'TRIM'
                 };
             default:
                 return {
-                    label: exitType,
+                    label: exitType.replace(/_/g, ' '),
                     badge: 'bg-slate-500/15 border-slate-400/40 text-slate-300',
                     dot: 'bg-slate-400',
                     tag: 'CLOSE'
@@ -267,7 +267,7 @@ export default function TodayHarvestModal({
 
     return (
         <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000001] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
             onClick={onClose}
         >
             <div 
@@ -278,9 +278,9 @@ export default function TodayHarvestModal({
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-500 pointer-events-none" />
 
                 {/* 🏷️ Header */}
-                <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-white/10 shrink-0 bg-black/40">
-                    <div className="flex items-center gap-2.5 sm:gap-3.5">
-                        <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+                <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-white/10 shrink-0 bg-black/40">
+                    <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+                        <div className="relative w-9 h-9 sm:w-11 sm:h-11 flex-shrink-0 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
                             <Image 
                                 src="/farm/base_farmbox_full.webp" 
                                 alt="Crate" 
@@ -289,80 +289,77 @@ export default function TodayHarvestModal({
                                 unoptimized 
                             />
                         </div>
-                        <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-sm sm:text-lg font-black font-mono tracking-wider text-amber-300 drop-shadow flex items-center gap-1.5">
-                                    <span>🌾 สรุปการปิดรวบกำไรวันนี้</span>
-                                    <span className="text-[10px] sm:text-xs font-mono font-bold text-white/50 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-400/30">
-                                        TODAY HARVEST
-                                    </span>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                <h2 className="text-sm sm:text-base font-black font-mono tracking-wider text-amber-300 drop-shadow whitespace-nowrap">
+                                    🌾 TODAY HARVEST
                                 </h2>
-                                <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.2 rounded-full border border-cyan-500/30 whitespace-nowrap">
                                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                                    <span>LIVE TELEMETRY</span>
+                                    <span>LIVE</span>
                                 </span>
                             </div>
-                            <p className="text-[10px] sm:text-xs text-white/60 font-mono mt-0.5">
-                                พอร์ต: <span className="text-amber-200 font-bold">{portNumber}</span> | รายละเอียดการรวบกำไรจาก MT5 Real-time
+                            <p className="text-[9.5px] sm:text-xs text-white/60 font-mono mt-0.5 whitespace-nowrap truncate">
+                                PORT: <span className="text-amber-200 font-bold">{portNumber}</span> • MT5 Live Telemetry
                             </p>
                         </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         <button
                             onClick={() => fetchData(true)}
                             disabled={isRefreshing}
                             className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                             title="รีเฟรชข้อมูลล่าสุด"
                         >
-                            <RefreshCw className={`w-4 h-4 sm:w-4.5 sm:h-4.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                            <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
                         </button>
                         <button
                             onClick={onClose}
                             className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-white/70 hover:text-rose-300 transition-all cursor-pointer active:scale-95"
                             aria-label="Close"
                         >
-                            <X className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                     </div>
                 </div>
 
                 {/* 📊 Today Hero Summary Badges Row */}
-                <div className="grid grid-cols-3 gap-2 px-3 sm:px-6 py-2.5 bg-black/60 border-b border-white/5 shrink-0 text-center font-mono">
-                    <div className="bg-[#051c14]/80 border border-emerald-500/30 rounded-xl p-2 flex flex-col items-center justify-center">
-                        <span className="text-[9px] sm:text-[10px] text-emerald-400/80 font-bold tracking-wider uppercase">
-                            กำไรสุทธิวันนี้ (Profit)
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5 bg-black/60 border-b border-white/5 shrink-0 text-center font-mono">
+                    <div className="bg-[#051c14]/80 border border-emerald-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
+                        <span className="text-[8.5px] sm:text-[10px] text-emerald-400/80 font-bold tracking-wider uppercase whitespace-nowrap">
+                            NET PROFIT
                         </span>
-                        <span className="text-xs sm:text-base font-black text-emerald-400 leading-tight mt-0.5">
+                        <span className="text-[11px] sm:text-base font-black text-emerald-400 leading-tight mt-0.5 whitespace-nowrap">
                             {pnlFormatted.main}
                         </span>
-                        <span className="text-[8px] sm:text-[9.5px] text-emerald-300/60 leading-tight">
+                        <span className="text-[7.5px] sm:text-[9.5px] text-emerald-300/60 leading-tight whitespace-nowrap">
                             {pnlFormatted.usd}
                         </span>
                     </div>
 
-                    <div className="bg-[#05141f]/80 border border-cyan-500/30 rounded-xl p-2 flex flex-col items-center justify-center">
-                        <span className="text-[9px] sm:text-[10px] text-cyan-400/80 font-bold tracking-wider uppercase">
-                            วอลุ่มปิดสะสม (Closed Lots)
+                    <div className="bg-[#05141f]/80 border border-cyan-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
+                        <span className="text-[8.5px] sm:text-[10px] text-cyan-400/80 font-bold tracking-wider uppercase whitespace-nowrap">
+                            CLOSED LOTS
                         </span>
-                        <span className="text-xs sm:text-base font-black text-cyan-300 leading-tight mt-0.5">
+                        <span className="text-[11px] sm:text-base font-black text-cyan-300 leading-tight mt-0.5 whitespace-nowrap">
                             {displayLots.toFixed(2)} Lots
                         </span>
-                        <span className="text-[8px] sm:text-[9.5px] text-cyan-400/60 leading-tight">
-                            {data?.events_count ?? 0} รอบการปิดรวบ
+                        <span className="text-[7.5px] sm:text-[9.5px] text-cyan-400/60 leading-tight whitespace-nowrap">
+                            {data?.events_count ?? 0} Baskets
                         </span>
                     </div>
 
-                    <div className="bg-[#1f0d05]/80 border border-amber-500/30 rounded-xl p-2 flex flex-col items-center justify-center">
-                        <span className="text-[9px] sm:text-[10px] text-amber-400/80 font-bold tracking-wider uppercase">
-                            Drawdown สูงสุดวันนี้
+                    <div className="bg-[#1f0d05]/80 border border-amber-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
+                        <span className="text-[8.5px] sm:text-[10px] text-amber-400/80 font-bold tracking-wider uppercase whitespace-nowrap">
+                            MAX DRAWDOWN
                         </span>
-                        <span className="text-xs sm:text-base font-black text-amber-300 leading-tight mt-0.5">
+                        <span className="text-[11px] sm:text-base font-black text-amber-300 leading-tight mt-0.5 whitespace-nowrap">
                             -{Math.abs(displayMaxDd).toFixed(2)}%
                         </span>
-                        <span className="text-[8px] sm:text-[9.5px] text-amber-400/60 leading-tight">
-                            Max DD Daily Peak
+                        <span className="text-[7.5px] sm:text-[9.5px] text-amber-400/60 leading-tight whitespace-nowrap">
+                            Daily Peak
                         </span>
                     </div>
                 </div>
@@ -374,19 +371,19 @@ export default function TodayHarvestModal({
                     {/* 1. UPPER SECTION: DONUT CHART + PAIR GROUPED SUMMARY           */}
                     {/* ═══════════════════════════════════════════════════════════════ */}
                     <div className="bg-black/50 border border-white/10 rounded-2xl p-3 sm:p-5 backdrop-blur-md">
-                        <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
-                            <div className="flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-amber-400" />
-                                <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider">
-                                    สัดส่วนกำไรแยกตามคู่เงิน (Pair Profit Distribution)
+                        <div className="flex items-center justify-between mb-2.5 sm:mb-3 border-b border-white/5 pb-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+                                <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider whitespace-nowrap truncate">
+                                    PROFIT BY PAIRS
                                 </h3>
                             </div>
                             {selectedPairFilter && (
                                 <button
                                     onClick={() => setSelectedPairFilter(null)}
-                                    className="text-[10px] sm:text-xs font-mono text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30 flex items-center gap-1 transition-all"
+                                    className="text-[9px] sm:text-xs font-mono text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30 flex items-center gap-1 transition-all shrink-0 whitespace-nowrap"
                                 >
-                                    <span>ล้างการกรอง ({selectedPairFilter})</span>
+                                    <span>RESET ({selectedPairFilter})</span>
                                     <X className="w-3 h-3" />
                                 </button>
                             )}
@@ -405,7 +402,7 @@ export default function TodayHarvestModal({
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                                 {/* Left: Interactive SVG Donut Chart */}
                                 <div className="md:col-span-5 flex flex-col items-center justify-center relative">
-                                    <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center">
+                                    <div className="relative w-44 h-44 sm:w-56 sm:h-56 flex items-center justify-center">
                                         <svg 
                                             className="w-full h-full transform transition-transform" 
                                             viewBox="0 0 200 200"
@@ -482,8 +479,8 @@ export default function TodayHarvestModal({
                                             </span>
                                         </div>
                                     </div>
-                                    <span className="text-[8px] sm:text-[9px] text-white/40 font-mono mt-1 text-center">
-                                        💡 คลิกที่ชิ้นกราฟเพื่อกรองดูเฉพาะคู่นั้น
+                                    <span className="text-[8px] sm:text-[9px] text-white/40 font-mono mt-1 text-center whitespace-nowrap">
+                                        💡 แตะกราฟเพื่อกรองคู่เงิน (Tap slice to filter)
                                     </span>
                                 </div>
 
@@ -513,26 +510,26 @@ export default function TodayHarvestModal({
                                                         style={{ backgroundColor: pair.color }}
                                                     />
                                                     <div className="truncate">
-                                                        <span className="font-mono font-black text-xs sm:text-sm text-white tracking-wider">
+                                                        <span className="font-mono font-black text-xs sm:text-sm text-white tracking-wider whitespace-nowrap">
                                                             {pair.symbol}
                                                         </span>
-                                                        <div className="flex items-center gap-1.5 text-[8.5px] sm:text-[9.5px] font-mono text-white/40">
-                                                            <span>{pair.basketsCount} รอบ</span>
+                                                        <div className="flex items-center gap-1.5 text-[8px] sm:text-[9.5px] font-mono text-white/40 whitespace-nowrap">
+                                                            <span>{pair.basketsCount} Baskets</span>
                                                             <span>•</span>
-                                                            <span className="text-cyan-400 font-bold">{pair.totalLots.toFixed(2)} Lots</span>
+                                                            <span className="text-cyan-400 font-bold">{pair.totalLots.toFixed(2)}L</span>
                                                             <span>•</span>
-                                                            <span>{pair.totalOrders} ไม้</span>
+                                                            <span>{pair.totalOrders} Orders</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Right: Profit & Progress bar */}
-                                                <div className="flex flex-col items-end shrink-0 min-w-[90px] sm:min-w-[120px]">
-                                                    <div className="flex items-center gap-1.5">
+                                                <div className="flex flex-col items-end shrink-0 min-w-[85px] sm:min-w-[120px]">
+                                                    <div className="flex items-center gap-1.5 whitespace-nowrap">
                                                         <span className="text-xs sm:text-sm font-mono font-black text-emerald-400">
-                                                            +{pair.totalProfit.toFixed(2)} <span className="text-[9px] font-normal text-white/50">USC</span>
+                                                            +{pair.totalProfit.toFixed(2)} <span className="text-[8.5px] font-normal text-white/50">USC</span>
                                                         </span>
-                                                        <span className="text-[9px] sm:text-[10px] font-mono font-bold text-white/60 bg-white/5 px-1.5 py-0.2 rounded border border-white/10">
+                                                        <span className="text-[8.5px] sm:text-[10px] font-mono font-bold text-white/60 bg-white/5 px-1.5 py-0.2 rounded border border-white/10">
                                                             {pair.profitSharePct}%
                                                         </span>
                                                     </div>
@@ -543,7 +540,7 @@ export default function TodayHarvestModal({
                                                             style={{ 
                                                                 width: `${pair.profitSharePct}%`,
                                                                 backgroundColor: pair.color 
-                                                            }}
+                                                             }}
                                                         />
                                                     </div>
                                                 </div>
@@ -560,10 +557,10 @@ export default function TodayHarvestModal({
                     {/* ═══════════════════════════════════════════════════════════════ */}
                     <div className="bg-black/50 border border-white/10 rounded-2xl p-3 sm:p-5 backdrop-blur-md">
                         <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2 flex-wrap gap-2">
-                            <div className="flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-cyan-400" />
-                                <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider">
-                                    รายละเอียดการปิดรวบแต่ละคู่เงินจาก MT5 ({filteredEvents.length} รายการ)
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 shrink-0" />
+                                <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider whitespace-nowrap truncate">
+                                    MT5 BASKET CLOSURES ({filteredEvents.length})
                                 </h3>
                             </div>
 
@@ -572,19 +569,19 @@ export default function TodayHarvestModal({
                                 <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
                                     <button
                                         onClick={() => setSelectedPairFilter(null)}
-                                        className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all ${
+                                        className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all whitespace-nowrap ${
                                             selectedPairFilter === null 
                                                 ? 'bg-white/20 border-white text-white' 
                                                 : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
                                         }`}
                                     >
-                                        ทั้งหมด ({data.events.length})
+                                        ALL ({data.events.length})
                                     </button>
                                     {data.pair_summary.map(p => (
                                         <button
                                             key={`pill_${p.symbol}`}
                                             onClick={() => setSelectedPairFilter(prev => prev === p.symbol ? null : p.symbol)}
-                                            className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all ${
+                                            className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all whitespace-nowrap ${
                                                 selectedPairFilter === p.symbol 
                                                     ? 'border-amber-400 text-amber-200 bg-amber-500/20' 
                                                     : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
@@ -610,20 +607,20 @@ export default function TodayHarvestModal({
                                     return (
                                         <div
                                             key={ev.id || `ev_${idx}`}
-                                            className="p-2.5 sm:p-3 rounded-xl bg-black/40 hover:bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-all font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                                            className="p-2 sm:p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-all font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                                         >
                                             {/* Left Block: Time, Symbol, Side, Exit Type */}
-                                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                                                <div className="flex items-center gap-1.5 text-white/40 text-[10px] sm:text-xs">
-                                                    <Clock className="w-3.5 h-3.5 text-white/30" />
+                                            <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap min-w-0">
+                                                <div className="flex items-center gap-1 text-white/40 text-[9px] sm:text-xs whitespace-nowrap">
+                                                    <Clock className="w-3 h-3 text-white/30" />
                                                     <span>{formatTime(ev.closed_at)}</span>
                                                 </div>
 
-                                                <span className="px-2 py-0.5 rounded-md font-black text-xs sm:text-sm bg-white/10 text-white border border-white/15">
+                                                <span className="px-1.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs bg-white/10 text-white border border-white/15 whitespace-nowrap">
                                                     {ev.symbol}
                                                 </span>
 
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-black border ${
+                                                <span className={`px-1.5 py-0.2 rounded text-[8.5px] sm:text-[9.5px] font-black border whitespace-nowrap ${
                                                     isBuy 
                                                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
                                                         : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
@@ -631,32 +628,32 @@ export default function TodayHarvestModal({
                                                     {ev.side}
                                                 </span>
 
-                                                <span className={`px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold border flex items-center gap-1 ${exitInfo.badge}`}>
+                                                <span className={`px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9.5px] font-bold border flex items-center gap-1 whitespace-nowrap ${exitInfo.badge}`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${exitInfo.dot}`} />
                                                     <span>{exitInfo.label}</span>
                                                 </span>
                                             </div>
 
                                             {/* Right Block: Orders, Lots, Profit, Max DD */}
-                                            <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-5 text-right shrink-0">
-                                                <div className="flex flex-col items-start sm:items-end leading-tight">
-                                                    <span className="text-[10px] sm:text-xs text-white/70">
-                                                        <span className="text-white font-bold">{ev.orders}</span> ไม้
-                                                        <span className="text-white/30 mx-1">|</span>
-                                                        <span className="text-cyan-300 font-bold">{ev.lots.toFixed(2)}</span> Lots
+                                            <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-4 text-right shrink-0">
+                                                <div className="flex flex-col items-start sm:items-end leading-tight whitespace-nowrap">
+                                                    <span className="text-[9.5px] sm:text-xs text-white/70">
+                                                        <span className="text-white font-bold">{ev.orders}</span> Orders
+                                                        <span className="text-white/30 mx-1">•</span>
+                                                        <span className="text-cyan-300 font-bold">{ev.lots.toFixed(2)}</span>L
                                                     </span>
-                                                    <span className="text-[8.5px] sm:text-[9.5px] text-white/40 mt-0.5">
-                                                        Max DD: <span className="text-amber-400 font-bold">-{ev.max_dd_pct.toFixed(1)}%</span>
+                                                    <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
+                                                        DD: <span className="text-amber-400 font-bold">-{ev.max_dd_pct.toFixed(1)}%</span>
                                                     </span>
                                                 </div>
 
-                                                <div className="flex flex-col items-end leading-tight min-w-[85px] sm:min-w-[105px]">
-                                                    <span className={`text-xs sm:text-base font-black ${
+                                                <div className="flex flex-col items-end leading-tight min-w-[75px] sm:min-w-[95px] whitespace-nowrap">
+                                                    <span className={`text-[11px] sm:text-sm font-black ${
                                                         ev.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
                                                     }`}>
-                                                        {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[9px] font-normal text-white/50">USC</span>
+                                                        {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[8px] font-normal text-white/50">USC</span>
                                                     </span>
-                                                    <span className="text-[8.5px] sm:text-[9.5px] text-white/40 mt-0.5">
+                                                    <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
                                                         {ev.profit >= 0 ? '+' : ''}${(ev.profit / 100).toFixed(2)} USD
                                                     </span>
                                                 </div>
@@ -671,12 +668,12 @@ export default function TodayHarvestModal({
                 </div>
 
                 {/* 📌 Footer */}
-                <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-white/10 bg-black/70 flex items-center justify-between text-[10px] sm:text-xs font-mono text-white/40 shrink-0">
-                    <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                        <span>EasyM Prime Basket Telemetry Engine v2.10</span>
+                <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 border-t border-white/10 bg-black/70 flex items-center justify-between text-[9px] sm:text-xs font-mono text-white/40 shrink-0 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5 truncate">
+                        <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span className="truncate">EasyM Prime Telemetry v2.10</span>
                     </div>
-                    <span>อัปเดตอัตโนมัติทุก 15 วินาที</span>
+                    <span className="shrink-0 text-white/50">Auto-poll: 15s</span>
                 </div>
             </div>
         </div>
