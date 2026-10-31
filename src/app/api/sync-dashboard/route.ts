@@ -356,6 +356,54 @@ export async function POST(req: Request) {
             if (statusErr) {
                 console.error('Error syncing farm_port_status:', statusErr);
             }
+
+            // Automatically keep farm_daily_history synchronized with today's PnL & lots
+            if (todayPnl > 0 || todayClosedLots > 0) {
+                try {
+                    const now = new Date();
+                    const nyFormatter = new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'America/New_York',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: 'numeric',
+                        hour12: false
+                    });
+                    const parts = nyFormatter.formatToParts(now);
+                    const pMap: Record<string, string> = {};
+                    for (const p of parts) pMap[p.type] = p.value;
+                    const d = new Date(parseInt(pMap.year, 10), parseInt(pMap.month, 10) - 1, parseInt(pMap.day, 10));
+                    const nyHour = parseInt(pMap.hour, 10);
+                    const dayOfWeek = d.getDay();
+                    if (dayOfWeek === 5) {
+                        // Friday: stays Friday until Sunday 17:00 NY
+                    } else if (dayOfWeek === 6) {
+                        d.setDate(d.getDate() - 1);
+                    } else if (dayOfWeek === 0) {
+                        if (nyHour >= 17) d.setDate(d.getDate() + 1);
+                        else d.setDate(d.getDate() - 2);
+                    } else if (nyHour >= 17) {
+                        d.setDate(d.getDate() + 1);
+                    }
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const activeMarketDateStr = `${yyyy}-${mm}-${dd}`;
+
+                    await supabase.rpc('sync_ea_history_batch', {
+                        p_api_key: 'KHUCHAI_SUPHAKORN',
+                        p_port_number: portNumber,
+                        p_history_array: [{
+                            date: activeMarketDateStr,
+                            profit: todayPnl,
+                            max_dd: dailyMaxDrawdown,
+                            lots: todayClosedLots
+                        }]
+                    });
+                } catch (hSyncErr) {
+                    // Non-blocking history sync
+                }
+            }
         }
 
         // 4. Process Active Orders & On-Demand Live Trades Stream
