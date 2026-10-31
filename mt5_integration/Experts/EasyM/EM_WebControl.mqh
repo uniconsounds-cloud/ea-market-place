@@ -5,18 +5,12 @@
 #ifndef __EM_WEB_CONTROL_MQH__
 #define __EM_WEB_CONTROL_MQH__
 
-//====================================================================
-// 2-WAY WEB COMMAND & CONTROL AUTHORITY ENUM
-//====================================================================
 enum ENUM_CONTROL_MODE
 {
-   CONTROL_MODE_WEB_SYNC = 0, // Web Controlled (แนะนำ - ระบบเว็บคุมหลัก ซิงค์ 2 ทาง ไม่ถูก F7 ทับ)
-   CONTROL_MODE_MANUAL   = 1  // Manual MT5 (ตั้งค่าตาม F7 เท่านั้น ไม่รับคำสั่งจากเว็บ)
+   CONTROL_MODE_WEB_SYNC = 0, // Web Controlled
+   CONTROL_MODE_MANUAL   = 1  // Manual MT5
 };
 
-//+------------------------------------------------------------------+
-//| Helper: Extract JSON String value by key                         |
-//+------------------------------------------------------------------+
 string WebControlExtractJsonString(const string json, const string key)
 {
    int keyPos = StringFind(json, "\"" + key + "\":");
@@ -35,9 +29,6 @@ string WebControlExtractJsonString(const string json, const string key)
    return "";
 }
 
-//+------------------------------------------------------------------+
-//| Helper: Extract JSON Boolean value by key                        |
-//+------------------------------------------------------------------+
 bool WebControlExtractJsonBool(const string json, const string key, bool defaultVal = false)
 {
    int keyPos = StringFind(json, "\"" + key + "\":");
@@ -49,22 +40,33 @@ bool WebControlExtractJsonBool(const string json, const string key, bool default
    return defaultVal;
 }
 
-//+------------------------------------------------------------------+
-//| Parse & Apply Web Command Config from Server HTTP Response       |
-//+------------------------------------------------------------------+
 void WebControlParseAndApplyResponse(const string response)
 {
    int wcPos = StringFind(response, "\"web_config\"");
+   if(wcPos < 0) wcPos = StringFind(response, "\"control\"");
    if(wcPos < 0) return;
    
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
    string subJson = StringSubstr(response, wcPos);
+   
+   // 0. Sequence Check (Prevents clobbering manual MT5 chart clicks with stale commands)
+   string seqStr = WebControlExtractJsonString(subJson, "command_seq");
+   long cmdSeq = (seqStr != "") ? StringToInteger(seqStr) : 0;
+   string gvAckKey = StringFormat("EMP_%I64d_ACK_SEQ", login);
+   long lastAckSeq = GlobalVariableCheck(gvAckKey) ? (long)GlobalVariableGet(gvAckKey) : 0;
+
+   // If this command sequence was already applied, skip so local MT5 chart clicks are not clobbered
+   if(cmdSeq > 0 && cmdSeq <= lastAckSeq)
+   {
+      return;
+   }
    
    // 1. Control Mode ("web" vs "manual")
    string ctrlMode = WebControlExtractJsonString(subJson, "control_mode");
    if(ctrlMode != "")
    {
       double modeVal = (ctrlMode == "manual") ? 0.0 : 1.0;
+      GlobalVariableSet(StringFormat("EMP_%I64d_CONTROL_MODE", login), modeVal);
       GlobalVariableSet(StringFormat("EMP18_%I64d_CONTROL_MODE", login), modeVal);
    }
    
@@ -75,6 +77,7 @@ void WebControlParseAndApplyResponse(const string response)
       double pmVal = 0.0;
       if(portMode == "SLOW") pmVal = 1.0;
       else if(portMode == "FREEZE") pmVal = 2.0;
+      GlobalVariableSet(StringFormat("EMP_%I64d_PORT_MODE", login), pmVal);
       GlobalVariableSet(StringFormat("EMP18_%I64d_PORT_MODE", login), pmVal);
    }
    
@@ -82,6 +85,7 @@ void WebControlParseAndApplyResponse(const string response)
    if(StringFind(subJson, "\"pause_new_orders\":") >= 0)
    {
       bool isPaused = WebControlExtractJsonBool(subJson, "pause_new_orders", false);
+      GlobalVariableSet(StringFormat("EMP_%I64d_PAUSE", login), isPaused ? 1.0 : 0.0);
       GlobalVariableSet(StringFormat("EMP18_%I64d_PAUSE", login), isPaused ? 1.0 : 0.0);
    }
    
@@ -109,43 +113,70 @@ void WebControlParseAndApplyResponse(const string response)
             {
                string block = StringSubstr(symJson, sKey, sEnd - sKey + 1);
                
-               string gvEn = StringFormat("EMP18_%I64d_%s_EN", login, sym);
-               string gvQt = StringFormat("EMP18_%I64d_%s_QT", login, sym);
+               string gvEn = StringFormat("EMP_%I64d_%s_EN", login, sym);
+               string gvEn18 = StringFormat("EMP18_%I64d_%s_EN", login, sym);
+               string gvQt = StringFormat("EMP_%I64d_%s_QT", login, sym);
+               string gvQt18 = StringFormat("EMP18_%I64d_%s_QT", login, sym);
 
-               if(StringFind(block, "\"close_only\":true") >= 0 || StringFind(block, "\"close_only\": true") >= 0)
+               double prevVal = GlobalVariableCheck(gvEn) ? GlobalVariableGet(gvEn) : -1.0;
+
+               if(StringFind(block, "\"close_only\":true") >= 0 || StringFind(block, "\"close_only\": true") >= 0 ||
+                  StringFind(block, "\"enabled\":false") >= 0 || StringFind(block, "\"enabled\": false") >= 0)
+               {
                   GlobalVariableSet(gvEn, 0.0);
-               else if(StringFind(block, "\"enabled\":false") >= 0 || StringFind(block, "\"enabled\": false") >= 0)
-                  GlobalVariableSet(gvEn, 0.0);
+                  GlobalVariableSet(gvEn18, 0.0);
+                  if(prevVal != 0.0)
+                  {
+                     PrintFormat("[WebControl] Remote Switch Applied: %s -> CLOSE-ONLY", sym);
+                  }
+               }
                else if(StringFind(block, "\"enabled\":true") >= 0 || StringFind(block, "\"enabled\": true") >= 0)
+               {
                   GlobalVariableSet(gvEn, 1.0);
+                  GlobalVariableSet(gvEn18, 1.0);
+                  if(prevVal != 1.0)
+                  {
+                     PrintFormat("[WebControl] Remote Switch Applied: %s -> ACTIVE", sym);
+                  }
+               }
 
                if(StringFind(block, "\"quarantined\":true") >= 0 || StringFind(block, "\"quarantined\": true") >= 0)
+               {
                   GlobalVariableSet(gvQt, 1.0);
+                  GlobalVariableSet(gvQt18, 1.0);
+               }
                else if(StringFind(block, "\"quarantined\":false") >= 0 || StringFind(block, "\"quarantined\": false") >= 0)
+               {
                   GlobalVariableSet(gvQt, 0.0);
+                  GlobalVariableSet(gvQt18, 0.0);
+               }
             }
          }
       }
    }
    
-   GlobalVariableSet(StringFormat("EMP18_%I64d_LAST_WEB_UPDATE", login), (double)TimeCurrent());
+   if(cmdSeq > 0)
+   {
+      GlobalVariableSet(gvAckKey, (double)cmdSeq);
+   }
+
+   // Clean up any old timestamp key from previous builds
+   string gvLastUpdateKey = StringFormat("EMP_%I64d_LAST_WEB_UPDATE", login);
+   if(GlobalVariableCheck(gvLastUpdateKey)) GlobalVariableDel(gvLastUpdateKey);
+   string gvLastUpdateKey18 = StringFormat("EMP18_%I64d_LAST_WEB_UPDATE", login);
+   if(GlobalVariableCheck(gvLastUpdateKey18)) GlobalVariableDel(gvLastUpdateKey18);
 }
 
-//+------------------------------------------------------------------+
-//| Check if New Orders are paused from Web                          |
-//+------------------------------------------------------------------+
 bool WebControlIsPaused()
 {
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
-   string gvPauseKey = StringFormat("EMP18_%I64d_PAUSE", login);
-   if(GlobalVariableCheck(gvPauseKey) && GlobalVariableGet(gvPauseKey) > 0.5)
-      return true;
+   string gvPauseKey = StringFormat("EMP_%I64d_PAUSE", login);
+   if(GlobalVariableCheck(gvPauseKey) && GlobalVariableGet(gvPauseKey) > 0.5) return true;
+   string gvPauseKey18 = StringFormat("EMP18_%I64d_PAUSE", login);
+   if(GlobalVariableCheck(gvPauseKey18) && GlobalVariableGet(gvPauseKey18) > 0.5) return true;
    return false;
 }
 
-//+------------------------------------------------------------------+
-//| Get Dashboard Authority Badge text                               |
-//+------------------------------------------------------------------+
 string WebControlGetBadge(ENUM_CONTROL_MODE mode)
 {
    return (mode == CONTROL_MODE_WEB_SYNC) ? "[🌐 WEB CONTROL]" : "[💻 MANUAL]";

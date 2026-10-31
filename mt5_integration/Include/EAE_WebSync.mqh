@@ -14,6 +14,9 @@
 
 #include <Trade/PositionInfo.mqh>
 #include "EAE_MonitorTypes.mqh"
+#ifdef ENABLE_EM_WEB_CONTROL
+#include "EM_WebControl.mqh"
+#endif
 
 // --- Global Sync State ---
 uint     g_eae_last_sync_ticks        = 0;
@@ -56,6 +59,71 @@ bool EAE_IsPortfolioMagic(long magic, long baseMagic)
    if(magic >= baseMagic && magic < baseMagic + 100) return true;           // Regular Grid (2001-2023)
    if(magic >= baseMagic + 1000 && magic < baseMagic + 1100) return true;   // Auto-Hedge (3001-3023)
    if(magic >= baseMagic + 2000 && magic < baseMagic + 2100) return true;   // Smart 3 Rescue (4001-4023)
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Check if deal belongs to EasyM Portfolio (Magic + Comment check) |
+//+------------------------------------------------------------------+
+bool EAE_IsPortfolioDeal(ulong ticket, long baseMagic, datetime restoreStart = 0, datetime restoreEnd = 0)
+{
+   if(baseMagic <= 0) return true;
+   long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+   if(EAE_IsPortfolioMagic(magic, baseMagic)) return true;
+
+   string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+   if(StringFind(comment, "EMP:") >= 0 || StringFind(comment, "EasyM") >= 0 || StringFind(comment, "RescueCut") >= 0)
+      return true;
+
+   // Check if this deal closed a position originally opened by our EA (e.g. user closed by hand)
+   long posId = HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
+   if(posId > 0)
+   {
+      // 1. Fast check if the opening order is in active order cache
+      if(HistoryOrderSelect((ulong)posId))
+      {
+         long openMagic = HistoryOrderGetInteger((ulong)posId, ORDER_MAGIC);
+         if(EAE_IsPortfolioMagic(openMagic, baseMagic)) return true;
+
+         string openComment = HistoryOrderGetString((ulong)posId, ORDER_COMMENT);
+         if(StringFind(openComment, "EMP:") >= 0 || StringFind(openComment, "EasyM") >= 0 || StringFind(openComment, "RescueCut") >= 0)
+            return true;
+      }
+
+      // 2. Position ID Backtracking: Query full broker position history across all dates
+      if(HistorySelectByPosition((ulong)posId))
+      {
+         bool is_ea_origin = false;
+         int pDeals = HistoryDealsTotal();
+         for(int pd = 0; pd < pDeals; pd++)
+         {
+            ulong pTicket = HistoryDealGetTicket(pd);
+            if(pTicket > 0 && HistoryDealGetInteger(pTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+            {
+               long pMagic = HistoryDealGetInteger(pTicket, DEAL_MAGIC);
+               if(EAE_IsPortfolioMagic(pMagic, baseMagic))
+               {
+                  is_ea_origin = true;
+                  break;
+               }
+               string pComm = HistoryDealGetString(pTicket, DEAL_COMMENT);
+               if(StringFind(pComm, "EMP:") >= 0 || StringFind(pComm, "EasyM") >= 0 || StringFind(pComm, "RescueCut") >= 0)
+               {
+                  is_ea_origin = true;
+                  break;
+               }
+            }
+         }
+
+         // Restore original history range
+         if(restoreStart > 0 && restoreEnd > 0)
+         {
+            HistorySelect(restoreStart, restoreEnd);
+         }
+
+         if(is_ea_origin) return true;
+      }
+   }
    return false;
 }
 
@@ -210,10 +278,16 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
    if(!HistorySelect(start, end)) return false;
    
    int total = HistoryDealsTotal();
+   ulong dealTickets[];
+   ArrayResize(dealTickets, total);
+   for(int k = 0; k < total; k++)
+      dealTickets[k] = HistoryDealGetTicket(k);
+
    for(int i = 0; i < total; i++)
    {
-      ulong ticket = HistoryDealGetTicket(i);
+      ulong ticket = dealTickets[i];
       if(ticket <= 0) continue;
+      HistoryDealSelect(ticket);
       
       long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
       if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
@@ -223,8 +297,11 @@ bool EAE_ScanHistoryDailySummary(datetime targetDay, long magicB, long magicS, E
          bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
          bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
          
-         // Match TodayClosedProfit() on EA chart: in multi-currency portfolio, include all closed deals today
-         if(magicB != magicS && magicB != 0) {
+         // Filter closed deals strictly by EA Magic Number (Portfolio 2000+/3000+/4000+ or Directional magicB/magicS)
+         if(magicB == magicS && magicB > 0) {
+            if(!EAE_IsPortfolioDeal(ticket, magicB, start, end)) continue;
+         }
+         else if(magicB != magicS && magicB != 0) {
             if(is_buy_side && magic != magicB) continue;
             if(is_sell_side && magicS != 0 && magic != magicS) continue;
          }
@@ -317,17 +394,18 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    // 1. Throttling / Sleep-Wake Check
    // On initial boot (g_eae_last_sync_ticks == 0), sync immediately so dashboard has instant data!
    bool is_initial_sync = (g_eae_last_sync_ticks == 0);
+   bool is_dev_port = (AccountInfoInteger(ACCOUNT_LOGIN) == 97053088);
    if(g_eae_last_sync_ticks > 0)
    {
       int current_interval = g_eae_sync_interval;
-      if(g_eae_using_fallback) {
+      if(g_eae_using_fallback && !is_dev_port) {
          // 1-URL Fallback Mode: Strictly locked to 10-minute (600s) summary sync only (zero 10s/20s polling overhead on VPS)
          current_interval = g_eae_sleep_interval;
       } else if(g_eae_full_sync_mode) {
          if(g_eae_active_sync_interval > 0 && g_eae_active_sync_interval <= 60) {
             current_interval = g_eae_active_sync_interval;
          } else {
-            current_interval = 20; // Live Viewer Mode (2-URL Direct Supabase): every 20 seconds
+            current_interval = 20; // Live Viewer Mode: every 20 seconds
          }
       } else {
          if(g_eae_active_sync_interval >= 180) {
@@ -353,8 +431,8 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    EAE_DailySummary today;
    EAE_ScanHistoryDailySummary(now, snap.identity.magic_buy, snap.identity.magic_sell, today);
 
-   // Hash Check for Throttling (only applies in live full sync mode on 2-URL)
-   if(g_eae_full_sync_mode && !g_eae_using_fallback && !is_initial_sync)
+   // Hash Check for Throttling (only applies to regular customer ports in live full sync mode on 2-URL; dev port 97053088 is never throttled)
+   if(!is_dev_port && g_eae_full_sync_mode && !g_eae_using_fallback && !is_initial_sync)
    {
       current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2) + "_" + DoubleToString(today.total_profit, 2);
       if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now_ticks - g_eae_last_heartbeat_ticks) < g_eae_heartbeat_interval * 1000)
@@ -443,50 +521,58 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    else
    {
       int primary_err = GetLastError();
-      if(!g_eae_using_fallback)
+      if(!is_dev_port)
       {
-         g_eae_using_fallback = true;
-         if(res == -1 && (primary_err == 4060 || primary_err == 4014))
+         if(!g_eae_using_fallback)
          {
-            Print("EAE WebSync: URL #2 (https://mfrspvzxmpksqnzcrysz.supabase.co) is not whitelisted in MT5. Switching to 10-Minute Standby Fallback via https://eaeze.com (Live Farm disabled until URL #2 is added).");
+            g_eae_using_fallback = true;
+            if(res == -1 && (primary_err == 4060 || primary_err == 4014))
+            {
+               Print("EAE WebSync: URL #2 (https://mfrspvzxmpksqnzcrysz.supabase.co) is not whitelisted in MT5. Switching to 10-Minute Standby Fallback via https://eaeze.com (Live Farm disabled until URL #2 is added).");
+            }
          }
-      }
 
-      // Strictly throttle URL #1 Fallback (eaeze.com) to once every 10 minutes (600s)
-      if(!force_now && g_eae_last_fallback_ticks > 0 && (int)(now_ticks - g_eae_last_fallback_ticks) < g_eae_sleep_interval * 1000)
+         // Strictly throttle URL #1 Fallback (eaeze.com) to once every 10 minutes (600s)
+         if(!force_now && g_eae_last_fallback_ticks > 0 && (int)(now_ticks - g_eae_last_fallback_ticks) < g_eae_sleep_interval * 1000)
+         {
+            return true;
+         }
+         g_eae_last_fallback_ticks = now_ticks;
+
+         // Build stripped 10-minute summary payload for 1-URL Fallback (no live orders, no live pair details, tagged FALLBACK_1URL)
+         string fb_meta = "{\"sync_mode\":\"FALLBACK_1URL\"}";
+         string fb_sys_code = base_sys_code + ":::" + EAE_EscapeJsonString(fb_meta);
+         string fb_payload = "{ \"p_payload\": {";
+         fb_payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+         fb_payload += "\"server_time\":" + IntegerToString(now) + ",";
+         fb_payload += "\"current_price\":0,";
+         fb_payload += "\"ping_only\":false,";
+         fb_payload += "\"sync_mode\":\"FALLBACK_1URL\",";
+         fb_payload += "\"today_profit\":" + DoubleToString(today.total_profit, 2) + ",";
+         fb_payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
+         fb_payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
+         fb_payload += "\"snapshot\":{";
+         fb_payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
+         fb_payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
+         fb_payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
+         fb_payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + fb_sys_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
+         fb_payload += "},";
+         fb_payload += "\"orders\":[],";
+         fb_payload += "\"prime_data\":" + fb_meta;
+         fb_payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
+
+         char fb_data[];
+         StringToCharArray(fb_payload, fb_data, 0, WHOLE_ARRAY, CP_UTF8);
+         ArrayResize(fb_data, ArraySize(fb_data) - 1);
+
+         ResetLastError();
+         res = WebRequest("POST", g_eae_fallback_url, headers, 10000, fb_data, result, result_headers);
+      }
+      else
       {
-         return true;
+         // Dev port 97053088 is connected directly to eaeze.com; retry on next 5s tick without entering 600s sleep
+         PrintFormat("EAE WebSync: [DEV PORT 97053088] WebRequest HTTP %d (Err %d) - Retrying on next tick", res, primary_err);
       }
-      g_eae_last_fallback_ticks = now_ticks;
-
-      // Build stripped 10-minute summary payload for 1-URL Fallback (no live orders, no live pair details, tagged FALLBACK_1URL)
-      string fb_meta = "{\"sync_mode\":\"FALLBACK_1URL\"}";
-      string fb_sys_code = base_sys_code + ":::" + EAE_EscapeJsonString(fb_meta);
-      string fb_payload = "{ \"p_payload\": {";
-      fb_payload += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
-      fb_payload += "\"server_time\":" + IntegerToString(now) + ",";
-      fb_payload += "\"current_price\":0,";
-      fb_payload += "\"ping_only\":false,";
-      fb_payload += "\"sync_mode\":\"FALLBACK_1URL\",";
-      fb_payload += "\"today_profit\":" + DoubleToString(today.total_profit, 2) + ",";
-      fb_payload += "\"today_closed_lots\":" + DoubleToString(today.total_lots, 2) + ",";
-      fb_payload += "\"daily_max_drawdown\":" + DoubleToString(today.max_dd_pct, 2) + ",";
-      fb_payload += "\"snapshot\":{";
-      fb_payload += "\"account\":{\"balance\":" + DoubleToString(snap.account.balance, 2) + ",\"equity\":" + DoubleToString(snap.account.equity, 2) + ",\"margin_level\":" + DoubleToString(snap.account.margin_level, 2) + ",\"currency\":\"" + snap.account.currency + "\"},";
-      fb_payload += "\"buy_state\":{\"open_count\":" + IntegerToString(snap.buy_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.buy_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.buy_state.floating_pnl, 2) + "},";
-      fb_payload += "\"sell_state\":{\"open_count\":" + IntegerToString(snap.sell_state.open_count) + ",\"open_lots\":" + DoubleToString(snap.sell_state.open_lots, 2) + ",\"floating_pnl\":" + DoubleToString(snap.sell_state.floating_pnl, 2) + "},";
-      fb_payload += "\"identity\":{\"product_family\":\"" + snap.identity.product_family + "\",\"system_code\":\"" + fb_sys_code + "\",\"ea_version\":\"" + snap.identity.ea_version + "\"}";
-      fb_payload += "},";
-      fb_payload += "\"orders\":[],";
-      fb_payload += "\"prime_data\":" + fb_meta;
-      fb_payload += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
-
-      char fb_data[];
-      StringToCharArray(fb_payload, fb_data, 0, WHOLE_ARRAY, CP_UTF8);
-      ArrayResize(fb_data, ArraySize(fb_data) - 1);
-
-      ResetLastError();
-      res = WebRequest("POST", g_eae_fallback_url, headers, 10000, fb_data, result, result_headers);
    }
 
    if(res == -1) {
@@ -590,7 +676,7 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
          if(end > start) {
             int parsed_interval = (int)StringToInteger(StringSubstr(response, start, end - start));
             if(viewer_active) {
-               g_eae_active_sync_interval = parsed_interval;
+               g_eae_active_sync_interval = (parsed_interval > 0 && parsed_interval <= 60) ? parsed_interval : 20;
             } else {
                // In standby mode, enforce at least 10m (600s) unless server sends an even longer interval
                g_eae_active_sync_interval = (parsed_interval >= 600 ? parsed_interval : g_eae_sleep_interval);
@@ -680,10 +766,16 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
    if(HistorySelect(start_time, now))
    {
       int total = HistoryDealsTotal();
+      ulong dealTickets[];
+      ArrayResize(dealTickets, total);
+      for(int k = 0; k < total; k++)
+         dealTickets[k] = HistoryDealGetTicket(k);
+
       for(int i = 0; i < total; i++)
       {
-         ulong ticket = HistoryDealGetTicket(i);
+         ulong ticket = dealTickets[i];
          if(ticket <= 0) continue;
+         HistoryDealSelect(ticket);
          
          long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
          if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
@@ -701,7 +793,10 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
             bool is_buy_side = (deal_type == DEAL_TYPE_SELL);
             bool is_sell_side = (deal_type == DEAL_TYPE_BUY);
             
-            if(magicB != magicS && magicB != 0) {
+            if(magicB == magicS && magicB > 0) {
+               if(!EAE_IsPortfolioDeal(ticket, magicB, start_time, now)) continue;
+            }
+            else if(magicB != magicS && magicB != 0) {
                if(is_buy_side && magic != magicB) continue;
                if(is_sell_side && magicS != 0 && magic != magicS) continue;
             }
@@ -769,7 +864,7 @@ bool EAE_WebSyncPushHistoryBatch(int days_to_sync, long magicB, long magicS)
    if((res == -1 || res != 200) && !g_eae_using_fallback)
    {
       int primary_err = GetLastError();
-      if(res == -1 && (primary_err == 4060 || primary_err == 4014))
+      if(AccountInfoInteger(ACCOUNT_LOGIN) != 97053088 && res == -1 && (primary_err == 4060 || primary_err == 4014))
       {
          g_eae_using_fallback = true;
       }
@@ -868,12 +963,35 @@ void EAE_WebSyncCheckAndPushHistory(long magicB, long magicS)
 //+------------------------------------------------------------------+
 void EAE_WebSyncTriggerEvent(string type, int total_orders, double total_lots, double total_profit)
 {
+   EAE_WebSyncTriggerBasketEvent(type, "", "", total_orders, total_lots, total_profit, 0, 0.0);
+}
+
+//+------------------------------------------------------------------+
+//| Immediate Sync for Basket Closure Events (Rich Telemetry)        |
+//+------------------------------------------------------------------+
+void EAE_WebSyncTriggerBasketEvent(string exit_type, string sym, string side, int total_orders, double total_lots, double total_profit, int duration_sec = 0, double max_dd_pct = 0.0)
+{
    string json = "{ \"p_payload\": {";
    json += "\"port_number\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
-   json += "\"type\":\"" + type + "\",";
+   json += "\"type\":\"BATCH_CLOSE\",";
+   json += "\"exit_type\":\"" + exit_type + "\",";
+   json += "\"symbol\":\"" + sym + "\",";
+   json += "\"side\":\"" + side + "\",";
    json += "\"total_orders\":" + IntegerToString(total_orders) + ",";
    json += "\"total_lots\":" + DoubleToString(total_lots, 2) + ",";
-   json += "\"total_profit\":" + DoubleToString(total_profit, 2);
+   json += "\"total_profit\":" + DoubleToString(total_profit, 2) + ",";
+   json += "\"duration_sec\":" + IntegerToString(duration_sec) + ",";
+   json += "\"max_dd_pct\":" + DoubleToString(max_dd_pct, 2) + ",";
+#ifdef EA_SYSTEM_CODE
+   json += "\"ea_name\":\"" + EA_SYSTEM_CODE + "\",";
+#else
+   json += "\"ea_name\":\"EasyM\",";
+#endif
+#ifdef EA_BUILD_ID
+   json += "\"ea_build\":\"" + EA_BUILD_ID + "\"";
+#else
+   json += "\"ea_build\":\"\"";
+#endif
    json += "}, \"p_api_key\":\"" + g_eae_api_key + "\" }";
 
    char data[]; char result[]; string result_headers;
