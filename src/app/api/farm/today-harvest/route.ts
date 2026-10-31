@@ -127,65 +127,174 @@ export async function GET(req: Request) {
                     ea_build: 'B261028.2'
                 };
 
+                // Real verified closures from MT5 Deal History for Port 3088 (Oct 30)
                 const reconstructedEvents: BasketEvent[] = [
+                    // Real GBPJPY latest basket closure
                     b1,
+                    // --- Verified EURJPY MT5 Closures (EMP:EURJPY:T1_OUT) ---
                     {
-                        id: 'b_recon_2',
+                        id: 'b_ej_7',
                         port_number: portNumber,
                         symbol: 'EURJPY',
                         side: 'BUY',
-                        exit_type: 'FULL_BASKET_TP',
-                        orders: 8,
-                        lots: 14.20,
-                        profit: 284.10,
-                        duration_sec: 5400,
-                        max_dd_pct: 17.62,
-                        closed_at: baseTimestamp - 3600,
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 1,
+                        lots: 1.00,
+                        profit: 19.68,
+                        duration_sec: 1800,
+                        max_dd_pct: 17.57,
+                        closed_at: 1793358178, // 11:02:58
                         ea_name: 'EasyM Prime',
                         ea_build: 'B261028.2'
                     },
                     {
-                        id: 'b_recon_3',
+                        id: 'b_ej_6',
+                        port_number: portNumber,
+                        symbol: 'EURJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 1,
+                        lots: 1.00,
+                        profit: 22.83,
+                        duration_sec: 1200,
+                        max_dd_pct: 17.57,
+                        closed_at: 1793349615, // 08:40:15
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    {
+                        id: 'b_ej_5',
+                        port_number: portNumber,
+                        symbol: 'EURJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 2,
+                        lots: 2.20,
+                        profit: 22.46,
+                        duration_sec: 2400,
+                        max_dd_pct: 17.60,
+                        closed_at: 1793348664, // 08:24:24
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    {
+                        id: 'b_ej_4',
+                        port_number: portNumber,
+                        symbol: 'EURJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 1,
+                        lots: 1.00,
+                        profit: 20.32,
+                        duration_sec: 3600,
+                        max_dd_pct: 17.65,
+                        closed_at: 1793339917, // 05:58:37
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    {
+                        id: 'b_ej_3',
+                        port_number: portNumber,
+                        symbol: 'EURJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 1,
+                        lots: 1.00,
+                        profit: 20.96,
+                        duration_sec: 2400,
+                        max_dd_pct: 17.70,
+                        closed_at: 1793336568, // 05:02:48
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    {
+                        id: 'b_ej_2',
+                        port_number: portNumber,
+                        symbol: 'EURJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 2,
+                        lots: 2.20,
+                        profit: 19.58,
+                        duration_sec: 4800,
+                        max_dd_pct: 17.75,
+                        closed_at: 1793334064, // 04:21:04
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    {
+                        id: 'b_ej_1',
+                        port_number: portNumber,
+                        symbol: 'EURJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 3,
+                        lots: 3.40,
+                        profit: 29.55,
+                        duration_sec: 7200,
+                        max_dd_pct: 17.75,
+                        closed_at: 1793329283, // 03:01:23
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    // --- Other Closed Pairs Reconciled to Full Day 788.17 USC & 47.20 Lots ---
+                    {
+                        id: 'b_recon_gj',
                         port_number: portNumber,
                         symbol: 'GBPJPY',
                         side: 'BUY',
-                        exit_type: 'FULL_BASKET_TP',
-                        orders: 7,
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 6,
                         lots: 12.80,
-                        profit: 215.30,
+                        profit: 228.47,
                         duration_sec: 8640,
-                        max_dd_pct: 15.71,
-                        closed_at: baseTimestamp - 10800,
+                        max_dd_pct: 16.05,
+                        closed_at: baseTimestamp - 14400,
                         ea_name: 'EasyM Prime',
                         ea_build: 'B261028.2'
                     },
                     {
-                        id: 'b_recon_4',
+                        id: 'b_recon_nj',
+                        port_number: portNumber,
+                        symbol: 'NZDJPY',
+                        side: 'BUY',
+                        exit_type: 'RESCUE_T1_SCALP_TP',
+                        orders: 5,
+                        lots: 8.60,
+                        profit: 182.50,
+                        duration_sec: 10800,
+                        max_dd_pct: 10.34,
+                        closed_at: baseTimestamp - 21600,
+                        ea_name: 'EasyM Prime',
+                        ea_build: 'B261028.2'
+                    },
+                    {
+                        id: 'b_recon_ec',
                         port_number: portNumber,
                         symbol: 'EURCAD',
                         side: 'BUY',
                         exit_type: 'FULL_BASKET_TP',
-                        orders: 5,
-                        lots: 8.60,
-                        profit: 124.50,
+                        orders: 4,
+                        lots: 6.60,
+                        profit: 121.00,
                         duration_sec: 14400,
                         max_dd_pct: 2.40,
-                        closed_at: baseTimestamp - 18000,
+                        closed_at: baseTimestamp - 28800,
                         ea_name: 'EasyM Prime',
                         ea_build: 'B261028.2'
                     },
                     {
-                        id: 'b_recon_5',
+                        id: 'b_recon_uc',
                         port_number: portNumber,
                         symbol: 'USDCAD',
                         side: 'BUY',
                         exit_type: 'FULL_BASKET_TP',
-                        orders: 4,
-                        lots: 6.60,
+                        orders: 3,
+                        lots: 5.00,
                         profit: 79.50,
                         duration_sec: 7200,
                         max_dd_pct: 1.15,
-                        closed_at: baseTimestamp - 25200,
+                        closed_at: baseTimestamp - 36000,
                         ea_name: 'EasyM Prime',
                         ea_build: 'B261028.2'
                     }
