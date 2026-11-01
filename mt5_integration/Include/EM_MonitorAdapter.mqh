@@ -213,6 +213,25 @@ void EM_SaveHarvestQueueToDisk()
    FileClose(h);
 }
 
+// Helper to extract JSON value without external dependencies
+string EM_ExtractJsonStringValue(const string json, const string key)
+{
+   int keyPos = StringFind(json, "\"" + key + "\":");
+   if(keyPos < 0) return "";
+   int start = keyPos + StringLen("\"" + key + "\":");
+   while(start < StringLen(json) && (json[start] == ' ' || json[start] == '\"')) start++;
+   int end = start;
+   while(end < StringLen(json) && json[end] != '\"' && json[end] != ',' && json[end] != '}') end++;
+   if(end > start)
+   {
+      string val = StringSubstr(json, start, end - start);
+      StringTrimLeft(val);
+      StringTrimRight(val);
+      return val;
+   }
+   return "";
+}
+
 // Load queue from local disk file (Survives power outage / VPS restart)
 void EM_LoadHarvestQueueFromDisk()
 {
@@ -244,16 +263,16 @@ void EM_LoadHarvestQueueFromDisk()
       searchPos = endObj + 1;
 
       EAE_HarvestEventItem item;
-      item.event_id     = WebControlExtractJsonString(objStr, "event_id");
-      item.symbol       = WebControlExtractJsonString(objStr, "symbol");
-      item.side         = WebControlExtractJsonString(objStr, "side");
-      item.exit_type    = WebControlExtractJsonString(objStr, "exit_type");
-      item.orders       = (int)StringToInteger(WebControlExtractJsonString(objStr, "orders"));
-      item.lots         = StringToDouble(WebControlExtractJsonString(objStr, "lots"));
-      item.profit       = StringToDouble(WebControlExtractJsonString(objStr, "profit"));
-      item.duration_sec = (int)StringToInteger(WebControlExtractJsonString(objStr, "duration_sec"));
-      item.max_dd       = StringToDouble(WebControlExtractJsonString(objStr, "max_dd"));
-      item.closed_at    = (datetime)StringToInteger(WebControlExtractJsonString(objStr, "closed_at"));
+      item.event_id     = EM_ExtractJsonStringValue(objStr, "event_id");
+      item.symbol       = EM_ExtractJsonStringValue(objStr, "symbol");
+      item.side         = EM_ExtractJsonStringValue(objStr, "side");
+      item.exit_type    = EM_ExtractJsonStringValue(objStr, "exit_type");
+      item.orders       = (int)StringToInteger(EM_ExtractJsonStringValue(objStr, "orders"));
+      item.lots         = StringToDouble(EM_ExtractJsonStringValue(objStr, "lots"));
+      item.profit       = StringToDouble(EM_ExtractJsonStringValue(objStr, "profit"));
+      item.duration_sec = (int)StringToInteger(EM_ExtractJsonStringValue(objStr, "duration_sec"));
+      item.max_dd       = StringToDouble(EM_ExtractJsonStringValue(objStr, "max_dd"));
+      item.closed_at    = (datetime)StringToInteger(EM_ExtractJsonStringValue(objStr, "closed_at"));
 
       if(StringLen(item.event_id) > 0 && StringLen(item.symbol) > 0)
       {
