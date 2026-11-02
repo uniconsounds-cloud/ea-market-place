@@ -25,73 +25,115 @@ export async function GET(req: Request) {
         const rawPort = searchParams.get('port') || searchParams.get('port_number') || '3088';
         let portNumber = String(rawPort).trim();
 
-        // Normalize 3088 to 97053088 for database lookup
         if (portNumber === '3088') {
             portNumber = '97053088';
         }
 
-        const isDevPort = portNumber === '97053088' || portNumber.endsWith('3088') || portNumber === '3088';
+        const period = (searchParams.get('period') || 'today').toLowerCase(); // 'today' | 'daily' | 'weekly' | 'monthly'
+        const reqDate = searchParams.get('date')?.trim() || '';
+        const tradingDateParam = searchParams.get('trading_date')?.trim() || '';
 
-        // 1. Fetch current port status
+        // 1. Fetch current live port status from database
         const { data: status } = await supabase
             .from('farm_port_status')
             .select('*')
             .eq('port_number', portNumber)
             .maybeSingle();
 
-        const balance = Number(status?.balance || 183780.82);
-        const equity = Number(status?.equity || 105511.83);
-        let todayProfit = Number(status?.today_pnl || 0);
-        let todayClosedLots = Number(status?.today_closed_lots || 0);
-        let dailyMaxDrawdown = Number(status?.daily_max_drawdown || 0);
-
-        if (todayProfit <= 0) {
-            const { data: latestHist } = await supabase
-                .from('farm_daily_history')
-                .select('profit, closed_lots, max_drawdown')
-                .eq('port_number', portNumber)
-                .gt('profit', 0)
-                .order('date', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            if (latestHist && Number(latestHist.profit) > 0) {
-                todayProfit = Number(latestHist.profit);
-                todayClosedLots = Number(latestHist.closed_lots || 0);
-                dailyMaxDrawdown = Number(latestHist.max_drawdown || 0);
-            } else if (portNumber.endsWith('3088')) {
-                todayProfit = 788.17;
-                todayClosedLots = 47.20;
-                dailyMaxDrawdown = 42.22;
-            }
-        }
+        const balance = Number(status?.balance || 0);
+        const equity = Number(status?.equity || balance);
         const accountType = status?.account_type || 'USC';
         const updatedAt = status?.updated_at || new Date().toISOString();
 
-        // 2. Extract last_basket from system_code if available
-        let lastBasketFromSystem: BasketEvent | null = null;
+        // 2. Fetch full daily history from farm_daily_history
+        const { data: rawHistory } = await supabase
+            .from('farm_daily_history')
+            .select('date, profit, closed_lots, lots, max_drawdown, max_dd')
+            .eq('port_number', portNumber)
+            .order('date', { ascending: false })
+            .limit(60);
+
+        const historyList = (rawHistory || []).map((h: any) => ({
+            date: String(h.date || ''),
+            profit: Number(h.profit || 0),
+            lots: Number(h.closed_lots ?? h.lots ?? 0),
+            max_dd: Number(h.max_drawdown ?? h.max_dd ?? 0)
+        }));
+
+        // Determine active trading date from client or server_time
+        let activeTradingDate = tradingDateParam || reqDate;
+        if (!activeTradingDate) {
+            if (status?.server_time && Number(status.server_time) > 0) {
+                const sDate = new Date(Number(status.server_time) * 1000);
+                const y = sDate.getUTCFullYear();
+                const m = String(sDate.getUTCMonth() + 1).padStart(2, '0');
+                const d = String(sDate.getUTCDate()).padStart(2, '0');
+                activeTradingDate = `${y}-${m}-${d}`;
+            } else {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                activeTradingDate = `${y}-${m}-${d}`;
+            }
+        }
+
+        // 3. Extract any real incoming basket events from system_code & memory store
+        const realEvents: BasketEvent[] = [];
+
+        // Parse system_code if present
         if (status?.system_code && status.system_code.includes(':::')) {
             try {
                 const parts = status.system_code.split(':::');
                 const pData = JSON.parse(parts.slice(1).join(':::'));
+                
+                // Real last_basket from EA
                 if (pData?.last_basket && typeof pData.last_basket === 'object') {
                     const lb = pData.last_basket;
                     if (lb.symbol) {
-                        lastBasketFromSystem = {
+                        const cleanSym = String(lb.symbol).replace(/\.v$/i, '').toUpperCase();
+                        realEvents.push({
+                            id: lb.event_id || `lb_${lb.closed_at}_${cleanSym}`,
                             port_number: portNumber,
-                            symbol: String(lb.symbol).replace(/\.v$/i, '').toUpperCase(),
+                            symbol: cleanSym,
                             side: String(lb.side || 'BUY').toUpperCase(),
                             exit_type: String(lb.exit_type || 'FULL_BASKET_TP'),
                             orders: Number(lb.orders || 1),
-                            lots: Number(lb.lots || 1.2),
-                            profit: Number(lb.profit || 22.84),
+                            lots: Number(lb.lots || 0),
+                            profit: Number(lb.profit || 0),
                             duration_sec: Number(lb.duration_sec || 0),
-                            max_dd_pct: Number(lb.max_dd || 15.55),
-                            closed_at: Number(lb.closed_at || Math.floor(Date.now() / 1000) - 300),
+                            max_dd_pct: Number(lb.max_dd || 0),
+                            closed_at: Number(lb.closed_at || Math.floor(Date.now() / 1000)),
                             ea_name: 'EasyM Prime',
-                            ea_build: pData.build_id || 'B261028.2'
-                        };
-                        recordBasketEvent(portNumber, lastBasketFromSystem);
+                            ea_build: pData.build_id || 'B261031.1'
+                        });
+                    }
+                }
+
+                // Real harvest_events array from EA (B261031.1+)
+                if (Array.isArray(pData?.harvest_events)) {
+                    for (const ev of pData.harvest_events) {
+                        if (ev && ev.symbol) {
+                            const cleanSym = String(ev.symbol).replace(/\.v$/i, '').toUpperCase();
+                            const exists = realEvents.some(e => e.id === ev.event_id || (e.symbol === cleanSym && e.closed_at === Number(ev.closed_at)));
+                            if (!exists) {
+                                realEvents.push({
+                                    id: ev.event_id || `ev_${ev.closed_at}_${cleanSym}`,
+                                    port_number: portNumber,
+                                    symbol: cleanSym,
+                                    side: String(ev.side || 'BUY').toUpperCase(),
+                                    exit_type: String(ev.exit_type || 'FULL_BASKET_TP'),
+                                    orders: Number(ev.orders || 1),
+                                    lots: Number(ev.lots || 0),
+                                    profit: Number(ev.profit || 0),
+                                    duration_sec: Number(ev.duration_sec || 0),
+                                    max_dd_pct: Number(ev.max_dd || 0),
+                                    closed_at: Number(ev.closed_at || Math.floor(Date.now() / 1000)),
+                                    ea_name: 'EasyM Prime',
+                                    ea_build: pData.build_id || 'B261031.1'
+                                });
+                            }
+                        }
                     }
                 }
             } catch (e) {
@@ -99,256 +141,123 @@ export async function GET(req: Request) {
             }
         }
 
-        // 3. Read events: Query persistent farm_batch_events from Supabase first
-        let events = getBasketEvents(portNumber);
+        // Also check memory store
+        const memEvents = getBasketEvents(portNumber);
+        for (const me of memEvents) {
+            const cleanSym = String(me.symbol || '').replace(/\.v$/i, '').toUpperCase();
+            const exists = realEvents.some(e => e.id === me.id || (e.symbol === cleanSym && e.closed_at === me.closed_at));
+            if (!exists && cleanSym) {
+                realEvents.push({
+                    ...me,
+                    symbol: cleanSym
+                });
+            }
+        }
 
+        // Check persistent farm_batch_events table in Supabase
         try {
-            // Check past 24 hours of events for this port
-            const past24hIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
             const { data: dbBatchEvents } = await supabase
                 .from('farm_batch_events')
                 .select('*')
                 .eq('port_number', portNumber)
-                .gte('event_timestamp', past24hIso)
                 .order('event_timestamp', { ascending: false })
                 .limit(100);
 
             if (dbBatchEvents && dbBatchEvents.length > 0) {
-                const dbMapped: BasketEvent[] = dbBatchEvents.map((row: any) => ({
-                    id: row.event_id || row.id || `ev_${row.port_number}_${row.event_timestamp}`,
-                    port_number: row.port_number,
-                    symbol: String(row.symbol || 'UNKNOWN').toUpperCase(),
-                    side: (row.side || 'BUY') as 'BUY' | 'SELL',
-                    exit_type: row.exit_type || 'FULL_BASKET_TP',
-                    orders: Number(row.total_orders || 1),
-                    lots: Number(row.total_lots || 0),
-                    profit: Number(row.total_profit || 0),
-                    duration_sec: Number(row.duration_sec || 0),
-                    max_dd_pct: Number(row.max_dd_pct || 0),
-                    closed_at: Math.floor(new Date(row.event_timestamp).getTime() / 1000),
-                    ea_name: row.ea_name || 'EasyM Prime',
-                    ea_build: row.ea_build || 'B261028.2'
-                }));
-
-                const existingIds = new Set(dbMapped.map(e => e.id));
-                const extraMemory = events.filter(e => !existingIds.has(e.id));
-                events = [...dbMapped, ...extraMemory];
+                for (const row of dbBatchEvents) {
+                    const cleanSym = String(row.symbol || '').replace(/\.v$/i, '').toUpperCase();
+                    const closedAtSec = Math.floor(new Date(row.event_timestamp).getTime() / 1000);
+                    const rowId = row.event_id || row.id || `db_${closedAtSec}_${cleanSym}`;
+                    const exists = realEvents.some(e => e.id === rowId || (e.symbol === cleanSym && e.closed_at === closedAtSec));
+                    if (!exists && cleanSym) {
+                        realEvents.push({
+                            id: rowId,
+                            port_number: row.port_number,
+                            symbol: cleanSym,
+                            side: (row.side || 'BUY').toUpperCase(),
+                            exit_type: row.exit_type || 'FULL_BASKET_TP',
+                            orders: Number(row.total_orders || 1),
+                            lots: Number(row.total_lots || 0),
+                            profit: Number(row.total_profit || 0),
+                            duration_sec: Number(row.duration_sec || 0),
+                            max_dd_pct: Number(row.max_dd_pct || 0),
+                            closed_at: closedAtSec,
+                            ea_name: row.ea_name || 'EasyM Prime',
+                            ea_build: row.ea_build || 'B261031.1'
+                        });
+                    }
+                }
             }
         } catch (dbErr) {
-            console.error('Error fetching farm_batch_events:', dbErr);
+            // Non-blocking
         }
 
-        // If for dev port 3088, we need a complete reconciled breakdown for today matching the real numbers
-        if (isDevPort) {
-            const hasCompleteEvents = events.length >= 3 && Math.abs(events.reduce((s, e) => s + (e.profit || 0), 0) - todayProfit) < 5;
-            
-            if (!hasCompleteEvents) {
-                // Synthesize complete realistic closures that reconcile EXACTLY to today's 726.24 USC and 43.4 Lots
-                const baseTimestamp = Math.floor(Date.now() / 1000);
-                
-                // Real latest basket from MT5 or default
-                const b1 = lastBasketFromSystem || {
-                    id: 'b_live_1',
-                    port_number: portNumber,
-                    symbol: 'GBPJPY',
-                    side: 'BUY',
-                    exit_type: 'RESCUE_T1_SCALP_TP',
-                    orders: 1,
-                    lots: 1.20,
-                    profit: 22.84,
-                    duration_sec: 2160,
-                    max_dd_pct: 15.55,
-                    closed_at: baseTimestamp - 600,
-                    ea_name: 'EasyM Prime',
-                    ea_build: 'B261028.2'
-                };
+        // 4. Calculate stats and events according to selected period
+        let displayProfit = 0;
+        let displayLots = 0;
+        let displayMaxDd = 0;
+        let filteredEvents: BasketEvent[] = [];
 
-                // Real verified closures from MT5 Deal History for Port 3088 (Oct 30)
-                const reconstructedEvents: BasketEvent[] = [
-                    // Real GBPJPY latest basket closure
-                    b1,
-                    // --- Verified EURJPY MT5 Closures (EMP:EURJPY:T1_OUT) ---
-                    {
-                        id: 'b_ej_7',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 1,
-                        lots: 1.00,
-                        profit: 19.68,
-                        duration_sec: 1800,
-                        max_dd_pct: 17.57,
-                        closed_at: 1793358178, // 11:02:58
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_ej_6',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 1,
-                        lots: 1.00,
-                        profit: 22.83,
-                        duration_sec: 1200,
-                        max_dd_pct: 17.57,
-                        closed_at: 1793349615, // 08:40:15
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_ej_5',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 2,
-                        lots: 2.20,
-                        profit: 22.46,
-                        duration_sec: 2400,
-                        max_dd_pct: 17.60,
-                        closed_at: 1793348664, // 08:24:24
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_ej_4',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 1,
-                        lots: 1.00,
-                        profit: 20.32,
-                        duration_sec: 3600,
-                        max_dd_pct: 17.65,
-                        closed_at: 1793339917, // 05:58:37
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_ej_3',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 1,
-                        lots: 1.00,
-                        profit: 20.96,
-                        duration_sec: 2400,
-                        max_dd_pct: 17.70,
-                        closed_at: 1793336568, // 05:02:48
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_ej_2',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 2,
-                        lots: 2.20,
-                        profit: 19.58,
-                        duration_sec: 4800,
-                        max_dd_pct: 17.75,
-                        closed_at: 1793334064, // 04:21:04
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_ej_1',
-                        port_number: portNumber,
-                        symbol: 'EURJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 3,
-                        lots: 3.40,
-                        profit: 29.55,
-                        duration_sec: 7200,
-                        max_dd_pct: 17.75,
-                        closed_at: 1793329283, // 03:01:23
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    // --- Other Closed Pairs Reconciled to Full Day 788.17 USC & 47.20 Lots ---
-                    {
-                        id: 'b_recon_gj',
-                        port_number: portNumber,
-                        symbol: 'GBPJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 6,
-                        lots: 12.80,
-                        profit: 228.47,
-                        duration_sec: 8640,
-                        max_dd_pct: 16.05,
-                        closed_at: baseTimestamp - 14400,
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_recon_nj',
-                        port_number: portNumber,
-                        symbol: 'NZDJPY',
-                        side: 'BUY',
-                        exit_type: 'RESCUE_T1_SCALP_TP',
-                        orders: 5,
-                        lots: 8.60,
-                        profit: 182.50,
-                        duration_sec: 10800,
-                        max_dd_pct: 10.34,
-                        closed_at: baseTimestamp - 21600,
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_recon_ec',
-                        port_number: portNumber,
-                        symbol: 'EURCAD',
-                        side: 'BUY',
-                        exit_type: 'FULL_BASKET_TP',
-                        orders: 4,
-                        lots: 6.60,
-                        profit: 121.00,
-                        duration_sec: 14400,
-                        max_dd_pct: 2.40,
-                        closed_at: baseTimestamp - 28800,
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    },
-                    {
-                        id: 'b_recon_uc',
-                        port_number: portNumber,
-                        symbol: 'USDCAD',
-                        side: 'BUY',
-                        exit_type: 'FULL_BASKET_TP',
-                        orders: 3,
-                        lots: 5.00,
-                        profit: 79.50,
-                        duration_sec: 7200,
-                        max_dd_pct: 1.15,
-                        closed_at: baseTimestamp - 36000,
-                        ea_name: 'EasyM Prime',
-                        ea_build: 'B261028.2'
-                    }
-                ];
+        if (period === 'today') {
+            // Find today in historyList or fallback to live port status
+            const histToday = historyList.find(h => h.date === activeTradingDate);
+            const livePnl = Number(status?.today_pnl || 0);
+            const liveLots = Number(status?.today_closed_lots || 0);
+            const liveDd = Number(status?.daily_max_drawdown || 0);
 
-                // Ensure any recent real incoming events in store are kept at the very top
-                const realNewEvents = events.filter(e => e.id && !e.id.startsWith('b_recon_'));
-                events = [...realNewEvents, ...reconstructedEvents];
+            displayProfit = livePnl !== 0 ? livePnl : Number(histToday?.profit || 0);
+            displayLots = liveLots !== 0 ? liveLots : Number(histToday?.lots || 0);
+            displayMaxDd = liveDd !== 0 ? liveDd : Number(histToday?.max_dd || 0);
+
+            // Filter real events to only those occurring on today's trading date
+            filteredEvents = realEvents.filter(ev => {
+                if (!ev.closed_at) return false;
+                const evDate = new Date(ev.closed_at * 1000);
+                const evDateStr = `${evDate.getUTCFullYear()}-${String(evDate.getUTCMonth() + 1).padStart(2, '0')}-${String(evDate.getUTCDate()).padStart(2, '0')}`;
+                return evDateStr === activeTradingDate || Math.abs(Date.now() / 1000 - ev.closed_at) < 86400;
+            });
+        } else if (period === 'daily') {
+            // Specific selected date or most recent completed day
+            const targetDate = reqDate || tradingDateParam || historyList[0]?.date || activeTradingDate;
+            const targetHist = historyList.find(h => h.date === targetDate) || historyList[0];
+            if (targetHist) {
+                displayProfit = targetHist.profit;
+                displayLots = targetHist.lots;
+                displayMaxDd = targetHist.max_dd;
             }
+            // Filter real events for that day
+            filteredEvents = realEvents.filter(ev => {
+                if (!ev.closed_at) return false;
+                const evDate = new Date(ev.closed_at * 1000);
+                const evDateStr = `${evDate.getUTCFullYear()}-${String(evDate.getUTCMonth() + 1).padStart(2, '0')}-${String(evDate.getUTCDate()).padStart(2, '0')}`;
+                return evDateStr === targetDate;
+            });
+        } else if (period === 'weekly') {
+            // Past 7 active trading days
+            const weekHistory = historyList.slice(0, 7);
+            displayProfit = Number(weekHistory.reduce((s, h) => s + h.profit, 0).toFixed(2));
+            displayLots = Number(weekHistory.reduce((s, h) => s + h.lots, 0).toFixed(2));
+            displayMaxDd = Number(Math.max(0, ...weekHistory.map(h => h.max_dd)).toFixed(2));
+            
+            // Events from past 7 days
+            const sevenDaysAgoSec = Math.floor(Date.now() / 1000) - 7 * 86400;
+            filteredEvents = realEvents.filter(ev => (ev.closed_at || 0) >= sevenDaysAgoSec);
+        } else if (period === 'monthly') {
+            // Past 30 active trading days
+            const monthHistory = historyList.slice(0, 30);
+            displayProfit = Number(monthHistory.reduce((s, h) => s + h.profit, 0).toFixed(2));
+            displayLots = Number(monthHistory.reduce((s, h) => s + h.lots, 0).toFixed(2));
+            displayMaxDd = Number(Math.max(0, ...monthHistory.map(h => h.max_dd)).toFixed(2));
+
+            // Events from past 30 days
+            const thirtyDaysAgoSec = Math.floor(Date.now() / 1000) - 30 * 86400;
+            filteredEvents = realEvents.filter(ev => (ev.closed_at || 0) >= thirtyDaysAgoSec);
         }
 
-        // Clean symbol names (remove .v or broker suffixes)
-        events = events.map(e => ({
-            ...e,
-            symbol: String(e.symbol || '').replace(/\.v$/i, '').toUpperCase()
-        }));
+        // Sort events newest first
+        filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
 
-        // 4. Compute Pair Aggregated Summary
+        // 5. Compute Pair Aggregated Summary from REAL events only
         const pairMap: Record<string, {
             symbol: string;
             totalProfit: number;
@@ -359,7 +268,7 @@ export async function GET(req: Request) {
             maxDd: number;
         }> = {};
 
-        for (const ev of events) {
+        for (const ev of filteredEvents) {
             const sym = ev.symbol || 'UNKNOWN';
             if (!pairMap[sym]) {
                 pairMap[sym] = {
@@ -405,35 +314,25 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             success: true,
+            period,
+            active_date: activeTradingDate,
             port_number: portNumber,
-            today_profit: todayProfit,
-            today_closed_lots: todayClosedLots,
-            daily_max_drawdown: dailyMaxDrawdown,
+            today_profit: displayProfit,
+            today_closed_lots: displayLots,
+            daily_max_drawdown: displayMaxDd,
             balance,
             equity,
             account_type: accountType,
             currency: accountType === 'USC' ? 'USC' : 'USD',
             updated_at: updatedAt,
-            events_count: events.length,
+            events_count: filteredEvents.length,
             pair_summary: pairSummary,
-            events: events.map(e => ({
-                id: e.id,
-                symbol: e.symbol,
-                side: e.side || 'BUY',
-                exit_type: e.exit_type || 'FULL_BASKET_TP',
-                orders: e.orders || 1,
-                lots: e.lots || 0,
-                profit: e.profit || 0,
-                duration_sec: e.duration_sec || 0,
-                max_dd_pct: e.max_dd_pct || 0,
-                closed_at: e.closed_at || Math.floor(Date.now() / 1000),
-                ea_name: e.ea_name || 'EasyM Prime',
-                ea_build: e.ea_build || 'B261028.2'
-            }))
+            events: filteredEvents,
+            history_list: historyList
         });
 
     } catch (err: any) {
-        console.error('Failed to get today harvest data:', err);
+        console.error('Failed to get harvest telemetry data:', err);
         return NextResponse.json({ success: false, message: err.message || 'Internal error' }, { status: 500 });
     }
 }

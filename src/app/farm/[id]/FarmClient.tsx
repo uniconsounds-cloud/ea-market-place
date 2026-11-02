@@ -1696,6 +1696,15 @@ export default function FarmClient({
     // 🌾 Today Harvest Basket Closures Modal State (Gated to isDevPort3088)
     const [isHarvestModalOpen, setIsHarvestModalOpen] = useState(false);
 
+    // 🗓️ Farm Active Trading Date string (synchronized with broker day and market hours)
+    const activeFarmTradingDate = useMemo(() => {
+        const mDate = getMarketTradingDate(time || new Date());
+        const yyyy = mDate.getFullYear();
+        const mm = String(mDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(mDate.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }, [time]);
+
     // 🚪 Auto-collapse DD Orbs when any modal popup opens
     useEffect(() => {
         if (primeActiveOrb !== null || isLiveTerminalOpen || isHarvestModalOpen || expandedActivePair !== null) {
@@ -6855,10 +6864,12 @@ export default function FarmClient({
                     isOpen={isHarvestModalOpen}
                     onClose={() => setIsHarvestModalOpen(false)}
                     portNumber={portNumber}
-                    initialTodayProfit={smoothedTodayProfit > 0 ? smoothedTodayProfit : (Number(portStatus?.today_pnl) || 788.17)}
-                    initialTodayLots={effectiveTodayLots > 0 ? effectiveTodayLots : 47.20}
-                    initialMaxDd={effectiveDailyMaxDd > 0 ? effectiveDailyMaxDd : 42.22}
+                    activeTradingDate={activeFarmTradingDate}
+                    initialTodayProfit={smoothedTodayProfit > 0 ? smoothedTodayProfit : Number(portStatus?.today_pnl || 0)}
+                    initialTodayLots={effectiveTodayLots > 0 ? effectiveTodayLots : Number(portStatus?.today_closed_lots || 0)}
+                    initialMaxDd={effectiveDailyMaxDd > 0 ? effectiveDailyMaxDd : Math.abs(Number(portStatus?.daily_max_drawdown) || 0)}
                     accountType={portStatus?.account_type || 'USC'}
+                    history={history}
                 />
             )}
         </div>

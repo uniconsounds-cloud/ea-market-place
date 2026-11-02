@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { X, RefreshCw, Layers, TrendingUp, Clock, CheckCircle2, ShieldAlert, Sparkles, Filter, ChevronRight } from 'lucide-react';
+import { 
+    X, RefreshCw, Layers, TrendingUp, Clock, CheckCircle2, 
+    ShieldAlert, Sparkles, Filter, ChevronRight, Calendar, 
+    BarChart3, ArrowRight, Activity 
+} from 'lucide-react';
 
 export interface BasketClosureEvent {
     id: string;
@@ -31,8 +35,17 @@ export interface PairSummary {
     maxDd: number;
 }
 
+export interface DailyHistoryItem {
+    date: string;
+    profit: number;
+    lots: number;
+    max_dd: number;
+}
+
 export interface TodayHarvestData {
     success: boolean;
+    period?: 'today' | 'daily' | 'weekly' | 'monthly';
+    active_date?: string;
     port_number: string;
     today_profit: number;
     today_closed_lots: number;
@@ -45,27 +58,36 @@ export interface TodayHarvestData {
     events_count: number;
     pair_summary: PairSummary[];
     events: BasketClosureEvent[];
+    history_list?: DailyHistoryItem[];
 }
+
+export type HarvestPeriod = 'today' | 'daily' | 'weekly' | 'monthly';
 
 interface TodayHarvestModalProps {
     isOpen: boolean;
     onClose: () => void;
     portNumber: string;
+    activeTradingDate?: string;
     initialTodayProfit?: number;
     initialTodayLots?: number;
     initialMaxDd?: number;
     accountType?: string;
+    history?: any[];
 }
 
 export default function TodayHarvestModal({
     isOpen,
     onClose,
     portNumber,
+    activeTradingDate = '',
     initialTodayProfit = 0,
     initialTodayLots = 0,
     initialMaxDd = 0,
-    accountType = 'USC'
+    accountType = 'USC',
+    history = []
 }: TodayHarvestModalProps) {
+    const [period, setPeriod] = useState<HarvestPeriod>('today');
+    const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
     const [data, setData] = useState<TodayHarvestData | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -96,14 +118,18 @@ export default function TodayHarvestModal({
         return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     };
 
-    const formatDuration = (sec: number) => {
-        if (!sec || sec <= 0) return '< 1 นาที';
-        if (sec < 60) return `${sec} วิ`;
-        const mins = Math.floor(sec / 60);
-        if (mins < 60) return `${mins} นาที`;
-        const hrs = Math.floor(mins / 60);
-        const remMins = mins % 60;
-        return `${hrs} ชม. ${remMins} น.`;
+    const formatDateLabel = (dateStr: string) => {
+        if (!dateStr) return '';
+        try {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+            }
+        } catch (e) {
+            // fallback
+        }
+        return dateStr;
     };
 
     const getExitTypeInfo = (exitType: string) => {
@@ -164,7 +190,18 @@ export default function TodayHarvestModal({
     const fetchData = useCallback(async (isManual = false) => {
         if (isManual) setIsRefreshing(true);
         try {
-            const res = await fetch(`/api/farm/today-harvest?port=${encodeURIComponent(portNumber)}`);
+            const queryParams = new URLSearchParams({
+                port: portNumber,
+                period: period
+            });
+            if (activeTradingDate) {
+                queryParams.set('trading_date', activeTradingDate);
+            }
+            if (period === 'daily' && selectedHistoryDate) {
+                queryParams.set('date', selectedHistoryDate);
+            }
+
+            const res = await fetch(`/api/farm/today-harvest?${queryParams.toString()}`);
             if (res.ok) {
                 const json = await res.json();
                 if (json.success) {
@@ -179,17 +216,20 @@ export default function TodayHarvestModal({
                 setTimeout(() => setIsRefreshing(false), 400);
             }
         }
-    }, [portNumber]);
+    }, [portNumber, period, activeTradingDate, selectedHistoryDate]);
 
-    // Initial load and polling every 15 seconds while open
+    // Initial load and polling every 15 seconds while open in today mode
     useEffect(() => {
         if (!isOpen) return;
+        setIsLoading(true);
         fetchData();
-        const interval = setInterval(() => {
-            fetchData();
-        }, 15000);
-        return () => clearInterval(interval);
-    }, [isOpen, fetchData]);
+        if (period === 'today') {
+            const interval = setInterval(() => {
+                fetchData();
+            }, 15000);
+            return () => clearInterval(interval);
+        }
+    }, [isOpen, fetchData, period]);
 
     // Handle ESC key to close
     useEffect(() => {
@@ -200,6 +240,25 @@ export default function TodayHarvestModal({
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, onClose]);
+
+    // Available daily history dates
+    const historyList = useMemo<DailyHistoryItem[]>(() => {
+        if (data?.history_list && data.history_list.length > 0) {
+            return data.history_list;
+        }
+        if (history && history.length > 0) {
+            return [...history]
+                .filter(h => h.date)
+                .map(h => ({
+                    date: String(h.date),
+                    profit: Number(h.profit || 0),
+                    lots: Number(h.closed_lots ?? h.lots ?? 0),
+                    max_dd: Number(h.max_drawdown ?? h.max_dd ?? 0)
+                }))
+                .sort((a, b) => b.date.localeCompare(a.date));
+        }
+        return [];
+    }, [data?.history_list, history]);
 
     // Filter events
     const filteredEvents = useMemo(() => {
@@ -265,6 +324,50 @@ export default function TodayHarvestModal({
     const displayMaxDd = data?.daily_max_drawdown ?? initialMaxDd;
     const pnlFormatted = formatProfit(displayProfit);
 
+    // Period badge titles
+    const getPeriodLabels = () => {
+        switch (period) {
+            case 'today':
+                return {
+                    profitTitle: 'NET PROFIT',
+                    profitSub: `Today (${data?.active_date || activeTradingDate || 'Real-time'})`,
+                    lotsTitle: 'CLOSED LOTS',
+                    lotsSub: `${data?.events_count ?? 0} Baskets`,
+                    ddTitle: 'MAX DRAWDOWN',
+                    ddSub: 'Daily Peak'
+                };
+            case 'daily':
+                return {
+                    profitTitle: 'NET PROFIT',
+                    profitSub: `Day: ${selectedHistoryDate || data?.active_date || activeTradingDate}`,
+                    lotsTitle: 'CLOSED LOTS',
+                    lotsSub: `${displayLots.toFixed(2)} Lots`,
+                    ddTitle: 'MAX DRAWDOWN',
+                    ddSub: 'Day Peak'
+                };
+            case 'weekly':
+                return {
+                    profitTitle: '7D TOTAL PROFIT',
+                    profitSub: 'Past 7 Trading Days',
+                    lotsTitle: '7D TOTAL LOTS',
+                    lotsSub: `${Math.min(7, historyList.length)} Days`,
+                    ddTitle: '7D PEAK DRAWDOWN',
+                    ddSub: 'Period Peak'
+                };
+            case 'monthly':
+                return {
+                    profitTitle: '30D TOTAL PROFIT',
+                    profitSub: 'Past 30 Trading Days',
+                    lotsTitle: '30D TOTAL LOTS',
+                    lotsSub: `${Math.min(30, historyList.length)} Days`,
+                    ddTitle: '30D PEAK DRAWDOWN',
+                    ddSub: 'Period Peak'
+                };
+        }
+    };
+
+    const periodLabels = getPeriodLabels();
+
     return (
         <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000001] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
@@ -280,7 +383,7 @@ export default function TodayHarvestModal({
                 {/* 🏷️ Header */}
                 <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-white/10 shrink-0 bg-black/40">
                     <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
-                        <div className="relative w-9 h-9 sm:w-11 sm:h-11 flex-shrink-0 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+                        <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
                             <Image 
                                 src="/farm/base_farmbox_full.webp" 
                                 alt="Crate" 
@@ -291,16 +394,18 @@ export default function TodayHarvestModal({
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-1.5 sm:gap-2">
-                                <h2 className="text-sm sm:text-base font-black font-mono tracking-wider text-amber-300 drop-shadow whitespace-nowrap">
-                                    🌾 TODAY HARVEST
+                                <h2 className="text-xs sm:text-base font-black font-mono tracking-wider text-amber-300 drop-shadow whitespace-nowrap">
+                                    🌾 HARVEST REPORT
                                 </h2>
-                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.2 rounded-full border border-cyan-500/30 whitespace-nowrap">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                                    <span>LIVE</span>
-                                </span>
+                                {period === 'today' && (
+                                    <span className="flex items-center gap-1 text-[8px] sm:text-[9px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.2 rounded-full border border-cyan-500/30 whitespace-nowrap">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                                        <span>LIVE</span>
+                                    </span>
+                                )}
                             </div>
                             <p className="text-[9.5px] sm:text-xs text-white/60 font-mono mt-0.5 whitespace-nowrap truncate">
-                                PORT: <span className="text-amber-200 font-bold">{portNumber}</span> • MT5 Live Telemetry
+                                PORT: <span className="text-amber-200 font-bold">{portNumber}</span> • MT5 Telemetry
                             </p>
                         </div>
                     </div>
@@ -325,41 +430,136 @@ export default function TodayHarvestModal({
                     </div>
                 </div>
 
+                {/* 🧭 Period Selector Tabs (Today, Daily, Weekly, Monthly) */}
+                <div className="px-2.5 sm:px-6 py-2 bg-black/50 border-b border-white/10 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-1.5 w-full">
+                        <button
+                            onClick={() => {
+                                setPeriod('today');
+                                setSelectedHistoryDate(null);
+                                setSelectedPairFilter(null);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl font-mono text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap text-center border ${
+                                period === 'today'
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/80 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+                                    : 'bg-white/5 text-white/60 border-white/5 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            🌾 วันนี้ (Today)
+                        </button>
+                        <button
+                            onClick={() => {
+                                setPeriod('daily');
+                                if (!selectedHistoryDate && historyList.length > 0) {
+                                    setSelectedHistoryDate(historyList[0].date);
+                                }
+                                setSelectedPairFilter(null);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl font-mono text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap text-center border ${
+                                period === 'daily'
+                                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/80 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                                    : 'bg-white/5 text-white/60 border-white/5 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            📅 รายวัน (Daily)
+                        </button>
+                        <button
+                            onClick={() => {
+                                setPeriod('weekly');
+                                setSelectedHistoryDate(null);
+                                setSelectedPairFilter(null);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl font-mono text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap text-center border ${
+                                period === 'weekly'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/80 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                                    : 'bg-white/5 text-white/60 border-white/5 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            📊 7 วัน (Weekly)
+                        </button>
+                        <button
+                            onClick={() => {
+                                setPeriod('monthly');
+                                setSelectedHistoryDate(null);
+                                setSelectedPairFilter(null);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl font-mono text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap text-center border ${
+                                period === 'monthly'
+                                    ? 'bg-purple-500/20 text-purple-300 border-purple-400/80 shadow-[0_0_12px_rgba(168,85,247,0.3)]'
+                                    : 'bg-white/5 text-white/60 border-white/5 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            🗓️ 30 วัน (Monthly)
+                        </button>
+                    </div>
+                </div>
+
+                {/* 📅 Date Picker Pills Bar (Only active when in 'daily' mode) */}
+                {period === 'daily' && historyList.length > 0 && (
+                    <div className="px-2.5 sm:px-6 py-1.5 bg-black/70 border-b border-white/5 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+                        <span className="text-[9px] font-mono font-bold text-white/40 uppercase whitespace-nowrap mr-1">
+                            เลือกวัน:
+                        </span>
+                        {historyList.map(h => {
+                            const isSelected = (selectedHistoryDate || data?.active_date) === h.date;
+                            return (
+                                <button
+                                    key={`hist_btn_${h.date}`}
+                                    onClick={() => {
+                                        setSelectedHistoryDate(h.date);
+                                        setSelectedPairFilter(null);
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-mono font-bold transition-all whitespace-nowrap flex items-center gap-1 border ${
+                                        isSelected
+                                            ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-sm'
+                                            : 'bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                                    }`}
+                                >
+                                    <span>{h.date}</span>
+                                    <span className={h.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                        {h.profit >= 0 ? '+' : ''}{h.profit.toFixed(1)}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
                 {/* 📊 Today Hero Summary Badges Row */}
                 <div className="grid grid-cols-3 gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5 bg-black/60 border-b border-white/5 shrink-0 text-center font-mono">
                     <div className="bg-[#051c14]/80 border border-emerald-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
-                        <span className="text-[8.5px] sm:text-[10px] text-emerald-400/80 font-bold tracking-wider uppercase whitespace-nowrap">
-                            NET PROFIT
+                        <span className="text-[8px] sm:text-[9.5px] text-emerald-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                            {periodLabels.profitTitle}
                         </span>
                         <span className="text-[11px] sm:text-base font-black text-emerald-400 leading-tight mt-0.5 whitespace-nowrap">
                             {pnlFormatted.main}
                         </span>
-                        <span className="text-[7.5px] sm:text-[9.5px] text-emerald-300/60 leading-tight whitespace-nowrap">
+                        <span className="text-[7.5px] sm:text-[9px] text-emerald-300/60 leading-tight whitespace-nowrap truncate max-w-full">
                             {pnlFormatted.usd}
                         </span>
                     </div>
 
                     <div className="bg-[#05141f]/80 border border-cyan-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
-                        <span className="text-[8.5px] sm:text-[10px] text-cyan-400/80 font-bold tracking-wider uppercase whitespace-nowrap">
-                            CLOSED LOTS
+                        <span className="text-[8px] sm:text-[9.5px] text-cyan-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                            {periodLabels.lotsTitle}
                         </span>
                         <span className="text-[11px] sm:text-base font-black text-cyan-300 leading-tight mt-0.5 whitespace-nowrap">
                             {displayLots.toFixed(2)} Lots
                         </span>
-                        <span className="text-[7.5px] sm:text-[9.5px] text-cyan-400/60 leading-tight whitespace-nowrap">
-                            {data?.events_count ?? 0} Baskets
+                        <span className="text-[7.5px] sm:text-[9px] text-cyan-400/60 leading-tight whitespace-nowrap truncate max-w-full">
+                            {periodLabels.lotsSub}
                         </span>
                     </div>
 
                     <div className="bg-[#1f0d05]/80 border border-amber-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
-                        <span className="text-[8.5px] sm:text-[10px] text-amber-400/80 font-bold tracking-wider uppercase whitespace-nowrap">
-                            MAX DRAWDOWN
+                        <span className="text-[8px] sm:text-[9.5px] text-amber-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                            {periodLabels.ddTitle}
                         </span>
                         <span className="text-[11px] sm:text-base font-black text-amber-300 leading-tight mt-0.5 whitespace-nowrap">
                             -{Math.abs(displayMaxDd).toFixed(2)}%
                         </span>
-                        <span className="text-[7.5px] sm:text-[9.5px] text-amber-400/60 leading-tight whitespace-nowrap">
-                            Daily Peak
+                        <span className="text-[7.5px] sm:text-[9px] text-amber-400/60 leading-tight whitespace-nowrap truncate max-w-full">
+                            {periodLabels.ddSub}
                         </span>
                     </div>
                 </div>
@@ -390,13 +590,19 @@ export default function TodayHarvestModal({
                         </div>
 
                         {isLoading ? (
-                            <div className="flex items-center justify-center py-10">
-                                <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
+                            <div className="flex items-center justify-center py-8">
+                                <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
                                 <span className="ml-2 font-mono text-xs text-white/60">กำลังดึงข้อมูล Telemetry...</span>
                             </div>
                         ) : !data?.pair_summary || data.pair_summary.length === 0 ? (
-                            <div className="text-center py-8 text-white/40 font-mono text-xs">
-                                ยังไม่มีข้อมูลการปิดรวบกำไรในวันนี้
+                            <div className="text-center py-6 px-4 bg-white/[0.02] rounded-xl border border-white/5 font-mono">
+                                <Activity className="w-6 h-6 text-white/20 mx-auto mb-1.5" />
+                                <p className="text-xs text-white/50 font-bold">ไม่มีบันทึกข้อมูลคู่เงินในช่วงเวลานี้</p>
+                                <p className="text-[10px] text-white/30 mt-0.5">
+                                    {period === 'today' 
+                                        ? 'ระบบจะบันทึกอัตโนมัติทันทีที่ EA ปิดไม้ทำกำไร (Real-time MT5 Telemetry)'
+                                        : 'ไม่มีข้อมูลรอบปิดรวบที่แยกตามคู่เงินสำหรับช่วงเวลานี้'}
+                                </p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
@@ -540,7 +746,7 @@ export default function TodayHarvestModal({
                                                             style={{ 
                                                                 width: `${pair.profitSharePct}%`,
                                                                 backgroundColor: pair.color 
-                                                             }}
+                                                            }}
                                                         />
                                                     </div>
                                                 </div>
@@ -553,117 +759,191 @@ export default function TodayHarvestModal({
                     </div>
 
                     {/* ═══════════════════════════════════════════════════════════════ */}
-                    {/* 2. LOWER SECTION: DETAILED BASKET EVENTS FROM MT5              */}
+                    {/* 2. LOWER SECTION: CONDITIONAL BY PERIOD                        */}
+                    {/*    - If Weekly/Monthly: Show Daily Breakdown History Table     */}
+                    {/*    - If Today/Daily: Show Real MT5 Basket Closures List       */}
                     {/* ═══════════════════════════════════════════════════════════════ */}
-                    <div className="bg-black/50 border border-white/10 rounded-2xl p-3 sm:p-5 backdrop-blur-md">
-                        <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2 flex-wrap gap-2">
-                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 shrink-0" />
-                                <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider whitespace-nowrap truncate">
-                                    MT5 BASKET CLOSURES ({filteredEvents.length})
-                                </h3>
+                    {(period === 'weekly' || period === 'monthly') ? (
+                        <div className="bg-black/50 border border-white/10 rounded-2xl p-3 sm:p-5 backdrop-blur-md">
+                            <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                                    <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider whitespace-nowrap truncate">
+                                        DAILY HARVEST BREAKDOWN ({period === 'weekly' ? 'PAST 7 DAYS' : 'PAST 30 DAYS'})
+                                    </h3>
+                                </div>
+                                <span className="text-[9px] font-mono text-white/40">
+                                    แตะวันเพื่อดูรายละเอียด (Tap day to view)
+                                </span>
                             </div>
 
-                            {/* Quick Symbol Pills Filter */}
-                            {data?.pair_summary && data.pair_summary.length > 1 && (
-                                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-                                    <button
-                                        onClick={() => setSelectedPairFilter(null)}
-                                        className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all whitespace-nowrap ${
-                                            selectedPairFilter === null 
-                                                ? 'bg-white/20 border-white text-white' 
-                                                : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
-                                        }`}
-                                    >
-                                        ALL ({data.events.length})
-                                    </button>
-                                    {data.pair_summary.map(p => (
-                                        <button
-                                            key={`pill_${p.symbol}`}
-                                            onClick={() => setSelectedPairFilter(prev => prev === p.symbol ? null : p.symbol)}
-                                            className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all whitespace-nowrap ${
-                                                selectedPairFilter === p.symbol 
-                                                    ? 'border-amber-400 text-amber-200 bg-amber-500/20' 
-                                                    : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
-                                            }`}
+                            {historyList.length === 0 ? (
+                                <div className="text-center py-8 text-white/40 font-mono text-xs">
+                                    ไม่มีประวัติการเทรดในฐานข้อมูล
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5 sm:space-y-2">
+                                    {(period === 'weekly' ? historyList.slice(0, 7) : historyList.slice(0, 30)).map((day) => (
+                                        <div
+                                            key={`day_row_${day.date}`}
+                                            onClick={() => {
+                                                setSelectedHistoryDate(day.date);
+                                                setPeriod('daily');
+                                            }}
+                                            className="p-2 sm:p-2.5 rounded-xl bg-black/40 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer font-mono flex items-center justify-between gap-2"
                                         >
-                                            {p.symbol}
-                                        </button>
+                                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                                <Calendar className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                                                <span className="font-bold text-xs sm:text-sm text-white whitespace-nowrap">
+                                                    {day.date}
+                                                </span>
+                                                <span className="text-[9px] text-white/40 whitespace-nowrap hidden sm:inline">
+                                                    ({formatDateLabel(day.date)})
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
+                                                <div className="flex flex-col items-end leading-tight text-[9px] sm:text-xs">
+                                                    <span className="text-cyan-300 font-bold">{day.lots.toFixed(2)} Lots</span>
+                                                    <span className="text-amber-400/80 text-[8px] sm:text-[9.5px]">DD: -{Math.abs(day.max_dd).toFixed(1)}%</span>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 min-w-[85px] sm:min-w-[110px] justify-end">
+                                                    <div className="flex flex-col items-end leading-tight">
+                                                        <span className={`text-xs sm:text-sm font-black ${day.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                            {day.profit >= 0 ? '+' : ''}{day.profit.toFixed(2)} USC
+                                                        </span>
+                                                        <span className="text-[7.5px] sm:text-[9px] text-white/40">
+                                                            {day.profit >= 0 ? '+' : ''}${(day.profit / 100).toFixed(2)} USD
+                                                        </span>
+                                                    </div>
+                                                    <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-emerald-400 shrink-0" />
+                                                </div>
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             )}
                         </div>
+                    ) : (
+                        <div className="bg-black/50 border border-white/10 rounded-2xl p-3 sm:p-5 backdrop-blur-md">
+                            <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2 flex-wrap gap-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                    <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 shrink-0" />
+                                    <h3 className="text-xs sm:text-sm font-bold font-mono text-white/90 uppercase tracking-wider whitespace-nowrap truncate">
+                                        MT5 BASKET CLOSURES ({filteredEvents.length})
+                                    </h3>
+                                </div>
 
-                        {/* Events Table / Card List */}
-                        {filteredEvents.length === 0 ? (
-                            <div className="text-center py-8 text-white/40 font-mono text-xs">
-                                {selectedPairFilter ? `ไม่มีรายการปิดรวบของ ${selectedPairFilter}` : 'ยังไม่มีรายการปิดรวบในวันนี้'}
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {filteredEvents.map((ev, idx) => {
-                                    const exitInfo = getExitTypeInfo(ev.exit_type);
-                                    const isBuy = ev.side.toUpperCase() === 'BUY';
-                                    return (
-                                        <div
-                                            key={ev.id || `ev_${idx}`}
-                                            className="p-2 sm:p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-all font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                {/* Quick Symbol Pills Filter */}
+                                {data?.pair_summary && data.pair_summary.length > 1 && (
+                                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                                        <button
+                                            onClick={() => setSelectedPairFilter(null)}
+                                            className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all whitespace-nowrap ${
+                                                selectedPairFilter === null 
+                                                    ? 'bg-white/20 border-white text-white' 
+                                                    : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
+                                            }`}
                                         >
-                                            {/* Left Block: Time, Symbol, Side, Exit Type */}
-                                            <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap min-w-0">
-                                                <div className="flex items-center gap-1 text-white/40 text-[9px] sm:text-xs whitespace-nowrap">
-                                                    <Clock className="w-3 h-3 text-white/30" />
-                                                    <span>{formatTime(ev.closed_at)}</span>
-                                                </div>
-
-                                                <span className="px-1.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs bg-white/10 text-white border border-white/15 whitespace-nowrap">
-                                                    {ev.symbol}
-                                                </span>
-
-                                                <span className={`px-1.5 py-0.2 rounded text-[8.5px] sm:text-[9.5px] font-black border whitespace-nowrap ${
-                                                    isBuy 
-                                                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
-                                                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                                                }`}>
-                                                    {ev.side}
-                                                </span>
-
-                                                <span className={`px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9.5px] font-bold border flex items-center gap-1 whitespace-nowrap ${exitInfo.badge}`}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${exitInfo.dot}`} />
-                                                    <span>{exitInfo.label}</span>
-                                                </span>
-                                            </div>
-
-                                            {/* Right Block: Orders, Lots, Profit, Max DD */}
-                                            <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-4 text-right shrink-0">
-                                                <div className="flex flex-col items-start sm:items-end leading-tight whitespace-nowrap">
-                                                    <span className="text-[9.5px] sm:text-xs text-white/70">
-                                                        <span className="text-white font-bold">{ev.orders}</span> Orders
-                                                        <span className="text-white/30 mx-1">•</span>
-                                                        <span className="text-cyan-300 font-bold">{ev.lots.toFixed(2)}</span>L
-                                                    </span>
-                                                    <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
-                                                        DD: <span className="text-amber-400 font-bold">-{ev.max_dd_pct.toFixed(1)}%</span>
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex flex-col items-end leading-tight min-w-[75px] sm:min-w-[95px] whitespace-nowrap">
-                                                    <span className={`text-[11px] sm:text-sm font-black ${
-                                                        ev.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                                                    }`}>
-                                                        {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[8px] font-normal text-white/50">USC</span>
-                                                    </span>
-                                                    <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
-                                                        {ev.profit >= 0 ? '+' : ''}${(ev.profit / 100).toFixed(2)} USD
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                            ALL ({data.events.length})
+                                        </button>
+                                        {data.pair_summary.map(p => (
+                                            <button
+                                                key={`pill_${p.symbol}`}
+                                                onClick={() => setSelectedPairFilter(prev => prev === p.symbol ? null : p.symbol)}
+                                                className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border transition-all whitespace-nowrap ${
+                                                    selectedPairFilter === p.symbol 
+                                                        ? 'border-amber-400 text-amber-200 bg-amber-500/20' 
+                                                        : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
+                                                }`}
+                                            >
+                                                {p.symbol}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+
+                            {/* Events Table / Card List */}
+                            {filteredEvents.length === 0 ? (
+                                <div className="text-center py-6 px-4 bg-white/[0.02] rounded-xl border border-white/5 font-mono">
+                                    <Layers className="w-6 h-6 text-white/20 mx-auto mb-1.5" />
+                                    <p className="text-xs text-white/50 font-bold">
+                                        {selectedPairFilter 
+                                            ? `ไม่มีรายการปิดรวบของ ${selectedPairFilter}` 
+                                            : 'ยังไม่มีรอบการปิดรวบที่บันทึกไว้ในวันดังกล่าว'}
+                                    </p>
+                                    <p className="text-[10px] text-white/30 mt-0.5">
+                                        เมื่อ EA ทำการปิดรวบไม้ใน MT5 ข้อมูลจะปรากฏที่นี่ทันทีตาม Telemetry จริง
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredEvents.map((ev, idx) => {
+                                        const exitInfo = getExitTypeInfo(ev.exit_type);
+                                        const isBuy = ev.side.toUpperCase() === 'BUY';
+                                        return (
+                                            <div
+                                                key={ev.id || `ev_${idx}`}
+                                                className="p-2 sm:p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-all font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                            >
+                                                {/* Left Block: Time, Symbol, Side, Exit Type */}
+                                                <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap min-w-0">
+                                                    <div className="flex items-center gap-1 text-white/40 text-[9px] sm:text-xs whitespace-nowrap">
+                                                        <Clock className="w-3 h-3 text-white/30" />
+                                                        <span>{formatTime(ev.closed_at)}</span>
+                                                    </div>
+
+                                                    <span className="px-1.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs bg-white/10 text-white border border-white/15 whitespace-nowrap">
+                                                        {ev.symbol}
+                                                    </span>
+
+                                                    <span className={`px-1.5 py-0.2 rounded text-[8.5px] sm:text-[9.5px] font-black border whitespace-nowrap ${
+                                                        isBuy 
+                                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                                                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                                    }`}>
+                                                        {ev.side}
+                                                    </span>
+
+                                                    <span className={`px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9.5px] font-bold border flex items-center gap-1 whitespace-nowrap ${exitInfo.badge}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${exitInfo.dot}`} />
+                                                        <span>{exitInfo.label}</span>
+                                                    </span>
+                                                </div>
+
+                                                {/* Right Block: Orders, Lots, Profit, Max DD */}
+                                                <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-4 text-right shrink-0">
+                                                    <div className="flex flex-col items-start sm:items-end leading-tight whitespace-nowrap">
+                                                        <span className="text-[9.5px] sm:text-xs text-white/70">
+                                                            <span className="text-white font-bold">{ev.orders}</span> Orders
+                                                            <span className="text-white/30 mx-1">•</span>
+                                                            <span className="text-cyan-300 font-bold">{ev.lots.toFixed(2)}</span>L
+                                                        </span>
+                                                        <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
+                                                            DD: <span className="text-amber-400 font-bold">-{ev.max_dd_pct.toFixed(1)}%</span>
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex flex-col items-end leading-tight min-w-[75px] sm:min-w-[95px] whitespace-nowrap">
+                                                        <span className={`text-[11px] sm:text-sm font-black ${
+                                                            ev.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                                        }`}>
+                                                            {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[8px] font-normal text-white/50">USC</span>
+                                                        </span>
+                                                        <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
+                                                            {ev.profit >= 0 ? '+' : ''}${(ev.profit / 100).toFixed(2)} USD
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                 </div>
 
@@ -671,9 +951,11 @@ export default function TodayHarvestModal({
                 <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 border-t border-white/10 bg-black/70 flex items-center justify-between text-[9px] sm:text-xs font-mono text-white/40 shrink-0 whitespace-nowrap">
                     <div className="flex items-center gap-1.5 truncate">
                         <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                        <span className="truncate">EasyM Prime Telemetry v2.10</span>
+                        <span className="truncate">MT5 Real-Time Telemetry</span>
                     </div>
-                    <span className="shrink-0 text-white/50">Auto-poll: 15s</span>
+                    <span className="shrink-0 text-white/50">
+                        {period === 'today' ? 'Auto-poll: 15s' : `${period.toUpperCase()} View`}
+                    </span>
                 </div>
             </div>
         </div>
