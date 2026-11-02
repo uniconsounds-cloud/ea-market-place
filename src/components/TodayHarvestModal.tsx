@@ -48,6 +48,13 @@ export interface TodayHarvestData {
     active_date?: string;
     port_number: string;
     today_profit: number;
+    net_mt5_profit?: number;
+    ea_profit?: number;
+    ea_cut_loss?: number;
+    relief_used?: number;
+    manual_profit?: number;
+    manual_lots?: number;
+    manual_orders?: number;
     today_closed_lots: number;
     daily_max_drawdown: number;
     balance: number;
@@ -175,6 +182,21 @@ export default function TodayHarvestModal({
                     badge: 'bg-purple-500/15 border-purple-400/50 text-purple-300',
                     dot: 'bg-purple-400',
                     tag: 'TRIM'
+                };
+            case 'MANUAL_CLOSE_EA':
+            case 'MANUAL_EXIT':
+                return {
+                    label: 'MANUAL EXIT (EA)',
+                    badge: 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.2)]',
+                    dot: 'bg-amber-400',
+                    tag: 'MANUAL'
+                };
+            case 'MANUAL_TRADE':
+                return {
+                    label: 'MANUAL TRADE',
+                    badge: 'bg-orange-500/20 border-orange-400/60 text-orange-300 shadow-[0_0_8px_rgba(249,115,22,0.2)]',
+                    dot: 'bg-orange-400',
+                    tag: 'HAND'
                 };
             default:
                 return {
@@ -323,6 +345,11 @@ export default function TodayHarvestModal({
     const displayLots = data?.today_closed_lots ?? initialTodayLots;
     const displayMaxDd = data?.daily_max_drawdown ?? initialMaxDd;
     const pnlFormatted = formatProfit(displayProfit);
+    const isProfitPositive = displayProfit >= 0;
+
+    const eaGrossProfit = data?.ea_profit !== undefined ? Number(data.ea_profit) : (displayProfit > 0 ? displayProfit : 0);
+    const eaCutLoss = data?.ea_cut_loss !== undefined ? Number(data.ea_cut_loss) : 0;
+    const hasCutLossOrDual = (eaCutLoss > 0) || (eaGrossProfit > 0 && Math.abs(displayProfit - eaGrossProfit) >= 0.01) || displayProfit < 0;
 
     // Period badge titles
     const getPeriodLabels = () => {
@@ -526,46 +553,142 @@ export default function TodayHarvestModal({
                 )}
 
                 {/* 📊 Today Hero Summary Badges Row */}
-                <div className="grid grid-cols-3 gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5 bg-black/60 border-b border-white/5 shrink-0 text-center font-mono">
-                    <div className="bg-[#051c14]/80 border border-emerald-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
-                        <span className="text-[8px] sm:text-[9.5px] text-emerald-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
-                            {periodLabels.profitTitle}
-                        </span>
-                        <span className="text-[11px] sm:text-base font-black text-emerald-400 leading-tight mt-0.5 whitespace-nowrap">
-                            {pnlFormatted.main}
-                        </span>
-                        <span className="text-[7.5px] sm:text-[9px] text-emerald-300/60 leading-tight whitespace-nowrap truncate max-w-full">
-                            {pnlFormatted.usd}
-                        </span>
-                    </div>
+                {hasCutLossOrDual ? (
+                    <div className="flex flex-col gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5 bg-black/60 border-b border-white/5 shrink-0 text-center font-mono">
+                        {/* Row 1: 3-column breakdown of Net MT5 Profit, EA Harvest, and EA Cut Loss */}
+                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                            {/* Card 1: Net MT5 Profit */}
+                            <div className={`${isProfitPositive ? 'bg-[#051c14]/80 border-emerald-500/30' : 'bg-[#1f0505]/80 border-rose-500/40'} border rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0 shadow-sm`}>
+                                <span className={`text-[8px] sm:text-[9.5px] ${isProfitPositive ? 'text-emerald-400/80' : 'text-rose-400/80'} font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full`}>
+                                    กำไรสุทธิ MT5
+                                </span>
+                                <span className={`text-[11px] sm:text-base font-black ${isProfitPositive ? 'text-emerald-400' : 'text-rose-400'} leading-tight mt-0.5 whitespace-nowrap`}>
+                                    {pnlFormatted.main}
+                                </span>
+                                <span className={`text-[7.5px] sm:text-[9px] ${isProfitPositive ? 'text-emerald-300/60' : 'text-rose-300/60'} leading-tight whitespace-nowrap truncate max-w-full`}>
+                                    {pnlFormatted.usd}
+                                </span>
+                            </div>
 
-                    <div className="bg-[#05141f]/80 border border-cyan-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
-                        <span className="text-[8px] sm:text-[9.5px] text-cyan-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
-                            {periodLabels.lotsTitle}
-                        </span>
-                        <span className="text-[11px] sm:text-base font-black text-cyan-300 leading-tight mt-0.5 whitespace-nowrap">
-                            {displayLots.toFixed(2)} Lots
-                        </span>
-                        <span className="text-[7.5px] sm:text-[9px] text-cyan-400/60 leading-tight whitespace-nowrap truncate max-w-full">
-                            {periodLabels.lotsSub}
-                        </span>
-                    </div>
+                            {/* Card 2: EA Harvest Profit */}
+                            <div className="bg-[#051c14]/80 border border-emerald-500/40 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                                <span className="text-[8px] sm:text-[9.5px] text-emerald-400 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                                    กำไรของอีเอ
+                                </span>
+                                <span className="text-[11px] sm:text-base font-black text-[#4de180] leading-tight mt-0.5 whitespace-nowrap drop-shadow-[0_0_6px_rgba(77,225,128,0.4)]">
+                                    +{eaGrossProfit.toFixed(2)} {isUSC ? 'USC' : 'USD'}
+                                </span>
+                                <span className="text-[7.5px] sm:text-[9px] text-emerald-300/70 leading-tight whitespace-nowrap truncate max-w-full">
+                                    ปิดรวบ {data?.events_count ?? 0} ไม้
+                                </span>
+                            </div>
 
-                    <div className="bg-[#1f0d05]/80 border border-amber-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
-                        <span className="text-[8px] sm:text-[9.5px] text-amber-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
-                            {periodLabels.ddTitle}
-                        </span>
-                        <span className="text-[11px] sm:text-base font-black text-amber-300 leading-tight mt-0.5 whitespace-nowrap">
-                            -{Math.abs(displayMaxDd).toFixed(2)}%
-                        </span>
-                        <span className="text-[7.5px] sm:text-[9px] text-amber-400/60 leading-tight whitespace-nowrap truncate max-w-full">
-                            {periodLabels.ddSub}
-                        </span>
+                            {/* Card 3: EA Cut Loss / Relief Used */}
+                            <div className="bg-[#1f0f05]/80 border border-amber-500/40 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0 shadow-sm">
+                                <span className="text-[8px] sm:text-[9.5px] text-amber-400/90 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                                    ยอดตัดขาดทุนวันนี้
+                                </span>
+                                <span className="text-[11px] sm:text-base font-black text-amber-300 leading-tight mt-0.5 whitespace-nowrap">
+                                    -{eaCutLoss.toFixed(2)} {isUSC ? 'USC' : 'USD'}
+                                </span>
+                                <span className="text-[7.5px] sm:text-[9px] text-amber-400/60 leading-tight whitespace-nowrap truncate max-w-full">
+                                    ตัดไม้ใหญ่/กองทุน
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Row 2: Closed Lots and Max Drawdown */}
+                        <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                            <div className="bg-[#05141f]/80 border border-cyan-500/30 rounded-xl p-1.5 sm:p-2 flex items-center justify-between px-3 min-w-0">
+                                <span className="text-[8px] sm:text-[9.5px] text-cyan-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate">
+                                    {periodLabels.lotsTitle}
+                                </span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[11px] sm:text-sm font-black text-cyan-300 leading-tight whitespace-nowrap">
+                                        {displayLots.toFixed(2)} Lots
+                                    </span>
+                                    <span className="text-[7.5px] sm:text-[9px] text-cyan-400/60 leading-tight whitespace-nowrap truncate">
+                                        ({periodLabels.lotsSub})
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#1f0d05]/80 border border-amber-500/30 rounded-xl p-1.5 sm:p-2 flex items-center justify-between px-3 min-w-0">
+                                <span className="text-[8px] sm:text-[9.5px] text-amber-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate">
+                                    {periodLabels.ddTitle}
+                                </span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[11px] sm:text-sm font-black text-amber-300 leading-tight whitespace-nowrap">
+                                        -{Math.abs(displayMaxDd).toFixed(2)}%
+                                    </span>
+                                    <span className="text-[7.5px] sm:text-[9px] text-amber-400/60 leading-tight whitespace-nowrap truncate">
+                                        ({periodLabels.ddSub})
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5 bg-black/60 border-b border-white/5 shrink-0 text-center font-mono">
+                        <div className={`${isProfitPositive ? 'bg-[#051c14]/80 border-emerald-500/30' : 'bg-[#1f0505]/80 border-rose-500/40'} border rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0`}>
+                            <span className={`text-[8px] sm:text-[9.5px] ${isProfitPositive ? 'text-emerald-400/80' : 'text-rose-400/80'} font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full`}>
+                                {periodLabels.profitTitle}
+                            </span>
+                            <span className={`text-[11px] sm:text-base font-black ${isProfitPositive ? 'text-emerald-400' : 'text-rose-400'} leading-tight mt-0.5 whitespace-nowrap`}>
+                                {pnlFormatted.main}
+                            </span>
+                            <span className={`text-[7.5px] sm:text-[9px] ${isProfitPositive ? 'text-emerald-300/60' : 'text-rose-300/60'} leading-tight whitespace-nowrap truncate max-w-full`}>
+                                {pnlFormatted.usd}
+                            </span>
+                        </div>
+
+                        <div className="bg-[#05141f]/80 border border-cyan-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
+                            <span className="text-[8px] sm:text-[9.5px] text-cyan-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                                {periodLabels.lotsTitle}
+                            </span>
+                            <span className="text-[11px] sm:text-base font-black text-cyan-300 leading-tight mt-0.5 whitespace-nowrap">
+                                {displayLots.toFixed(2)} Lots
+                            </span>
+                            <span className="text-[7.5px] sm:text-[9px] text-cyan-400/60 leading-tight whitespace-nowrap truncate max-w-full">
+                                {periodLabels.lotsSub}
+                            </span>
+                        </div>
+
+                        <div className="bg-[#1f0d05]/80 border border-amber-500/30 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0">
+                            <span className="text-[8px] sm:text-[9.5px] text-amber-400/80 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
+                                {periodLabels.ddTitle}
+                            </span>
+                            <span className="text-[11px] sm:text-base font-black text-amber-300 leading-tight mt-0.5 whitespace-nowrap">
+                                -{Math.abs(displayMaxDd).toFixed(2)}%
+                            </span>
+                            <span className="text-[7.5px] sm:text-[9px] text-amber-400/60 leading-tight whitespace-nowrap truncate max-w-full">
+                                {periodLabels.ddSub}
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 {/* 📜 Scrollable Main Content */}
                 <div className="overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 flex-1 no-scrollbar">
+
+                    {/* 👤 Manual Trades Callout (if user closed/opened manual trades) */}
+                    {data?.manual_orders !== undefined && (data.manual_orders > 0 || Math.abs(data.manual_profit || 0) > 0.001) && (
+                        <div className="bg-[#181106]/90 border border-amber-500/40 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2 backdrop-blur-md">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="px-2 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                                    MANUAL TRADES
+                                </span>
+                                <span className="text-[10px] sm:text-xs text-white/70 font-mono truncate">
+                                    ตรวจพบการเทรด/ปิดออเดอร์ด้วยมือ ({data.manual_orders} ไม้, {(data.manual_lots || 0).toFixed(2)} Lots)
+                                </span>
+                            </div>
+                            <div className="font-mono text-right shrink-0">
+                                <span className={`text-xs sm:text-sm font-black ${(data.manual_profit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {(data.manual_profit || 0) >= 0 ? '+' : ''}{(data.manual_profit || 0).toFixed(2)} {isUSC ? 'USC' : 'USD'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* ═══════════════════════════════════════════════════════════════ */}
                     {/* 1. UPPER SECTION: DONUT CHART + PAIR GROUPED SUMMARY           */}

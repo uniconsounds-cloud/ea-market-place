@@ -70,6 +70,7 @@ type FarmHudProps = {
     equity: number;
     floatingPnl: number;
     todayProfit: number; // Added for Today Result
+    eaTodayProfit?: number; // Gross profit closed by EA baskets today (e.g. +150.88)
     totalStandardLots: number;
     accountType: string;
     assetType: string; // Added assetType
@@ -97,6 +98,7 @@ export default function FarmHud({
     equity,
     floatingPnl,
     todayProfit,
+    eaTodayProfit,
     totalStandardLots,
     accountType,
     assetType, // Added assetType
@@ -424,13 +426,23 @@ export default function FarmHud({
                             <span>Today Result</span>
                             {onHarvestClick && <span className="text-[7.5px] font-bold text-amber-400/80 bg-amber-400/10 px-1 py-0.2 rounded border border-amber-400/30">REPORT ↗</span>}
                         </span>
-                        <span className={`text-[11px] sm:text-sm lg:text-xl font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm leading-none`}>
-                            <AnimatedNumber
-                                value={todayProfit}
-                                formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`}
-                                colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'}
-                            />
-                        </span>
+                        <div className="flex items-baseline gap-1 leading-none">
+                            <span className={`text-[11px] sm:text-sm lg:text-xl font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-sm leading-none`}>
+                                <AnimatedNumber
+                                    value={todayProfit}
+                                    formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`}
+                                    colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'}
+                                />
+                            </span>
+                            {eaTodayProfit !== undefined && eaTodayProfit > 0 && (todayProfit < 0 || Math.abs(todayProfit - eaTodayProfit) >= 0.01) && (
+                                <span 
+                                    className="text-[9px] sm:text-xs lg:text-sm font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
+                                    title={`กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
+                                >
+                                    ({eaTodayProfit.toFixed(2)})
+                                </span>
+                            )}
+                        </div>
                         {/* More visible USC Label */}
                         <div className="flex items-center gap-1 mt-0.5">
                            <span className="inline sm:inline text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-1">{todayClosedLots.toFixed(2)}</span></span>
@@ -465,6 +477,7 @@ export function FarmMobileStatsOverlay({
     sellPnl,
     balance,
     todayProfit,
+    eaTodayProfit,
     todayClosedLots,
     dailyMaxDrawdown,
     drawdownPercent,
@@ -484,6 +497,7 @@ export function FarmMobileStatsOverlay({
     sellPnl: number;
     balance: number;
     todayProfit: number;
+    eaTodayProfit?: number;
     todayClosedLots: number;
     dailyMaxDrawdown: number;
     drawdownPercent?: number;
@@ -602,9 +616,19 @@ export function FarmMobileStatsOverlay({
             >
                 {/* Profit Text on Top-Left */}
                 <div className="relative z-20 flex-1 pl-[2px] pt-[2px]">
-                    <span className={`text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
-                        <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
-                    </span>
+                    <div className="flex items-baseline gap-1 leading-none">
+                        <span className={`text-[14px] sm:text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
+                            <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
+                        </span>
+                        {eaTodayProfit !== undefined && eaTodayProfit > 0 && (todayProfit < 0 || Math.abs(todayProfit - eaTodayProfit) >= 0.01) && (
+                            <span 
+                                className="text-[10px] sm:text-xs font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
+                                title={`กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
+                            >
+                                ({eaTodayProfit.toFixed(2)})
+                            </span>
+                        )}
+                    </div>
                     <div className="flex flex-col gap-0 mt-[-2px]">
                         {(() => {
                             const maxDd = Math.abs(Number(dailyMaxDrawdown) || 0);

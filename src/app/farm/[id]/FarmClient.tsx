@@ -453,6 +453,30 @@ export default function FarmClient({
         return null;
     }, [portStatus?.system_code, initialPortStatus?.system_code]);
 
+    // 🌾 Gross profit closed by EA baskets today (displayed in parentheses e.g. -1154.36(150.88))
+    const eaHarvestProfitToday = useMemo(() => {
+        // 1. Direct from harvest_events in parsedPrimeData
+        if (parsedPrimeData && Array.isArray(parsedPrimeData.harvest_events) && parsedPrimeData.harvest_events.length > 0) {
+            const sum = parsedPrimeData.harvest_events.reduce((acc: number, ev: any) => {
+                const p = Number(ev.profit || 0);
+                return acc + (p > 0 ? p : 0);
+            }, 0);
+            if (sum > 0) return Number(sum.toFixed(2));
+        }
+        // 2. Direct from ea_profit field in parsedPrimeData
+        if (parsedPrimeData?.ea_profit !== undefined && Number(parsedPrimeData.ea_profit) > 0) {
+            return Number(Number(parsedPrimeData.ea_profit).toFixed(2));
+        }
+        // 3. Fallback calculation if relief_used is present (e.g. cut toxic orders with fund)
+        const relief = Number(parsedPrimeData?.relief_used || 0);
+        const net = Number(smoothedTodayProfit || portStatus?.today_pnl || 0);
+        if (relief > 0 && net < 0) {
+            const grossEst = net + relief;
+            if (grossEst > 0) return Number(grossEst.toFixed(2));
+        }
+        return 0;
+    }, [parsedPrimeData, smoothedTodayProfit, portStatus?.today_pnl]);
+
     const isEasyM = prodKey.includes('EZM') || 
                     prodName.includes('easym') || 
                     prodName.includes('easy m') ||
@@ -474,7 +498,7 @@ export default function FarmClient({
         activePortStr.endsWith('2434') ||
         activePortStr === '2434';
     const isAllowedDevMenuPort = isDevPort3088 || isDevPort2434;
-    const isOwnerTestPort = isDevPort3088;
+    const isOwnerTestPort = isAllowedDevMenuPort;
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem('owner_prime_release_gate');
@@ -1734,9 +1758,9 @@ export default function FarmClient({
         isLoading: boolean;
     }>({ orders: [], updated_at: 0, isLoading: false });
 
-    // 👁️ Active Viewer Presence Heartbeat for Dev Port 3088 (Auto-triggers MT5 20s Live Streaming)
+    // 👁️ Active Viewer Presence Heartbeat for Dev Ports (Auto-triggers MT5 20s Live Streaming)
     useEffect(() => {
-        if (!isDevPort3088) return;
+        if (!isAllowedDevMenuPort) return;
         const sendPing = () => {
             if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
                 fetch(`/api/farm/viewer-ping?port=${portNumber}`).catch(() => {});
@@ -1745,11 +1769,11 @@ export default function FarmClient({
         sendPing();
         const pingInterval = setInterval(sendPing, 25000); // Heartbeat every 25s
         return () => clearInterval(pingInterval);
-    }, [isDevPort3088, portNumber]);
+    }, [isAllowedDevMenuPort, portNumber]);
 
     // 🔄 Live Orders Poller (Runs every 15s when Live Terminal is open to balance freshness & bandwidth)
     useEffect(() => {
-        if (!isDevPort3088 || !isLiveTerminalOpen) return;
+        if (!isAllowedDevMenuPort || !isLiveTerminalOpen) return;
         let isMounted = true;
 
         const fetchLive = async () => {
@@ -1776,7 +1800,7 @@ export default function FarmClient({
             isMounted = false;
             clearInterval(pollTimer);
         };
-    }, [isDevPort3088, isLiveTerminalOpen, portNumber]);
+    }, [isAllowedDevMenuPort, isLiveTerminalOpen, portNumber]);
 
     // 🎛️ Prime 20-Pair Cockpit Matrix Controls (Persisted to localStorage)
     const [pairControls, setPairControls] = useState<Record<string, { enabled: boolean }>>(() => {
@@ -3026,6 +3050,7 @@ export default function FarmClient({
                     buyPnl={stats.buyPnl}
                     sellPnl={stats.sellPnl}
                     todayProfit={smoothedTodayProfit}
+                    eaTodayProfit={eaHarvestProfitToday}
                     todayClosedLots={effectiveTodayLots}
                     dailyMaxDrawdown={effectiveDailyMaxDd}
                     drawdownPercent={totalPortDDPct}
@@ -3035,7 +3060,7 @@ export default function FarmClient({
                     systemCode={portStatus?.system_code?.split(':::')[0]}
                     onClick={handleSecretToggle}
                     isNonLive10m={isFallback1Url}
-                    onHarvestClick={isDevPort3088 ? () => setIsHarvestModalOpen(true) : undefined}
+                    onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
                 />
                 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -3074,6 +3099,7 @@ export default function FarmClient({
                 sellPnl={stats.sellPnl}
                 balance={Number(portStatus?.balance) || 0}
                 todayProfit={smoothedTodayProfit}
+                eaTodayProfit={eaHarvestProfitToday}
                 accountType={portStatus?.account_type || 'USC'}
                 todayClosedLots={effectiveTodayLots}
                 dailyMaxDrawdown={effectiveDailyMaxDd}
@@ -3083,7 +3109,7 @@ export default function FarmClient({
                 isShaking={isShaking}
                 customName={currentCustomName || undefined}
                 isNonLive10m={isFallback1Url}
-                onHarvestClick={isDevPort3088 ? () => setIsHarvestModalOpen(true) : undefined}
+                onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
             />
 
             {/* ⚠️ CENTERED NON-LIVE SETUP GUIDE MODAL (WHEN URL #2 IS MISSING IN MT5) */}
@@ -5740,7 +5766,7 @@ export default function FarmClient({
                                                 <span className="text-amber-400 font-black">{closeOnlyCount} CLOSE-ONLY</span>
                                             </div>
 
-                                            {isDevPort3088 && (
+                                            {isAllowedDevMenuPort && (
                                                 <button
                                                     onClick={() => {
                                                         setLiveTerminalFilter('ALL');
@@ -6233,8 +6259,8 @@ export default function FarmClient({
                         </div>
                     )}
 
-                    {/* 📡 MT5 Live Orders Streaming Terminal Modal (Gated to Dev Port 3088 Only) */}
-                    {isDevPort3088 && isLiveTerminalOpen && (
+                    {/* 📡 MT5 Live Orders Streaming Terminal Modal (Gated to Dev Ports 3088 & 2434) */}
+                    {isAllowedDevMenuPort && isLiveTerminalOpen && (
                         <div 
                             className="fixed inset-0 bg-black/85 backdrop-blur-md z-[210] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
                             onClick={() => setIsLiveTerminalOpen(false)}
@@ -6891,14 +6917,14 @@ export default function FarmClient({
                     onSetSimulatedFarmStatus={setSimulatedFarmStatus}
                 />
             )}
-            {/* 🌾 Today Harvest Basket Closures Modal (Gated to Dev Port 3088 Only) */}
-            {isDevPort3088 && (
+            {/* 🌾 Today Harvest Basket Closures Modal (Gated to Dev Ports 3088 & 2434) */}
+            {isAllowedDevMenuPort && (
                 <TodayHarvestModal
                     isOpen={isHarvestModalOpen}
                     onClose={() => setIsHarvestModalOpen(false)}
                     portNumber={portNumber}
                     activeTradingDate={activeFarmTradingDate}
-                    initialTodayProfit={smoothedTodayProfit > 0 ? smoothedTodayProfit : Number(portStatus?.today_pnl || 0)}
+                    initialTodayProfit={smoothedTodayProfit !== 0 ? smoothedTodayProfit : Number(portStatus?.today_pnl || 0)}
                     initialTodayLots={effectiveTodayLots > 0 ? effectiveTodayLots : Number(portStatus?.today_closed_lots || 0)}
                     initialMaxDd={effectiveDailyMaxDd > 0 ? effectiveDailyMaxDd : Math.abs(Number(portStatus?.daily_max_drawdown) || 0)}
                     accountType={portStatus?.account_type || 'USC'}

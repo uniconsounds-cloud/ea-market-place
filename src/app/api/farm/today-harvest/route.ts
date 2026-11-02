@@ -80,13 +80,20 @@ export async function GET(req: Request) {
 
         // 3. Extract any real incoming basket events from system_code & memory store
         const realEvents: BasketEvent[] = [];
+        let pData: any = (status as any)?.prime_data || null;
 
         // Parse system_code if present
-        if (status?.system_code && status.system_code.includes(':::')) {
+        if (!pData && status?.system_code && status.system_code.includes(':::')) {
             try {
                 const parts = status.system_code.split(':::');
-                const pData = JSON.parse(parts.slice(1).join(':::'));
-                
+                pData = JSON.parse(parts.slice(1).join(':::'));
+            } catch (e) {
+                // Ignore parse error
+            }
+        }
+
+        if (pData) {
+            try {
                 // Real last_basket from EA
                 if (pData?.last_basket && typeof pData.last_basket === 'object') {
                     const lb = pData.last_basket;
@@ -257,6 +264,26 @@ export async function GET(req: Request) {
         // Sort events newest first
         filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
 
+        // 4.5 Compute EA Gross Harvest Profit, Cut Loss (Relief Cut), and MT5 Net Profit
+        const eaGrossProfit = Number(
+            filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) > 0 ? Number(ev.profit) : 0), 0).toFixed(2)
+        );
+        const directCutLoss = Number(
+            filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) < 0 ? Math.abs(Number(ev.profit)) : 0), 0).toFixed(2)
+        );
+        const reliefUsedVal = Number(pData?.relief_used || 0);
+        const eaCutLoss = directCutLoss > 0 
+            ? directCutLoss 
+            : (reliefUsedVal > 0 
+                ? reliefUsedVal 
+                : (displayProfit < eaGrossProfit ? Number((eaGrossProfit - displayProfit).toFixed(2)) : 0));
+
+        // Manual non-EA trades telemetry
+        const manualTrades = pData?.manual_trades || {};
+        const manualProfit = Number(manualTrades.profit || 0);
+        const manualLots = Number(manualTrades.lots || 0);
+        const manualOrders = Number(manualTrades.orders || 0);
+
         // 5. Compute Pair Aggregated Summary from REAL events only
         const pairMap: Record<string, {
             symbol: string;
@@ -318,6 +345,13 @@ export async function GET(req: Request) {
             active_date: activeTradingDate,
             port_number: portNumber,
             today_profit: displayProfit,
+            net_mt5_profit: displayProfit,
+            ea_profit: eaGrossProfit,
+            ea_cut_loss: eaCutLoss,
+            relief_used: reliefUsedVal,
+            manual_profit: manualProfit,
+            manual_lots: manualLots,
+            manual_orders: manualOrders,
             today_closed_lots: displayLots,
             daily_max_drawdown: displayMaxDd,
             balance,

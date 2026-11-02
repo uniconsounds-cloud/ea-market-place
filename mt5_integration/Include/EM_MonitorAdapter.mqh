@@ -131,13 +131,13 @@ void EM_MonitorInit(long magicBase)
 
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
 
-   // Direct-to-Supabase RPC primary endpoint (Dev port 97053088 routes to eaeze.com for two-way web control)
-   if(login == 97053088)
+   // Direct-to-Supabase RPC primary endpoint (Dev ports 97053088 & 21692434 route to eaeze.com for two-way web control)
+   if(login == 97053088 || login == 21692434)
    {
       EAE_WebSyncInit("https://eaeze.com/api/sync-dashboard", 5);
       g_eae_supabase_sync_url = "https://eaeze.com/api/sync-dashboard";
       g_eae_supabase_history_url = "https://eaeze.com/api/sync-dashboard";
-      Print("EAE WebSync: [DEV PORT 97053088] Two-Way Remote Command Channel Active via eaeze.com");
+      Print("EAE WebSync: [DEV PORT " + IntegerToString(login) + "] Two-Way Remote Command Channel Active via eaeze.com");
    }
    else
    {
@@ -317,6 +317,11 @@ string EM_BuildHarvestQueueJson()
    return json;
 }
 
+// Global state for non-EA manual trades telemetry
+double g_em_manual_profit = 0.0;
+double g_em_manual_lots   = 0.0;
+int    g_em_manual_orders = 0;
+
 // Day Rollover check: resets harvest queue only when day changes
 void EM_CheckHarvestDayRollover()
 {
@@ -335,6 +340,9 @@ void EM_CheckHarvestDayRollover()
       last_harvest_day = current_day;
       ArrayResize(g_em_harvest_queue, 0);
       g_em_last_basket_json = "";
+      g_em_manual_profit = 0.0;
+      g_em_manual_lots   = 0.0;
+      g_em_manual_orders = 0;
       EM_SaveHarvestQueueToDisk();
    }
 }
@@ -349,6 +357,7 @@ struct EAE_TempDealItem
    double   profit;
    string   comment;
    long     magic;
+   bool     is_manual;
 };
 
 //+------------------------------------------------------------------+
@@ -377,6 +386,10 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
    EAE_TempDealItem closedDeals[];
    int closedCount = 0;
 
+   g_em_manual_profit = 0.0;
+   g_em_manual_lots   = 0.0;
+   g_em_manual_orders = 0;
+
    for(int i = 0; i < totalDeals; i++)
    {
       ulong ticket = dealTickets[i];
@@ -388,6 +401,7 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
 
       long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
       string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+      ENUM_DEAL_REASON deal_reason = (ENUM_DEAL_REASON)HistoryDealGetInteger(ticket, DEAL_REASON);
 
       bool is_our_deal = (magicBase <= 0) ||
                          EAE_IsPortfolioMagic(magic, magicBase) ||
@@ -396,17 +410,27 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
                          (StringFind(comment, "EasyM") >= 0) ||
                          (StringFind(comment, "RescueCut") >= 0);
 
-      if(!is_our_deal) continue;
+      double dealProfit = HistoryDealGetDouble(ticket, DEAL_PROFIT) + HistoryDealGetDouble(ticket, DEAL_COMMISSION) + HistoryDealGetDouble(ticket, DEAL_SWAP);
+      double dealLots   = HistoryDealGetDouble(ticket, DEAL_VOLUME);
+
+      if(!is_our_deal)
+      {
+         g_em_manual_profit += dealProfit;
+         g_em_manual_lots   += dealLots;
+         g_em_manual_orders++;
+         continue;
+      }
 
       ArrayResize(closedDeals, closedCount + 1);
       closedDeals[closedCount].ticket    = ticket;
       closedDeals[closedCount].time      = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
       closedDeals[closedCount].symbol    = HistoryDealGetString(ticket, DEAL_SYMBOL);
       closedDeals[closedCount].deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
-      closedDeals[closedCount].lots      = HistoryDealGetDouble(ticket, DEAL_VOLUME);
-      closedDeals[closedCount].profit    = HistoryDealGetDouble(ticket, DEAL_PROFIT) + HistoryDealGetDouble(ticket, DEAL_COMMISSION) + HistoryDealGetDouble(ticket, DEAL_SWAP);
+      closedDeals[closedCount].lots      = dealLots;
+      closedDeals[closedCount].profit    = dealProfit;
       closedDeals[closedCount].comment   = comment;
       closedDeals[closedCount].magic     = magic;
+      closedDeals[closedCount].is_manual = (deal_reason == DEAL_REASON_CLIENT || deal_reason == DEAL_REASON_MOBILE || deal_reason == DEAL_REASON_WEB);
       closedCount++;
    }
 
@@ -435,6 +459,7 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       double basketLots = 0.0;
       double basketProfit = 0.0;
       string exitComment = closedDeals[i].comment;
+      bool isManualExit = false;
 
       for(int j = i; j < closedCount; j++)
       {
@@ -445,12 +470,15 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
             basketLots += closedDeals[j].lots;
             basketProfit += closedDeals[j].profit;
             if(StringLen(closedDeals[j].comment) > 0) exitComment = closedDeals[j].comment;
+            if(closedDeals[j].is_manual) isManualExit = true;
          }
       }
 
-      // Determine exit_type from deal comment
+      // Determine exit_type from deal comment & closure reason
       string exitType = "FULL_BASKET_TP";
-      if(StringFind(exitComment, "T1_OUT") >= 0 || StringFind(exitComment, "T1") >= 0)
+      if(isManualExit)
+         exitType = "MANUAL_CLOSE_EA";
+      else if(StringFind(exitComment, "T1_OUT") >= 0 || StringFind(exitComment, "T1") >= 0)
          exitType = "RESCUE_T1_SCALP_TP";
       else if(StringFind(exitComment, "T2_OUT") >= 0 || StringFind(exitComment, "T2") >= 0)
          exitType = "RESCUE_T2_SCALP_TP";
@@ -558,6 +586,16 @@ void EM_MonitorOnTimer(string extra_payload_json = "", bool force_now = false)
    else if(ArraySize(g_em_harvest_queue) > 0)
    {
       telemetryEmbed = "\"harvest_events\":" + harvestQueueJson;
+   }
+
+   // Embed non-EA manual trades telemetry if recorded today
+   if(g_em_manual_orders > 0 || MathAbs(g_em_manual_profit) > 0.001)
+   {
+      string manualEmbed = StringFormat("\"manual_trades\":{\"profit\":%.2f,\"lots\":%.2f,\"orders\":%d}", g_em_manual_profit, g_em_manual_lots, g_em_manual_orders);
+      if(StringLen(telemetryEmbed) > 0)
+         telemetryEmbed += "," + manualEmbed;
+      else
+         telemetryEmbed = manualEmbed;
    }
 
    if(StringLen(telemetryEmbed) > 0)
