@@ -218,7 +218,7 @@ const GlowingDdOrb = ({
         EA: {
             container: 'border-cyan-400/80 bg-gradient-to-b from-[#051c24]/95 via-[#021218]/95 to-[#01080d]/95 shadow-[0_0_20px_rgba(6,182,212,0.6),inset_0_0_12px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(6,182,212,0.9)]',
             label: 'EA',
-            labelColor: 'text-cyan-300/90 font-bold',
+            labelColor: 'text-cyan-300 font-black drop-shadow-[0_0_6px_rgba(6,182,212,0.8)]',
             pingBg: 'bg-cyan-400',
             pingDot: 'bg-cyan-500',
             tooltip: `🌾 DD ของระบบ EasyM EA: -${value.toFixed(2)}%`
@@ -332,7 +332,7 @@ const GlowingDdOrb = ({
 
             {/* 🔢 Center Dial Gauge Value & Label (ย่อขนาดเล็กลงพอเหมาะ ไม่ทับสเกล - สีตัวเลขเปลี่ยนตามระดับ DD) */}
             <div className="relative z-20 flex flex-col items-center justify-center leading-none text-center pointer-events-none">
-                <span className={`text-[5px] sm:text-[6px] font-black tracking-widest uppercase mb-0.5 ${config.labelColor}`}>
+                <span className={`font-black uppercase mb-0.5 ${type === 'EA' ? 'text-[8px] sm:text-[9.5px] tracking-wider' : 'text-[5px] sm:text-[6px] tracking-widest'} ${config.labelColor}`}>
                     {config.label}
                 </span>
                 <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${type === 'MANUAL' && value <= 0 ? 'text-cyan-300' : levelTheme.textColor} ${(isSlowBlink || type === 'MANUAL') ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
@@ -1470,7 +1470,22 @@ export default function FarmClient({
         return () => clearInterval(interval);
     }, []);
 
-    // Day rollover & today's profit sync
+    // Market weekend status (Friday after 17:00 NY, Saturday, Sunday before 17:00 NY)
+    const isMarketWeekend = useMemo(() => {
+        const now = time || new Date();
+        const nyFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            hour: 'numeric',
+            hour12: false
+        });
+        const nyHour = parseInt(nyFormatter.format(now), 10);
+        const nyDay = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay();
+        return (nyDay === 6) || (nyDay === 0 && nyHour < 17) || (nyDay === 5 && nyHour >= 17);
+    }, [time]);
+
+    // Day rollover & today's profit sync:
+    // Retains previous day's profit until the first tick of the new trading day arrives.
+    // Once new day arrives, displays today's profit immediately (shows 0 if no profit yet).
     useEffect(() => {
         if (!portStatus) return;
         const currentPnl = Number(portStatus.today_pnl || 0);
@@ -1483,63 +1498,48 @@ export default function FarmClient({
         const dd = String(mDate.getDate()).padStart(2, '0');
         const activeTradingDateStr = `${yyyy}-${mm}-${dd}`;
 
-        // Check if market is currently in weekend closed hours (Friday after 17:00 NY, Saturday, Sunday before 17:00 NY)
-        const now = time || new Date();
-        const nyFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/New_York',
-            hour: 'numeric',
-            hour12: false
-        });
-        const nyHour = parseInt(nyFormatter.format(now), 10);
-        const nyDay = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay();
-        const isMarketWeekend = (nyDay === 6) || (nyDay === 0 && nyHour < 17) || (nyDay === 5 && nyHour >= 17);
-        const isForexOrGold = !portStatus?.asset_type || portStatus?.asset_type === 'FOREX' || portStatus?.asset_type === 'GOLD';
-
-        // Find the latest non-zero daily profit from history as fallback for weekends/rollover
+        // Find the latest completed daily profit from history before today
         const latestHistItem = [...(history || [])]
-            .filter(h => h.date && (Number(h.profit || 0) > 0 || Number(h.closed_lots || h.lots || 0) > 0))
+            .filter(h => h.date && !h.date.startsWith(activeTradingDateStr) && (Number(h.profit || 0) > 0 || Number(h.closed_lots || h.lots || 0) > 0))
             .sort((a, b) => b.date.localeCompare(a.date))[0];
         const latestHistProfit = latestHistItem ? Number(latestHistItem.profit) : 0;
-        const fallbackCompletedProfit = currentPnl > 0 ? currentPnl : latestHistProfit;
 
-        if (isMarketWeekend && isForexOrGold) {
-            // Market is closed for the weekend: keep displaying the latest completed trading day's profit
-            // so users can inspect today's harvest and Friday's final results over the weekend.
-            setSmoothedTodayProfit(fallbackCompletedProfit);
+        // Check if broker tick for the new trading day has arrived
+        const serverTimeSec = Number(portStatus?.server_time || 0);
+        const serverDate = serverTimeSec > 0 ? new Date(serverTimeSec * 1000) : null;
+        const brokerDateStr = serverDate ? (() => {
+            const smd = getMarketTradingDate(serverDate);
+            return `${smd.getFullYear()}-${String(smd.getMonth() + 1).padStart(2, '0')}-${String(smd.getDate()).padStart(2, '0')}`;
+        })() : '';
+
+        const hasNewDayFirstTick = Boolean(
+            !isMarketWeekend && (
+                (serverTimeSec > 0 && brokerDateStr >= activeTradingDateStr) ||
+                (portStatus?.updated_at && getMarketTradingDate(new Date(portStatus.updated_at)).toISOString().slice(0, 10) === activeTradingDateStr) ||
+                (history && history.some(h => h.date && h.date.startsWith(activeTradingDateStr)))
+            )
+        );
+
+        if (!hasNewDayFirstTick) {
+            // Market is closed (weekend) or waiting for first tick of the new day:
+            // Keep displaying the latest completed trading day's profit
+            setSmoothedTodayProfit(latestHistProfit);
             return;
         }
-        
+
+        // New day has arrived and first tick has arrived:
+        // Immediately display today's profit (shows 0 if no profit yet on the new day)
+        lastDayRef.current = activeTradingDateStr;
         const histToday = history.find(h => h.date && h.date.startsWith(activeTradingDateStr));
         const histProfit = histToday ? Number(histToday.profit) : 0;
-        const histLots = histToday ? Number(histToday.closed_lots || histToday.lots || 0) : 0;
-        const effectivePnl = currentPnl > 0 ? currentPnl : (histProfit > 0 ? histProfit : currentPnl);
-        const effectiveLots = currentClosedLots > 0 ? currentClosedLots : histLots;
+        const effectivePnl = currentPnl !== 0 ? currentPnl : (histProfit !== 0 ? histProfit : currentPnl);
 
-        if (lastDayRef.current !== activeTradingDateStr) {
-            // New day or first load:
-            lastDayRef.current = activeTradingDateStr;
-            // If new day has no closed trades yet (0 PnL and 0 lots), retain latest completed profit so the box is never blank
-            if (effectivePnl === 0 && effectiveLots === 0 && fallbackCompletedProfit > 0) {
-                setSmoothedTodayProfit(fallbackCompletedProfit);
-            } else {
-                setSmoothedTodayProfit(effectivePnl);
-            }
+        if (effectivePnl === 0 && smoothedTodayProfit > 0 && currentClosedLots > 0) {
+            // Momentary 0 drop protection during position reload on the same day with existing closed lots
         } else {
-            // Same day: if 0 trades closed today, check if market is idle or new day
-            if (effectiveLots === 0 && effectivePnl === 0) {
-                if (fallbackCompletedProfit > 0) {
-                    setSmoothedTodayProfit(fallbackCompletedProfit);
-                } else {
-                    setSmoothedTodayProfit(0);
-                }
-            } else if (effectivePnl === 0 && smoothedTodayProfit > 0 && effectiveLots > 0) {
-                // Keep the last positive profit rather than collapsing to 0 due to an EA
-                // momentary 0 drop during position reload on the same day with existing closed lots
-            } else {
-                setSmoothedTodayProfit(effectivePnl);
-            }
+            setSmoothedTodayProfit(effectivePnl);
         }
-    }, [portStatus?.today_pnl, portStatus?.today_closed_lots, portStatus?.asset_type, time, smoothedTodayProfit, history]);
+    }, [portStatus?.today_pnl, portStatus?.today_closed_lots, portStatus?.server_time, portStatus?.updated_at, isMarketWeekend, time, smoothedTodayProfit, history]);
 
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -1609,14 +1609,28 @@ export default function FarmClient({
         const currentPnl = Number(portStatus?.today_pnl || 0);
 
         const latestHistItem = [...(history || [])]
-            .filter(h => h.date && (Number(h.profit || 0) > 0 || Number(h.closed_lots || h.lots || 0) > 0))
+            .filter(h => h.date && !h.date.startsWith(activeTradingDateStr) && (Number(h.profit || 0) > 0 || Number(h.closed_lots || h.lots || 0) > 0))
             .sort((a, b) => b.date.localeCompare(a.date))[0];
         const latestHistProfit = latestHistItem ? Number(latestHistItem.profit) : 0;
-        const fallbackProfit = currentPnl > 0 ? currentPnl : latestHistProfit;
 
-        const resolvedTodayProfit = smoothedTodayProfit > 0 
-            ? smoothedTodayProfit 
-            : (currentPnl !== 0 ? currentPnl : (histProfit !== 0 ? histProfit : fallbackProfit));
+        const serverTimeSec = Number(portStatus?.server_time || 0);
+        const serverDate = serverTimeSec > 0 ? new Date(serverTimeSec * 1000) : null;
+        const brokerDateStr = serverDate ? (() => {
+            const smd = getMarketTradingDate(serverDate);
+            return `${smd.getFullYear()}-${String(smd.getMonth() + 1).padStart(2, '0')}-${String(smd.getDate()).padStart(2, '0')}`;
+        })() : '';
+
+        const hasNewDayFirstTick = Boolean(
+            !isMarketWeekend && (
+                (serverTimeSec > 0 && brokerDateStr >= activeTradingDateStr) ||
+                (portStatus?.updated_at && getMarketTradingDate(new Date(portStatus.updated_at)).toISOString().slice(0, 10) === activeTradingDateStr) ||
+                (history && history.some(h => h.date && h.date.startsWith(activeTradingDateStr)))
+            )
+        );
+
+        const resolvedTodayProfit = hasNewDayFirstTick
+            ? (currentPnl !== 0 ? currentPnl : (histProfit !== 0 ? histProfit : smoothedTodayProfit))
+            : latestHistProfit;
 
         // If EA is sending data to farm_port_status, use that directly
         if (portStatus?.floating_pnl !== undefined) {
@@ -3238,9 +3252,28 @@ export default function FarmClient({
                                 const ddFillPct = Math.min(100, Math.max(portDDPct > 0 ? 5 : 0, (portDDPct / 35) * 100));
 
                                 const fallbackHistProfit = Number((activePort as any)?.latestHistoryProfit || 0);
+
+                                const portServerSec = Number(activePort?.portStatus?.server_time || 0);
+                                const portServerDate = portServerSec > 0 ? new Date(portServerSec * 1000) : null;
+                                const portTradingDateStr = portServerDate ? (() => {
+                                    const smd = getMarketTradingDate(portServerDate);
+                                    return `${smd.getFullYear()}-${String(smd.getMonth() + 1).padStart(2, '0')}-${String(smd.getDate()).padStart(2, '0')}`;
+                                })() : '';
+
+                                const isPortOnNewDay = Boolean(
+                                    !isMarketWeekend && (
+                                        (portServerSec > 0 && portTradingDateStr >= activeFarmTradingDate) ||
+                                        (activePort?.portStatus?.updated_at && getMarketTradingDate(new Date(activePort.portStatus.updated_at)).toISOString().slice(0, 10) === activeFarmTradingDate) ||
+                                        (activePort?.portStatus?.today_pnl !== undefined && Number(activePort.portStatus.today_pnl) !== 0)
+                                    )
+                                );
+
+                                const currentPortPnl = Number(portStatus?.today_pnl || 0);
+                                const otherPortPnl = Number(activePort?.portStatus?.today_pnl || 0);
+
                                 const rawProfit = isCurrentPort 
-                                    ? (smoothedTodayProfit > 0 ? smoothedTodayProfit : (Number(portStatus?.today_pnl) || fallbackHistProfit))
-                                    : (Number(activePort?.portStatus?.today_pnl) || fallbackHistProfit);
+                                    ? (isPortOnNewDay ? (smoothedTodayProfit !== undefined ? smoothedTodayProfit : currentPortPnl) : fallbackHistProfit)
+                                    : (isPortOnNewDay ? otherPortPnl : fallbackHistProfit);
                                 const portTodayPnl = rawProfit;
                                 const portAccProfit = Number(activePort?.portStatus?.accumulated_profit) || 0;
                                 const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
