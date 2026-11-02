@@ -151,6 +151,9 @@ void EM_MonitorInit(long magicBase)
    // Load any unsent basket closures from disk cache (resilience against power failure / VPS crash)
    EM_LoadHarvestQueueFromDisk();
 
+   // Reconstruct today's harvest events directly from MT5 deals history
+   EM_ReconstructTodayHarvestFromDeals(magicBase);
+
    g_em_initialized = true;
    g_em_data_loaded = false; 
 }
@@ -314,14 +317,187 @@ string EM_BuildHarvestQueueJson()
    return json;
 }
 
-// Prune acknowledged events after successful sync
-void EM_ClearHarvestQueue()
+// Day Rollover check: resets harvest queue only when day changes
+void EM_CheckHarvestDayRollover()
 {
-   if(ArraySize(g_em_harvest_queue) > 0)
+   datetime now = TimeCurrent();
+   datetime current_day = (now / 86400) * 86400;
+   static datetime last_harvest_day = 0;
+   
+   if(last_harvest_day == 0)
    {
+      last_harvest_day = current_day;
+      return;
+   }
+   
+   if(current_day != last_harvest_day)
+   {
+      last_harvest_day = current_day;
       ArrayResize(g_em_harvest_queue, 0);
+      g_em_last_basket_json = "";
       EM_SaveHarvestQueueToDisk();
    }
+}
+
+struct EAE_TempDealItem
+{
+   ulong    ticket;
+   datetime time;
+   string   symbol;
+   long     deal_type;
+   double   lots;
+   double   profit;
+   string   comment;
+   long     magic;
+};
+
+//+------------------------------------------------------------------+
+//| Reconstruct Today's Basket Closures from MT5 History Deals       |
+//| Ensures 100% resilient recovery after restart / power loss        |
+//+------------------------------------------------------------------+
+void EM_ReconstructTodayHarvestFromDeals(long magicBase)
+{
+   datetime now = TimeCurrent();
+   MqlDateTime dt;
+   TimeToStruct(now, dt);
+   dt.hour = 0; dt.min = 0; dt.sec = 0;
+   datetime startOfDay = StructToTime(dt);
+
+   if(!HistorySelect(startOfDay, now)) return;
+
+   int totalDeals = HistoryDealsTotal();
+   if(totalDeals == 0) return;
+
+   EAE_TempDealItem closedDeals[];
+   int closedCount = 0;
+
+   for(int i = 0; i < totalDeals; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket <= 0) continue;
+      HistoryDealSelect(ticket);
+
+      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+      if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT) continue;
+
+      if(magicBase > 0 && !EAE_IsPortfolioDeal(ticket, magicBase, startOfDay, now)) continue;
+
+      ArrayResize(closedDeals, closedCount + 1);
+      closedDeals[closedCount].ticket    = ticket;
+      closedDeals[closedCount].time      = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
+      closedDeals[closedCount].symbol    = HistoryDealGetString(ticket, DEAL_SYMBOL);
+      closedDeals[closedCount].deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+      closedDeals[closedCount].lots      = HistoryDealGetDouble(ticket, DEAL_VOLUME);
+      closedDeals[closedCount].profit    = HistoryDealGetDouble(ticket, DEAL_PROFIT) + HistoryDealGetDouble(ticket, DEAL_COMMISSION) + HistoryDealGetDouble(ticket, DEAL_SWAP);
+      closedDeals[closedCount].comment   = HistoryDealGetString(ticket, DEAL_COMMENT);
+      closedDeals[closedCount].magic     = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+      closedCount++;
+   }
+
+   if(closedCount == 0) return;
+
+   // Group closed deals into Baskets by (symbol + time window <= 3 seconds)
+   bool processed[];
+   ArrayResize(processed, closedCount);
+   ArrayInitialize(processed, false);
+
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+
+   for(int i = 0; i < closedCount; i++)
+   {
+      if(processed[i]) continue;
+
+      string sym = closedDeals[i].symbol;
+      datetime baseTime = closedDeals[i].time;
+      long baseDealType = closedDeals[i].deal_type;
+      string side = (baseDealType == DEAL_TYPE_SELL ? "BUY" : "SELL"); // Exit deal type is opposite of position side
+
+      int basketOrders = 0;
+      double basketLots = 0.0;
+      double basketProfit = 0.0;
+      string exitComment = closedDeals[i].comment;
+
+      for(int j = i; j < closedCount; j++)
+      {
+         if(!processed[j] && closedDeals[j].symbol == sym && MathAbs((long)closedDeals[j].time - (long)baseTime) <= 3)
+         {
+            processed[j] = true;
+            basketOrders++;
+            basketLots += closedDeals[j].lots;
+            basketProfit += closedDeals[j].profit;
+            if(StringLen(closedDeals[j].comment) > 0) exitComment = closedDeals[j].comment;
+         }
+      }
+
+      // Determine exit_type from deal comment
+      string exitType = "FULL_BASKET_TP";
+      if(StringFind(exitComment, "T1_OUT") >= 0 || StringFind(exitComment, "T1") >= 0)
+         exitType = "RESCUE_T1_SCALP_TP";
+      else if(StringFind(exitComment, "T2_OUT") >= 0 || StringFind(exitComment, "T2") >= 0)
+         exitType = "RESCUE_T2_SCALP_TP";
+      else if(StringFind(exitComment, "T3_OUT") >= 0 || StringFind(exitComment, "T3") >= 0)
+         exitType = "RESCUE_ALL_SCALP_TP";
+      else if(StringFind(exitComment, "CUT") >= 0 || StringFind(exitComment, "TRIM") >= 0)
+         exitType = "RELIEF_TRIM";
+      else if(StringFind(exitComment, "QUAR") >= 0)
+         exitType = "QUARANTINE_FULL_EXIT";
+
+      int profitCents = (int)MathRound(basketProfit * 100.0);
+      string event_id = StringFormat("%I64d_%s_%I64d_%d_%d", login, sym, (long)baseTime, basketOrders, profitCents);
+
+      // Check if event already exists in g_em_harvest_queue
+      bool exists = false;
+      for(int q = 0; q < ArraySize(g_em_harvest_queue); q++)
+      {
+         if(g_em_harvest_queue[q].event_id == event_id ||
+            (g_em_harvest_queue[q].symbol == sym && MathAbs((long)g_em_harvest_queue[q].closed_at - (long)baseTime) <= 3))
+         {
+            exists = true;
+            break;
+         }
+      }
+
+      if(!exists)
+      {
+         int qSz = ArraySize(g_em_harvest_queue);
+         if(qSz >= 80)
+         {
+            for(int k = 0; k < qSz - 1; k++) g_em_harvest_queue[k] = g_em_harvest_queue[k+1];
+            ArrayResize(g_em_harvest_queue, qSz);
+            qSz = qSz - 1;
+         }
+         else
+         {
+            ArrayResize(g_em_harvest_queue, qSz + 1);
+         }
+
+         g_em_harvest_queue[qSz].event_id     = event_id;
+         g_em_harvest_queue[qSz].symbol       = sym;
+         g_em_harvest_queue[qSz].side         = side;
+         g_em_harvest_queue[qSz].exit_type    = exitType;
+         g_em_harvest_queue[qSz].orders       = basketOrders;
+         g_em_harvest_queue[qSz].lots         = basketLots;
+         g_em_harvest_queue[qSz].profit       = basketProfit;
+         g_em_harvest_queue[qSz].duration_sec = 0;
+         g_em_harvest_queue[qSz].max_dd       = 0.0;
+         g_em_harvest_queue[qSz].closed_at    = baseTime;
+      }
+
+      // Update g_em_last_basket_json with the latest basket
+      if(StringLen(g_em_last_basket_json) == 0 || (ArraySize(g_em_harvest_queue) > 0 && baseTime >= g_em_harvest_queue[ArraySize(g_em_harvest_queue)-1].closed_at))
+      {
+         g_em_last_basket_json = StringFormat("{\"event_id\":\"%s\",\"symbol\":\"%s\",\"side\":\"%s\",\"exit_type\":\"%s\",\"orders\":%d,\"lots\":%.2f,\"profit\":%.2f,\"duration_sec\":%d,\"max_dd\":%.2f,\"closed_at\":%I64d}",
+                                              event_id, sym, side, exitType, basketOrders, basketLots, basketProfit, 0, 0.0, (long)baseTime);
+      }
+   }
+
+   EM_SaveHarvestQueueToDisk();
+}
+
+// Prune acknowledged events after successful sync (Kept for legacy compatibility, but rollover handles reset)
+void EM_ClearHarvestQueue()
+{
+   EM_CheckHarvestDayRollover();
 }
 
 //+------------------------------------------------------------------+
@@ -376,6 +552,15 @@ void EM_MonitorOnTimer(string extra_payload_json = "", bool force_now = false)
 {
    if(!g_em_initialized) return;
 
+   // Periodically refresh/reconstruct today's harvest events from MT5 closed deals (every 30s)
+   uint now_ticks = GetTickCount();
+   static uint last_deal_scan_ticks = 0;
+   if(last_deal_scan_ticks == 0 || (now_ticks - last_deal_scan_ticks) >= 30000)
+   {
+      EM_ReconstructTodayHarvestFromDeals(g_em_magic_base);
+      last_deal_scan_ticks = now_ticks;
+   }
+
    // Embed cached last basket closure and harvest queue into telemetry payload
    string harvestQueueJson = EM_BuildHarvestQueueJson();
    string telemetryEmbed = "";
@@ -428,10 +613,8 @@ void EM_MonitorOnTimer(string extra_payload_json = "", bool force_now = false)
    
    // Sync to Supabase RPC (with auto-fallback)
    bool syncOk = EAE_WebSyncPerform(snap, force_now, extra_payload_json);
-   if(syncOk && ArraySize(g_em_harvest_queue) > 0)
-   {
-      EM_ClearHarvestQueue();
-   }
+   // Retain harvest events for the entire trading day (cleared only upon date rollover)
+   EM_CheckHarvestDayRollover();
 }
 
 #endif // __EM_MONITOR_ADAPTER_MQH__
