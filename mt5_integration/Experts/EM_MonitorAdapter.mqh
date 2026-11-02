@@ -484,26 +484,6 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
    }
 
    EM_SaveHarvestQueueToDisk();
-
-   // Write debug log to MQL5/Files/EAE_Harvest_Debug.txt
-   int hDbg = FileOpen("EAE_Harvest_Debug.txt", FILE_WRITE | FILE_TXT | FILE_ANSI);
-   if(hDbg != INVALID_HANDLE)
-   {
-      FileWriteString(hDbg, StringFormat("StartOfDay: %s, Now: %s, TotalDeals: %d, ClosedDeals: %d, Baskets: %d\r\n", 
-                                         TimeToString(startOfDay), TimeToString(now), totalDeals, closedCount, ArraySize(g_em_harvest_queue)));
-      double dbgLots = 0.0, dbgProfit = 0.0;
-      for(int b = 0; b < ArraySize(g_em_harvest_queue); b++)
-      {
-         dbgLots += g_em_harvest_queue[b].lots;
-         dbgProfit += g_em_harvest_queue[b].profit;
-         FileWriteString(hDbg, StringFormat("#%d %s %s %s Orders:%d Lots:%.2f Profit:%.2f Time:%s\r\n",
-                                            b+1, g_em_harvest_queue[b].symbol, g_em_harvest_queue[b].side, g_em_harvest_queue[b].exit_type,
-                                            g_em_harvest_queue[b].orders, g_em_harvest_queue[b].lots, g_em_harvest_queue[b].profit,
-                                            TimeToString(g_em_harvest_queue[b].closed_at)));
-      }
-      FileWriteString(hDbg, StringFormat("TOTAL LOTS: %.2f, TOTAL PROFIT: %.2f\r\n", dbgLots, dbgProfit));
-      FileClose(hDbg);
-   }
 }
 
 // Prune acknowledged events after successful sync (Kept for legacy compatibility, but rollover handles reset)
@@ -563,15 +543,6 @@ void EM_TriggerBasketEvent(string exit_type, string sym, string side, int total_
 void EM_MonitorOnTimer(string extra_payload_json = "", bool force_now = false)
 {
    if(!g_em_initialized) return;
-
-   // Periodically refresh/reconstruct today's harvest events from MT5 closed deals (every 30s)
-   uint now_ticks = GetTickCount();
-   static uint last_deal_scan_ticks = 0;
-   if(last_deal_scan_ticks == 0 || (now_ticks - last_deal_scan_ticks) >= 30000)
-   {
-      EM_ReconstructTodayHarvestFromDeals(g_em_magic_base);
-      last_deal_scan_ticks = now_ticks;
-   }
 
    // Embed cached last basket closure and harvest queue into telemetry payload
    string harvestQueueJson = EM_BuildHarvestQueueJson();

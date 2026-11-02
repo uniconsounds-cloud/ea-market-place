@@ -37,6 +37,9 @@ function getBangkokDateAndHour(nowMs: number = Date.now()): { dateKey: string; h
 }
 
 const initBkk = getBangkokDateAndHour();
+// Fast in-memory cache of batch event IDs already persisted to DB to eliminate redundant DB upserts during telemetry
+const g_persistedBatchEventIds = new Set<string>();
+
 const trafficState: TrafficTelemetryState = {
     dateKey: initBkk.dateKey,
     hourlyReqs: Array(24).fill(0),
@@ -451,6 +454,7 @@ export async function POST(req: Request) {
         }
 
         const processedHarvestIds: string[] = [];
+        const newBatchEventsToSave: any[] = [];
 
         if (incomingHarvestList.length > 0) {
             for (const ev of incomingHarvestList) {
@@ -489,37 +493,44 @@ export async function POST(req: Request) {
                     ea_build: eaBuild
                 });
 
-                // 2. Persistent Supabase DB write with de-duplication
-                const richData: any = {
-                    event_id: eventId,
-                    port_number: portNumber,
-                    total_orders: totalOrders,
-                    total_lots: totalLots,
-                    total_profit: totalProfit,
-                    symbol: sym,
-                    side: side,
-                    exit_type: exitType,
-                    duration_sec: durationSec,
-                    ea_name: eaName,
-                    ea_build: eaBuild,
-                    max_dd_pct: maxDdPct,
-                    event_timestamp: evTimestamp
-                };
+                // 2. Only queue for persistent Supabase DB write if not already persisted
+                if (!g_persistedBatchEventIds.has(eventId)) {
+                    g_persistedBatchEventIds.add(eventId);
+                    newBatchEventsToSave.push({
+                        event_id: eventId,
+                        port_number: portNumber,
+                        total_orders: totalOrders,
+                        total_lots: totalLots,
+                        total_profit: totalProfit,
+                        symbol: sym,
+                        side: side,
+                        exit_type: exitType,
+                        duration_sec: durationSec,
+                        ea_name: eaName,
+                        ea_build: eaBuild,
+                        max_dd_pct: maxDdPct,
+                        event_timestamp: evTimestamp
+                    });
+                }
+            }
 
+            // Prune cache if it gets too large
+            if (g_persistedBatchEventIds.size > 10000) {
+                g_persistedBatchEventIds.clear();
+            }
+
+            // 3. Batch write all new events to Supabase in a single fast query
+            if (newBatchEventsToSave.length > 0) {
                 try {
-                    // Try Upsert with event_id uniqueness to prevent duplicates
                     const { error: upErr } = await supabase
                         .from('farm_batch_events')
-                        .upsert(richData, { onConflict: 'event_id', ignoreDuplicates: true });
+                        .upsert(newBatchEventsToSave, { onConflict: 'event_id', ignoreDuplicates: true });
 
                     if (upErr) {
-                        // Fallback without event_id column if table migration pending
-                        delete richData.event_id;
-                        await supabase.from('farm_batch_events').insert(richData);
+                        console.error('Batch upsert farm_batch_events warning:', upErr);
                     }
                 } catch (dbErr) {
-                    // Non-blocking log
-                    console.error('Failed to write farm_batch_events:', dbErr);
+                    console.error('Failed to write farm_batch_events batch:', dbErr);
                 }
             }
         }
