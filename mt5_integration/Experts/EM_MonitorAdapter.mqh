@@ -368,19 +368,35 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
    int totalDeals = HistoryDealsTotal();
    if(totalDeals == 0) return;
 
+   // Pre-fetch all deal tickets into an array to prevent loop corruption
+   ulong dealTickets[];
+   ArrayResize(dealTickets, totalDeals);
+   for(int k = 0; k < totalDeals; k++)
+      dealTickets[k] = HistoryDealGetTicket(k);
+
    EAE_TempDealItem closedDeals[];
    int closedCount = 0;
 
    for(int i = 0; i < totalDeals; i++)
    {
-      ulong ticket = HistoryDealGetTicket(i);
+      ulong ticket = dealTickets[i];
       if(ticket <= 0) continue;
-      HistoryDealSelect(ticket);
+      if(!HistoryDealSelect(ticket)) continue;
 
       long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
       if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT) continue;
 
-      if(magicBase > 0 && !EAE_IsPortfolioDeal(ticket, magicBase, startOfDay, now)) continue;
+      long magic = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+      string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
+
+      bool is_our_deal = (magicBase <= 0) ||
+                         EAE_IsPortfolioMagic(magic, magicBase) ||
+                         (magic >= 2000 && magic < 5000) ||
+                         (StringFind(comment, "EMP:") >= 0) ||
+                         (StringFind(comment, "EasyM") >= 0) ||
+                         (StringFind(comment, "RescueCut") >= 0);
+
+      if(!is_our_deal) continue;
 
       ArrayResize(closedDeals, closedCount + 1);
       closedDeals[closedCount].ticket    = ticket;
@@ -389,12 +405,15 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       closedDeals[closedCount].deal_type = HistoryDealGetInteger(ticket, DEAL_TYPE);
       closedDeals[closedCount].lots      = HistoryDealGetDouble(ticket, DEAL_VOLUME);
       closedDeals[closedCount].profit    = HistoryDealGetDouble(ticket, DEAL_PROFIT) + HistoryDealGetDouble(ticket, DEAL_COMMISSION) + HistoryDealGetDouble(ticket, DEAL_SWAP);
-      closedDeals[closedCount].comment   = HistoryDealGetString(ticket, DEAL_COMMENT);
-      closedDeals[closedCount].magic     = HistoryDealGetInteger(ticket, DEAL_MAGIC);
+      closedDeals[closedCount].comment   = comment;
+      closedDeals[closedCount].magic     = magic;
       closedCount++;
    }
 
    if(closedCount == 0) return;
+
+   // Reconstruct fresh today's harvest queue directly from actual closed deals
+   ArrayResize(g_em_harvest_queue, 0);
 
    // Group closed deals into Baskets by (symbol + time window <= 3 seconds)
    bool processed[];
@@ -445,53 +464,46 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       int profitCents = (int)MathRound(basketProfit * 100.0);
       string event_id = StringFormat("%I64d_%s_%I64d_%d_%d", login, sym, (long)baseTime, basketOrders, profitCents);
 
-      // Check if event already exists in g_em_harvest_queue
-      bool exists = false;
-      for(int q = 0; q < ArraySize(g_em_harvest_queue); q++)
-      {
-         if(g_em_harvest_queue[q].event_id == event_id ||
-            (g_em_harvest_queue[q].symbol == sym && MathAbs((long)g_em_harvest_queue[q].closed_at - (long)baseTime) <= 3))
-         {
-            exists = true;
-            break;
-         }
-      }
+      int qSz = ArraySize(g_em_harvest_queue);
+      ArrayResize(g_em_harvest_queue, qSz + 1);
 
-      if(!exists)
-      {
-         int qSz = ArraySize(g_em_harvest_queue);
-         if(qSz >= 80)
-         {
-            for(int k = 0; k < qSz - 1; k++) g_em_harvest_queue[k] = g_em_harvest_queue[k+1];
-            ArrayResize(g_em_harvest_queue, qSz);
-            qSz = qSz - 1;
-         }
-         else
-         {
-            ArrayResize(g_em_harvest_queue, qSz + 1);
-         }
-
-         g_em_harvest_queue[qSz].event_id     = event_id;
-         g_em_harvest_queue[qSz].symbol       = sym;
-         g_em_harvest_queue[qSz].side         = side;
-         g_em_harvest_queue[qSz].exit_type    = exitType;
-         g_em_harvest_queue[qSz].orders       = basketOrders;
-         g_em_harvest_queue[qSz].lots         = basketLots;
-         g_em_harvest_queue[qSz].profit       = basketProfit;
-         g_em_harvest_queue[qSz].duration_sec = 0;
-         g_em_harvest_queue[qSz].max_dd       = 0.0;
-         g_em_harvest_queue[qSz].closed_at    = baseTime;
-      }
+      g_em_harvest_queue[qSz].event_id     = event_id;
+      g_em_harvest_queue[qSz].symbol       = sym;
+      g_em_harvest_queue[qSz].side         = side;
+      g_em_harvest_queue[qSz].exit_type    = exitType;
+      g_em_harvest_queue[qSz].orders       = basketOrders;
+      g_em_harvest_queue[qSz].lots         = basketLots;
+      g_em_harvest_queue[qSz].profit       = basketProfit;
+      g_em_harvest_queue[qSz].duration_sec = 0;
+      g_em_harvest_queue[qSz].max_dd       = 0.0;
+      g_em_harvest_queue[qSz].closed_at    = baseTime;
 
       // Update g_em_last_basket_json with the latest basket
-      if(StringLen(g_em_last_basket_json) == 0 || (ArraySize(g_em_harvest_queue) > 0 && baseTime >= g_em_harvest_queue[ArraySize(g_em_harvest_queue)-1].closed_at))
-      {
-         g_em_last_basket_json = StringFormat("{\"event_id\":\"%s\",\"symbol\":\"%s\",\"side\":\"%s\",\"exit_type\":\"%s\",\"orders\":%d,\"lots\":%.2f,\"profit\":%.2f,\"duration_sec\":%d,\"max_dd\":%.2f,\"closed_at\":%I64d}",
-                                              event_id, sym, side, exitType, basketOrders, basketLots, basketProfit, 0, 0.0, (long)baseTime);
-      }
+      g_em_last_basket_json = StringFormat("{\"event_id\":\"%s\",\"symbol\":\"%s\",\"side\":\"%s\",\"exit_type\":\"%s\",\"orders\":%d,\"lots\":%.2f,\"profit\":%.2f,\"duration_sec\":%d,\"max_dd\":%.2f,\"closed_at\":%I64d}",
+                                           event_id, sym, side, exitType, basketOrders, basketLots, basketProfit, 0, 0.0, (long)baseTime);
    }
 
    EM_SaveHarvestQueueToDisk();
+
+   // Write debug log to MQL5/Files/EAE_Harvest_Debug.txt
+   int hDbg = FileOpen("EAE_Harvest_Debug.txt", FILE_WRITE | FILE_TXT | FILE_ANSI);
+   if(hDbg != INVALID_HANDLE)
+   {
+      FileWriteString(hDbg, StringFormat("StartOfDay: %s, Now: %s, TotalDeals: %d, ClosedDeals: %d, Baskets: %d\r\n", 
+                                         TimeToString(startOfDay), TimeToString(now), totalDeals, closedCount, ArraySize(g_em_harvest_queue)));
+      double dbgLots = 0.0, dbgProfit = 0.0;
+      for(int b = 0; b < ArraySize(g_em_harvest_queue); b++)
+      {
+         dbgLots += g_em_harvest_queue[b].lots;
+         dbgProfit += g_em_harvest_queue[b].profit;
+         FileWriteString(hDbg, StringFormat("#%d %s %s %s Orders:%d Lots:%.2f Profit:%.2f Time:%s\r\n",
+                                            b+1, g_em_harvest_queue[b].symbol, g_em_harvest_queue[b].side, g_em_harvest_queue[b].exit_type,
+                                            g_em_harvest_queue[b].orders, g_em_harvest_queue[b].lots, g_em_harvest_queue[b].profit,
+                                            TimeToString(g_em_harvest_queue[b].closed_at)));
+      }
+      FileWriteString(hDbg, StringFormat("TOTAL LOTS: %.2f, TOTAL PROFIT: %.2f\r\n", dbgLots, dbgProfit));
+      FileClose(hDbg);
+   }
 }
 
 // Prune acknowledged events after successful sync (Kept for legacy compatibility, but rollover handles reset)
