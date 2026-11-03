@@ -92,14 +92,58 @@ export async function GET(req: Request) {
             }
         }
 
+        // Helper to check for duplicate events across various sources
+        const isDuplicateEvent = (evToCheck: { id?: string; symbol: string; closed_at: number; profit: number; lots: number }) => {
+            return realEvents.some(e => {
+                if (e.id && evToCheck.id && e.id === evToCheck.id) return true;
+                if (e.symbol === evToCheck.symbol) {
+                    const timeDiff = Math.abs(Number(e.closed_at || 0) - Number(evToCheck.closed_at || 0));
+                    const profitDiff = Math.abs(Number(e.profit || 0) - Number(evToCheck.profit || 0));
+                    const lotsDiff = Math.abs(Number(e.lots || 0) - Number(evToCheck.lots || 0));
+                    // Same symbol and closed within 15 seconds with matching profit or lots
+                    if (timeDiff <= 15 && (profitDiff < 0.05 || lotsDiff < 0.01)) return true;
+                    // Exact same profit and lots within 60 seconds
+                    if (timeDiff <= 60 && profitDiff < 0.01 && lotsDiff < 0.01) return true;
+                }
+                return false;
+            });
+        };
+
         if (pData) {
             try {
-                // Real last_basket from EA
+                // 1. Prioritize authoritative harvest_events array directly from EA deals reconstruction (B261031.1+)
+                if (Array.isArray(pData?.harvest_events)) {
+                    for (const ev of pData.harvest_events) {
+                        if (ev && ev.symbol) {
+                            const cleanSym = String(ev.symbol).replace(/\.v$/i, '').toUpperCase();
+                            const evItem = {
+                                id: ev.event_id || `ev_${ev.closed_at}_${cleanSym}`,
+                                port_number: portNumber,
+                                symbol: cleanSym,
+                                side: String(ev.side || 'BUY').toUpperCase(),
+                                exit_type: String(ev.exit_type || 'FULL_BASKET_TP'),
+                                orders: Number(ev.orders || 1),
+                                lots: Number(ev.lots || 0),
+                                profit: Number(ev.profit || 0),
+                                duration_sec: Number(ev.duration_sec || 0),
+                                max_dd_pct: Number(ev.max_dd || 0),
+                                closed_at: Number(ev.closed_at || Math.floor(Date.now() / 1000)),
+                                ea_name: 'EasyM Prime',
+                                ea_build: pData.build_id || 'B261031.1'
+                            };
+                            if (!isDuplicateEvent(evItem)) {
+                                realEvents.push(evItem);
+                            }
+                        }
+                    }
+                }
+
+                // 2. Fallback last_basket from EA (only if not already in realEvents)
                 if (pData?.last_basket && typeof pData.last_basket === 'object') {
                     const lb = pData.last_basket;
                     if (lb.symbol) {
                         const cleanSym = String(lb.symbol).replace(/\.v$/i, '').toUpperCase();
-                        realEvents.push({
+                        const lbItem = {
                             id: lb.event_id || `lb_${lb.closed_at}_${cleanSym}`,
                             port_number: portNumber,
                             symbol: cleanSym,
@@ -113,33 +157,9 @@ export async function GET(req: Request) {
                             closed_at: Number(lb.closed_at || Math.floor(Date.now() / 1000)),
                             ea_name: 'EasyM Prime',
                             ea_build: pData.build_id || 'B261031.1'
-                        });
-                    }
-                }
-
-                // Real harvest_events array from EA (B261031.1+)
-                if (Array.isArray(pData?.harvest_events)) {
-                    for (const ev of pData.harvest_events) {
-                        if (ev && ev.symbol) {
-                            const cleanSym = String(ev.symbol).replace(/\.v$/i, '').toUpperCase();
-                            const exists = realEvents.some(e => e.id === ev.event_id || (e.symbol === cleanSym && e.closed_at === Number(ev.closed_at)));
-                            if (!exists) {
-                                realEvents.push({
-                                    id: ev.event_id || `ev_${ev.closed_at}_${cleanSym}`,
-                                    port_number: portNumber,
-                                    symbol: cleanSym,
-                                    side: String(ev.side || 'BUY').toUpperCase(),
-                                    exit_type: String(ev.exit_type || 'FULL_BASKET_TP'),
-                                    orders: Number(ev.orders || 1),
-                                    lots: Number(ev.lots || 0),
-                                    profit: Number(ev.profit || 0),
-                                    duration_sec: Number(ev.duration_sec || 0),
-                                    max_dd_pct: Number(ev.max_dd || 0),
-                                    closed_at: Number(ev.closed_at || Math.floor(Date.now() / 1000)),
-                                    ea_name: 'EasyM Prime',
-                                    ea_build: pData.build_id || 'B261031.1'
-                                });
-                            }
+                        };
+                        if (!isDuplicateEvent(lbItem)) {
+                            realEvents.push(lbItem);
                         }
                     }
                 }
@@ -148,36 +168,38 @@ export async function GET(req: Request) {
             }
         }
 
-        // Also check memory store
-        const memEvents = getBasketEvents(portNumber);
-        for (const me of memEvents) {
-            const cleanSym = String(me.symbol || '').replace(/\.v$/i, '').toUpperCase();
-            const exists = realEvents.some(e => e.id === me.id || (e.symbol === cleanSym && e.closed_at === me.closed_at));
-            if (!exists && cleanSym) {
-                realEvents.push({
+        // 3. Fallback memory store (only if events are not already present)
+        const hasAuthoritativeEvents = Array.isArray(pData?.harvest_events) && pData.harvest_events.length > 0;
+        if (!hasAuthoritativeEvents) {
+            const memEvents = getBasketEvents(portNumber);
+            for (const me of memEvents) {
+                const cleanSym = String(me.symbol || '').replace(/\.v$/i, '').toUpperCase();
+                const meItem = {
                     ...me,
                     symbol: cleanSym
-                });
+                };
+                if (cleanSym && !isDuplicateEvent(meItem)) {
+                    realEvents.push(meItem);
+                }
             }
         }
 
-        // Check persistent farm_batch_events table in Supabase
-        try {
-            const { data: dbBatchEvents } = await supabase
-                .from('farm_batch_events')
-                .select('*')
-                .eq('port_number', portNumber)
-                .order('event_timestamp', { ascending: false })
-                .limit(100);
+        // 4. Fallback persistent farm_batch_events table in Supabase
+        if (!hasAuthoritativeEvents) {
+            try {
+                const { data: dbBatchEvents } = await supabase
+                    .from('farm_batch_events')
+                    .select('*')
+                    .eq('port_number', portNumber)
+                    .order('event_timestamp', { ascending: false })
+                    .limit(100);
 
-            if (dbBatchEvents && dbBatchEvents.length > 0) {
-                for (const row of dbBatchEvents) {
-                    const cleanSym = String(row.symbol || '').replace(/\.v$/i, '').toUpperCase();
-                    const closedAtSec = Math.floor(new Date(row.event_timestamp).getTime() / 1000);
-                    const rowId = row.event_id || row.id || `db_${closedAtSec}_${cleanSym}`;
-                    const exists = realEvents.some(e => e.id === rowId || (e.symbol === cleanSym && e.closed_at === closedAtSec));
-                    if (!exists && cleanSym) {
-                        realEvents.push({
+                if (dbBatchEvents && dbBatchEvents.length > 0) {
+                    for (const row of dbBatchEvents) {
+                        const cleanSym = String(row.symbol || '').replace(/\.v$/i, '').toUpperCase();
+                        const closedAtSec = Math.floor(new Date(row.event_timestamp).getTime() / 1000);
+                        const rowId = row.event_id || row.id || `db_${closedAtSec}_${cleanSym}`;
+                        const dbItem = {
                             id: rowId,
                             port_number: row.port_number,
                             symbol: cleanSym,
@@ -191,12 +213,15 @@ export async function GET(req: Request) {
                             closed_at: closedAtSec,
                             ea_name: row.ea_name || 'EasyM Prime',
                             ea_build: row.ea_build || 'B261031.1'
-                        });
+                        };
+                        if (cleanSym && !isDuplicateEvent(dbItem)) {
+                            realEvents.push(dbItem);
+                        }
                     }
                 }
+            } catch (dbErr) {
+                // Non-blocking
             }
-        } catch (dbErr) {
-            // Non-blocking
         }
 
         // 4. Calculate stats and events according to selected period
@@ -336,6 +361,8 @@ export async function GET(req: Request) {
         // 5. Compute Pair Aggregated Summary from REAL events only
         const pairMap: Record<string, {
             symbol: string;
+            harvestProfit: number;
+            cutLoss: number;
             totalProfit: number;
             totalLots: number;
             totalOrders: number;
@@ -349,6 +376,8 @@ export async function GET(req: Request) {
             if (!pairMap[sym]) {
                 pairMap[sym] = {
                     symbol: sym,
+                    harvestProfit: 0,
+                    cutLoss: 0,
                     totalProfit: 0,
                     totalLots: 0,
                     totalOrders: 0,
@@ -357,7 +386,12 @@ export async function GET(req: Request) {
                     maxDd: 0
                 };
             }
-            pairMap[sym].totalProfit += Number(ev.profit || 0);
+            const pVal = Number(ev.profit || 0);
+            if (pVal > 0) {
+                pairMap[sym].harvestProfit += pVal;
+            } else if (pVal < 0) {
+                pairMap[sym].cutLoss += Math.abs(pVal);
+            }
             pairMap[sym].totalLots += Number(ev.lots || 0);
             pairMap[sym].totalOrders += Number(ev.orders || 0);
             pairMap[sym].basketsCount += 1;
@@ -367,16 +401,26 @@ export async function GET(req: Request) {
             }
         }
 
-        const effectiveTotalProfit = Math.max(0.01, Object.values(pairMap).reduce((sum, p) => sum + (p.totalProfit > 0 ? p.totalProfit : 0), 0));
+        // Set totalProfit to represent the gross closed harvest profit for each pair in the Harvest Report
+        for (const sym of Object.keys(pairMap)) {
+            const p = pairMap[sym];
+            // If the pair closed profitable baskets, totalProfit is its harvest profit
+            // If the pair only had cut losses, totalProfit is negative cut loss
+            p.totalProfit = Number((p.harvestProfit > 0 ? p.harvestProfit : -p.cutLoss).toFixed(2));
+        }
+
+        const effectiveTotalProfit = Math.max(0.01, Object.values(pairMap).reduce((sum, p) => sum + (p.harvestProfit > 0 ? p.harvestProfit : (p.totalProfit > 0 ? p.totalProfit : 0)), 0));
 
         const pairSummary = Object.values(pairMap)
             .map((p, idx) => {
-                const profitPositive = Math.max(0, p.totalProfit);
+                const profitPositive = Math.max(0, p.harvestProfit > 0 ? p.harvestProfit : p.totalProfit);
                 const sharePct = Number(((profitPositive / effectiveTotalProfit) * 100).toFixed(1));
                 const color = PAIR_COLORS[p.symbol] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
                 return {
                     symbol: p.symbol,
                     totalProfit: Number(p.totalProfit.toFixed(2)),
+                    harvestProfit: Number(p.harvestProfit.toFixed(2)),
+                    cutLoss: Number(p.cutLoss.toFixed(2)),
                     totalLots: Number(p.totalLots.toFixed(2)),
                     totalOrders: p.totalOrders,
                     basketsCount: p.basketsCount,
@@ -396,6 +440,7 @@ export async function GET(req: Request) {
             today_profit: displayProfit,
             net_mt5_profit: displayProfit,
             ea_profit: eaGrossProfit,
+            total_harvest: eaGrossProfit > 0 ? eaGrossProfit : (displayProfit > 0 ? displayProfit : 0),
             ea_cut_loss: eaCutLoss,
             relief_used: eaCutLoss,
             manual_profit: manualProfit,

@@ -26,6 +26,8 @@ export interface BasketClosureEvent {
 export interface PairSummary {
     symbol: string;
     totalProfit: number;
+    harvestProfit?: number;
+    cutLoss?: number;
     totalLots: number;
     totalOrders: number;
     basketsCount: number;
@@ -785,17 +787,19 @@ export default function TodayHarvestModal({
                                             <span className="text-[8px] sm:text-[9px] font-mono font-bold tracking-widest text-white/40 uppercase mb-1">
                                                 {hoveredSlice || selectedPairFilter || 'TOTAL HARVEST'}
                                             </span>
-                                            <span className={`text-xs sm:text-base font-mono font-black ${displayProfit >= 0 ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}>
-                                                {(() => {
-                                                    const targetSym = hoveredSlice || selectedPairFilter;
-                                                    if (targetSym) {
-                                                        const p = data.pair_summary.find(s => s.symbol === targetSym);
-                                                        if (p) return `${p.totalProfit >= 0 ? '+' : ''}${p.totalProfit.toFixed(1)}`;
-                                                    }
-                                                    return `${displayProfit >= 0 ? '+' : ''}${displayProfit.toFixed(1)}`;
-                                                })()}
-                                                <span className="text-[9px] font-normal text-white/50 ml-0.5">{isUSC ? 'USC' : 'USD'}</span>
-                                            </span>
+                                            {(() => {
+                                                const targetSym = hoveredSlice || selectedPairFilter;
+                                                const p = targetSym ? data.pair_summary.find(s => s.symbol === targetSym) : null;
+                                                const targetProfit = p ? p.totalProfit : (hasCutLossOrDual ? eaGrossProfit : displayProfit);
+                                                const isPositive = targetProfit >= 0;
+
+                                                return (
+                                                    <span className={`text-xs sm:text-base font-mono font-black ${isPositive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}>
+                                                        {isPositive ? '+' : ''}{targetProfit.toFixed(1)}
+                                                        <span className="text-[9px] font-normal text-white/50 ml-0.5">{isUSC ? 'USC' : 'USD'}</span>
+                                                    </span>
+                                                );
+                                            })()}
                                             <span className="text-[8px] sm:text-[9.5px] font-mono text-cyan-300 font-bold mt-1">
                                                 {(() => {
                                                     const targetSym = hoveredSlice || selectedPairFilter;
@@ -848,6 +852,12 @@ export default function TodayHarvestModal({
                                                             <span className="text-cyan-400 font-bold">{pair.totalLots.toFixed(2)}L</span>
                                                             <span>•</span>
                                                             <span>{pair.totalOrders} Orders</span>
+                                                            {pair.cutLoss && pair.cutLoss > 0 ? (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span className="text-amber-400 font-bold">ตัดไม้ -{pair.cutLoss.toFixed(2)}</span>
+                                                                </>
+                                                            ) : null}
                                                         </div>
                                                     </div>
                                                 </div>
