@@ -355,19 +355,17 @@ export default function TodayHarvestModal({
     const hasCutLossOrDual = eaCutLoss > 0 || displayProfit < 0;
 
     // Total EA Harvest Profit (Pure closed profit earned by the EA, isolated from balance cut-loss)
-    const totalHarvestProfit = useMemo(() => {
-        if (data?.total_harvest !== undefined && Number(data.total_harvest) > 0) {
-            return Number(data.total_harvest);
-        }
-        if (data?.ea_profit !== undefined && Number(data.ea_profit) > 0) {
-            return Number(data.ea_profit);
-        }
-        if (data?.pair_summary && data.pair_summary.length > 0) {
-            const sumPairs = data.pair_summary.reduce((acc, p) => acc + (p.harvestProfit ?? (p.totalProfit > 0 ? p.totalProfit : 0)), 0);
-            if (sumPairs > 0) return Number(sumPairs.toFixed(2));
-        }
-        return displayProfit >= 0 ? displayProfit : 0;
-    }, [data?.total_harvest, data?.ea_profit, data?.pair_summary, displayProfit]);
+    let totalHarvestProfit = 0;
+    if (data?.total_harvest !== undefined && Number(data.total_harvest) > 0) {
+        totalHarvestProfit = Number(data.total_harvest);
+    } else if (data?.ea_profit !== undefined && Number(data.ea_profit) > 0) {
+        totalHarvestProfit = Number(data.ea_profit);
+    } else if (data?.pair_summary && data.pair_summary.length > 0) {
+        const sumPairs = data.pair_summary.reduce((acc, p) => acc + (p.harvestProfit ?? (p.totalProfit > 0 ? p.totalProfit : 0)), 0);
+        if (sumPairs > 0) totalHarvestProfit = Number(sumPairs.toFixed(2));
+    } else {
+        totalHarvestProfit = displayProfit >= 0 ? displayProfit : 0;
+    }
 
     // Period badge titles
     const getPeriodLabels = () => {
