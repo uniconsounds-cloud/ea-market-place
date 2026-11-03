@@ -455,13 +455,32 @@ export default function FarmClient({
 
     // 🌾 Gross profit closed by EA baskets today (displayed in parentheses e.g. -1154.36(150.88))
     const eaHarvestProfitToday = useMemo(() => {
-        // 1. Direct from harvest_events in parsedPrimeData
+        // Determine today's active trading date
+        let todayDateStr = '';
+        if (portStatus?.server_time && Number(portStatus.server_time) > 0) {
+            const sDate = new Date(Number(portStatus.server_time) * 1000);
+            todayDateStr = `${sDate.getUTCFullYear()}-${String(sDate.getUTCMonth() + 1).padStart(2, '0')}-${String(sDate.getUTCDate()).padStart(2, '0')}`;
+        } else {
+            const mDate = getMarketTradingDate(time || new Date());
+            todayDateStr = `${mDate.getFullYear()}-${String(mDate.getMonth() + 1).padStart(2, '0')}-${String(mDate.getDate()).padStart(2, '0')}`;
+        }
+
+        // 1. Direct from harvest_events in parsedPrimeData (strictly filtered to today's trading date)
         if (parsedPrimeData && Array.isArray(parsedPrimeData.harvest_events) && parsedPrimeData.harvest_events.length > 0) {
-            const sum = parsedPrimeData.harvest_events.reduce((acc: number, ev: any) => {
-                const p = Number(ev.profit || 0);
-                return acc + (p > 0 ? p : 0);
-            }, 0);
-            if (sum > 0) return Number(sum.toFixed(2));
+            const todayEvents = parsedPrimeData.harvest_events.filter((ev: any) => {
+                if (!ev.closed_at) return false;
+                const evDate = new Date(Number(ev.closed_at) * 1000);
+                const evDateStr = `${evDate.getUTCFullYear()}-${String(evDate.getUTCMonth() + 1).padStart(2, '0')}-${String(evDate.getUTCDate()).padStart(2, '0')}`;
+                return evDateStr === todayDateStr;
+            });
+
+            if (todayEvents.length > 0) {
+                const sum = todayEvents.reduce((acc: number, ev: any) => {
+                    const p = Number(ev.profit || 0);
+                    return acc + (p > 0 ? p : 0);
+                }, 0);
+                if (sum > 0) return Number(sum.toFixed(2));
+            }
         }
         // 2. Direct from ea_profit field in parsedPrimeData
         if (parsedPrimeData?.ea_profit !== undefined && Number(parsedPrimeData.ea_profit) > 0) {
@@ -475,7 +494,7 @@ export default function FarmClient({
             if (grossEst > 0) return Number(grossEst.toFixed(2));
         }
         return 0;
-    }, [parsedPrimeData, smoothedTodayProfit, portStatus?.today_pnl]);
+    }, [parsedPrimeData, smoothedTodayProfit, portStatus?.today_pnl, portStatus?.server_time, time]);
 
     const isEasyM = prodKey.includes('EZM') || 
                     prodName.includes('easym') || 
