@@ -433,14 +433,20 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
                          (StringFind(comment, "EasyM") >= 0) ||
                          (StringFind(comment, "RescueCut") >= 0);
 
+      datetime dealTime = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
+      long dealType     = HistoryDealGetInteger(ticket, DEAL_TYPE);
       double dealProfit = HistoryDealGetDouble(ticket, DEAL_PROFIT) + HistoryDealGetDouble(ticket, DEAL_COMMISSION) + HistoryDealGetDouble(ticket, DEAL_SWAP);
       double dealLots   = HistoryDealGetDouble(ticket, DEAL_VOLUME);
 
       if(!is_our_deal)
       {
-         g_em_manual_profit += dealProfit;
-         g_em_manual_lots   += dealLots;
-         g_em_manual_orders++;
+         // Accumulate manual non-EA trades ONLY if closed TODAY and are buy/sell deals
+         if(dealTime >= startOfDay && (dealType == DEAL_TYPE_BUY || dealType == DEAL_TYPE_SELL))
+         {
+            g_em_manual_profit += dealProfit;
+            g_em_manual_lots   += dealLots;
+            g_em_manual_orders++;
+         }
          continue;
       }
 

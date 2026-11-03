@@ -349,7 +349,7 @@ export default function TodayHarvestModal({
 
     const eaGrossProfit = data?.ea_profit !== undefined ? Number(data.ea_profit) : (displayProfit > 0 ? displayProfit : 0);
     const eaCutLoss = data?.ea_cut_loss !== undefined ? Number(data.ea_cut_loss) : 0;
-    const hasCutLossOrDual = (eaCutLoss > 0) || (eaGrossProfit > 0 && Math.abs(displayProfit - eaGrossProfit) >= 0.01) || displayProfit < 0;
+    const hasCutLossOrDual = eaCutLoss > 0 || displayProfit < 0;
 
     // Period badge titles
     const getPeriodLabels = () => {
@@ -672,7 +672,7 @@ export default function TodayHarvestModal({
                 <div className="overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 flex-1 no-scrollbar">
 
                     {/* 👤 Manual Trades Callout (if user closed/opened manual trades) */}
-                    {data?.manual_orders !== undefined && (data.manual_orders > 0 || Math.abs(data.manual_profit || 0) > 0.001) && (
+                    {data?.manual_orders !== undefined && data.manual_orders > 0 && Math.abs(data.manual_profit || 0) > 0.01 && (
                         <div className="bg-[#181106]/90 border border-amber-500/40 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2 backdrop-blur-md">
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="px-2 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
@@ -785,16 +785,16 @@ export default function TodayHarvestModal({
                                             <span className="text-[8px] sm:text-[9px] font-mono font-bold tracking-widest text-white/40 uppercase mb-1">
                                                 {hoveredSlice || selectedPairFilter || 'TOTAL HARVEST'}
                                             </span>
-                                            <span className="text-xs sm:text-base font-mono font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
+                                            <span className={`text-xs sm:text-base font-mono font-black ${displayProfit >= 0 ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}>
                                                 {(() => {
                                                     const targetSym = hoveredSlice || selectedPairFilter;
                                                     if (targetSym) {
                                                         const p = data.pair_summary.find(s => s.symbol === targetSym);
-                                                        return p ? `+${p.totalProfit.toFixed(1)}` : `+${displayProfit.toFixed(1)}`;
+                                                        if (p) return `${p.totalProfit >= 0 ? '+' : ''}${p.totalProfit.toFixed(1)}`;
                                                     }
-                                                    return `+${displayProfit.toFixed(1)}`;
+                                                    return `${displayProfit >= 0 ? '+' : ''}${displayProfit.toFixed(1)}`;
                                                 })()}
-                                                <span className="text-[9px] font-normal text-white/50 ml-0.5">USC</span>
+                                                <span className="text-[9px] font-normal text-white/50 ml-0.5">{isUSC ? 'USC' : 'USD'}</span>
                                             </span>
                                             <span className="text-[8px] sm:text-[9.5px] font-mono text-cyan-300 font-bold mt-1">
                                                 {(() => {
@@ -855,8 +855,8 @@ export default function TodayHarvestModal({
                                                 {/* Right: Profit & Progress bar */}
                                                 <div className="flex flex-col items-end shrink-0 min-w-[85px] sm:min-w-[120px]">
                                                     <div className="flex items-center gap-1.5 whitespace-nowrap">
-                                                        <span className="text-xs sm:text-sm font-mono font-black text-emerald-400">
-                                                            +{pair.totalProfit.toFixed(2)} <span className="text-[8.5px] font-normal text-white/50">USC</span>
+                                                        <span className={`text-xs sm:text-sm font-mono font-black ${pair.totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                            {pair.totalProfit >= 0 ? '+' : ''}{pair.totalProfit.toFixed(2)} <span className="text-[8.5px] font-normal text-white/50">{isUSC ? 'USC' : 'USD'}</span>
                                                         </span>
                                                         <span className="text-[8.5px] sm:text-[10px] font-mono font-bold text-white/60 bg-white/5 px-1.5 py-0.2 rounded border border-white/10">
                                                             {pair.profitSharePct}%

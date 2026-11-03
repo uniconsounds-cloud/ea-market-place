@@ -221,16 +221,27 @@ export async function GET(req: Request) {
                 if (!ev.closed_at) return false;
                 const evDate = new Date(ev.closed_at * 1000);
                 const evDateStr = `${evDate.getUTCFullYear()}-${String(evDate.getUTCMonth() + 1).padStart(2, '0')}-${String(evDate.getUTCDate()).padStart(2, '0')}`;
-                return evDateStr === activeTradingDate || Math.abs(Date.now() / 1000 - ev.closed_at) < 86400;
+                return evDateStr === activeTradingDate;
             });
         } else if (period === 'daily') {
             // Specific selected date or most recent completed day
             const targetDate = reqDate || tradingDateParam || historyList[0]?.date || activeTradingDate;
-            const targetHist = historyList.find(h => h.date === targetDate) || historyList[0];
+            const targetHist = historyList.find(h => h.date === targetDate);
             if (targetHist) {
                 displayProfit = targetHist.profit;
                 displayLots = targetHist.lots;
                 displayMaxDd = targetHist.max_dd;
+            } else if (targetDate === activeTradingDate) {
+                const livePnl = Number(status?.today_pnl || 0);
+                const liveLots = Number(status?.today_closed_lots || 0);
+                const liveDd = Number(status?.daily_max_drawdown || 0);
+                displayProfit = livePnl;
+                displayLots = liveLots;
+                displayMaxDd = liveDd;
+            } else {
+                displayProfit = 0;
+                displayLots = 0;
+                displayMaxDd = 0;
             }
             // Filter real events for that day
             filteredEvents = realEvents.filter(ev => {
@@ -271,12 +282,16 @@ export async function GET(req: Request) {
         const directCutLoss = Number(
             filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) < 0 ? Math.abs(Number(ev.profit)) : 0), 0).toFixed(2)
         );
-        const reliefUsedVal = Number(pData?.relief_used || 0);
-        const eaCutLoss = directCutLoss > 0 
-            ? directCutLoss 
-            : (reliefUsedVal > 0 
-                ? reliefUsedVal 
-                : (displayProfit < eaGrossProfit ? Number((eaGrossProfit - displayProfit).toFixed(2)) : 0));
+        
+        let eaCutLoss = 0;
+        if (directCutLoss > 0) {
+            eaCutLoss = directCutLoss;
+        } else if (displayProfit < 0) {
+            const reliefUsedVal = Number(pData?.relief_used || 0);
+            eaCutLoss = reliefUsedVal > 0 ? reliefUsedVal : Number(Math.abs(displayProfit).toFixed(2));
+        } else {
+            eaCutLoss = 0;
+        }
 
         // Manual non-EA trades telemetry
         const manualTrades = pData?.manual_trades || {};
@@ -348,7 +363,7 @@ export async function GET(req: Request) {
             net_mt5_profit: displayProfit,
             ea_profit: eaGrossProfit,
             ea_cut_loss: eaCutLoss,
-            relief_used: reliefUsedVal,
+            relief_used: eaCutLoss,
             manual_profit: manualProfit,
             manual_lots: manualLots,
             manual_orders: manualOrders,
