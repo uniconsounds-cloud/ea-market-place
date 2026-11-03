@@ -8,6 +8,8 @@
 
 | เวอร์ชัน | วันที่ปล่อย | วัตถุประสงค์หลัก / สถานะ | การสั่งการผ่านหน้าเว็บ (2-Way) | โค้ดหลัก |
 | :--- | :--- | :--- | :--- | :--- |
+| **v2.10-1103** | 2026-11-03 | **Precision Daily Harvest & Manual Trade Scoping Fix (Production Fleet)** | ✅ เปิดเต็มระบบ | `EasyM_Prime_v210_B261103_1.mq5 / .ex5` |
+| **v2.10-1031** | 2026-10-31 | **Resilient Harvest Queue & Anti-Duplicate Telemetry (Universal Edition)** | ✅ เปิดเต็มระบบ | `EasyM_Prime_v210_B261031_1.mq5 / .ex5` |
 | **v2.00-1014** | 2026-10-14 | **Multi-Tier Cascading Rescue & Anchor Handover Edition** | Standalone Local Engine | `EasyM_Prime_v200_B261014_1.mq5 / .ex5` |
 | **v2.00-1008** | 2026-10-08 | **Stable Standalone Release (เวอร์ชันเสถียรหลักสำหรับลูกค้าทั่วไป)** | ❌ ปิด (ทำงานแบบ MT5 Standalone ไม่รับคำสั่งรีโมต) | `EASY_M_Prime_v200_1008.mq5 / .ex5` |
 | **v2.00-1009** | 2026-10-09 | **2-Way Command & Control Edition (เวอร์ชันเชื่อมโยงสั่งงานหน้าเว็บฟาร์ม)** | ✅ เปิดเต็มระบบ (Web Priority + สวิตช์ F7 Authority) | `EASY_M_Prime_v200_1009.mq5 / .ex5` + `EM_WebControl.mqh` |
@@ -18,6 +20,15 @@
 ---
 
 ## รายละเอียดการเปลี่ยนแปลงแต่ละเวอร์ชัน (Detailed Changelog)
+
+### [v2.10-1103] - 2026-11-03 / [Build B261103.1] (Precision Daily Harvest & Manual Trade Scoping Fix)
+> **สถานะ:** เวอร์ชันเสถียรล่าสุดสำหรับ Production Fleet ปรับปรุงระบบคัดกรองวันที่เทรด, ขจัดประวัติเทรดมือค้างข้ามวัน และขจัดยอดตัดขาดทุนเท็จ
+
+* **ฟีเจอร์และการปรับปรุงใหม่ (New Features & Architecture Enhancements):**
+  1. **Strict Day Rollover & Date Scoping:** แก้ไขการกรองข้อมูลใน Telemetry และ Adapter ให้จับคู่ตามวันที่จริงของโบรกเกอร์แบบตรงเป๊ะ (`evDateStr === activeTradingDate`) ตัดตรรกะ 24 ชั่วโมงย้อนหลัง (`Math.abs < 86400`) ป้องกันประวัติการปิดรวบของวันก่อนหน้ารั่วไหลเข้ามาในวันใหม่
+  2. **Scoped Non-EA Manual Trades Detection:** ใน `EM_MonitorAdapter.mqh` ฟังก์ชันกวาดประวัติปรับให้สะสมค่า `g_em_manual_profit`, `g_em_manual_lots`, และ `g_em_manual_orders` เฉพาะไม้ที่ปิดในวันปัจจุบันจริง ๆ (`dealTime >= startOfDay`) และเป็นคำสั่ง BUY/SELL เท่านั้น ขจัดปัญหาประวัติเทรดมือเก่า 7 วันมารวมซ้ำ และตัดออเดอร์ฝาก/ถอนเงินออก
+  3. **Zero False Cut Loss:** ปรับตรรกะการคำนวณ `eaCutLoss` ใน API และ Modal โดยจะแสดงยอดตัดขาดทุนและสลับเป็นการ์ด 3 ช่องแบบพิเศษ ก็ต่อเมื่อมีไม้ปิดขาดทุนจริงในรอบนั้น (`directCutLoss > 0`) หรือกำไรสุทธิรวมติดลบ (`displayProfit < 0`) เท่านั้น กำจัดการนำผลต่าง Swap/Commission มาคิดเป็นยอดตัดขาดทุนเท็จ
+  4. **Clean Negative Number Rendering:** แก้ไขบั๊กเครื่องหมายลบซ้ำซ้อน (`+-1174`) ในหน้าต่าง Profit By Pairs และ Donut Chart
 
 ### [v2.00-1014] - 2026-10-14 / [Build B261014.1] (Multi-Tier Cascading Rescue & Anchor Handover Edition)
 > **สถานะ:** สถาปัตยกรรมกู้ภัยหลายระดับขั้นบันได (Multi-Tier Cascading) ผสานการส่งต่อไม้ถ่วงสมอราคา (Anchor Handover) ขจัดจุดบอดไม้กู้ภัยติดล็อก และสร้าง Cash Flow รายวันอย่างมั่นคง
