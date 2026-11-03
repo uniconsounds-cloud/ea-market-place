@@ -246,9 +246,11 @@ export async function GET(req: Request) {
             const liveLots = Number(status?.today_closed_lots || 0);
             const liveDd = Number(status?.daily_max_drawdown || 0);
 
-            displayProfit = livePnl !== 0 ? livePnl : Number(histToday?.profit || 0);
-            displayLots = liveLots !== 0 ? liveLots : Number(histToday?.lots || 0);
-            displayMaxDd = liveDd !== 0 ? liveDd : Number(histToday?.max_dd || 0);
+            const isFreshDayZero = Boolean(status?.is_online && liveLots === 0 && livePnl === 0);
+
+            displayProfit = isFreshDayZero ? 0 : (livePnl !== 0 ? livePnl : Number(histToday?.profit || 0));
+            displayLots = isFreshDayZero ? 0 : (liveLots !== 0 ? liveLots : Number(histToday?.lots || 0));
+            displayMaxDd = isFreshDayZero ? 0 : (liveDd !== 0 ? liveDd : Number(histToday?.max_dd || 0));
 
             // Filter real events to only those occurring on today's trading date
             filteredEvents = realEvents.filter(ev => {

@@ -1575,7 +1575,9 @@ export default function FarmClient({
         lastDayRef.current = activeTradingDateStr;
         const histToday = history.find(h => h.date && h.date.startsWith(activeTradingDateStr));
         const histProfit = histToday ? Number(histToday.profit) : 0;
-        const effectivePnl = currentPnl !== 0 ? currentPnl : (histProfit !== 0 ? histProfit : currentPnl);
+        // If live port reports 0 closed lots and 0 PnL, today's trading is fresh at 0
+        const isFreshDayZero = Boolean(currentClosedLots === 0 && currentPnl === 0);
+        const effectivePnl = isFreshDayZero ? 0 : (currentPnl !== 0 ? currentPnl : (histProfit !== 0 ? histProfit : currentPnl));
 
         if (effectivePnl === 0 && smoothedTodayProfit > 0 && currentClosedLots > 0) {
             // Momentary 0 drop protection during position reload on the same day with existing closed lots
