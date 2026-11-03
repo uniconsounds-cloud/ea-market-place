@@ -938,6 +938,7 @@ export default function TodayHarvestModal({
                                         const dayEaProfit = day.ea_profit !== undefined ? day.ea_profit : (day.profit > 0 ? day.profit : 0);
                                         const dayNetProfit = day.profit;
                                         const isNetPositive = dayNetProfit >= 0;
+                                        const hasProfitDiff = Math.abs(dayNetProfit - dayEaProfit) > 0.05 || (day.cut_loss && day.cut_loss > 0);
 
                                         return (
                                             <div
@@ -965,17 +966,19 @@ export default function TodayHarvestModal({
                                                     </div>
 
                                                     <div className="flex items-center gap-2 sm:gap-3.5 justify-end">
-                                                        {/* ตัวเลขเล็กๆ แสดงยอดกำไรสุทธิ MT5 ไว้ด้านหน้าอย่างชัดเจน */}
-                                                        <div className="flex flex-col items-end leading-tight text-right">
-                                                            <span className="text-[7.5px] sm:text-[8.5px] text-white/40 uppercase tracking-tighter whitespace-nowrap">
-                                                                สุทธิ MT5
-                                                            </span>
-                                                            <span className={`text-[10px] sm:text-[11.5px] font-bold font-mono whitespace-nowrap ${
-                                                                isNetPositive ? 'text-emerald-400/90' : 'text-rose-400 font-extrabold'
-                                                            }`}>
-                                                                {isNetPositive ? '+' : ''}{dayNetProfit.toFixed(2)}
-                                                            </span>
-                                                        </div>
+                                                        {/* แสดงตัวเลขกำไรสุทธิ MT5 ด้านหน้าเฉพาะวันที่ยอดไม่เท่ากับกำไรของอีเอ */}
+                                                        {hasProfitDiff && (
+                                                            <div className="flex flex-col items-end leading-tight text-right mr-0.5">
+                                                                <span className="text-[7.5px] sm:text-[8.5px] text-white/40 uppercase tracking-tighter whitespace-nowrap">
+                                                                    สุทธิ MT5
+                                                                </span>
+                                                                <span className={`text-[10px] sm:text-[11.5px] font-bold font-mono whitespace-nowrap ${
+                                                                    isNetPositive ? 'text-emerald-400/90' : 'text-rose-400 font-extrabold'
+                                                                }`}>
+                                                                    {isNetPositive ? '+' : ''}{dayNetProfit.toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        )}
 
                                                         {/* ตัวเลขหลัก: กำไรของอีเอ (EA Harvest Profit) */}
                                                         <div className="flex flex-col items-end leading-tight min-w-[75px] sm:min-w-[95px]">
