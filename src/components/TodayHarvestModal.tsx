@@ -39,7 +39,9 @@ export interface PairSummary {
 
 export interface DailyHistoryItem {
     date: string;
-    profit: number;
+    profit: number; // Net MT5 Profit
+    ea_profit?: number; // EA Gross Harvest Profit
+    cut_loss?: number; // Cut Loss Amount
     lots: number;
     max_dd: number;
 }
@@ -277,6 +279,8 @@ export default function TodayHarvestModal({
                 .map(h => ({
                     date: String(h.date),
                     profit: Number(h.profit || 0),
+                    ea_profit: Number(h.ea_profit ?? (h.profit > 0 ? h.profit : 0)),
+                    cut_loss: Number(h.cut_loss ?? 0),
                     lots: Number(h.closed_lots ?? h.lots ?? 0),
                     max_dd: Number(h.max_drawdown ?? h.max_dd ?? 0)
                 }))
@@ -930,45 +934,64 @@ export default function TodayHarvestModal({
                                 </div>
                             ) : (
                                 <div className="space-y-1.5 sm:space-y-2">
-                                    {(period === 'weekly' ? historyList.slice(0, 7) : historyList.slice(0, 30)).map((day) => (
-                                        <div
-                                            key={`day_row_${day.date}`}
-                                            onClick={() => {
-                                                setSelectedHistoryDate(day.date);
-                                                setPeriod('daily');
-                                            }}
-                                            className="p-2 sm:p-2.5 rounded-xl bg-black/40 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer font-mono flex items-center justify-between gap-2"
-                                        >
-                                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                                                <Calendar className="w-3.5 h-3.5 text-white/30 shrink-0" />
-                                                <span className="font-bold text-xs sm:text-sm text-white whitespace-nowrap">
-                                                    {day.date}
-                                                </span>
-                                                <span className="text-[9px] text-white/40 whitespace-nowrap hidden sm:inline">
-                                                    ({formatDateLabel(day.date)})
-                                                </span>
-                                            </div>
+                                    {(period === 'weekly' ? historyList.slice(0, 7) : historyList.slice(0, 30)).map((day) => {
+                                        const dayEaProfit = day.ea_profit !== undefined ? day.ea_profit : (day.profit > 0 ? day.profit : 0);
+                                        const dayNetProfit = day.profit;
+                                        const isNetPositive = dayNetProfit >= 0;
 
-                                            <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
-                                                <div className="flex flex-col items-end leading-tight text-[9px] sm:text-xs">
-                                                    <span className="text-cyan-300 font-bold">{day.lots.toFixed(2)} Lots</span>
-                                                    <span className="text-amber-400/80 text-[8px] sm:text-[9.5px]">DD: -{Math.abs(day.max_dd).toFixed(1)}%</span>
+                                        return (
+                                            <div
+                                                key={`day_row_${day.date}`}
+                                                onClick={() => {
+                                                    setSelectedHistoryDate(day.date);
+                                                    setPeriod('daily');
+                                                }}
+                                                className="p-2 sm:p-2.5 rounded-xl bg-black/40 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer font-mono flex items-center justify-between gap-2"
+                                            >
+                                                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                                    <Calendar className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                                                    <span className="font-bold text-xs sm:text-sm text-white whitespace-nowrap">
+                                                        {day.date}
+                                                    </span>
+                                                    <span className="text-[9px] text-white/40 whitespace-nowrap hidden sm:inline">
+                                                        ({formatDateLabel(day.date)})
+                                                    </span>
                                                 </div>
 
-                                                <div className="flex items-center gap-1.5 min-w-[85px] sm:min-w-[110px] justify-end">
-                                                    <div className="flex flex-col items-end leading-tight">
-                                                        <span className={`text-xs sm:text-sm font-black ${day.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                            {day.profit >= 0 ? '+' : ''}{day.profit.toFixed(2)} USC
-                                                        </span>
-                                                        <span className="text-[7.5px] sm:text-[9px] text-white/40">
-                                                            {day.profit >= 0 ? '+' : ''}${(day.profit / 100).toFixed(2)} USD
-                                                        </span>
+                                                <div className="flex items-center gap-2.5 sm:gap-5 text-right shrink-0">
+                                                    <div className="flex flex-col items-end leading-tight text-[9px] sm:text-xs">
+                                                        <span className="text-cyan-300 font-bold">{day.lots.toFixed(2)} Lots</span>
+                                                        <span className="text-amber-400/80 text-[8px] sm:text-[9.5px]">DD: -{Math.abs(day.max_dd).toFixed(1)}%</span>
                                                     </div>
-                                                    <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-emerald-400 shrink-0" />
+
+                                                    <div className="flex items-center gap-2 sm:gap-3.5 justify-end">
+                                                        {/* ตัวเลขเล็กๆ แสดงยอดกำไรสุทธิ MT5 ไว้ด้านหน้าอย่างชัดเจน */}
+                                                        <div className="flex flex-col items-end leading-tight text-right">
+                                                            <span className="text-[7.5px] sm:text-[8.5px] text-white/40 uppercase tracking-tighter whitespace-nowrap">
+                                                                สุทธิ MT5
+                                                            </span>
+                                                            <span className={`text-[10px] sm:text-[11.5px] font-bold font-mono whitespace-nowrap ${
+                                                                isNetPositive ? 'text-emerald-400/90' : 'text-rose-400 font-extrabold'
+                                                            }`}>
+                                                                {isNetPositive ? '+' : ''}{dayNetProfit.toFixed(2)}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* ตัวเลขหลัก: กำไรของอีเอ (EA Harvest Profit) */}
+                                                        <div className="flex flex-col items-end leading-tight min-w-[75px] sm:min-w-[95px]">
+                                                            <span className="text-xs sm:text-sm font-black text-[#4de180] whitespace-nowrap drop-shadow-[0_0_8px_rgba(77,225,128,0.35)]">
+                                                                +{dayEaProfit.toFixed(2)} {isUSC ? 'USC' : 'USD'}
+                                                            </span>
+                                                            <span className="text-[7.5px] sm:text-[9px] text-white/40 whitespace-nowrap">
+                                                                +${(dayEaProfit / (isUSC ? 100 : 1)).toFixed(2)} USD
+                                                            </span>
+                                                        </div>
+                                                        <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-emerald-400 shrink-0 ml-0.5" />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

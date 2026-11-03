@@ -441,6 +441,46 @@ export async function GET(req: Request) {
             })
             .sort((a, b) => b.totalProfit - a.totalProfit);
 
+        // Enrich history_list with real EA harvest profit & cut loss per day
+        const dailyEventsMap: Record<string, { ea_profit: number; cut_loss: number }> = {};
+        for (const ev of realEvents) {
+            if (!ev.closed_at) continue;
+            const evDate = new Date(ev.closed_at * 1000);
+            const evDateStr = `${evDate.getUTCFullYear()}-${String(evDate.getUTCMonth() + 1).padStart(2, '0')}-${String(evDate.getUTCDate()).padStart(2, '0')}`;
+            if (!dailyEventsMap[evDateStr]) {
+                dailyEventsMap[evDateStr] = { ea_profit: 0, cut_loss: 0 };
+            }
+            const p = Number(ev.profit || 0);
+            if (p > 0) {
+                dailyEventsMap[evDateStr].ea_profit += p;
+            } else if (p < 0) {
+                dailyEventsMap[evDateStr].cut_loss += Math.abs(p);
+            }
+        }
+
+        const enrichedHistoryList = historyList.map(h => {
+            const evInfo = dailyEventsMap[h.date];
+            let eaProfit = h.profit;
+            let cutLoss = 0;
+            if (evInfo) {
+                if (evInfo.cut_loss > 0) {
+                    eaProfit = Number(evInfo.ea_profit.toFixed(2));
+                    cutLoss = Number(evInfo.cut_loss.toFixed(2));
+                } else {
+                    eaProfit = Math.max(Number(evInfo.ea_profit.toFixed(2)), h.profit);
+                    cutLoss = 0;
+                }
+            } else if (h.profit < 0) {
+                eaProfit = 0;
+                cutLoss = Math.abs(h.profit);
+            }
+            return {
+                ...h,
+                ea_profit: Number(eaProfit.toFixed(2)),
+                cut_loss: Number(cutLoss.toFixed(2))
+            };
+        });
+
         return NextResponse.json({
             success: true,
             period,
@@ -465,7 +505,7 @@ export async function GET(req: Request) {
             events_count: filteredEvents.length,
             pair_summary: pairSummary,
             events: filteredEvents,
-            history_list: historyList
+            history_list: enrichedHistoryList
         });
 
     } catch (err: any) {
