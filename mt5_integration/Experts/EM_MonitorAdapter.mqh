@@ -297,10 +297,15 @@ string EM_BuildHarvestQueueJson()
    int count = ArraySize(g_em_harvest_queue);
    if(count == 0) return "[]";
 
+   int startIdx = 0;
+   if(count > 60) startIdx = count - 60; // Cap at newest 60 events for fast network telemetry
+
    string json = "[";
-   for(int i = 0; i < count; i++)
+   bool first = true;
+   for(int i = startIdx; i < count; i++)
    {
-      if(i > 0) json += ",";
+      if(!first) json += ",";
+      first = false;
       json += StringFormat("{\"event_id\":\"%s\",\"symbol\":\"%s\",\"side\":\"%s\",\"exit_type\":\"%s\",\"orders\":%d,\"lots\":%.2f,\"profit\":%.2f,\"duration_sec\":%d,\"max_dd\":%.2f,\"closed_at\":%I64d}",
                            g_em_harvest_queue[i].event_id,
                            g_em_harvest_queue[i].symbol,
@@ -322,7 +327,7 @@ double g_em_manual_profit = 0.0;
 double g_em_manual_lots   = 0.0;
 int    g_em_manual_orders = 0;
 
-// Day Rollover check: resets harvest queue only when day changes
+// Day Rollover check: prunes events older than 7 days instead of wiping
 void EM_CheckHarvestDayRollover()
 {
    datetime now = TimeCurrent();
@@ -338,11 +343,28 @@ void EM_CheckHarvestDayRollover()
    if(current_day != last_harvest_day)
    {
       last_harvest_day = current_day;
-      ArrayResize(g_em_harvest_queue, 0);
-      g_em_last_basket_json = "";
       g_em_manual_profit = 0.0;
       g_em_manual_lots   = 0.0;
       g_em_manual_orders = 0;
+
+      // Prune events older than 7 days to retain weekly harvest history across days
+      datetime cutoff = now - 7 * 86400;
+      EAE_HarvestEventItem tempQueue[];
+      int keepCount = 0;
+      int curSz = ArraySize(g_em_harvest_queue);
+      for(int i = 0; i < curSz; i++)
+      {
+         if(g_em_harvest_queue[i].closed_at >= cutoff)
+         {
+            ArrayResize(tempQueue, keepCount + 1);
+            tempQueue[keepCount] = g_em_harvest_queue[i];
+            keepCount++;
+         }
+      }
+      ArrayResize(g_em_harvest_queue, keepCount);
+      for(int i = 0; i < keepCount; i++)
+         g_em_harvest_queue[i] = tempQueue[i];
+
       EM_SaveHarvestQueueToDisk();
    }
 }
@@ -371,8 +393,9 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
    TimeToStruct(now, dt);
    dt.hour = 0; dt.min = 0; dt.sec = 0;
    datetime startOfDay = StructToTime(dt);
+   datetime scanStart = startOfDay - 7 * 86400; // Retain past 7 trading days of harvest history
 
-   if(!HistorySelect(startOfDay, now)) return;
+   if(!HistorySelect(scanStart, now)) return;
 
    int totalDeals = HistoryDealsTotal();
    if(totalDeals == 0) return;

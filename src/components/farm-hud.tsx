@@ -434,7 +434,7 @@ export default function FarmHud({
                                     colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'}
                                 />
                             </span>
-                            {eaTodayProfit !== undefined && eaTodayProfit > 0 && (todayProfit < 0 || Math.abs(todayProfit - eaTodayProfit) >= 0.01) && (
+                            {eaTodayProfit !== undefined && eaTodayProfit > 0 && todayProfit < 0 && (
                                 <span 
                                     className="text-[9px] sm:text-xs lg:text-sm font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
                                     title={`กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
@@ -620,7 +620,7 @@ export function FarmMobileStatsOverlay({
                         <span className={`text-[14px] sm:text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
                             <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                         </span>
-                        {eaTodayProfit !== undefined && eaTodayProfit > 0 && (todayProfit < 0 || Math.abs(todayProfit - eaTodayProfit) >= 0.01) && (
+                        {eaTodayProfit !== undefined && eaTodayProfit > 0 && todayProfit < 0 && (
                             <span 
                                 className="text-[10px] sm:text-xs font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
                                 title={`กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
