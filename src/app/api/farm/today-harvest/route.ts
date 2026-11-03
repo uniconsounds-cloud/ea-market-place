@@ -53,12 +53,21 @@ export async function GET(req: Request) {
             .order('date', { ascending: false })
             .limit(60);
 
-        const historyList = (rawHistory || []).map((h: any) => ({
-            date: String(h.date || ''),
-            profit: Number(h.profit || 0),
-            lots: Number(h.closed_lots ?? h.lots ?? 0),
-            max_dd: Number(h.max_drawdown ?? h.max_dd ?? 0)
-        }));
+        const historyList = (rawHistory || [])
+            .filter((h: any) => {
+                if (!h.date) return false;
+                const d = new Date(String(h.date) + 'T00:00:00');
+                const day = d.getDay();
+                const isWeekend = (day === 0 || day === 6);
+                const hasActivity = Math.abs(Number(h.profit || 0)) > 0.001 || Number(h.closed_lots ?? h.lots ?? 0) > 0.001;
+                return !isWeekend || hasActivity;
+            })
+            .map((h: any) => ({
+                date: String(h.date || ''),
+                profit: Number(h.profit || 0),
+                lots: Number(h.closed_lots ?? h.lots ?? 0),
+                max_dd: Number(h.max_drawdown ?? h.max_dd ?? 0)
+            }));
 
         // Determine active trading date from client or server_time
         let activeTradingDate = tradingDateParam || reqDate;

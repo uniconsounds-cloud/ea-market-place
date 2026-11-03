@@ -2811,15 +2811,6 @@ export default function FarmClient({
 
                 if (historyMap.has(dateStr)) {
                     let item = historyMap.get(dateStr)!;
-                    // Reconcile: If this completed date has 0 recorded in history but portStatus has positive today_pnl, use portStatus.today_pnl
-                    if (Number(item.profit || 0) === 0 && Number(portStatus?.today_pnl || 0) > 0) {
-                        item = {
-                            ...item,
-                            profit: Number(portStatus.today_pnl),
-                            closed_lots: Number(portStatus.today_closed_lots || item.closed_lots || 0),
-                            max_drawdown: Number(portStatus.daily_max_drawdown || item.max_drawdown || 0)
-                        };
-                    }
                     // Forex & Gold markets are strictly closed on Saturday & Sunday.
                     // Always skip weekends for Forex/Gold, and skip zero-profit weekends for others.
                     if (isWeekend && (isForexOrGold || Math.abs(Number(item.profit)) < 0.01)) {
@@ -2828,16 +2819,14 @@ export default function FarmClient({
                         filledList.push(item);
                     }
                 } else if (!isWeekend) {
-                    // MISSING WEEKDAY DETECTED! (e.g. Aug 17)
-                    // Check if portStatus has profit for this completed date
-                    const fallbackProfit = Number(portStatus?.today_pnl || 0);
+                    // MISSING WEEKDAY: Default to 0 profit without trades
                     filledList.push({
                         id: `missing_${dateStr}`,
                         date: dateStr,
-                        profit: fallbackProfit,
-                        closed_lots: Number(portStatus?.today_closed_lots || 0),
-                        max_drawdown: Number(portStatus?.daily_max_drawdown || 0),
-                        isAutoFilled: fallbackProfit === 0
+                        profit: 0,
+                        closed_lots: 0,
+                        max_drawdown: 0,
+                        isAutoFilled: true
                     });
                 }
 

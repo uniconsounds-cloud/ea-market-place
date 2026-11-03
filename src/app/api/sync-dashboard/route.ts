@@ -361,7 +361,7 @@ export async function POST(req: Request) {
             }
 
             // Automatically keep farm_daily_history synchronized with today's PnL & lots
-            if (todayPnl > 0 || todayClosedLots > 0) {
+            if (todayPnl !== 0 || todayClosedLots > 0) {
                 try {
                     const now = new Date();
                     const nyFormatter = new Intl.DateTimeFormat('en-US', {
