@@ -52,6 +52,7 @@ export interface TodayHarvestData {
     today_profit: number;
     net_mt5_profit?: number;
     ea_profit?: number;
+    total_harvest?: number;
     ea_cut_loss?: number;
     relief_used?: number;
     manual_profit?: number;
@@ -352,6 +353,21 @@ export default function TodayHarvestModal({
     const eaGrossProfit = data?.ea_profit !== undefined ? Number(data.ea_profit) : (displayProfit > 0 ? displayProfit : 0);
     const eaCutLoss = data?.ea_cut_loss !== undefined ? Number(data.ea_cut_loss) : 0;
     const hasCutLossOrDual = eaCutLoss > 0 || displayProfit < 0;
+
+    // Total EA Harvest Profit (Pure closed profit earned by the EA, isolated from balance cut-loss)
+    const totalHarvestProfit = useMemo(() => {
+        if (data?.total_harvest !== undefined && Number(data.total_harvest) > 0) {
+            return Number(data.total_harvest);
+        }
+        if (data?.ea_profit !== undefined && Number(data.ea_profit) > 0) {
+            return Number(data.ea_profit);
+        }
+        if (data?.pair_summary && data.pair_summary.length > 0) {
+            const sumPairs = data.pair_summary.reduce((acc, p) => acc + (p.harvestProfit ?? (p.totalProfit > 0 ? p.totalProfit : 0)), 0);
+            if (sumPairs > 0) return Number(sumPairs.toFixed(2));
+        }
+        return displayProfit >= 0 ? displayProfit : 0;
+    }, [data?.total_harvest, data?.ea_profit, data?.pair_summary, displayProfit]);
 
     // Period badge titles
     const getPeriodLabels = () => {
@@ -790,7 +806,7 @@ export default function TodayHarvestModal({
                                             {(() => {
                                                 const targetSym = hoveredSlice || selectedPairFilter;
                                                 const p = targetSym ? data.pair_summary.find(s => s.symbol === targetSym) : null;
-                                                const targetProfit = p ? p.totalProfit : (hasCutLossOrDual ? eaGrossProfit : displayProfit);
+                                                const targetProfit = p ? p.totalProfit : totalHarvestProfit;
                                                 const isPositive = targetProfit >= 0;
 
                                                 return (
