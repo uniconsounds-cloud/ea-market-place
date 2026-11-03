@@ -196,6 +196,61 @@ async function fetchAllDailyHistory(
 }
 
 /**
+ * Market trading date helpers (5:00 PM NY rollover / New York timezone)
+ */
+export function getMarketTradingDate(date: Date = new Date()): Date {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const partMap: Record<string, string> = {};
+    for (const p of parts) {
+        partMap[p.type] = p.value;
+    }
+    const year = parseInt(partMap.year, 10);
+    const month = parseInt(partMap.month, 10) - 1;
+    const day = parseInt(partMap.day, 10);
+    const hour = parseInt(partMap.hour, 10);
+
+    const d = new Date(year, month, day);
+    const dayOfWeek = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+
+    if (dayOfWeek === 5) {
+        return d;
+    } else if (dayOfWeek === 6) {
+        d.setDate(d.getDate() - 1);
+        return d;
+    } else if (dayOfWeek === 0) {
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1);
+        } else {
+            d.setDate(d.getDate() - 2);
+        }
+        return d;
+    } else {
+        if (hour >= 17) {
+            d.setDate(d.getDate() + 1);
+        }
+        return d;
+    }
+}
+
+export function getMarketTradingDateStr(date: Date = new Date()): string {
+    const d = getMarketTradingDate(date);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
  * Computes synthetic combined history & status for Live Tracker
  */
 export async function getSyntheticLiveTrackerData(
@@ -206,7 +261,7 @@ export async function getSyntheticLiveTrackerData(
     const startDate = config.startDate || '2026-06-22';
     const activePorts = config.activePorts.length > 0 ? config.activePorts : DEFAULT_LIVE_TRACKER_CONFIG.activePorts;
 
-    // 1. Fetch pre-June 22 history from 21692434 and active port statuses/orders
+    // 1. Fetch pre-June 22 history from 21692434 and active port statuses/orders (including SYNTHETIC-MASTER)
     const [preHistRes, postHistRows, statusesRes, ordersRes] = await Promise.all([
         supabase
             .from('farm_daily_history')
@@ -220,7 +275,7 @@ export async function getSyntheticLiveTrackerData(
         supabase
             .from('farm_port_status')
             .select('*')
-            .in('port_number', activePorts),
+            .in('port_number', [...activePorts, 'SYNTHETIC-MASTER']),
         // Active orders from leading active ports
         supabase
             .from('farm_active_orders')
@@ -250,10 +305,11 @@ export async function getSyntheticLiveTrackerData(
     Array.from(dateMap.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([date, profits]) => {
-            const nonZeroProfits = profits.filter(p => p !== 0);
-            const avgProfit = nonZeroProfits.length > 0
-                ? nonZeroProfits.reduce((a, b) => a + b, 0) / nonZeroProfits.length
-                : (profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / Math.max(1, activePorts.length) : 0);
+            // ไม่เอาพอร์ตที่มีกำไรติดลบมาเฉลี่ยประวัติ
+            const positiveProfits = profits.filter(p => p > 0);
+            const avgProfit = positiveProfits.length > 0
+                ? positiveProfits.reduce((a, b) => a + b, 0) / positiveProfits.length
+                : 0;
             combinedDailyHistory.push({
                 id: `synth-${date}`,
                 date,
@@ -262,14 +318,37 @@ export async function getSyntheticLiveTrackerData(
         });
 
     // Compute live status
-    const statuses = statusesRes.data || [];
+    const allStatuses = statusesRes.data || [];
+    const synthMasterRow = allStatuses.find(s => s.port_number === 'SYNTHETIC-MASTER');
+    const statuses = allStatuses.filter(s => s.port_number !== 'SYNTHETIC-MASTER');
     const validCount = Math.max(1, statuses.length);
 
-    // คำนวณกำไรเฉลี่ยวันนี้เฉพาะพอร์ตที่ไม่เป็น 0 (มีกำไร/การปิดรอบ)
-    const nonZeroStatuses = statuses.filter(s => (Number(s.today_pnl) || 0) !== 0);
-    const avgTodayProfit = nonZeroStatuses.length > 0
-        ? nonZeroStatuses.reduce((sum, s) => sum + (Number(s.today_pnl) || 0), 0) / nonZeroStatuses.length
+    // 1) ไม่เอาพอร์ตที่มีกำไรติดลบ (<= 0) มาคำนวณกำไรเฉลี่ยวันนี้
+    const positiveStatuses = statuses.filter(s => (Number(s.today_pnl) || 0) > 0);
+    const rawAvgTodayProfit = positiveStatuses.length > 0
+        ? positiveStatuses.reduce((sum, s) => sum + (Number(s.today_pnl) || 0), 0) / positiveStatuses.length
         : 0;
+
+    // 2) High-Water Mark (Ratchet) ต่อวันเปิดตลาด:
+    // ค่าที่แสดงต้องไม่ต่ำกว่าค่าที่แสดงครั้งก่อนหน้าของแต่ละวัน
+    // ตัวอย่าง: พอร์ตแรกได้ 100 แสดง 100 ต่อมาพอร์ตที่ 2 ได้ 60 รวมได้เฉลี่ย 80 หน้าฟาร์มยังคงแสดง 100
+    // จนกว่าเฉลี่ยจะมากกว่า 100 จึงแสดงค่าใหม่
+    const activeMarketDateStr = getMarketTradingDateStr(new Date());
+    let effectiveTodayProfit = rawAvgTodayProfit;
+
+    if (synthMasterRow) {
+        const lastMarketDateStr = synthMasterRow.system_code?.includes(':::')
+            ? synthMasterRow.system_code.split(':::')[1]
+            : (synthMasterRow.updated_at ? getMarketTradingDateStr(new Date(synthMasterRow.updated_at)) : '');
+
+        if (lastMarketDateStr === activeMarketDateStr) {
+            // วันเปิดตลาดเดียวกัน: ถือยอดสูงสุดที่เคยคำนวณได้ (ไม่ลดลง)
+            effectiveTodayProfit = Math.max(Number(synthMasterRow.today_pnl) || 0, rawAvgTodayProfit);
+        } else {
+            // ข้ามวันเปิดตลาดใหม่: เริ่มต้นตามค่ารอบปัจจุบันของวันใหม่
+            effectiveTodayProfit = rawAvgTodayProfit;
+        }
+    }
 
     const nonZeroClosedLots = statuses.filter(s => (Number(s.today_closed_lots) || 0) > 0);
     const avgTodayClosedLots = nonZeroClosedLots.length > 0
@@ -287,7 +366,7 @@ export async function getSyntheticLiveTrackerData(
     const bkkTodayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
     const isTodayRecorded = combinedDailyHistory.some(h => h.date === bkkTodayStr);
     const historyProfitSum = combinedDailyHistory.reduce((sum, h) => sum + h.profit, 0);
-    const todayPnlToAdd = isTodayRecorded ? 0 : avgTodayProfit;
+    const todayPnlToAdd = isTodayRecorded ? 0 : effectiveTodayProfit;
     const currentBalance = 100000 + historyProfitSum + todayPnlToAdd;
 
     const syntheticStatus = {
@@ -296,7 +375,7 @@ export async function getSyntheticLiveTrackerData(
         balance: Number(currentBalance.toFixed(2)),
         equity: Number((currentBalance + avgFloatingPnl).toFixed(2)),
         floating_pnl: Number(avgFloatingPnl.toFixed(2)),
-        today_pnl: Number(avgTodayProfit.toFixed(2)),
+        today_pnl: Number(effectiveTodayProfit.toFixed(2)),
         daily_max_drawdown: Number(avgDD.toFixed(2)),
         total_lots: Number(avgTotalLots.toFixed(2)),
         today_closed_lots: Number(avgTodayClosedLots.toFixed(2)),
@@ -307,12 +386,30 @@ export async function getSyntheticLiveTrackerData(
         asset_type: 'FOREX',
         account_type: 'USC',
         currency: 'USC',
-        system_code: 'EasyM Live Tracker (10-Port Model)',
+        system_code: `EasyM Live Tracker (10-Port Model):::${activeMarketDateStr}`,
         ea_version: 'v2.00',
         is_online: true,
         last_ping: new Date().toISOString(),
         server_time: Math.floor(Date.now() / 1000)
     };
+
+    // บันทึก High-Water Mark ลงใน DB เพื่อให้ผู้เข้าชมทุกคนได้ค่าที่สม่ำเสมอกัน
+    const shouldUpdateDb = !synthMasterRow
+        || Number(synthMasterRow.today_pnl) !== Number(effectiveTodayProfit.toFixed(2))
+        || !synthMasterRow.system_code?.includes(activeMarketDateStr);
+
+    if (shouldUpdateDb) {
+        try {
+            await supabase
+                .from('farm_port_status')
+                .upsert({
+                    ...syntheticStatus,
+                    updated_at: new Date().toISOString()
+                });
+        } catch (err) {
+            console.error('[liveTrackerSynthetic] Failed to persist high-water mark:', err);
+        }
+    }
 
     return {
         dailyHistory: combinedDailyHistory,

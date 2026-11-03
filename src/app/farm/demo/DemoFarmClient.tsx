@@ -645,11 +645,10 @@ export default function DemoFarmClient({
         return () => clearInterval(interval);
     }, []);
 
-    // Day rollover & today's profit sync
+    // Day rollover & today's profit sync (High-Water Mark Ratchet)
     useEffect(() => {
         if (!portStatus) return;
         const currentPnl = Number(portStatus.today_pnl || 0);
-        const currentClosedLots = Number(portStatus.today_closed_lots || 0);
         
         // Derive trading day from market trading date (rolls over at 05:00 AM Bangkok)
         const mDate = getMarketTradingDate(time || new Date());
@@ -663,16 +662,12 @@ export default function DemoFarmClient({
             lastDayRef.current = activeTradingDateStr;
             setSmoothedTodayProfit(currentPnl);
         } else {
-            // Same day: if 0 trades closed today, today's PnL is definitely 0
-            if (currentClosedLots === 0 && currentPnl === 0) {
-                setSmoothedTodayProfit(0);
-            } else if (currentPnl === 0 && smoothedTodayProfit > 0 && currentClosedLots > 0) {
-                // momentary 0 drop during position reload on the same day with existing closed lots
-            } else {
-                setSmoothedTodayProfit(currentPnl);
-            }
+            // Same day: Ratchet (High-Water Mark)
+            // Value must not decrease below previously displayed peak during the trading day
+            // e.g., if it was 100 and a 2nd port closes at 60 (avg 80), keep showing 100 until avg exceeds 100
+            setSmoothedTodayProfit(prev => Math.max(prev, currentPnl));
         }
-    }, [portStatus?.today_pnl, portStatus?.today_closed_lots, time, smoothedTodayProfit]);
+    }, [portStatus?.today_pnl, time]);
 
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -839,7 +834,7 @@ export default function DemoFarmClient({
                 balance: currentBalanceValue,
                 equity: currentEquityValue,
                 maxDrawdown: currentBalanceValue > 0 ? (Number(portStatus.max_drawdown || 0) * Number(portStatus.master_balance || portStatus.balance || 10000) / currentBalanceValue) : 0,
-                todayProfit: Number(portStatus.today_pnl || 0),
+                todayProfit: smoothedTodayProfit,
                 serverTime: portStatus.server_time ? new Date(Number(portStatus.server_time) * 1000) : new Date(),
                 // Correct broker day progress: use modulo to extract HH:MM from raw broker timestamp
                 // (avoids timezone mismatch since MQL5 TimeCurrent is broker-local, not UTC)
@@ -880,11 +875,11 @@ export default function DemoFarmClient({
             balance: currentBalanceValue,
             equity: currentEquityValue,
             maxDrawdown: maxDrawdownValue,
-            todayProfit: Number(portStatus?.today_pnl || 0),
+            todayProfit: smoothedTodayProfit,
             serverTime: new Date(),
             brokerDayPercent: null
         };
-    }, [displayOrders, portStatus, orders, liveUserBalance]);
+    }, [displayOrders, portStatus, orders, liveUserBalance, smoothedTodayProfit]);
 
     const treePriority = useMemo(() => {
         const order = Array.from({ length: 25 }).map((_, i) => ({ index: i, c: i % 5, r: Math.floor(i / 5) }));
