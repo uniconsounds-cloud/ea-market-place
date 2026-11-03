@@ -489,32 +489,50 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       double basketProfit = 0.0;
       string exitComment = closedDeals[i].comment;
       bool isManualExit = false;
+      bool isCut_i = (StringFind(closedDeals[i].comment, "CUT") >= 0 || StringFind(closedDeals[i].comment, "TRIM") >= 0 || StringFind(closedDeals[i].comment, "RescueCut") >= 0);
 
       for(int j = i; j < closedCount; j++)
       {
-         if(!processed[j] && closedDeals[j].symbol == sym && MathAbs((long)closedDeals[j].time - (long)baseTime) <= 3)
+         if(processed[j]) continue;
+         if(closedDeals[j].symbol != sym) continue;
+         if(MathAbs((long)closedDeals[j].time - (long)baseTime) > 3) continue;
+
+         // A relief cut-loss deal should NEVER merge with a take-profit/scalp deal
+         bool isCut_j = (StringFind(closedDeals[j].comment, "CUT") >= 0 || StringFind(closedDeals[j].comment, "TRIM") >= 0 || StringFind(closedDeals[j].comment, "RescueCut") >= 0);
+         if(isCut_i != isCut_j) continue;
+
+         // If not a cut deal, they must share the same tier comment category (T1, T2, T3, or regular)
+         if(!isCut_i)
          {
-            processed[j] = true;
-            basketOrders++;
-            basketLots += closedDeals[j].lots;
-            basketProfit += closedDeals[j].profit;
-            if(StringLen(closedDeals[j].comment) > 0) exitComment = closedDeals[j].comment;
-            if(closedDeals[j].is_manual) isManualExit = true;
+            bool isT1_i = (StringFind(closedDeals[i].comment, "T1") >= 0);
+            bool isT1_j = (StringFind(closedDeals[j].comment, "T1") >= 0);
+            if(isT1_i != isT1_j) continue;
+
+            bool isT2_i = (StringFind(closedDeals[i].comment, "T2") >= 0);
+            bool isT2_j = (StringFind(closedDeals[j].comment, "T2") >= 0);
+            if(isT2_i != isT2_j) continue;
          }
+
+         processed[j] = true;
+         basketOrders++;
+         basketLots += closedDeals[j].lots;
+         basketProfit += closedDeals[j].profit;
+         if(StringLen(closedDeals[j].comment) > 0) exitComment = closedDeals[j].comment;
+         if(closedDeals[j].is_manual) isManualExit = true;
       }
 
       // Determine exit_type from deal comment & closure reason
       string exitType = "FULL_BASKET_TP";
       if(isManualExit)
          exitType = "MANUAL_CLOSE_EA";
+      else if(isCut_i || StringFind(exitComment, "CUT") >= 0 || StringFind(exitComment, "TRIM") >= 0 || StringFind(exitComment, "RescueCut") >= 0)
+         exitType = "RELIEF_TRIM";
       else if(StringFind(exitComment, "T1_OUT") >= 0 || StringFind(exitComment, "T1") >= 0)
          exitType = "RESCUE_T1_SCALP_TP";
       else if(StringFind(exitComment, "T2_OUT") >= 0 || StringFind(exitComment, "T2") >= 0)
          exitType = "RESCUE_T2_SCALP_TP";
       else if(StringFind(exitComment, "T3_OUT") >= 0 || StringFind(exitComment, "T3") >= 0)
          exitType = "RESCUE_ALL_SCALP_TP";
-      else if(StringFind(exitComment, "CUT") >= 0 || StringFind(exitComment, "TRIM") >= 0)
-         exitType = "RELIEF_TRIM";
       else if(StringFind(exitComment, "QUAR") >= 0)
          exitType = "QUARANTINE_FULL_EXIT";
 

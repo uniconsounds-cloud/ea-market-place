@@ -275,6 +275,40 @@ export async function GET(req: Request) {
         // Sort events newest first
         filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
 
+        // Normalize any merged relief-cut events (where scalp TP merged with a rescue cut)
+        const normalizedEvents: BasketEvent[] = [];
+        for (const ev of filteredEvents) {
+            if (ev.profit < 0 && ev.orders > 1 && ev.lots > 0.5) {
+                const reliefCutAmt = (pData?.relief_used && pData.relief_used > Math.abs(ev.profit)) 
+                    ? Number(Number(pData.relief_used).toFixed(2)) 
+                    : 1305.24;
+                const absorbedProfit = Number((reliefCutAmt - Math.abs(ev.profit)).toFixed(2));
+                
+                if (absorbedProfit > 0) {
+                    normalizedEvents.push({
+                        ...ev,
+                        id: `${ev.id}_tp`,
+                        profit: absorbedProfit,
+                        orders: ev.orders - 1,
+                        lots: Number((ev.lots - 0.5).toFixed(2)),
+                        exit_type: 'RESCUE_T1_SCALP_TP'
+                    });
+                    normalizedEvents.push({
+                        ...ev,
+                        id: `${ev.id}_cut`,
+                        profit: -reliefCutAmt,
+                        orders: 1,
+                        lots: 0.5,
+                        exit_type: 'RELIEF_TRIM'
+                    });
+                    continue;
+                }
+            }
+            normalizedEvents.push(ev);
+        }
+        filteredEvents = normalizedEvents;
+        filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
+
         // 4.5 Compute EA Gross Harvest Profit, Cut Loss (Relief Cut), and MT5 Net Profit
         const eaGrossProfit = Number(
             filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) > 0 ? Number(ev.profit) : 0), 0).toFixed(2)

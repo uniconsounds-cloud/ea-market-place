@@ -579,14 +579,14 @@ export default function TodayHarvestModal({
                                     +{eaGrossProfit.toFixed(2)} {isUSC ? 'USC' : 'USD'}
                                 </span>
                                 <span className="text-[7.5px] sm:text-[9px] text-emerald-300/70 leading-tight whitespace-nowrap truncate max-w-full">
-                                    ปิดรวบ {data?.events_count ?? 0} ไม้
+                                    ปิดรวบ {data?.events ? data.events.filter(e => e.profit > 0).length : (data?.events_count ?? 0)} ไม้
                                 </span>
                             </div>
 
                             {/* Card 3: EA Cut Loss / Relief Used */}
                             <div className="bg-[#1f0f05]/80 border border-amber-500/40 rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-center min-w-0 shadow-sm">
                                 <span className="text-[8px] sm:text-[9.5px] text-amber-400/90 font-bold tracking-wider uppercase whitespace-nowrap truncate max-w-full">
-                                    ยอดตัดขาดทุนวันนี้
+                                    {period === 'today' ? 'ยอดตัดขาดทุนวันนี้' : 'ยอดตัดขาดทุน'}
                                 </span>
                                 <span className="text-[11px] sm:text-base font-black text-amber-300 leading-tight mt-0.5 whitespace-nowrap">
                                     -{eaCutLoss.toFixed(2)} {isUSC ? 'USC' : 'USD'}
