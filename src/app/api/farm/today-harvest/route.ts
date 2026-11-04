@@ -45,13 +45,15 @@ export async function GET(req: Request) {
         const accountType = status?.account_type || 'USC';
         const updatedAt = status?.updated_at || new Date().toISOString();
 
-        // 2. Fetch full daily history from farm_daily_history
+        // 2. Fetch daily history from farm_daily_history
+        const isOwnerDev = (portNumber === '97053088' || portNumber === '21692434');
+        const historyLimit = isOwnerDev ? 3650 : 90; // User personal ports unlimited, customer ports capped at 90 days
         const { data: rawHistory } = await supabase
             .from('farm_daily_history')
             .select('date, profit, closed_lots, lots, max_drawdown, max_dd')
             .eq('port_number', portNumber)
             .order('date', { ascending: false })
-            .limit(60);
+            .limit(historyLimit);
 
         const historyList = (rawHistory || [])
             .filter((h: any) => {

@@ -558,7 +558,28 @@ export async function POST(req: Request) {
             }
         }
 
-        // 7. Dynamic Interval policy (Live 20s vs Standby 180s/600s)
+        // 7. 1-Year Retention Auto-Pruning for Customer Ports (User ports 97053088 and 21692434 are 100% exempt)
+        if (portNumber !== '97053088' && portNumber !== '21692434') {
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+            const oneYearAgoDateStr = oneYearAgo.toISOString().split('T')[0];
+            const oneYearAgoIso = oneYearAgo.toISOString();
+
+            // Non-blocking cleanup of customer records older than 1 year (365 days)
+            supabase.from('farm_daily_history')
+                .delete()
+                .eq('port_number', portNumber)
+                .lt('date', oneYearAgoDateStr)
+                .then(() => {});
+
+            supabase.from('farm_batch_events')
+                .delete()
+                .eq('port_number', portNumber)
+                .lt('event_timestamp', oneYearAgoIso)
+                .then(() => {});
+        }
+
+        // 8. Dynamic Interval policy (Live 20s vs Standby 180s/600s)
         if (!lastViewedAtStr) {
             const { data: vData } = await supabase
                 .from('farm_port_status')

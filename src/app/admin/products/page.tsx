@@ -1,13 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, ArrowRight, Filter, X, Sparkles, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { 
+    Plus, 
+    Pencil, 
+    Filter, 
+    X, 
+    Sparkles, 
+    Eye, 
+    EyeOff, 
+    CheckCircle2, 
+    Trash2, 
+    AlertTriangle, 
+    Loader2, 
+    Coins, 
+    Layers 
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     fetchStorefrontVisibilityConfig,
     isProductShownOnStore,
@@ -18,6 +41,9 @@ import {
 export default function AdminProductsPage() {
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [updatingVisibilityId, setUpdatingVisibilityId] = useState<string | null>(null);
+    const [productToDelete, setProductToDelete] = useState<any | null>(null);
+    const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
     // --- Filter State ---
     const [isOpen, setIsOpen] = useState(false);
@@ -274,6 +300,207 @@ export default function AdminProductsPage() {
         return categories[category as keyof typeof categories].find(c => c.id === id)?.label || id;
     };
 
+    // --- Direct Toggle Storefront Visibility Handler ---
+    const handleToggleStorefrontVisibility = async (product: any) => {
+        if (updatingVisibilityId) return;
+        const nextShow = !product.show_on_store;
+        setUpdatingVisibilityId(product.id);
+
+        try {
+            // 1. Save storefront visibility config (audit/config table)
+            await saveProductStorefrontVisibility(supabase, product.id, product.product_key, nextShow);
+
+            // 2. If enabling visibility on store, ensure product.is_active is also true in database
+            if (nextShow && !product.is_active) {
+                await supabase.from('products').update({ is_active: true }).eq('id', product.id);
+            }
+
+            // 3. Update local state immediately
+            setProducts(prev => prev.map(p => {
+                if (p.id === product.id) {
+                    return {
+                        ...p,
+                        show_on_store: nextShow,
+                        is_active: nextShow ? true : p.is_active
+                    };
+                }
+                return p;
+            }));
+        } catch (err: any) {
+            console.error('Failed to update product visibility:', err);
+            alert('เกิดข้อผิดพลาดในการเปลี่ยนการแสดงผลสินค้า: ' + (err.message || 'Unknown error'));
+        } finally {
+            setUpdatingVisibilityId(null);
+        }
+    };
+
+    // --- Direct Delete Product Handler with Modal ---
+    const handleConfirmDeleteProduct = async () => {
+        if (!productToDelete) return;
+        setIsDeleting(true);
+
+        try {
+            const { error } = await supabase.from('products').delete().eq('id', productToDelete.id);
+            if (error) throw error;
+
+            // Remove from local list
+            setProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+            setProductToDelete(null);
+        } catch (err: any) {
+            console.error('Failed to delete product:', err);
+            alert('ลบสินค้าไม่สำเร็จ: ' + (err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'));
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    // --- Product Grouping Logic (EasyGold vs EasyM) ---
+    const isGoldProduct = (p: any) => {
+        const asset = (p.asset_class || '').toLowerCase().trim();
+        const name = (p.name || '').toLowerCase().trim();
+        const key = (p.product_key || '').toLowerCase().trim();
+        return asset === 'gold' || name.includes('gold') || key.includes('gold') || key.startsWith('ezg-');
+    };
+
+    const goldProducts = useMemo(() => {
+        return filteredProducts.filter(p => isGoldProduct(p));
+    }, [filteredProducts]);
+
+    const easymProducts = useMemo(() => {
+        return filteredProducts.filter(p => !isGoldProduct(p));
+    }, [filteredProducts]);
+
+    // --- Render Single Product Card ---
+    const renderProductCard = (product: any) => {
+        const isUpdatingVisibility = updatingVisibilityId === product.id;
+
+        return (
+            <Card key={product.id} className="overflow-hidden mb-3 hover:border-primary/50 transition-all shadow-sm">
+                <CardContent className="p-0 flex flex-col xl:flex-row xl:items-center justify-between">
+                    <div className="flex items-start sm:items-center gap-4 p-4 min-w-0">
+                        <div className="h-20 w-20 bg-gray-800 rounded-md flex items-center justify-center overflow-hidden shrink-0 border">
+                            {product.image_url ? (
+                                <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                            ) : (
+                                <span className="text-xs text-gray-500">No Image</span>
+                            )}
+                        </div>
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link href={`/admin/products/${product.id}`} className="hover:underline">
+                                    <h3 className="font-bold text-lg leading-none">{product.name}</h3>
+                                </Link>
+                                {product.platform && (
+                                    <Badge variant="outline" className="text-xs py-0 h-5">
+                                        {product.platform.toUpperCase()}
+                                    </Badge>
+                                )}
+                                {product.asset_class && (
+                                    <Badge variant="secondary" className="text-xs py-0 h-5 bg-yellow-500/10 text-yellow-600">
+                                        {getLabel('asset_class', product.asset_class)}
+                                    </Badge>
+                                )}
+                                {product.strategy && (
+                                    <Badge variant="secondary" className="text-xs py-0 h-5 bg-blue-500/10 text-blue-600">
+                                        {formatStrategy(product.strategy)}
+                                    </Badge>
+                                )}
+                                <Badge
+                                    variant={product.is_active ? 'default' : 'destructive'}
+                                    className={`text-xs py-0 h-5 gap-1 ${product.is_active ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20' : ''}`}
+                                >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {product.is_active ? 'Active (เปิดใช้งาน)' : 'Inactive (ปิดใช้งาน)'}
+                                </Badge>
+                                {product.show_on_store ? (
+                                    <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30">
+                                        <Eye className="w-3 h-3" /> แสดงหน้าเว็บ
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                        <EyeOff className="w-3 h-3" /> ซ่อนจากหน้าเว็บ
+                                    </Badge>
+                                )}
+                                {product.product_key === 'EZM-PRIME-V1' && (
+                                    <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-purple-500/15 text-purple-300 border-purple-500/30">
+                                        <Sparkles className="w-3 h-3 text-yellow-300" /> สิทธิ์อัปเกรดทดลองฟรี 2 เดือน
+                                    </Badge>
+                                )}
+                            </div>
+                            <div className="text-sm text-muted-foreground flex flex-wrap gap-4 mt-2">
+                                <span>รายเดือน: ฿{product.price_monthly?.toLocaleString()}</span>
+                                {product.price_quarterly && <span>3 เดือน: ฿{product.price_quarterly?.toLocaleString()}</span>}
+                                <span>ถาวร: ฿{product.price_lifetime?.toLocaleString()}</span>
+                            </div>
+                            <div className="text-sm flex flex-wrap gap-4 mt-2 p-2 bg-muted/30 rounded-md border border-border/50 text-foreground w-max max-w-full">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-muted-foreground font-medium">Min Balance:</span>
+                                    <span className="font-bold text-yellow-600 dark:text-yellow-500">${product.min_balance || 0} {product.currency || 'USD'}</span>
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                    <span className="text-muted-foreground font-medium">เช่าซื้อ:</span>
+                                    <span className="font-bold">{product.stats?.regular || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-muted-foreground font-medium">โควต้า IB:</span>
+                                    <span className="font-bold text-blue-600 dark:text-blue-500">{product.stats?.ib || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                    <span className="text-muted-foreground font-medium">ใช้งานรวม:</span>
+                                    <span className="font-bold text-primary">{product.stats?.total || 0} พอร์ต</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Controls Toolbar */}
+                    <div className="flex flex-wrap items-center gap-2.5 p-4 xl:shrink-0 bg-muted/20 xl:bg-transparent justify-end border-t xl:border-t-0 border-border/40">
+                        {/* 🔘 Switch: แสดงที่หน้าสินค้า */}
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${
+                            product.show_on_store 
+                                ? 'bg-sky-500/10 border-sky-500/30 text-sky-300' 
+                                : 'bg-muted/40 border-border/50 text-muted-foreground'
+                        }`}>
+                            {isUpdatingVisibility ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                            ) : (
+                                <Switch
+                                    id={`switch-store-${product.id}`}
+                                    checked={Boolean(product.show_on_store)}
+                                    onCheckedChange={() => handleToggleStorefrontVisibility(product)}
+                                    aria-label="สลับการแสดงผลที่หน้าสินค้า"
+                                />
+                            )}
+                            <Label
+                                htmlFor={`switch-store-${product.id}`}
+                                className="text-xs cursor-pointer select-none font-medium whitespace-nowrap"
+                            >
+                                {product.show_on_store ? 'แสดงที่หน้าสินค้า' : 'ซ่อนจากหน้าสินค้า'}
+                            </Label>
+                        </div>
+
+                        {/* ✏️ จัดการ (แก้ไข) */}
+                        <Link href={`/admin/products/${product.id}`}>
+                            <Button variant="outline" size="sm" className="h-9">
+                                <Pencil className="h-4 w-4 mr-1.5" /> จัดการ
+                            </Button>
+                        </Link>
+
+                        {/* 🗑️ ลบสินค้านี้ */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setProductToDelete(product)}
+                            className="h-9 text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 border-rose-500/30 hover:border-rose-500/50"
+                        >
+                            <Trash2 className="h-4 w-4 mr-1.5" /> ลบสินค้านี้
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
+
     return (
         <div className="space-y-8">
             <div className="flex justify-between items-center">
@@ -449,107 +676,165 @@ export default function AdminProductsPage() {
                         )}
                     </div>
 
-                    {/* -- Products List -- */}
+                    {/* -- Products Grouped View -- */}
                     {filteredProducts.length === 0 ? (
                         <div className="text-center py-12 border rounded-lg bg-card/50">
                             <p className="text-muted-foreground">ไม่พบสินค้าที่ตรงกับเงื่อนไข</p>
                             {hasFilters && <Button variant="link" onClick={clearFilters}>ล้างตัวกรอง</Button>}
                         </div>
                     ) : (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
-                            {filteredProducts.map((product: any) => (
-                                <Card key={product.id} className="overflow-hidden mb-2 hover:border-primary/50 transition-colors">
-                                    <CardContent className="p-0 flex flex-col sm:flex-row sm:items-center justify-between">
-                                        <div className="flex items-center gap-4 p-4">
-                                            <div className="h-20 w-20 bg-gray-800 rounded-md flex items-center justify-center overflow-hidden shrink-0 border">
-                                                {product.image_url ? (
-                                                    <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <span className="text-xs text-gray-500">No Image</span>
-                                                )}
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <Link href={`/admin/products/${product.id}`} className="hover:underline">
-                                                        <h3 className="font-bold text-lg leading-none">{product.name}</h3>
-                                                    </Link>
-                                                    {product.platform && (
-                                                        <Badge variant="outline" className="text-xs py-0 h-5">
-                                                            {product.platform.toUpperCase()}
-                                                        </Badge>
-                                                    )}
-                                                    {product.asset_class && (
-                                                        <Badge variant="secondary" className="text-xs py-0 h-5 bg-yellow-500/10 text-yellow-600">
-                                                            {getLabel('asset_class', product.asset_class)}
-                                                        </Badge>
-                                                    )}
-                                                    {product.strategy && (
-                                                        <Badge variant="secondary" className="text-xs py-0 h-5 bg-blue-500/10 text-blue-600">
-                                                            {formatStrategy(product.strategy)}
-                                                        </Badge>
-                                                    )}
-                                                    <Badge
-                                                        variant={product.is_active ? 'default' : 'destructive'}
-                                                        className={`text-xs py-0 h-5 gap-1 ${product.is_active ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20' : ''}`}
-                                                    >
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                        {product.is_active ? 'Active (เปิดใช้งาน)' : 'Inactive (ปิดใช้งาน)'}
-                                                    </Badge>
-                                                    {product.show_on_store ? (
-                                                        <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30">
-                                                            <Eye className="w-3 h-3" /> แสดงหน้าเว็บ
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30">
-                                                            <EyeOff className="w-3 h-3" /> ซ่อนจากหน้าเว็บ
-                                                        </Badge>
-                                                    )}
-                                                    {product.product_key === 'EZM-PRIME-V1' && (
-                                                        <Badge variant="outline" className="text-xs py-0 h-5 gap-1 bg-purple-500/15 text-purple-300 border-purple-500/30">
-                                                            <Sparkles className="w-3 h-3 text-yellow-300" /> สิทธิ์อัปเกรดทดลองฟรี 2 เดือน
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <div className="text-sm text-muted-foreground flex flex-wrap gap-4 mt-2">
-                                                    <span>รายเดือน: ฿{product.price_monthly?.toLocaleString()}</span>
-                                                    {product.price_quarterly && <span>3 เดือน: ฿{product.price_quarterly?.toLocaleString()}</span>}
-                                                    <span>ถาวร: ฿{product.price_lifetime?.toLocaleString()}</span>
-                                                </div>
-                                                <div className="text-sm flex flex-wrap gap-4 mt-2 p-2 bg-muted/30 rounded-md border border-border/50 text-foreground w-max">
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-muted-foreground font-medium">Min Balance:</span>
-                                                        <span className="font-bold text-yellow-600 dark:text-yellow-500">${product.min_balance || 0} {product.currency || 'USD'}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 ml-2">
-                                                        <span className="text-muted-foreground font-medium">เช่าซื้อ:</span>
-                                                        <span className="font-bold">{product.stats?.regular || 0}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-muted-foreground font-medium">โควต้า IB:</span>
-                                                        <span className="font-bold text-blue-600 dark:text-blue-500">{product.stats?.ib || 0}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 ml-2">
-                                                        <span className="text-muted-foreground font-medium">ใช้งานรวม:</span>
-                                                        <span className="font-bold text-primary">{product.stats?.total || 0} พอร์ต</span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                        <div className="space-y-8">
+                            {/* 🟡 กลุ่มที่ 1: EasyGold (อีเอทองคำ / XAUUSD) */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between border-b border-amber-500/30 pb-2.5">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                                            <Coins className="w-5 h-5" />
                                         </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-amber-300 flex items-center gap-2">
+                                                กลุ่ม EasyGold (อีเอทองคำ)
+                                                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs">
+                                                    {goldProducts.length} รายการ
+                                                </Badge>
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground">
+                                                อีเอสำหรับเทรดทองคำ (XAUUSD) และโลหะมีค่า
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        <div className="flex items-center gap-2 p-4 sm:shrink-0 bg-muted/20 sm:bg-transparent justify-end">
-                                            <Link href={`/admin/products/${product.id}`}>
-                                                <Button variant="outline" size="sm">
-                                                    <Pencil className="h-4 w-4 mr-2" /> จัดการ
-                                                </Button>
-                                            </Link>
+                                {goldProducts.length === 0 ? (
+                                    <div className="text-center py-6 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-sm">
+                                        ไม่มีสินค้ากลุ่ม EasyGold ที่ตรงกับเงื่อนไขตัวกรอง
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {goldProducts.map(renderProductCard)}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 🌐 กลุ่มที่ 2: EasyM (คู่เงินและอื่นๆ) */}
+                            <div className="space-y-4 pt-4">
+                                <div className="flex items-center justify-between border-b border-cyan-500/30 pb-2.5">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                                            <Layers className="w-5 h-5" />
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                        <div>
+                                            <h2 className="text-lg font-bold text-cyan-300 flex items-center gap-2">
+                                                กลุ่ม EasyM (คู่เงินและอื่นๆ)
+                                                <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs">
+                                                    {easymProducts.length} รายการ
+                                                </Badge>
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground">
+                                                ระบบพอร์ตฟาร์ม EasyM Prime, EasyM Max, Mini, Farm และคู่เงิน Forex
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {easymProducts.length === 0 ? (
+                                    <div className="text-center py-6 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-sm">
+                                        ไม่มีสินค้ากลุ่ม EasyM ที่ตรงกับเงื่อนไขตัวกรอง
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {easymProducts.map(renderProductCard)}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
             )}
+
+            {/* 🗑️ Confirmation Dialog for Product Deletion */}
+            <Dialog open={Boolean(productToDelete)} onOpenChange={(open) => !open && !isDeleting && setProductToDelete(null)}>
+                <DialogContent className="max-w-md bg-zinc-950 border-rose-500/30 text-white">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+                                <Trash2 className="w-5 h-5 text-rose-400" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-lg font-bold text-rose-400">
+                                    ยืนยันคำสั่งลบสินค้า
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-white/60">
+                                    การลบสินค้าจะไม่สามารถย้อนกลับได้ กรุณาตรวจสอบรายละเอียดก่อนยืนยัน
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    {productToDelete && (
+                        <div className="space-y-3 py-2 text-sm">
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-1.5 font-mono text-xs">
+                                <div className="flex justify-between">
+                                    <span className="text-white/50">ชื่อสินค้า:</span>
+                                    <span className="font-bold text-white">{productToDelete.name}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/50">Product Key:</span>
+                                    <span className="text-amber-300 font-bold">{productToDelete.product_key || '-'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/50">ประเภท Asset:</span>
+                                    <span className="text-cyan-300">{getLabel('asset_class', productToDelete.asset_class)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-white/50">สถานะ License ใช้งาน:</span>
+                                    <span className="font-bold text-emerald-400">{productToDelete.stats?.total || 0} พอร์ต</span>
+                                </div>
+                            </div>
+
+                            {Number(productToDelete.stats?.total || 0) > 0 && (
+                                <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-3 flex items-start gap-2 text-amber-200 text-xs">
+                                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-bold">คำเตือน:</span> สินค้านี้มีผู้ใช้หรือ License ที่กำลัง Active อยู่จำนวน <span className="font-bold underline">{productToDelete.stats?.total} พอร์ต</span> หากลบสินค้านี้ออก ระบบอาจส่งผลต่อการตรวจจับสิทธิ์ License ที่ผูกกับ Product ID นี้
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-0 mt-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setProductToDelete(null)}
+                            disabled={isDeleting}
+                            className="border-white/10 hover:bg-white/10"
+                        >
+                            ยกเลิก
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleConfirmDeleteProduct}
+                            disabled={isDeleting}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold gap-2"
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    กำลังลบสินค้า...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="w-4 h-4" />
+                                    ยืนยันลบสินค้านี้
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

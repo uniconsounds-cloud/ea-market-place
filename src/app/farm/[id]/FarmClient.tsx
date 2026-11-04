@@ -2736,12 +2736,14 @@ export default function FarmClient({
         if (!isTabVisible || isIdle) return;
 
         const fetchHistory = async () => {
+            const isOwnerDev = (portNumber === '97053088' || portNumber === '21692434');
+            const historyLimit = isOwnerDev ? 3650 : 90; // User personal ports unlimited (10 yrs), customer ports capped at 90 days
             const { data, error } = await supabase
                 .from('farm_daily_history')
                 .select('*')
                 .eq('port_number', portNumber)
                 .order('date', { ascending: false })
-                .limit(120);
+                .limit(historyLimit);
 
             if (data) {
                 setHistory(data.reverse());
