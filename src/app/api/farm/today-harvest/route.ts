@@ -346,7 +346,7 @@ export async function GET(req: Request) {
         filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
 
         // 4.5 Compute EA Gross Harvest Profit, Cut Loss (Relief Cut), and MT5 Net Profit
-        const eaGrossProfit = Number(
+        const rawEaGrossProfit = Number(
             filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) > 0 ? Number(ev.profit) : 0), 0).toFixed(2)
         );
         const directCutLoss = Number(
@@ -361,6 +361,25 @@ export async function GET(req: Request) {
             eaCutLoss = reliefUsedVal > 0 ? reliefUsedVal : Number(Math.abs(displayProfit).toFixed(2));
         } else {
             eaCutLoss = 0;
+        }
+
+        // Reconcile pre-close floating estimations with actual settled MT5 deals
+        // Target Gross EA Harvest: Net settled MT5 profit + any financing cut loss
+        const targetGrossEaProfit = Number((displayProfit + eaCutLoss).toFixed(2));
+        const shouldAlignGross = targetGrossEaProfit > 0 && rawEaGrossProfit > 0 && Math.abs(targetGrossEaProfit - rawEaGrossProfit) > 0.01;
+        const grossScale = shouldAlignGross ? (targetGrossEaProfit / rawEaGrossProfit) : 1.0;
+        const eaGrossProfit = shouldAlignGross ? targetGrossEaProfit : rawEaGrossProfit;
+
+        if (shouldAlignGross) {
+            filteredEvents = filteredEvents.map(ev => {
+                if (Number(ev.profit) > 0) {
+                    return {
+                        ...ev,
+                        profit: Number((Number(ev.profit) * grossScale).toFixed(2))
+                    };
+                }
+                return ev;
+            });
         }
 
         // Manual non-EA trades telemetry

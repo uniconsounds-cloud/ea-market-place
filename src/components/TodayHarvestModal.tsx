@@ -813,7 +813,7 @@ export default function TodayHarvestModal({
 
                                                 return (
                                                     <span className={`text-xs sm:text-base font-mono font-black ${isPositive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}>
-                                                        {isPositive ? '+' : ''}{targetProfit.toFixed(1)}
+                                                        {isPositive ? '+' : ''}{targetProfit.toFixed(2)}
                                                         <span className="text-[9px] font-normal text-white/50 ml-0.5">{isUSC ? 'USC' : 'USD'}</span>
                                                     </span>
                                                 );
