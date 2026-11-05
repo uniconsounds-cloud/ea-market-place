@@ -44,6 +44,7 @@ export default function AdminProductsPage() {
     const [updatingVisibilityId, setUpdatingVisibilityId] = useState<string | null>(null);
     const [productToDelete, setProductToDelete] = useState<any | null>(null);
     const [isDeleting, setIsDeleting] = useState<boolean>(false);
+    const [selectedGroup, setSelectedGroup] = useState<'all' | 'gold' | 'easym'>('all');
 
     // --- Filter State ---
     const [isOpen, setIsOpen] = useState(false);
@@ -558,6 +559,70 @@ export default function AdminProductsPage() {
                 <div>กำลังโหลด...</div>
             ) : (
                 <div className="space-y-6 pb-8">
+                    {/* 🏷️ Group Selector (เอาหัวข้อกลุ่มมาไว้ด้านบนเพื่อเลือกแสดงแต่ละกลุ่ม) */}
+                    <div className="flex flex-wrap items-center gap-2 p-1.5 bg-card border rounded-xl shadow-sm w-fit">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedGroup('all')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                                selectedGroup === 'all'
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                            }`}
+                        >
+                            <span>แสดงทั้งหมด</span>
+                            <Badge
+                                variant={selectedGroup === 'all' ? 'secondary' : 'outline'}
+                                className="text-xs px-2 py-0.5 rounded-full font-bold"
+                            >
+                                {filteredProducts.length}
+                            </Badge>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setSelectedGroup('gold')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                                selectedGroup === 'gold'
+                                    ? 'bg-amber-500 text-black shadow-sm font-bold'
+                                    : 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10'
+                            }`}
+                        >
+                            <Coins className="w-4 h-4" />
+                            <span>กลุ่ม EasyGold (อีเอทองคำ)</span>
+                            <Badge
+                                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                                    selectedGroup === 'gold'
+                                        ? 'bg-black/25 text-black border-transparent'
+                                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                }`}
+                            >
+                                {goldProducts.length}
+                            </Badge>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setSelectedGroup('easym')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                                selectedGroup === 'easym'
+                                    ? 'bg-cyan-500 text-black shadow-sm font-bold'
+                                    : 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10'
+                            }`}
+                        >
+                            <Layers className="w-4 h-4" />
+                            <span>กลุ่ม EasyM (คู่เงินและอื่นๆ)</span>
+                            <Badge
+                                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                                    selectedGroup === 'easym'
+                                        ? 'bg-black/25 text-black border-transparent'
+                                        : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                                }`}
+                            >
+                                {easymProducts.length}
+                            </Badge>
+                        </button>
+                    </div>
 
                     {/* -- Filter Bar -- */}
                     <div className="bg-card p-4 rounded-xl border shadow-sm">
@@ -685,68 +750,72 @@ export default function AdminProductsPage() {
                     ) : (
                         <div className="space-y-8">
                             {/* 🟡 กลุ่มที่ 1: EasyGold (อีเอทองคำ / XAUUSD) */}
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between border-b border-amber-500/30 pb-2.5">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
-                                            <Coins className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-lg font-bold text-amber-300 flex items-center gap-2">
-                                                กลุ่ม EasyGold (อีเอทองคำ)
-                                                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs">
-                                                    {goldProducts.length} รายการ
-                                                </Badge>
-                                            </h2>
-                                            <p className="text-xs text-muted-foreground">
-                                                อีเอสำหรับเทรดทองคำ (XAUUSD) และโลหะมีค่า
-                                            </p>
+                            {(selectedGroup === 'all' || selectedGroup === 'gold') && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border-b border-amber-500/30 pb-2.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                                                <Coins className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-bold text-amber-300 flex items-center gap-2">
+                                                    กลุ่ม EasyGold (อีเอทองคำ)
+                                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs">
+                                                        {goldProducts.length} รายการ
+                                                    </Badge>
+                                                </h2>
+                                                <p className="text-xs text-muted-foreground">
+                                                    อีเอสำหรับเทรดทองคำ (XAUUSD) และโลหะมีค่า
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {goldProducts.length === 0 ? (
-                                    <div className="text-center py-6 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-sm">
-                                        ไม่มีสินค้ากลุ่ม EasyGold ที่ตรงกับเงื่อนไขตัวกรอง
-                                    </div>
-                                ) : (
-                                    <div className="grid gap-3">
-                                        {goldProducts.map(renderProductCard)}
-                                    </div>
-                                )}
-                            </div>
+                                    {goldProducts.length === 0 ? (
+                                        <div className="text-center py-6 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-sm">
+                                            ไม่มีสินค้ากลุ่ม EasyGold ที่ตรงกับเงื่อนไขตัวกรอง
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-3">
+                                            {goldProducts.map(renderProductCard)}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* 🌐 กลุ่มที่ 2: EasyM (คู่เงินและอื่นๆ) */}
-                            <div className="space-y-4 pt-4">
-                                <div className="flex items-center justify-between border-b border-cyan-500/30 pb-2.5">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                                            <Layers className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-lg font-bold text-cyan-300 flex items-center gap-2">
-                                                กลุ่ม EasyM (คู่เงินและอื่นๆ)
-                                                <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs">
-                                                    {easymProducts.length} รายการ
-                                                </Badge>
-                                            </h2>
-                                            <p className="text-xs text-muted-foreground">
-                                                ระบบพอร์ตฟาร์ม EasyM Prime, EasyM Max, Mini, Farm และคู่เงิน Forex
-                                            </p>
+                            {(selectedGroup === 'all' || selectedGroup === 'easym') && (
+                                <div className={`space-y-4 ${selectedGroup === 'all' ? 'pt-4' : ''}`}>
+                                    <div className="flex items-center justify-between border-b border-cyan-500/30 pb-2.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                                                <Layers className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-bold text-cyan-300 flex items-center gap-2">
+                                                    กลุ่ม EasyM (คู่เงินและอื่นๆ)
+                                                    <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-xs">
+                                                        {easymProducts.length} รายการ
+                                                    </Badge>
+                                                </h2>
+                                                <p className="text-xs text-muted-foreground">
+                                                    ระบบพอร์ตฟาร์ม EasyM Prime, EasyM Max, Mini, Farm และคู่เงิน Forex
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {easymProducts.length === 0 ? (
-                                    <div className="text-center py-6 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-sm">
-                                        ไม่มีสินค้ากลุ่ม EasyM ที่ตรงกับเงื่อนไขตัวกรอง
-                                    </div>
-                                ) : (
-                                    <div className="grid gap-3">
-                                        {easymProducts.map(renderProductCard)}
-                                    </div>
-                                )}
-                            </div>
+                                    {easymProducts.length === 0 ? (
+                                        <div className="text-center py-6 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-sm">
+                                            ไม่มีสินค้ากลุ่ม EasyM ที่ตรงกับเงื่อนไขตัวกรอง
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-3">
+                                            {easymProducts.map(renderProductCard)}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
