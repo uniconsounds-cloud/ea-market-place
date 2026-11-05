@@ -25,7 +25,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     // 3. Fetch License Owner, registration date, tier, and product details
     const { data: licenses } = await supabase
         .from('licenses')
-        .select('id, user_id, created_at, port_name, license_tier, dashboard_skin, is_active, products:product_id(id, name, product_key, min_balance, currency)')
+        .select('id, user_id, created_at, port_name, license_tier, dashboard_skin, is_active, show_farm, products:product_id(id, name, product_key, min_balance, currency)')
         .eq('account_number', portNumber);
 
     const license = licenses?.find(l => l.is_active) || licenses?.[0];
@@ -97,7 +97,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
 
     const { data: ownerLicensesRaw } = await supabase
         .from('licenses')
-        .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, products:product_id(id, name, product_key, min_balance, currency)')
+        .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, show_farm, products:product_id(id, name, product_key, min_balance, currency)')
         .eq('user_id', ownerUserId)
         .eq('is_active', true)
         .order('created_at', { ascending: true });
@@ -106,7 +106,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     if (isOwnerDevPort) {
         const { data: devPairLicenses } = await supabase
             .from('licenses')
-            .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, products:product_id(id, name, product_key, min_balance, currency)')
+            .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, license_tier, dashboard_skin, show_farm, products:product_id(id, name, product_key, min_balance, currency)')
             .in('account_number', ['97053088', '21692434'])
             .order('created_at', { ascending: true });
         if (devPairLicenses && devPairLicenses.length > 0) {
@@ -187,6 +187,10 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
 
         if (!isPrimePort && !isMaxPort) continue;
 
+        // 🛡️ Multi-Farm Access Control: เฉพาะพอร์ต Prime หรือพอร์ตที่แอดมินเปิดสิทธิ์ show_farm ให้เท่านั้น
+        const hasFarmRights = Boolean((lic as any)?.show_farm) || isPrimePort;
+        if (!hasFarmRights && !isOwnerDevPort) continue;
+
         seenPorts.add(accNum);
         initialUserFarmPorts.push({
             portNumber: accNum,
@@ -205,26 +209,29 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         });
     }
 
-    // Ensure current opened port is always present if it's an EasyM port
+    // Ensure current opened port is always present if it's an EasyM port and has farm rights
     if (!seenPorts.has(String(portNumber).trim()) && isEasyM) {
         const rawSys = String(portStatus?.system_code || '');
         const isCurrentPrime = prodKey.includes('PRIME') || prodName.includes('prime') || rawSys.toLowerCase().includes('prime') || rawSys.includes(':::');
-        initialUserFarmPorts.unshift({
-            portNumber: String(portNumber).trim(),
-            portName: license?.port_name || null,
-            eaType: isCurrentPrime ? 'PRIME' : 'MAX',
-            createdAt: license?.created_at || null,
-            portStatus: portStatus || null,
-            licenseInfo: {
-                isActive: true,
-                productName: product?.name || (isCurrentPrime ? 'EasyM Prime' : 'EasyM MAX'),
-                productKey: product?.product_key || '',
-                minBalance: product?.min_balance || 0,
-                currency: product?.currency || 'USC',
-                createdAt: license?.created_at || null
-            }
-        });
-        seenPorts.add(String(portNumber).trim());
+        const hasRights = isCurrentPrime || Boolean(license?.show_farm) || isOwnerDevPort;
+        if (hasRights) {
+            initialUserFarmPorts.unshift({
+                portNumber: String(portNumber).trim(),
+                portName: license?.port_name || null,
+                eaType: isCurrentPrime ? 'PRIME' : 'MAX',
+                createdAt: license?.created_at || null,
+                portStatus: portStatus || null,
+                licenseInfo: {
+                    isActive: true,
+                    productName: product?.name || (isCurrentPrime ? 'EasyM Prime' : 'EasyM MAX'),
+                    productKey: product?.product_key || '',
+                    minBalance: product?.min_balance || 0,
+                    currency: product?.currency || 'USC',
+                    createdAt: license?.created_at || null
+                }
+            });
+            seenPorts.add(String(portNumber).trim());
+        }
     }
 
     // For developer ports (97053088 & 21692434), ensure both ports are visible so developer can switch between them

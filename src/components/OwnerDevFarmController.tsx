@@ -76,7 +76,7 @@ export default function OwnerDevFarmController({
         if (!onSetSimulatedFarmStatus) return;
         const current = { ...(simulatedFarmStatus || {}) };
         if (selectedSimSlot === -1) {
-            [0, 1, 2, 3].forEach(slot => {
+            [0, 1, 2, 3, 4, 5, 6, 7, 8].forEach(slot => {
                 current[slot] = status;
             });
             toast.info(`จำลองทุกฟาร์ม: ${status === 'NORMAL' ? '🟢 ปกติ' : (status === 'EXPIRED_12H' ? '⚠️ ขาดตรวจ > 12 ชม.' : '🚨 ขาดตรวจ > 48 ชม.')}`);
@@ -330,13 +330,16 @@ export default function OwnerDevFarmController({
                             {/* Section 1: Real-time View Switcher */}
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between text-[10px] font-bold text-amber-300/80 uppercase">
-                                    <span>สลับมุมมองหน้าฟาร์ม (Preview)</span>
+                                    <span>สลับมุมมองหน้าฟาร์ม (Compare View)</span>
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-1.5 bg-black/60 p-1 rounded-xl border border-amber-500/30">
                                     <button
                                         type="button"
-                                        onClick={() => onTogglePreviewMode('dev')}
+                                        onClick={() => {
+                                            onTogglePreviewMode('dev');
+                                            toast.success('สลับไปโหมดพัฒนาปรับแต่ง (Dev V2)');
+                                        }}
                                         className={`py-1.5 px-2 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                                             previewMode === 'dev'
                                                 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.5)] font-black'
@@ -344,12 +347,15 @@ export default function OwnerDevFarmController({
                                         }`}
                                     >
                                         <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                                        <span>โหมดพัฒนา (Dev)</span>
+                                        <span>โหมดพัฒนา (V2)</span>
                                     </button>
 
                                     <button
                                         type="button"
-                                        onClick={() => onTogglePreviewMode('customer')}
+                                        onClick={() => {
+                                            onTogglePreviewMode('customer');
+                                            toast.info('สลับไปหน้าจอจริงที่ลูกค้าเห็น (PrimeUI v1)');
+                                        }}
                                         className={`py-1.5 px-2 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                                             previewMode === 'customer'
                                                 ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)] font-black'
@@ -357,14 +363,14 @@ export default function OwnerDevFarmController({
                                         }`}
                                     >
                                         <Eye className="w-3.5 h-3.5 shrink-0" />
-                                        <span>มุมมองลูกค้า</span>
+                                        <span>มุมมองลูกค้า (V1)</span>
                                     </button>
                                 </div>
 
                                 <p className="text-[10px] text-amber-200/70 leading-tight">
                                     {previewMode === 'dev' 
-                                        ? '🧪 กำลังแสดงไซโล + เขื่อนพลังงาน + โดมตำแหน่งใหม่ เฉพาะคุณ'
-                                        : '👁️ กำลังจำลองหน้าฟาร์มแบบที่ลูกค้าทั่วไปมองเห็น (เวอร์ชั่นก่อนหน้า)'
+                                        ? '🧪 กำลังเปิดโหมดพัฒนา: 9 ฟาร์มแนวตั้งต่อเนื่อง + ออร่าโดม + เครื่องมือแล็บ'
+                                        : '👁️ กำลังจำลองหน้าจอ PrimeUI v1 ตามจริงที่ลูกค้ามองเห็นอยู่ตอนนี้'
                                     }
                                 </p>
                             </div>
@@ -677,7 +683,7 @@ export default function OwnerDevFarmController({
                                                 </span>
                                             </div>
                                             <div className="grid grid-cols-5 gap-1">
-                                                {[0, 1, 2, 3].map((slot) => (
+                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((slot) => (
                                                     <button
                                                         key={slot}
                                                         type="button"
@@ -688,7 +694,7 @@ export default function OwnerDevFarmController({
                                                                 : 'bg-white/5 border-white/10 text-white/60 hover:text-white'
                                                         }`}
                                                     >
-                                                        ฟาร์ม {slot + 1}
+                                                        {slot + 1}
                                                     </button>
                                                 ))}
                                                 <button

@@ -14,7 +14,7 @@ import {
     Gauge, Activity, AlertTriangle, CheckCircle2, 
     Lock, Unlock, Power, RefreshCw, TrendingDown, ArrowUpRight,
     Coins, Sparkles, ShieldAlert, ShieldCheck,
-    HelpCircle, Info, Loader2
+    HelpCircle, Info, Loader2, Eye
 } from 'lucide-react';
 
 // --- Utilities ---
@@ -539,7 +539,7 @@ export default function FarmClient({
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
     const [simulatedFarmStatus, setSimulatedFarmStatus] = useState<Record<number, 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H'>>({});
 
-    // 🧭 Interactive Farm Guide & Multi-Port Farm View (ปลดล็อกเฉพาะพอร์ตพัฒนา 3088 และ 2434 เท่านั้น)
+    // 🧭 Interactive Farm Guide & Multi-Port Farm View
     const isOrb4Unlocked = isAllowedDevMenuPort && isOwnerDevUser;
     const [isFarmGuideActive, setIsFarmGuideActive] = useState<boolean>(false);
     const [expandedGuideBox, setExpandedGuideBox] = useState<number | null>(null);
@@ -550,7 +550,7 @@ export default function FarmClient({
         try {
             const { data: ownerLicensesRaw } = await supabase
                 .from('licenses')
-                .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
+                .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, show_farm, products:product_id(id, name, product_key, min_balance, currency)')
                 .eq('user_id', ownerUserId)
                 .eq('is_active', true)
                 .order('created_at', { ascending: true });
@@ -559,7 +559,7 @@ export default function FarmClient({
             if (isAllowedDevMenuPort) {
                 const { data: devPairLicenses } = await supabase
                     .from('licenses')
-                    .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, products:product_id(id, name, product_key, min_balance, currency)')
+                    .select('id, user_id, account_number, port_name, is_active, expiry_date, type, created_at, show_farm, products:product_id(id, name, product_key, min_balance, currency)')
                     .in('account_number', ['97053088', '21692434'])
                     .order('created_at', { ascending: true });
                 if (devPairLicenses && devPairLicenses.length > 0) {
@@ -646,6 +646,10 @@ export default function FarmClient({
                     ((pKey.startsWith('EZM') || pName.includes('easym') || pName.includes('easy m')) && !pName.includes('farm') && !sys.includes('farm'));
 
                 if (!isPrimePort && !isMaxPort) continue;
+
+                // 🛡️ Multi-Farm Access Control: เฉพาะพอร์ต Prime หรือพอร์ตที่แอดมินเปิดสิทธิ์ show_farm ให้เท่านั้น
+                const hasFarmRights = Boolean((lic as any)?.show_farm) || isPrimePort;
+                if (!hasFarmRights && !(isAllowedDevMenuPort && (accNum === '97053088' || accNum === '21692434'))) continue;
 
                 seen.add(accNum);
                 nextPorts.push({
@@ -928,6 +932,7 @@ export default function FarmClient({
         hasPrimeSignature ||
         (isOwnerTestPort && devPreviewMode === 'dev')
     );
+    const isOrb3Unlocked = isPrime; // ปลดล็อกให้ลูกค้าฟาร์ม Prime ทุกคนใช้งาน Multi-Farm ได้
 
     const [primeActiveOrb, setPrimeActiveOrb] = useState<number | null>(null);
 
@@ -3124,6 +3129,31 @@ export default function FarmClient({
                 onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
             />
 
+            {/* 👁️ Floating Mode Indicator for Developer (พอร์ต 97053088 และ 21692434) */}
+            {isAllowedDevMenuPort && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[140] pointer-events-auto">
+                    {devPreviewMode === 'customer' ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setDevPreviewMode('dev');
+                                toast.success('สลับกลับสู่โหมดพัฒนาปรับแต่ง (Dev V2) เรียบร้อยแล้ว');
+                            }}
+                            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-950/90 border border-cyan-400 text-cyan-200 text-xs font-bold shadow-[0_0_20px_rgba(6,182,212,0.5)] backdrop-blur-md hover:bg-cyan-900 transition-all cursor-pointer animate-pulse"
+                            title="คลิกเพื่อสลับกลับสู่โหมดพัฒนา"
+                        >
+                            <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>จำลองหน้าจอที่ลูกค้าเห็น (PrimeUI v1) • คลิกเพื่อกลับโหมด Dev ↺</span>
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[10px] font-mono shadow-md backdrop-blur-md opacity-75 hover:opacity-100 transition-opacity">
+                            <Sparkles className="w-3 h-3 text-amber-400" />
+                            <span>DEV LAB V2 • พอร์ตพัฒนา {portNumber}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ⚠️ CENTERED NON-LIVE SETUP GUIDE MODAL (WHEN URL #2 IS MISSING IN MT5) */}
             {isFallback1Url && (
                 <>
@@ -3240,42 +3270,95 @@ export default function FarmClient({
                 </>
             )}
 
-            <div 
-                ref={containerRef} 
-                onClick={() => {
-                    if (expandedGuideBox !== null) {
-                        setExpandedGuideBox(null);
-                    }
-                }}
-                className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]"
-            >
-                <div
-                    className="relative transition-all duration-500 ease-out origin-center"
-                    style={{ transform: `scale(${isClient ? scale : 1})`, width: '100px', height: '100px' }}
-                >
-                    {isMultiFarmView && isOrb4Unlocked ? (
-                        /* ═══════════════════════════════════════════════════════════════════ */
-                        /* 🌐 ORB 3: MULTI-PORT 2.5D DIAMOND FARM VIEW (เรียงรูปข้าวหลามตัด 4 ฟาร์ม) */
-                        /*   Slot 0: ตรงกลางบน   (fc=0, fr=0) -> offsetX = 0,          offsetY = -FARM_STEP_Y */
-                        /*   Slot 1: เยื้องมาทางซ้าย (fc=0, fr=1) -> offsetX = -FARM_STEP_X, offsetY = 0          */
-                        /*   Slot 2: เยื้องมาทางขวา (fc=1, fr=0) -> offsetX = +FARM_STEP_X, offsetY = 0          */
-                        /*   Slot 3: ข้างล่างตรงกลาง (fc=1, fr=1) -> offsetX = 0,          offsetY = +FARM_STEP_Y */
-                        /* ═══════════════════════════════════════════════════════════════════ */
-                        <div className="absolute left-1/2 top-1/2">
-                            {Array.from({ length: 4 }).map((_, slotIdx) => {
-                                // 2.5D Isometric Diamond Grid (ขยายขนาด 4 ฟาร์มลอยตัวให้เต็มความกว้างเท่ากับหน้าฟาร์มเดี่ยว)
-                                const FARM_STEP_X = 285;
-                                const FARM_STEP_Y = 142;
-                                const diamondCoords = [
-                                    { fc: 0, fr: 0, offsetX: 0,            offsetY: -FARM_STEP_Y, baseZ: 30 }, // ฟาร์มที่ 1: ตรงกลางบน
-                                    { fc: 0, fr: 1, offsetX: -FARM_STEP_X, offsetY: 0,            baseZ: 40 }, // ฟาร์มที่ 2: เยื้องมาทางซ้าย
-                                    { fc: 1, fr: 0, offsetX: FARM_STEP_X,  offsetY: 0,            baseZ: 40 }, // ฟาร์มที่ 3: เยื้องมาทางขวา
-                                    { fc: 1, fr: 1, offsetX: 0,            offsetY: FARM_STEP_Y,  baseZ: 50 }, // ฟาร์มที่ 4: ข้างล่างตรงกลาง
-                                ][slotIdx];
+            {(() => {
+                // 2.5D Isometric Diamond Grid (Pattern: 1 -> 2 -> 1 -> 2 -> 1 -> 2 ...)
+                const FARM_STEP_X = 285;
+                const FARM_STEP_Y = 142;
 
-                                const activePort = userFarmPorts[slotIdx] || null;
-                                const isActive = Boolean(activePort);
-                                const isCurrentPort = isActive && String(activePort?.portNumber) === String(portNumber);
+                const getDiamondSlotCoords = (slotIdx: number) => {
+                    const cycle = Math.floor(slotIdx / 3);
+                    const rem = slotIdx % 3;
+                    let row: number;
+                    let offsetX: number;
+
+                    if (rem === 0) {
+                        row = cycle * 2;
+                        offsetX = 0;
+                    } else if (rem === 1) {
+                        row = cycle * 2 + 1;
+                        offsetX = -FARM_STEP_X;
+                    } else {
+                        row = cycle * 2 + 1;
+                        offsetX = FARM_STEP_X;
+                    }
+
+                    const offsetY = (row - 1) * FARM_STEP_Y;
+                    const baseZ = 30 + row * 10;
+
+                    return { row, offsetX, offsetY, baseZ };
+                };
+
+                const isDevSim9 = isAllowedDevMenuPort && isOwnerDevUser;
+                const totalMultiFarmSlots = isDevSim9 ? 9 : Math.max(4, userFarmPorts.length);
+                const maxMultiFarmRow = getDiamondSlotCoords(totalMultiFarmSlots - 1).row;
+                const diamondCenterTop = FARM_STEP_Y + 120;
+                const unscaledGridHeight = diamondCenterTop + (maxMultiFarmRow * FARM_STEP_Y) + 420;
+
+                return (
+                    <div 
+                        ref={containerRef} 
+                        onClick={() => {
+                            if (expandedGuideBox !== null) {
+                                setExpandedGuideBox(null);
+                            }
+                        }}
+                        className={`flex-1 w-full relative flex justify-center ${
+                            isMultiFarmView 
+                                ? 'overflow-y-auto overflow-x-hidden pt-[140px] pb-[160px] sm:pt-[130px] sm:pb-[180px] scroll-smooth' 
+                                : 'items-center overflow-hidden pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]'
+                        }`}
+                    >
+                        <div 
+                            className={`relative w-full flex flex-col items-center shrink-0 ${isMultiFarmView ? 'transition-all duration-300' : ''}`}
+                            style={{
+                                height: isMultiFarmView ? `${unscaledGridHeight * (isClient ? scale : 1) + 120}px` : undefined,
+                                minHeight: isMultiFarmView ? `${unscaledGridHeight * (isClient ? scale : 1) + 120}px` : undefined,
+                            }}
+                        >
+                            <div
+                                className="relative transition-all duration-500 ease-out origin-center"
+                                style={{ 
+                                    transform: `scale(${isClient ? scale : 1})`, 
+                                    transformOrigin: isMultiFarmView ? 'top center' : 'center center',
+                                    width: isMultiFarmView ? '1000px' : '100px', 
+                                    height: isMultiFarmView ? `${unscaledGridHeight}px` : '100px' 
+                                }}
+                            >
+                                {isMultiFarmView && isOrb3Unlocked ? (
+                                    /* ═══════════════════════════════════════════════════════════════════ */
+                                    /* 🌐 ORB 3: MULTI-PORT 2.5D VERTICAL CONTINUOUS DIAMOND VIEW        */
+                                    /*   1 -> 2 -> 1 -> 2 -> 1 -> 2 ... ต่อเนื่องแนวตั้ง ปัดเลื่อนขึ้นได้ */
+                                    /* ═══════════════════════════════════════════════════════════════════ */
+                                    <div 
+                                        className="absolute left-1/2"
+                                        style={{ top: `${diamondCenterTop}px` }}
+                                    >
+                                        {/* 🌾 Multi-Farm Continuous Header Pill */}
+                                        <div className="absolute -top-[160px] left-1/2 -translate-x-1/2 z-[99] pointer-events-none flex items-center gap-2.5 px-5 py-2 rounded-full bg-slate-950/85 border border-purple-500/50 backdrop-blur-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] whitespace-nowrap">
+                                            <Zap className="w-4 h-4 text-purple-400 animate-pulse" />
+                                            <span className="text-[12px] font-mono font-black text-purple-200 tracking-wider uppercase">
+                                                MULTI-PORT 2.5D FARM {isDevSim9 ? '(จำลอง 9 แปลงทดสอบ)' : `(${userFarmPorts.filter(p => !!p).length} พอร์ตเชื่อมต่อ)`}
+                                            </span>
+                                            <span className="text-[11px] text-purple-300/80 font-sans">
+                                                • ปัดเลื่อนหน้าจอเพื่อดูต่อ ↓
+                                            </span>
+                                        </div>
+
+                                        {Array.from({ length: totalMultiFarmSlots }).map((_, slotIdx) => {
+                                            const diamondCoords = getDiamondSlotCoords(slotIdx);
+                                            const activePort = userFarmPorts[slotIdx] || null;
+                                            const isActive = Boolean(activePort);
+                                            const isCurrentPort = isActive && String(activePort?.portNumber) === String(portNumber);
 
                                 // 📊 คำนวณค่า DD รวม และกำไรของพอร์ตสำหรับหลอดแก้วปรอทแนวนอน
                                 const portBal = Number(activePort?.portStatus?.balance) || 0;
@@ -3622,7 +3705,7 @@ export default function FarmClient({
                                                                     INACTIVE
                                                                 </span>
                                                                 <span className="text-[12px] text-slate-400/70 mt-0.5">
-                                                                    ยังไม่ได้เปิดใช้งาน
+                                                                    ยังไม่ได้เปิดใช้งาน {isDevSim9 ? `(ฟาร์มที่ ${slotIdx + 1})` : ''}
                                                                 </span>
                                                             </div>
                                                         )}
@@ -4745,6 +4828,9 @@ export default function FarmClient({
                     )}
                 </div>
             </div>
+        </div>
+    );
+})()}
 
             {isClient && (
                 <div className="fixed bottom-0 left-0 w-full h-28 sm:h-40 bg-black/40 backdrop-blur-sm border-t border-amber-900/40 z-[60] flex flex-col">
@@ -5044,8 +5130,8 @@ export default function FarmClient({
                             <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 group-hover:rotate-12 transition-transform" />
                         </button>
 
-                        {/* Orb 3: Purple/Violet Glow (Multi-Port 2x2 Farm View - ปลดล็อกเฉพาะพอร์ตพัฒนา 3088) */}
-                        {isOrb4Unlocked ? (
+                        {/* Orb 3: Purple/Violet Glow (Multi-Port 2.5D Farm View) */}
+                        {isOrb3Unlocked ? (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -5061,7 +5147,7 @@ export default function FarmClient({
                                         ? 'border-purple-400 ring-2 ring-purple-400/90 shadow-[0_0_35px_rgba(168,85,247,0.85)] scale-110 bg-purple-950/50 z-[150]'
                                         : 'border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.75)] hover:scale-110 active:scale-95'
                                 }`}
-                                title="แสดงฟาร์มหลายพอร์ตในหน้าเดียว (Multi-Port Farm View 2x2)"
+                                title="แสดงฟาร์มหลายพอร์ตในหน้าเดียว (Multi-Port Farm View)"
                             >
                                 <Zap className={`h-5 w-5 sm:h-6 sm:w-6 transition-all duration-300 ${
                                     isMultiFarmView ? 'text-purple-300 scale-110' : 'text-purple-400 group-hover:scale-125'
