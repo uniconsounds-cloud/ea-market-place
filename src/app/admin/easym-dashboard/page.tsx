@@ -1182,45 +1182,8 @@ export default function EasyMMasterDashboardPage() {
             });
             easymPortSet.add('21692434');
 
-            // Helper: Detect if a daily history row is contaminated by external/manual/Gold trading or balance deposit delta
+            // Helper: Detect if a daily history row is contaminated (Disabled per user request: heuristic contamination rules removed)
             const evaluateDailyRecordContamination = (port: string, profitVal: number, closedLotsVal: number, dateStr: string): string | null => {
-                const st = statusMap.get(port);
-                const isGoldMismatchPort = (port === '97072259') || (port === '97115162') || (goldLicenseAccountSet.has(port) && (st?.system_code?.toLowerCase().includes('gold') || st?.system_code === 'EG_FARMING'));
-                const isGoldChart = String(st?.asset_type || '').toUpperCase() === 'GOLD';
-                if (isGoldMismatchPort || isGoldChart) {
-                    return 'พอร์ตรัน EA ทองคำ (EasyGold) ทั้งระบบ ไม่นำมารวมในสถิติ EasyM';
-                }
-                // 1. Massive closed lots in a single day (> 15.0 lots) — e.g. #97130324 (52.91 lots, +15,178.84 USC), #97115162 (23.5 lots on GOLD chart)
-                if (closedLotsVal > 15.0) {
-                    return `ปิดล็อตสูงผิดปกติ (${closedLotsVal.toFixed(2)} Lots ในวันเดียว${isGoldChart ? ' บนชาร์ต GOLD' : ''}) คาดว่ามีออเดอร์เทรดมือ/ทองคำ/EA อื่นปะปน`;
-                }
-                // 2. Port has open non-EasyM floating loss right now (Account Equity - Balance is much worse than EasyM floating_pnl)
-                const rawBal = Number(st?.balance) || 0;
-                const rawEq = Number(st?.equity) || 0;
-                const eqMinusBal = (rawBal > 0 && rawEq > 0) ? (rawEq - rawBal) : 0;
-                const easymFlt = Number(st?.floating_pnl) || 0;
-                const hasOrderTele = (Number(st?.buy_count) || 0) > 0 || (Number(st?.sell_count) || 0) > 0 || (Number(st?.total_lots) || 0) > 0 || activeOrdersSummaryMap.has(port);
-                const extFltDiff = (hasOrderTele && rawBal > 0 && rawEq > 0) ? (eqMinusBal - easymFlt) : 0;
-                if (dateStr === day1DateStr && extFltDiff < -200 && (profitVal > 1500 || closedLotsVal > 8.0)) {
-                    return `พอร์ตมีออเดอร์นอกระบบ/ทองคำติดลบค้างอยู่ (${extFltDiff.toLocaleString('en-US', { maximumFractionDigits: 2 })} USC) และมียอดปิดกำไรปะปน`;
-                }
-                // 3. Unverified 0-lot spike (from 1U balance delta / deposit or v1.16 EAE_ScanHistoryToday without Magic filter)
-                if (closedLotsVal === 0 && profitVal >= 1500) {
-                    const isExactDeposit = profitVal >= 5000 && Math.abs(profitVal - Math.round(profitVal / 1000) * 1000) < 1;
-                    if (isExactDeposit) {
-                        return `ยอด Balance เพิ่มขึ้นแบบตัวเลขกลม (+${profitVal.toLocaleString()} USC โดยไม่มีข้อมูลล็อต) คาดว่าเป็นการเติมเงินเข้าพอร์ต`;
-                    }
-                    // Preserve verified historical EasyM MAX champions from July-Aug 2026 (#97037173, #97032895) before closed_lots column was added
-                    const isHistoricalMaxChampion = (port === '97037173' || port === '97032895') && dateStr < '2026-09-01';
-                    if (!isHistoricalMaxChampion) {
-                        if (profitVal >= 10000) {
-                            return `กำไรสูงผิดปกติ (+${profitVal.toLocaleString()} USC) โดยไม่มีบันทึกจำนวนล็อตของ EasyM (คาดว่ามาจากการเทรดทองคำ/เทรดมือ หรือฝากเงิน)`;
-                        }
-                        if (dateStr >= '2026-10-01') {
-                            return `กำไร +${profitVal.toLocaleString()} USC จากพอร์ตที่ไม่ได้ส่งล็อตออเดอร์ EasyM ยืนยัน (คาดว่าปนกำไรเทรดทองคำ/คู่เงินอื่นจาก MT5 History หรือยอดฝากเงิน)`;
-                        }
-                    }
-                }
                 return null;
             };
 
@@ -1598,13 +1561,11 @@ export default function EasyMMasterDashboardPage() {
                     const externalFloatingDiff = (hasOrderLevelTele && rawBalVal > 0 && rawEqVal > 0)
                         ? Number((rawAccountFloating - easymOnlyFloatingPnl).toFixed(2))
                         : 0;
-                    const hasExternalFloatingLoss = externalFloatingDiff < -200;
+                    const hasExternalFloatingLoss = false; // Disabled heuristic contamination rule per user request
 
                     const resolvedFloatingPnl = easymOnlyFloatingPnl;
                     let resolvedEquity = rawEqVal;
-                    if (hasExternalFloatingLoss && rawBalVal > 0) {
-                        resolvedEquity = Number((rawBalVal + easymOnlyFloatingPnl).toFixed(2));
-                    } else if ((resolvedEquity === 0 || resolvedEquity === rawBalVal) && resolvedFloatingPnl !== 0 && rawBalVal > 0) {
+                    if ((resolvedEquity === 0 || resolvedEquity === rawBalVal) && resolvedFloatingPnl !== 0 && rawBalVal > 0) {
                         resolvedEquity = Number((rawBalVal + resolvedFloatingPnl).toFixed(2));
                     }
 
@@ -1614,33 +1575,18 @@ export default function EasyMMasterDashboardPage() {
                     }
                     const rawStatusDailyDD = Number(status?.daily_max_drawdown) || 0;
                     const rawStatusMaxDD = Number(status?.max_drawdown) || 0;
-                    const statusDailyDD = hasExternalFloatingLoss ? calculatedDD : Math.max(rawStatusDailyDD, calculatedDD);
+                    const statusDailyDD = Math.max(rawStatusDailyDD, calculatedDD);
                     const resolvedDailyDD = Math.max(statusDailyDD, Number(histToday?.max_dd || histToday?.max_drawdown) || 0);
 
-                    const statusMaxDD = hasExternalFloatingLoss ? calculatedDD : Math.max(rawStatusMaxDD, calculatedDD);
+                    const statusMaxDD = Math.max(rawStatusMaxDD, calculatedDD);
                     const histWorstDD = portWorstDDMap.get(accNum) || 0;
                     const resolvedMaxDD = Math.max(statusMaxDD, histWorstDD, resolvedDailyDD);
 
                     // Build External / Non-EasyM Activity Info for Badge & Clickable Inspector Modal
+                    // (Heuristic contamination rules EXCESSIVE_CLOSED_LOTS, UNVERIFIED_PROFIT_SPIKE, EXTERNAL_FLOATING_LOSS disabled per user request)
                     const extReasons: ExternalActivityReason[] = [];
                     if (isGoldMismatch) {
                         extReasons.push('GOLD_EA_MISMATCH');
-                    }
-                    if (String(status?.asset_type || '').toUpperCase() === 'GOLD' && !isGoldMismatch) {
-                        extReasons.push('GOLD_CHART_ATTACHED');
-                    }
-                    if (hasExternalFloatingLoss) {
-                        extReasons.push('EXTERNAL_FLOATING_LOSS');
-                    }
-                    if (rawTodayClosedLots > 15.0) {
-                        extReasons.push('EXCESSIVE_CLOSED_LOTS');
-                    }
-                    if (todayContaminationReason && rawTodayClosedLots === 0 && rawAccountTodayPnl >= 1500) {
-                        extReasons.push('UNVERIFIED_PROFIT_SPIKE');
-                    }
-                    const portAnomalies = portHistoryAnomaliesMap.get(accNum) || [];
-                    if (portAnomalies.length > 0 && extReasons.length === 0) {
-                        extReasons.push('UNVERIFIED_PROFIT_SPIKE');
                     }
                     const otherEaLicList = Array.from(otherEaProductsByAcc.get(accNum) || []);
                     if (otherEaLicList.length > 0 && !isGoldMismatch) {
@@ -1648,22 +1594,13 @@ export default function EasyMMasterDashboardPage() {
                     }
 
                     const hasExternalActivity = extReasons.length > 0;
-                    const isStatsFiltered = isGoldMismatch || hasExternalFloatingLoss || !!todayContaminationReason || portAnomalies.length > 0;
+                    const isStatsFiltered = isGoldMismatch;
 
                     let badgeText = '';
                     let summaryText = '';
                     if (extReasons.includes('GOLD_EA_MISMATCH')) {
                         badgeText = '🥇 รัน EasyGold (คลิกดู)';
                         summaryText = 'พอร์ตนี้ส่งรหัสระบบเป็น EA ทองคำ (EasyGold) จึงถูกคัดแยกออกจากสถิติฟาร์ม EasyM';
-                    } else if (extReasons.includes('EXTERNAL_FLOATING_LOSS') || extReasons.includes('EXCESSIVE_CLOSED_LOTS')) {
-                        badgeText = '⚠️ ปนเทรดนอกระบบ/ทองคำ (คลิกดู)';
-                        summaryText = `ตรวจพบออเดอร์นอกระบบ EasyM ปะปนในพอร์ตเดียว (ส่วนต่าง Floating ${externalFloatingDiff.toLocaleString()} ${resolvedAccType}${rawTodayClosedLots > 15 ? ` / ปิดสะสม ${rawTodayClosedLots.toFixed(2)} Lots` : ''}) ระบบกรองเอาเฉพาะสถิติของ EasyM มาแสดงแล้ว`;
-                    } else if (extReasons.includes('GOLD_CHART_ATTACHED')) {
-                        badgeText = '🥇 แปะกราฟทองคำ XAUUSD (คลิกดู)';
-                        summaryText = 'ตรวจพบการนำ EA EasyM ไปแปะบนชาร์ตทองคำ (asset_type = GOLD) หรือเทรดทองคำควบคู่ในพอร์ตเดียวกัน';
-                    } else if (extReasons.includes('UNVERIFIED_PROFIT_SPIKE')) {
-                        badgeText = '⚠️ มียอดปนเปื้อน/ฝากเงิน (คลิกดู)';
-                        summaryText = 'ตรวจพบยอดกำไรรายวันสูงผิดปกติโดยไม่มีจำนวนล็อตออเดอร์ EasyM ยืนยัน (คาดว่าปนกำไรทองคำ/คู่อื่นจาก MT5 History หรือยอดฝากเงิน) ระบบได้คัดกรองออกแล้ว';
                     } else if (extReasons.includes('MULTI_LICENSE_PORT')) {
                         badgeText = `🔀 พ่วงสิทธิ์ ${otherEaLicList.join(', ')} (คลิกดู)`;
                         summaryText = `พอร์ตนี้ลงทะเบียนใบอนุญาตควบคู่กับ EA อื่น (${otherEaLicList.join(', ')}) บนหมายเลขพอร์ตเดียวกัน`;
@@ -1672,7 +1609,7 @@ export default function EasyMMasterDashboardPage() {
                     const externalActivityInfo: ExternalActivityInfo = {
                         hasExternalActivity,
                         isStatsFiltered,
-                        severity: (isGoldMismatch || hasExternalFloatingLoss || rawTodayClosedLots > 15 || !!todayContaminationReason) ? 'high' : 'warning',
+                        severity: isGoldMismatch ? 'high' : 'warning',
                         reasons: extReasons,
                         badgeText,
                         summaryText,
@@ -1693,7 +1630,7 @@ export default function EasyMMasterDashboardPage() {
                             ? Number(status.sell_count)
                             : (activeOrderSummary?.sellCount || 0),
                         otherLicenses: otherEaLicList,
-                        historyAnomalies: portAnomalies,
+                        historyAnomalies: portHistoryAnomaliesMap.get(accNum) || [],
                     };
 
                     // Telemetry type & 3-Tier Engine classification
