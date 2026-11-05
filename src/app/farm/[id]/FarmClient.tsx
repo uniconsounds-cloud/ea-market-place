@@ -3129,28 +3129,21 @@ export default function FarmClient({
                 onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
             />
 
-            {/* 👁️ Floating Mode Indicator for Developer (พอร์ต 97053088 และ 21692434) */}
-            {isAllowedDevMenuPort && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[140] pointer-events-auto">
-                    {devPreviewMode === 'customer' ? (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setDevPreviewMode('dev');
-                                toast.success('สลับกลับสู่โหมดพัฒนาปรับแต่ง (Dev V2) เรียบร้อยแล้ว');
-                            }}
-                            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-950/90 border border-cyan-400 text-cyan-200 text-xs font-bold shadow-[0_0_20px_rgba(6,182,212,0.5)] backdrop-blur-md hover:bg-cyan-900 transition-all cursor-pointer animate-pulse"
-                            title="คลิกเพื่อสลับกลับสู่โหมดพัฒนา"
-                        >
-                            <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>จำลองหน้าจอที่ลูกค้าเห็น (PrimeUI v1) • คลิกเพื่อกลับโหมด Dev ↺</span>
-                        </button>
-                    ) : (
-                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[10px] font-mono shadow-md backdrop-blur-md opacity-75 hover:opacity-100 transition-opacity">
-                            <Sparkles className="w-3 h-3 text-amber-400" />
-                            <span>DEV LAB V2 • พอร์ตพัฒนา {portNumber}</span>
-                        </div>
-                    )}
+            {/* 👁️ Floating Mode Indicator for Developer (เมื่ออยู่ในมุมมองลูกค้า) */}
+            {isAllowedDevMenuPort && devPreviewMode === 'customer' && (
+                <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[140] pointer-events-auto">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setDevPreviewMode('dev');
+                            toast.success('สลับกลับสู่โหมดพัฒนาปรับแต่ง (Dev V2) เรียบร้อยแล้ว');
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-950/95 border border-cyan-400 text-cyan-200 text-xs font-bold shadow-[0_0_25px_rgba(6,182,212,0.6)] backdrop-blur-xl hover:bg-cyan-900 transition-all cursor-pointer animate-pulse whitespace-nowrap"
+                        title="คลิกเพื่อสลับกลับสู่โหมดพัฒนา"
+                    >
+                        <Eye className="w-4 h-4 text-cyan-400" />
+                        <span>จำลองหน้าจอที่ลูกค้าเห็น (PrimeUI v1) • คลิกเพื่อกลับโหมด Dev ↺</span>
+                    </button>
                 </div>
             )}
 
@@ -3301,8 +3294,9 @@ export default function FarmClient({
                 const isDevSim9 = isAllowedDevMenuPort && isOwnerDevUser;
                 const totalMultiFarmSlots = isDevSim9 ? 9 : Math.max(4, userFarmPorts.length);
                 const maxMultiFarmRow = getDiamondSlotCoords(totalMultiFarmSlots - 1).row;
-                const diamondCenterTop = FARM_STEP_Y + 120;
-                const unscaledGridHeight = diamondCenterTop + (maxMultiFarmRow * FARM_STEP_Y) + 420;
+                // วางจุดกึ่งกลางของฟาร์มชุดแรกให้อยู่ที่เดียวกับหน้า 4 ฟาร์มเดิม เพื่อให้ฟาร์มบนสุด (Slot 0) เริ่มต้นที่ตำแหน่งเดิม ไม่ล้นขึ้นไปด้านบน
+                const diamondCenterTop = FARM_STEP_Y + 248; // 390px
+                const unscaledGridHeight = diamondCenterTop + (maxMultiFarmRow * FARM_STEP_Y) + 480;
 
                 return (
                     <div 
@@ -3314,7 +3308,7 @@ export default function FarmClient({
                         }}
                         className={`flex-1 w-full relative flex justify-center ${
                             isMultiFarmView 
-                                ? 'overflow-y-auto overflow-x-hidden pt-[140px] pb-[160px] sm:pt-[130px] sm:pb-[180px] scroll-smooth' 
+                                ? 'overflow-y-auto overflow-x-hidden pt-[182px] pb-[140px] sm:pt-[136px] sm:pb-[160px] scroll-smooth' 
                                 : 'items-center overflow-hidden pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]'
                         }`}
                     >
@@ -3343,17 +3337,6 @@ export default function FarmClient({
                                         className="absolute left-1/2"
                                         style={{ top: `${diamondCenterTop}px` }}
                                     >
-                                        {/* 🌾 Multi-Farm Continuous Header Pill */}
-                                        <div className="absolute -top-[160px] left-1/2 -translate-x-1/2 z-[99] pointer-events-none flex items-center gap-2.5 px-5 py-2 rounded-full bg-slate-950/85 border border-purple-500/50 backdrop-blur-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] whitespace-nowrap">
-                                            <Zap className="w-4 h-4 text-purple-400 animate-pulse" />
-                                            <span className="text-[12px] font-mono font-black text-purple-200 tracking-wider uppercase">
-                                                MULTI-PORT 2.5D FARM {isDevSim9 ? '(จำลอง 9 แปลงทดสอบ)' : `(${userFarmPorts.filter(p => !!p).length} พอร์ตเชื่อมต่อ)`}
-                                            </span>
-                                            <span className="text-[11px] text-purple-300/80 font-sans">
-                                                • ปัดเลื่อนหน้าจอเพื่อดูต่อ ↓
-                                            </span>
-                                        </div>
-
                                         {Array.from({ length: totalMultiFarmSlots }).map((_, slotIdx) => {
                                             const diamondCoords = getDiamondSlotCoords(slotIdx);
                                             const activePort = userFarmPorts[slotIdx] || null;
