@@ -6,7 +6,9 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     const supabase = await createSupabaseServerClient();
     // Await params as required by Next.js 15+ in app directory structure
     const unwrappedParams = await params;
-    const portNumber = unwrappedParams.id;
+    let portNumber = unwrappedParams.id;
+    if (portNumber === '3088') portNumber = '97053088';
+    if (portNumber === '2434') portNumber = '21692434';
 
     // 1. Check Authentication
     const { data: { session } } = await supabase.auth.getSession();

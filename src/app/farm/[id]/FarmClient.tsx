@@ -5844,6 +5844,7 @@ export default function FarmClient({
                                                 <button
                                                     onClick={() => {
                                                         setLiveTerminalFilter('ALL');
+                                                        setLiveOrdersData(prev => ({ ...prev, isLoading: prev.orders.length === 0 }));
                                                         setIsLiveTerminalOpen(true);
                                                     }}
                                                     className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg font-mono text-[10px] sm:text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400/50 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
@@ -5871,6 +5872,7 @@ export default function FarmClient({
                                                 <div 
                                                     onClick={() => {
                                                         setLiveTerminalFilter('EXTERNAL');
+                                                        setLiveOrdersData(prev => ({ ...prev, isLoading: prev.orders.length === 0 }));
                                                         setIsLiveTerminalOpen(true);
                                                     }}
                                                     className="min-h-[44px] h-[44px] sm:h-12 flex items-center bg-amber-500/10 hover:bg-amber-500/20 active:scale-[0.99] border border-amber-500/35 hover:border-amber-400/60 rounded-xl sm:rounded-2xl px-3 sm:px-3.5 shrink-0 text-[10.5px] sm:text-xs font-mono overflow-hidden cursor-pointer transition-all shadow-[0_0_12px_rgba(251,191,36,0.15)] group"
@@ -6720,6 +6722,12 @@ export default function FarmClient({
                                                             })}
                                                         </tbody>
                                                     </table>
+                                                ) : liveOrdersData.isLoading ? (
+                                                    <div className="py-16 text-center text-white/40 font-mono text-xs space-y-3">
+                                                        <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                                                        <p className="font-bold text-cyan-300">กำลังเชื่อมต่อดึงข้อมูลออเดอร์สดจาก MT5...</p>
+                                                        <p className="text-[10px] text-white/30">รอสักครู่ ระบบกำลังประมวลผลข้อมูลออเดอร์ล่าสุด</p>
+                                                    </div>
                                                 ) : (
                                                     <div className="py-16 text-center text-white/40 font-mono text-xs space-y-2">
                                                         <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/30">

@@ -28,6 +28,9 @@ export async function GET(req: Request) {
         if (portNumber === '3088') {
             portNumber = '97053088';
         }
+        if (portNumber === '2434') {
+            portNumber = '21692434';
+        }
 
         const period = (searchParams.get('period') || 'today').toLowerCase(); // 'today' | 'daily' | 'weekly' | 'monthly'
         const reqDate = searchParams.get('date')?.trim() || '';

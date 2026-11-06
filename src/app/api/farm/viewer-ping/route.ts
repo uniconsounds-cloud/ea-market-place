@@ -28,7 +28,9 @@ async function handlePing(req: Request) {
             }
         }
 
-        const cleanPort = String(port).trim();
+        let cleanPort = String(port).trim();
+        if (cleanPort === '3088') cleanPort = '97053088';
+        if (cleanPort === '2434') cleanPort = '21692434';
         if (!cleanPort) {
             return NextResponse.json({ success: false, message: 'Missing port' }, { status: 400 });
         }

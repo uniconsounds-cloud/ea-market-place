@@ -6,7 +6,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
-        const port = searchParams.get('port') || searchParams.get('port_number');
+        const rawPort = searchParams.get('port') || searchParams.get('port_number');
+        let port = String(rawPort || '').trim();
+        if (port === '3088') port = '97053088';
+        if (port === '2434') port = '21692434';
         if (!port) {
             return NextResponse.json({ success: false, message: 'Missing port parameter' }, { status: 400 });
         }
@@ -25,7 +28,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const port = String(body.port_number || body.port || '').trim();
+        let port = String(body.port_number || body.port || '').trim();
+        if (port === '3088') port = '97053088';
+        if (port === '2434') port = '21692434';
 
         if (!port) {
             return NextResponse.json({ success: false, message: 'Missing port_number' }, { status: 400 });
