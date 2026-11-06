@@ -1298,10 +1298,15 @@ export default function EasyMMasterDashboardPage() {
                     }
 
                     const existing = todayHistoryRecords.find(r => r.port_number === accNum);
+                    const isFreshDayZero = (pnl === 0 && closedLots === 0);
                     if (!existing && (pnl !== 0 || dd > 0)) {
                         todayHistoryRecords.push({ port_number: accNum, profit: pnl, closed_lots: closedLots, max_dd: dd, max_drawdown: dd, date: day1DateStr });
                     } else if (existing) {
-                        if (pnl < 0) {
+                        if (isFreshDayZero) {
+                            // Fresh day rollover: port has cleanly reset to 0 profit & 0 closed lots. Clear premature/duplicate rollover records.
+                            existing.profit = 0;
+                            existing.closed_lots = 0;
+                        } else if (pnl < 0) {
                             existing.profit = pnl;
                         } else if (pnl > Number(existing.profit)) {
                             existing.profit = pnl;
@@ -1523,9 +1528,12 @@ export default function EasyMMasterDashboardPage() {
 
                     const statusTodayPnl = (isPingToday && !isGoldMismatch && !todayContaminationReason) ? (Number(status?.today_pnl) || 0) : 0;
                     const histPnl = Number(histToday?.profit) || 0;
+                    const isFreshDayZero = Boolean(isPingToday && (Number(status?.today_pnl) || 0) === 0 && rawTodayClosedLots === 0);
                     let resolvedTodayPnl = 0;
                     if (isGoldMismatch || todayContaminationReason) {
                         resolvedTodayPnl = histPnl; // 0 if filtered out of todayHistoryRecords
+                    } else if (isFreshDayZero) {
+                        resolvedTodayPnl = 0;
                     } else if (isPingToday && status?.today_pnl !== undefined && status?.today_pnl !== null) {
                         if (statusTodayPnl < 0) {
                             resolvedTodayPnl = statusTodayPnl;
@@ -1859,9 +1867,13 @@ export default function EasyMMasterDashboardPage() {
 
                         const histToday = todayHistoryRecords.find(r => r.port_number === accNum);
                         const statusTodayPnl = Number(status.today_pnl) || 0;
+                        const statusClosedLots = Number(status.today_closed_lots) || 0;
                         const histPnl = Number(histToday?.profit) || 0;
+                        const isFreshDayZero = Boolean(isOnline && statusTodayPnl === 0 && statusClosedLots === 0);
                         let resolvedTodayPnl = 0;
-                        if (statusTodayPnl < 0) {
+                        if (isFreshDayZero) {
+                            resolvedTodayPnl = 0;
+                        } else if (statusTodayPnl < 0) {
                             resolvedTodayPnl = statusTodayPnl;
                         } else if (statusTodayPnl > 0 && histPnl > 0) {
                             resolvedTodayPnl = Math.max(statusTodayPnl, histPnl);

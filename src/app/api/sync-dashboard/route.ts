@@ -370,6 +370,7 @@ export async function POST(req: Request) {
                         month: '2-digit',
                         day: '2-digit',
                         hour: 'numeric',
+                        minute: 'numeric',
                         hour12: false
                     });
                     const parts = nyFormatter.formatToParts(now);
@@ -377,6 +378,7 @@ export async function POST(req: Request) {
                     for (const p of parts) pMap[p.type] = p.value;
                     const d = new Date(parseInt(pMap.year, 10), parseInt(pMap.month, 10) - 1, parseInt(pMap.day, 10));
                     const nyHour = parseInt(pMap.hour, 10);
+                    const nyMinute = parseInt(pMap.minute, 10);
                     const dayOfWeek = d.getDay();
                     if (dayOfWeek === 5) {
                         // Friday: stays Friday until Sunday 17:00 NY
@@ -386,7 +388,14 @@ export async function POST(req: Request) {
                         if (nyHour >= 17) d.setDate(d.getDate() + 1);
                         else d.setDate(d.getDate() - 2);
                     } else if (nyHour >= 17) {
-                        d.setDate(d.getDate() + 1);
+                        // 2-minute rollover buffer:
+                        // At 17:00 (17:00:00 - 17:01:59 NY), MT5 terminals often send a final tick with the accumulated profit of the session just ended before their daily bar resets.
+                        // If todayClosedLots > 0 during these first 2 minutes, attribute it to the session just concluded (don't advance d).
+                        if (nyHour === 17 && nyMinute < 2 && todayClosedLots > 0) {
+                            // Retain session that just concluded to avoid stamping yesterday's profit into tomorrow's date
+                        } else {
+                            d.setDate(d.getDate() + 1);
+                        }
                     }
                     const yyyy = d.getFullYear();
                     const mm = String(d.getMonth() + 1).padStart(2, '0');
