@@ -39,6 +39,8 @@ function getBangkokDateAndHour(nowMs: number = Date.now()): { dateKey: string; h
 const initBkk = getBangkokDateAndHour();
 // Fast in-memory cache of batch event IDs already persisted to DB to eliminate redundant DB upserts during telemetry
 const g_persistedBatchEventIds = new Set<string>();
+// In-memory throttling map to prevent Vercel CPU, DB & bandwidth burn from hyperactive legacy EAs
+const g_lastPortSyncTimestampMs = new Map<string, number>();
 
 const trafficState: TrafficTelemetryState = {
     dateKey: initBkk.dateKey,
@@ -294,6 +296,41 @@ export async function POST(req: Request) {
             sync_mode: 'FALLBACK_1URL',
             last_10m_sync: nowIso
         } : incomingPrimeData;
+
+        // 2.5 Fast Throttle: Protect Vercel from hyperactive EAs pinging every 5-10 seconds
+        const nowMs = Date.now();
+        const isViewerActive = !isFallback1UrlEA && isViewerActiveForPort(portNumber);
+        const minAllowedIntervalMs = isViewerActive ? 15000 : 60000;
+        const lastSyncMs = g_lastPortSyncTimestampMs.get(portNumber) || 0;
+        const isThrottled = (nowMs - lastSyncMs) < minAllowedIntervalMs;
+
+        // Never throttle basket closure events or explicit batch closures
+        const hasCriticalHarvest = Boolean(
+            (Array.isArray(payload.harvest_events) && payload.harvest_events.length > 0) ||
+            (incomingPrimeData?.last_basket?.closed_at) ||
+            (type === 'BATCH_CLOSE' || payload.event?.type === 'BATCH_CLOSE')
+        );
+
+        if (isThrottled && !hasCriticalHarvest) {
+            const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? 20 : 600);
+            recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
+            const webConfig = await getPortControlAsync(portNumber);
+            return NextResponse.json({
+                status: 'success',
+                success: true,
+                throttled: true,
+                should_sync_full: isViewerActive,
+                viewer_active: isViewerActive,
+                sync_interval: assignedInterval,
+                sync_mode: isFallback1UrlEA ? 'FALLBACK_1URL' : (isViewerActive ? 'LIVE_20S' : 'SLEEP_180S'),
+                license_tier: isFallback1UrlEA ? 'free' : 'pro',
+                is_trial: false,
+                timestamp: nowIso,
+                web_config: webConfig
+            });
+        }
+
+        g_lastPortSyncTimestampMs.set(portNumber, nowMs);
 
         let lastViewedAtStr: string | null = null;
 
@@ -598,16 +635,16 @@ export async function POST(req: Request) {
             lastViewedAtStr = vData?.last_viewed_at || null;
         }
 
-        const nowMs = Date.now();
+        const currentNowMs = Date.now();
         const lastViewedMs = lastViewedAtStr ? new Date(lastViewedAtStr).getTime() : 0;
         // Viewer is active if in-memory ping was recorded or last_viewed_at was within 120s
-        const isViewerActive = !isFallback1UrlEA && (isViewerActiveForPort(portNumber) || ((nowMs - lastViewedMs) < 120000));
+        const resolvedViewerActive = !isFallback1UrlEA && (isViewerActive || ((currentNowMs - lastViewedMs) < 120000));
 
         // Fallback 1-URL = 600s, Live viewer = 20s, Sleep standby = 600s (10 minutes)
-        const assignedInterval = isFallback1UrlEA ? 600 : (isViewerActive ? 20 : 600);
+        const assignedInterval = isFallback1UrlEA ? 600 : (resolvedViewerActive ? 20 : 600);
 
         // Record real-time MT5 request telemetry (in-memory + 60s throttled snapshot flush)
-        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, isViewerActive, assignedInterval);
+        recordIncomingSyncTelemetry(portNumber, systemCode, eaVersion, resolvedViewerActive, assignedInterval);
 
         // 8. Retrieve & Harmonize 2-Way Command & Web Control state for this port
         let webConfig = await getPortControlAsync(portNumber);
@@ -651,10 +688,10 @@ export async function POST(req: Request) {
         return NextResponse.json({
             status: 'success',
             success: true,
-            should_sync_full: isViewerActive,
-            viewer_active: isViewerActive,
+            should_sync_full: resolvedViewerActive,
+            viewer_active: resolvedViewerActive,
             sync_interval: assignedInterval,
-            sync_mode: isFallback1UrlEA ? 'FALLBACK_1URL' : (isViewerActive ? 'LIVE_20S' : 'SLEEP_180S'),
+            sync_mode: isFallback1UrlEA ? 'FALLBACK_1URL' : (resolvedViewerActive ? 'LIVE_20S' : 'SLEEP_180S'),
             license_tier: isFallback1UrlEA ? 'free' : 'pro',
             is_trial: false,
             timestamp: nowIso,

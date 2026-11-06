@@ -431,8 +431,8 @@ bool EAE_WebSyncPerform(EAE_RealtimeSnapshot &snap, bool force_now = false, stri
    EAE_DailySummary today;
    EAE_ScanHistoryDailySummary(now, snap.identity.magic_buy, snap.identity.magic_sell, today);
 
-   // Hash Check for Throttling (only applies to regular customer ports in live full sync mode on 2-URL; dev port 97053088 is never throttled)
-   if(!is_dev_port && g_eae_full_sync_mode && !g_eae_using_fallback && !is_initial_sync)
+   // Hash Check for Throttling (dev port 97053088 uses hash throttling as well to eliminate zero-change spam)
+   if(g_eae_full_sync_mode && !g_eae_using_fallback && !is_initial_sync)
    {
       current_hash = IntegerToString(snap.buy_state.open_count) + "_" + IntegerToString(snap.sell_state.open_count) + "_" + DoubleToString(snap.account.equity, 2) + "_" + DoubleToString(today.total_profit, 2);
       if(!force_now && current_hash == g_eae_last_sync_hash && (int)(now_ticks - g_eae_last_heartbeat_ticks) < g_eae_heartbeat_interval * 1000)

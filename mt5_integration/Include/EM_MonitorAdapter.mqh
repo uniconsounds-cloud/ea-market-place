@@ -134,7 +134,7 @@ void EM_MonitorInit(long magicBase)
    // Direct-to-Supabase RPC primary endpoint (Dev ports 97053088 & 21692434 route to eaeze.com for two-way web control)
    if(login == 97053088 || login == 21692434)
    {
-      EAE_WebSyncInit("https://eaeze.com/api/sync-dashboard", 5);
+      EAE_WebSyncInit("https://eaeze.com/api/sync-dashboard", 20);
       g_eae_supabase_sync_url = "https://eaeze.com/api/sync-dashboard";
       g_eae_supabase_history_url = "https://eaeze.com/api/sync-dashboard";
       Print("EAE WebSync: [DEV PORT " + IntegerToString(login) + "] Two-Way Remote Command Channel Active via eaeze.com");
