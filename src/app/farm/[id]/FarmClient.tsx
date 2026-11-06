@@ -486,13 +486,6 @@ export default function FarmClient({
         if (parsedPrimeData?.ea_profit !== undefined && Number(parsedPrimeData.ea_profit) > 0) {
             return Number(Number(parsedPrimeData.ea_profit).toFixed(2));
         }
-        // 3. Fallback calculation if relief_used is present (e.g. cut toxic orders with fund)
-        const relief = Number(parsedPrimeData?.relief_used || 0);
-        const net = Number(smoothedTodayProfit || portStatus?.today_pnl || 0);
-        if (relief > 0 && net < 0) {
-            const grossEst = net + relief;
-            if (grossEst > 0) return Number(grossEst.toFixed(2));
-        }
         return 0;
     }, [parsedPrimeData, smoothedTodayProfit, portStatus?.today_pnl, portStatus?.server_time, time]);
 

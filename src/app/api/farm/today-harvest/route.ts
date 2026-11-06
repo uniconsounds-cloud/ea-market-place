@@ -358,31 +358,19 @@ export async function GET(req: Request) {
         let eaCutLoss = 0;
         if (directCutLoss > 0) {
             eaCutLoss = directCutLoss;
+        } else if (rawEaGrossProfit > 0 && displayProfit < rawEaGrossProfit) {
+            // Settled MT5 profit is less than gross EA harvest profit: difference is cut losses/toxic cuts today!
+            eaCutLoss = Number((rawEaGrossProfit - displayProfit).toFixed(2));
         } else if (displayProfit < 0) {
-            const reliefUsedVal = Number(pData?.relief_used || 0);
-            eaCutLoss = reliefUsedVal > 0 ? reliefUsedVal : Number(Math.abs(displayProfit).toFixed(2));
+            eaCutLoss = Number(Math.abs(displayProfit).toFixed(2));
         } else {
             eaCutLoss = 0;
         }
 
-        // Reconcile pre-close floating estimations with actual settled MT5 deals
-        // Target Gross EA Harvest: Net settled MT5 profit + any financing cut loss
-        const targetGrossEaProfit = Number((displayProfit + eaCutLoss).toFixed(2));
-        const shouldAlignGross = targetGrossEaProfit > 0 && rawEaGrossProfit > 0 && Math.abs(targetGrossEaProfit - rawEaGrossProfit) > 0.01;
-        const grossScale = shouldAlignGross ? (targetGrossEaProfit / rawEaGrossProfit) : 1.0;
-        const eaGrossProfit = shouldAlignGross ? targetGrossEaProfit : rawEaGrossProfit;
-
-        if (shouldAlignGross) {
-            filteredEvents = filteredEvents.map(ev => {
-                if (Number(ev.profit) > 0) {
-                    return {
-                        ...ev,
-                        profit: Number((Number(ev.profit) * grossScale).toFixed(2))
-                    };
-                }
-                return ev;
-            });
-        }
+        // Authoritative Gross EA Harvest is the true sum of closed profitable baskets
+        const eaGrossProfit = rawEaGrossProfit > 0 
+            ? rawEaGrossProfit 
+            : (displayProfit > 0 ? displayProfit : 0);
 
         // Manual non-EA trades telemetry
         const manualTrades = pData?.manual_trades || {};
