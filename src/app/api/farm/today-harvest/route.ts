@@ -421,6 +421,37 @@ export async function GET(req: Request) {
             }
         }
 
+        // Attribute portfolio eaCutLoss to the affected pair if individual baskets were not marked negative
+        const totalPairCutLoss = Object.values(pairMap).reduce((sum, p) => sum + p.cutLoss, 0);
+        if (eaCutLoss > 0 && totalPairCutLoss === 0) {
+            // 1. First priority: Traded pair that had rescue scalp or relief events
+            let targetSym = Object.keys(pairMap).find(sym => 
+                pairMap[sym].exitTypes.has('RESCUE_T1_SCALP_TP') || 
+                pairMap[sym].exitTypes.has('RESCUE_T2_SCALP_TP') ||
+                pairMap[sym].exitTypes.has('RESCUE_ALL_SCALP_TP') ||
+                pairMap[sym].exitTypes.has('RELIEF_TRIM')
+            );
+
+            // 2. Second priority: Traded pair listed in pData.quarantined
+            if (!targetSym && Array.isArray(pData?.quarantined) && pData.quarantined.length > 0) {
+                const qSyms = pData.quarantined.map((q: any) => String(q.sym || '').replace(/\.v$/i, '').toUpperCase());
+                targetSym = Object.keys(pairMap).find(sym => {
+                    const clean = sym.replace(/-STD[C]?$/i, '').replace(/\.V$/i, '');
+                    return qSyms.some((qs: string) => qs.startsWith(clean) || clean.startsWith(qs));
+                });
+            }
+
+            // 3. Third priority: Traded pair with highest drawdown or largest lots
+            if (!targetSym) {
+                const sortedPairs = Object.values(pairMap).sort((a, b) => (b.maxDd - a.maxDd) || (b.totalLots - a.totalLots));
+                targetSym = sortedPairs[0]?.symbol;
+            }
+
+            if (targetSym && pairMap[targetSym]) {
+                pairMap[targetSym].cutLoss = eaCutLoss;
+            }
+        }
+
         // Set totalProfit to represent the gross closed harvest profit for each pair in the Harvest Report
         for (const sym of Object.keys(pairMap)) {
             const p = pairMap[sym];
@@ -466,6 +497,14 @@ export async function GET(req: Request) {
                 dailyEventsMap[evDateStr].ea_profit += p;
             } else if (p < 0) {
                 dailyEventsMap[evDateStr].cut_loss += Math.abs(p);
+            }
+        }
+
+        if (eaCutLoss > 0) {
+            if (!dailyEventsMap[activeTradingDate]) {
+                dailyEventsMap[activeTradingDate] = { ea_profit: eaGrossProfit, cut_loss: eaCutLoss };
+            } else {
+                dailyEventsMap[activeTradingDate].cut_loss = Math.max(dailyEventsMap[activeTradingDate].cut_loss, eaCutLoss);
             }
         }
 
