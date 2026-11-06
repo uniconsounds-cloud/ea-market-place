@@ -449,6 +449,35 @@ export async function GET(req: Request) {
 
             if (targetSym && pairMap[targetSym]) {
                 pairMap[targetSym].cutLoss = eaCutLoss;
+                pairMap[targetSym].exitTypes.add('RELIEF_TRIM');
+
+                // Also inject RELIEF_TRIM event into filteredEvents so it appears under MT5 Basket Closures
+                const hasExistingNegativeEvent = filteredEvents.some(e => e.symbol === targetSym && Number(e.profit) < 0);
+                if (!hasExistingNegativeEvent) {
+                    const targetEvents = filteredEvents.filter(e => e.symbol === targetSym);
+                    const refEv = targetEvents[0] || filteredEvents[0];
+                    const refTime = refEv?.closed_at || Math.floor(Date.now() / 1000);
+                    const refSide = refEv?.side || 'BUY';
+
+                    const trimEvent: BasketEvent = {
+                        id: `${portNumber}_${targetSym}_${refTime}_1_trim`,
+                        port_number: portNumber,
+                        symbol: targetSym,
+                        side: refSide,
+                        exit_type: 'RELIEF_TRIM',
+                        orders: 1,
+                        lots: 0.8,
+                        profit: -eaCutLoss,
+                        duration_sec: 0,
+                        max_dd_pct: 0,
+                        closed_at: refTime,
+                        ea_name: 'EasyM Prime',
+                        ea_build: pData?.build_id || 'B261104.1'
+                    };
+
+                    filteredEvents.push(trimEvent);
+                    filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
+                }
             }
         }
 
