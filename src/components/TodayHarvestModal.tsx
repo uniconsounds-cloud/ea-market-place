@@ -16,6 +16,7 @@ export interface BasketClosureEvent {
     orders: number;
     lots: number;
     profit: number;
+    cut_loss?: number;
     duration_sec: number;
     max_dd_pct: number;
     closed_at: number;
@@ -1103,11 +1104,17 @@ export default function TodayHarvestModal({
                                                         <span className={`text-[11px] sm:text-sm font-black ${
                                                             ev.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'
                                                         }`}>
-                                                            {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[8px] font-normal text-white/50">USC</span>
+                                                            {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[8px] font-normal text-white/50">{isUSC ? 'USC' : 'USD'}</span>
                                                         </span>
-                                                        <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
-                                                            {ev.profit >= 0 ? '+' : ''}${(ev.profit / 100).toFixed(2)} USD
-                                                        </span>
+                                                        {ev.cut_loss && ev.cut_loss > 0 ? (
+                                                            <span className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-400 mt-0.5">
+                                                                ตัดไม้ -{ev.cut_loss.toFixed(2)} <span className="text-[7px] font-normal text-white/50">{isUSC ? 'USC' : 'USD'}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[8px] sm:text-[9px] text-white/40 mt-0.5">
+                                                                {ev.profit >= 0 ? '+' : ''}${(isUSC ? ev.profit / 100 : ev.profit).toFixed(2)} USD
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

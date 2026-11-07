@@ -33,6 +33,7 @@ export interface BasketEvent {
     orders: number;
     lots: number;
     profit: number;
+    cut_loss?: number;
     duration_sec?: number;
     max_dd_pct?: number;
     closed_at: number; // Unix timestamp in seconds
