@@ -551,6 +551,20 @@ export default function FarmClient({
             localStorage.setItem('easym_tiktok_live_mode', val ? 'true' : 'false');
         }
     }, []);
+
+    const [liveAssetType, setLiveAssetType] = useState<'island' | 'crate'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('easym_live_asset_type') as 'island' | 'crate') || 'island';
+        }
+        return 'island';
+    });
+
+    const handleSetLiveAssetType = useCallback((val: 'island' | 'crate') => {
+        setLiveAssetType(val);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('easym_live_asset_type', val);
+        }
+    }, []);
     // 🧪 Simulated Buffer & Threshold for testing dome buffer aura (Dev testing)
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
@@ -3095,6 +3109,7 @@ export default function FarmClient({
                     onClick={handleSecretToggle}
                     isNonLive10m={isFallback1Url}
                     isLiveMode={isLiveMode}
+                    liveAssetType={liveAssetType}
                     onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
                 />
                 
@@ -3145,6 +3160,7 @@ export default function FarmClient({
                 customName={currentCustomName || undefined}
                 isNonLive10m={isFallback1Url}
                 isLiveMode={isLiveMode}
+                liveAssetType={liveAssetType}
                 onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
             />
 
@@ -7088,6 +7104,8 @@ export default function FarmClient({
                     onSetSimulatedFarmStatus={setSimulatedFarmStatus}
                     isLiveMode={isLiveMode}
                     onToggleLiveMode={handleToggleLiveMode}
+                    liveAssetType={liveAssetType}
+                    onSetLiveAssetType={handleSetLiveAssetType}
                 />
             )}
             {/* 🌾 Today Harvest Basket Closures Modal (Gated to Dev Ports 3088 & 2434) */}

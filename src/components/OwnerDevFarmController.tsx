@@ -39,6 +39,8 @@ export interface OwnerDevFarmControllerProps {
     onSetSimulatedFarmStatus?: (status: Record<number, 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H'>) => void;
     isLiveMode?: boolean;
     onToggleLiveMode?: (enabled: boolean) => void;
+    liveAssetType?: 'island' | 'crate';
+    onSetLiveAssetType?: (type: 'island' | 'crate') => void;
 }
 
 export default function OwnerDevFarmController({
@@ -61,7 +63,9 @@ export default function OwnerDevFarmController({
     simulatedFarmStatus,
     onSetSimulatedFarmStatus,
     isLiveMode = false,
-    onToggleLiveMode
+    onToggleLiveMode,
+    liveAssetType = 'island',
+    onSetLiveAssetType
 }: OwnerDevFarmControllerProps) {
     // 🛡️ STRICT SAFETY GUARD: Never render anything for customers
     if (!isOwnerTestPort) return null;
@@ -429,6 +433,39 @@ export default function OwnerDevFarmController({
                                             : 'คลิกเพื่อเปิดโหมดไลฟ์สด พรางคำศัพท์การเงินเป็นเกมฟาร์มผลไม้โดยคงตำแหน่งเดิม 100%'
                                         }
                                     </div>
+
+                                    {/* 🎨 Live Asset Selector: เกาะมินิ vs ลังไม้ */}
+                                    {isLiveMode && (
+                                        <div className="mt-2 pt-2 border-t border-rose-500/25 flex items-center justify-between">
+                                            <span className="text-[9px] text-rose-200/80 font-bold uppercase tracking-wider">Live Graphic:</span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onSetLiveAssetType?.('island')}
+                                                    className={`px-2 py-0.5 rounded text-[8.5px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                                        liveAssetType === 'island'
+                                                            ? 'bg-emerald-500 text-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.5)] font-black'
+                                                            : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    <span>🌱</span>
+                                                    <span>เกาะมินิ (ปลอดภัยสุด)</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onSetLiveAssetType?.('crate')}
+                                                    className={`px-2 py-0.5 rounded text-[8.5px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                                        liveAssetType === 'crate'
+                                                            ? 'bg-amber-500 text-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.5)] font-black'
+                                                            : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    <span>📦</span>
+                                                    <span>ลังผลไม้</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

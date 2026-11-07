@@ -91,6 +91,7 @@ type FarmHudProps = {
     isNonLive10m?: boolean;
     onHarvestClick?: () => void;
     isLiveMode?: boolean;
+    liveAssetType?: 'island' | 'crate';
 };
 
 export default function FarmHud({
@@ -120,6 +121,7 @@ export default function FarmHud({
     isNonLive10m = false,
     onHarvestClick,
     isLiveMode = false,
+    liveAssetType = 'island',
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
@@ -153,10 +155,14 @@ export default function FarmHud({
     const centsValue = isUSD ? todayProfit * 100 : todayProfit;
 
     let todayHarvestAsset = '/farm/base_farmbox_empty.webp';
-    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
-    else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
-    else if (centsValue > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
-    else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
+    if (isLiveMode && liveAssetType === 'island') {
+        todayHarvestAsset = '/farm/mini_farm_island.webp';
+    } else {
+        if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
+        else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
+        else if (centsValue > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
+        else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
+    }
 
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
     const currencyPrefix = isLiveMode ? '' : (isUSC ? '' : '$');
@@ -227,7 +233,7 @@ export default function FarmHud({
                         <div className="flex flex-col items-center gap-1">
                             {/* Counter at TOP */}
                             <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-mono font-black text-cyan-400">
-                                <span>B</span>
+                                <span>{isLiveMode ? 'A' : 'B'}</span>
                                 <span className="opacity-80">{buyCount}</span>
                             </div>
 
@@ -265,7 +271,7 @@ export default function FarmHud({
                         <div className="flex flex-col items-center gap-1">
                             {/* Counter at TOP */}
                             <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-mono font-black text-orange-400">
-                                <span>S</span>
+                                <span>{isLiveMode ? 'B' : 'S'}</span>
                                 <span className="opacity-80">{sellCount}</span>
                             </div>
 
@@ -415,7 +421,7 @@ export default function FarmHud({
                     className={`hidden sm:flex flex-shrink-0 items-center gap-1 sm:gap-3 bg-black/40 border border-amber-900/20 rounded-lg p-1 sm:p-2 sm:pl-3 relative h-16 sm:h-24 ${slowBlinkClass} ${onHarvestClick ? 'cursor-pointer hover:border-amber-400/60 hover:bg-amber-950/30 hover:scale-[1.02] active:scale-[0.98] transition-all group' : ''}`}
                     title={onHarvestClick ? "📦 คลิกเพื่อดูสรุปการปิดรวบกำไรวันนี้ (Today Harvest Breakdown)" : undefined}
                 >
-                    <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking ? 'animate-box-shake' : ''} ${onHarvestClick ? 'group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(251,191,36,0.7)]' : ''}`}>
+                    <div className={`relative w-12 h-12 sm:w-20 sm:h-20 flex-shrink-0 transition-transform duration-300 ${isShaking && !isLiveMode ? 'animate-box-shake' : ''} ${onHarvestClick ? 'group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(251,191,36,0.7)]' : ''}`}>
                         <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                         {onHarvestClick && (
                             <span className="absolute -top-1 -right-1 flex h-3 w-3 sm:h-3.5 sm:w-3.5 items-center justify-center rounded-full bg-amber-400 text-black text-[8px] sm:text-[9px] font-black shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse pointer-events-none">
@@ -491,6 +497,7 @@ export function FarmMobileStatsOverlay({
     adminMessage,
     isNonLive10m = false,
     isLiveMode = false,
+    liveAssetType = 'island',
     onHarvestClick,
 }: {
     portNumber: string;
@@ -512,6 +519,7 @@ export function FarmMobileStatsOverlay({
     adminMessage?: string | null;
     isNonLive10m?: boolean;
     isLiveMode?: boolean;
+    liveAssetType?: 'island' | 'crate';
     onHarvestClick?: () => void;
 }) {
     const [messageIndex, setMessageIndex] = useState(0);
@@ -532,10 +540,14 @@ export function FarmMobileStatsOverlay({
     const centsValue_Mobile = isUSD_Mobile ? todayProfit * 100 : todayProfit;
 
     let todayHarvestAsset = '/farm/base_farmbox_empty.webp';
-    if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
-    else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
-    else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
-    else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
+    if (isLiveMode && liveAssetType === 'island') {
+        todayHarvestAsset = '/farm/mini_farm_island.webp';
+    } else {
+        if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
+        else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
+        else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
+        else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
+    }
 
     return (
         <div className="sm:hidden fixed top-[94px] left-0 w-full h-[88px] bg-black/5 backdrop-blur-[2px] z-[90] flex justify-between items-center px-1.5 pt-1 border-b border-amber-900/10 pointer-events-auto">
@@ -545,7 +557,7 @@ export function FarmMobileStatsOverlay({
                 {/* BUY GROUP */}
                 <div className="flex flex-col items-center gap-0.5">
                     <div className="flex items-center gap-1 text-[8px] font-mono font-black text-cyan-400 leading-none">
-                        <span>B</span><span className="opacity-80">{buyCount}</span>
+                        <span>{isLiveMode ? 'A' : 'B'}</span><span className="opacity-80">{buyCount}</span>
                     </div>
                     <div className="flex items-end gap-1 h-10">
                         {/* Order Count Bar */}
@@ -572,7 +584,7 @@ export function FarmMobileStatsOverlay({
                 {/* SELL GROUP */}
                 <div className="flex flex-col items-center gap-0.5 ml-1">
                     <div className="flex items-center gap-1 text-[8px] font-mono font-black text-orange-400 leading-none">
-                        <span>S</span><span className="opacity-80">{sellCount}</span>
+                        <span>{isLiveMode ? 'B' : 'S'}</span><span className="opacity-80">{sellCount}</span>
                     </div>
                     <div className="flex items-end gap-1 h-10">
                         {/* Order Count Bar */}
@@ -600,13 +612,13 @@ export function FarmMobileStatsOverlay({
             {/* Center Welcome/Port Name Section (The Red Area) */}
             <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
                 <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
-                    <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none">
+                    <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none whitespace-nowrap">
                         {isLiveMode ? `Showcase ${String(portNumber).slice(-4)}` : (customName ? customName : `PORT: ${portNumber}`)}
                     </div>
                 </div>
                 {adminMessage && (
                     <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
-                        <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-none truncate w-full">
+                        <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-none truncate w-full whitespace-nowrap">
                             {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
                         </div>
                     </div>
@@ -620,13 +632,13 @@ export function FarmMobileStatsOverlay({
             >
                 {/* Profit Text on Top-Left */}
                 <div className="relative z-20 flex-1 pl-[2px] pt-[2px]">
-                    <div className="flex items-baseline gap-1 leading-none">
-                        <span className={`text-[14px] sm:text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight`}>
+                    <div className="flex items-baseline gap-1 leading-none whitespace-nowrap">
+                        <span className={`text-[14px] sm:text-[15px] font-mono font-black ${todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} drop-shadow-[0_2px_4px_rgba(0,0,0,1)] leading-none tracking-tight whitespace-nowrap`}>
                             <AnimatedNumber value={todayProfit} formatter={v => `${v >= 0 ? '+' : ''}${currencyPrefix}${v.toFixed(2)}`} colorClass={todayProfit >= 0 ? 'text-[#4de180]' : 'text-red-500'} />
                         </span>
                         {eaTodayProfit !== undefined && eaTodayProfit > 0 && todayProfit < 0 && (
                             <span 
-                                className="text-[10px] sm:text-xs font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
+                                className="text-[10px] sm:text-xs font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none whitespace-nowrap"
                                 title={isLiveMode ? `EA: +${eaTodayProfit.toFixed(2)}` : `กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
                             >
                                 ({eaTodayProfit.toFixed(2)})
@@ -638,18 +650,18 @@ export function FarmMobileStatsOverlay({
                             const maxDd = Math.abs(Number(dailyMaxDrawdown) || 0);
                             const displayMaxDd = maxDd > 0 ? `-${maxDd.toFixed(2)}%` : '0.00%';
                             return (
-                                <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">{isLiveMode ? 'DD:' : 'MaxDD:'} <span className="text-red-500/80 font-mono font-bold">{displayMaxDd}</span></span>
+                                <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight whitespace-nowrap">{isLiveMode ? 'DD:' : 'MaxDD:'} <span className="text-red-500/80 font-mono font-bold">{displayMaxDd}</span></span>
                             );
                         })()}
-                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">{isLiveMode ? 'Seeds:' : 'Lots:'} <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
+                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight whitespace-nowrap">{isLiveMode ? 'Seeds:' : 'Lots:'} <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
                     </div>
                 </div>
                 {/* Port Number on Bottom-Left */}
                 <div className="absolute left-[4px] bottom-1.5 z-20">
-                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{isLiveMode ? `****${String(portNumber).slice(-4)}` : portNumber}</span>
+                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest whitespace-nowrap">{isLiveMode ? `****${String(portNumber).slice(-4)}` : portNumber}</span>
                 </div>
                 {/* Box Image on Bottom-Right */}
-                <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>
+                <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking && !isLiveMode ? 'animate-box-shake' : ''}`}>
                     <Image src={todayHarvestAsset} alt="Box" fill className="object-contain" unoptimized />
                 </div>
             </div>
