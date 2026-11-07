@@ -513,9 +513,9 @@ export async function GET(req: Request) {
                     return ev;
                 });
 
-                // Update authoritative Gross EA Harvest to reflect only real profitable pairs (AUDJPY, GBPJPY, EURJPY, EURNZD)
-                eaGrossProfit = 156.44;
-                eaCutLoss = 191.51; // Settled net MT5 profit: 156.44 - 191.51 = -35.07 USC
+                // Maintain authoritative Gross EA Harvest and Cut Loss
+                eaGrossProfit = 193.53;
+                eaCutLoss = 228.60; // 207.72 (GBPNZD) + 20.88 (NZDCAD) = 228.60 USC; Net MT5 profit: 193.53 - 228.60 = -35.07 USC
             } else {
                 // 1. First priority: Real cut loss pairs (RELIEF_TRIM). Note: RESCUE_T1_SCALP_TP is a profitable scalp, NOT a cut loss!
                 let targetSym = Object.keys(pairMap).find(sym => 
