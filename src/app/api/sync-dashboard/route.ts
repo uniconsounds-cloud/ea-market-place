@@ -536,7 +536,8 @@ export async function POST(req: Request) {
                     max_dd_pct: maxDdPct,
                     closed_at: closedAtSec,
                     ea_name: eaName,
-                    ea_build: eaBuild
+                    ea_build: eaBuild,
+                    deals: Array.isArray(ev.deals) ? ev.deals : undefined
                 });
 
                 // 2. Only queue for persistent Supabase DB write if not already persisted

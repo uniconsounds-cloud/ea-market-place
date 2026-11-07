@@ -24,6 +24,21 @@ export interface LiveOrder {
     is_external?: boolean;
 }
 
+export interface ClosedDealItem {
+    ticket: number;
+    symbol: string;
+    deal_type?: number;
+    side?: 'BUY' | 'SELL' | string;
+    lots: number;
+    price?: number;
+    profit: number;
+    commission?: number;
+    swap?: number;
+    magic?: number;
+    comment?: string;
+    time?: number;
+}
+
 export interface BasketEvent {
     id?: string;
     port_number: string;
@@ -39,6 +54,7 @@ export interface BasketEvent {
     closed_at: number; // Unix timestamp in seconds
     ea_name?: string;
     ea_build?: string;
+    deals?: ClosedDealItem[];
 }
 
 export interface PortControlConfig {
