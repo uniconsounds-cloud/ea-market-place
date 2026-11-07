@@ -482,6 +482,7 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       string sym = closedDeals[i].symbol;
       datetime baseTime = closedDeals[i].time;
       long baseDealType = closedDeals[i].deal_type;
+      long baseMagic = closedDeals[i].magic;
       string side = (baseDealType == DEAL_TYPE_SELL ? "BUY" : "SELL"); // Exit deal type is opposite of position side
 
       int basketOrders = 0;
@@ -494,10 +495,16 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       for(int j = i; j < closedCount; j++)
       {
          if(processed[j]) continue;
+         // 1. Strict Symbol Match
          if(closedDeals[j].symbol != sym) continue;
-         if(MathAbs((long)closedDeals[j].time - (long)baseTime) > 30) continue;
 
-         // A relief cut-loss deal should NEVER merge with a take-profit/scalp deal
+         // 2. Strict Magic Number Match (Prevents cross-pair contamination when multiple pairs close simultaneously)
+         if(closedDeals[j].magic != baseMagic) continue;
+
+         // 3. Proximity Time Window (within 15 seconds for multi-order broker sequential execution)
+         if(MathAbs((long)closedDeals[j].time - (long)baseTime) > 15) continue;
+
+         // 4. Strict Exit Intent / Comment Match: Relief Cut vs Take Profit vs Scalp
          bool isCut_j = (StringFind(closedDeals[j].comment, "CUT") >= 0 || StringFind(closedDeals[j].comment, "TRIM") >= 0 || StringFind(closedDeals[j].comment, "RescueCut") >= 0 || StringFind(closedDeals[j].comment, "R_OUT") >= 0 || StringFind(closedDeals[j].comment, "RELIEF") >= 0);
          if(isCut_i != isCut_j) continue;
 

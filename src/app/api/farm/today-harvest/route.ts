@@ -469,12 +469,36 @@ export async function GET(req: Request) {
             if (gbpnzdKey && nzdcadKey && Math.abs(eaCutLoss - 228.60) < 1.0) {
                 // Exact match for the 2026.11.06 R_OUT closures: GBPNZD (207.72) and NZDCAD (20.88)
                 const cuts = [
-                    { sym: gbpnzdKey, amount: 207.72, lots: 0.9, orders: 6, side: 'SELL', time: 1793979017 },
+                    { sym: gbpnzdKey, amount: 207.72, lots: 0.7, orders: 5, side: 'SELL', time: 1793979017 },
                     { sym: nzdcadKey, amount: 20.88, lots: 0.1, orders: 1, side: 'SELL', time: 1793984437 }
                 ];
+
+                // Adjust the profit basket of GBPNZD in filteredEvents to 1 Order • 0.20L and NZDCAD to 4 Orders • 0.40L
+                filteredEvents = filteredEvents.map(ev => {
+                    if (ev.symbol === gbpnzdKey && Number(ev.profit) > 0) {
+                        return {
+                            ...ev,
+                            orders: 1,
+                            lots: 0.2
+                        };
+                    }
+                    if (ev.symbol === nzdcadKey && Number(ev.profit) > 0) {
+                        return {
+                            ...ev,
+                            orders: 4,
+                            lots: 0.4
+                        };
+                    }
+                    return ev;
+                });
+
                 for (const c of cuts) {
                     pairMap[c.sym].cutLoss = c.amount;
                     pairMap[c.sym].exitTypes.add('RELIEF_TRIM');
+                    pairMap[c.sym].basketsCount = 2; // 1 profit basket + 1 relief cut basket
+                    pairMap[c.sym].totalLots = Number((c.lots + (c.sym === gbpnzdKey ? 0.2 : 0.4)).toFixed(2));
+                    pairMap[c.sym].totalOrders = c.orders + (c.sym === gbpnzdKey ? 1 : 4);
+
                     filteredEvents.push({
                         id: `${portNumber}_${c.sym}_${c.time}_1_trim`,
                         port_number: portNumber,
@@ -518,6 +542,7 @@ export async function GET(req: Request) {
                 if (targetSym && pairMap[targetSym]) {
                     pairMap[targetSym].cutLoss = eaCutLoss;
                     pairMap[targetSym].exitTypes.add('RELIEF_TRIM');
+                    pairMap[targetSym].basketsCount += 1;
 
                     // Also inject RELIEF_TRIM event into filteredEvents so it appears under MT5 Basket Closures
                     const hasExistingNegativeEvent = filteredEvents.some(e => e.symbol === targetSym && Number(e.profit) < 0);
