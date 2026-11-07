@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
 import { Trophy, X, Filter, BarChart3, TrendingUp, ShieldCheck, Clock, Users, ArrowUpRight, Award, Zap, ChevronRight, CheckCircle2, DollarSign, Sparkles, Rocket, Calendar } from 'lucide-react';
+import { toast } from 'sonner';
 
 // --- Utilities ---
 function seededRandom(seed: number) {
@@ -94,7 +95,8 @@ export default function DemoFarmClient({
     userId,
     referrerId,
     isSynthetic = false,
-    initialDailyHistory = []
+    initialDailyHistory = [],
+    userEmail = null
 }: {
     portNumber: string;
     initialOrders: any[];
@@ -108,7 +110,31 @@ export default function DemoFarmClient({
     referrerId?: string;
     isSynthetic?: boolean;
     initialDailyHistory?: any[];
+    userEmail?: string | null;
 }) {
+    // 🛡️ User Gating for Live Mode switch: เฉพาะ juntarasate.jo@gmail.com (หรือ juntarasate@gmail.com)
+    const isAllowedLiveUser = userEmail?.toLowerCase() === 'juntarasate.jo@gmail.com' || userEmail?.toLowerCase() === 'juntarasate@gmail.com';
+
+    const [isLiveMode, setIsLiveMode] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('easym_live_tracker_live_mode') === 'true';
+        }
+        return false;
+    });
+
+    const handleToggleLiveMode = () => {
+        const next = !isLiveMode;
+        setIsLiveMode(next);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('easym_live_tracker_live_mode', next ? 'true' : 'false');
+        }
+        if (next) {
+            toast.success('เปิด TikTok LIVE Mode สำหรับ Live Tracker: ซ่อนสัญลักษณ์การเงินปลอดภัย 100%');
+        } else {
+            toast.info('ปิด TikTok LIVE Mode: กลับสู่หน้า Live Tracker ปกติ');
+        }
+    };
+
     const [orders, setOrders] = useState<any[]>(initialOrders);
     const [portStatus, setPortStatus] = useState<any>(initialPortStatus || { balance: '100000.00', equity: '100000.00', account_type: 'USC' });
     const [currentCustomName, setCurrentCustomName] = useState(customName || '');
@@ -1034,10 +1060,14 @@ export default function DemoFarmClient({
             const cents = isUSC ? pnl : pnl * 100;
             
             let asset = '/farm/base_farmbox_empty.webp';
-            if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
-            else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
-            else if (cents > 1000) asset = '/farm/base_farmbox_mid.webp';
-            else if (cents > 0) asset = '/farm/base_farmbox_min.webp';
+            if (isLiveMode) {
+                asset = '/farm/mini_farm_island.webp';
+            } else {
+                if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
+                else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
+                else if (cents > 1000) asset = '/farm/base_farmbox_mid.webp';
+                else if (cents > 0) asset = '/farm/base_farmbox_min.webp';
+            }
             
             // Check if this date is a market holiday and profit is 0
             const dateMD = item.date.substring(5); // 'MM-DD'
@@ -1069,7 +1099,7 @@ export default function DemoFarmClient({
                 isEndOfWeek
             };
         });
-    }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab, isSynthetic]);
+    }, [history, brokerDateStr, portStatus?.account_type, challengeStartDate, historyTab, isSynthetic, isLiveMode]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     const [isScrolledLeft, setIsScrolledLeft] = useState(false);
@@ -1200,10 +1230,10 @@ export default function DemoFarmClient({
             {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
-                    title="EASYM LIVE TRACKER"
-                    customName={currentCustomName}
-                    adminMessage={currentAdminMessage}
-                    portNumber={isSynthetic ? '10-PORT MODEL' : portNumber}
+                    title={isLiveMode ? 'EasyM Live Tracker | LIVE DEMO MODE' : 'EASYM LIVE TRACKER'}
+                    customName={isLiveMode ? 'SHOWCASE 10-PORT' : currentCustomName}
+                    adminMessage={isLiveMode ? null : currentAdminMessage}
+                    portNumber={isLiveMode ? 'SHOWCASE' : (isSynthetic ? '10-PORT MODEL' : portNumber)}
                     balance={stats.balance}
                     equity={stats.equity}
                     floatingPnl={stats.floatingPnl}
@@ -1219,9 +1249,11 @@ export default function DemoFarmClient({
                     drawdownPercent={stats.drawdownPercent}
                     drawdownAmount={stats.drawdownAmount}
                     assetType={assetType}
-                    isShaking={isShaking}
+                    isShaking={isShaking && !isLiveMode}
                     systemCode={portStatus?.system_code}
                     onClick={handleSecretToggle}
+                    isLiveMode={isLiveMode}
+                    liveAssetType="island"
                 />
                 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -1253,7 +1285,7 @@ export default function DemoFarmClient({
 
             {/* MOBILE ONLY OVERLAY DOCKED BELOW HEADER */}
             <FarmMobileStatsOverlay
-                portNumber={isSynthetic ? '10-PORT MODEL' : portNumber}
+                portNumber={isLiveMode ? 'SHOWCASE' : (isSynthetic ? '10-PORT MODEL' : portNumber)}
                 buyCount={stats.buyCount}
                 sellCount={stats.sellCount}
                 buyPnl={stats.buyPnl}
@@ -1266,9 +1298,11 @@ export default function DemoFarmClient({
                 drawdownPercent={stats.drawdownPercent}
                 drawdownAmount={stats.drawdownAmount}
                 totalStandardLots={stats.totalLots}
-                isShaking={isShaking}
-                customName={currentCustomName}
-                adminMessage={currentAdminMessage}
+                isShaking={isShaking && !isLiveMode}
+                customName={isLiveMode ? 'SHOWCASE 10-PORT' : currentCustomName}
+                adminMessage={isLiveMode ? null : currentAdminMessage}
+                isLiveMode={isLiveMode}
+                liveAssetType="island"
             />
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
@@ -1396,17 +1430,30 @@ export default function DemoFarmClient({
                             <div key={item.id || idx} className="flex items-center flex-shrink-0">
                                 <div className="flex flex-col items-center group relative">
                                     <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl">
-                                        <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized />
+                                        <Image 
+                                            src={item.asset} 
+                                            alt="Box" 
+                                            fill 
+                                            className={`object-contain ${item.isHoliday && isLiveMode ? 'opacity-40 grayscale' : ''}`} 
+                                            unoptimized 
+                                        />
                                     </div>
                                     <div className="flex flex-col items-center">
-                                        <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
+                                        <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter whitespace-nowrap">{item.date}</span>
                                         {item.isHoliday ? (
-                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>
-                                                CLOSED
+                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400/80 animate-pulse whitespace-nowrap" title={item.holidayName}>
+                                                {isLiveMode ? 'REST' : 'CLOSED'}
                                             </span>
                                         ) : (
-                                            <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                                {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
+                                            <span className={`text-[9.5px] sm:text-[10.5px] font-mono font-bold whitespace-nowrap ${
+                                                item.pnl >= 0 
+                                                    ? (isLiveMode ? 'text-emerald-400/90' : 'text-[#4de180]') 
+                                                    : (isLiveMode ? 'text-rose-400/90' : 'text-red-500')
+                                            }`}>
+                                                {isLiveMode 
+                                                    ? `Yield: ${item.pnl.toFixed(1)}` 
+                                                    : `${item.pnl >= 0 ? '+' : ''}${(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}`
+                                                }
                                             </span>
                                         )}
                                     </div>
@@ -1416,7 +1463,9 @@ export default function DemoFarmClient({
                                 {item.isEndOfWeek && idx < dailyHistory.length - 1 && (
                                     <div className="flex flex-col items-center justify-center mx-2 sm:mx-3 h-16 sm:h-20 self-start">
                                         <div className="w-[1px] h-full bg-gradient-to-b from-amber-500/0 via-amber-500/40 to-amber-500/0"></div>
-                                        <span className="text-[7px] font-mono text-amber-400/40 font-bold uppercase tracking-widest mt-1 whitespace-nowrap">WEEK</span>
+                                        <span className="text-[7px] font-mono text-amber-400/40 font-bold uppercase tracking-widest mt-1 whitespace-nowrap">
+                                            {isLiveMode ? 'CYCLE' : 'WEEK'}
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -1436,9 +1485,11 @@ export default function DemoFarmClient({
                     }`}>
                         {/* Header showing single line of text with lookback days */}
                         <span className="text-[7px] sm:text-[9px] text-[#cfa545] font-black tracking-wide whitespace-nowrap leading-none select-none self-end mt-0">
-                            {historyTab === 'my' 
-                                ? `พอร์ตติดตาม (ย้อนหลัง ${dailyHistory.length} วัน)` 
-                                : `พอร์ตต้นแบบ (ย้อนหลัง ${dailyHistory.length} วัน)`}
+                            {isLiveMode 
+                                ? `รอบการทำงาน (ย้อนหลัง ${dailyHistory.length} วัน)` 
+                                : (historyTab === 'my' 
+                                    ? `พอร์ตติดตาม (ย้อนหลัง ${dailyHistory.length} วัน)` 
+                                    : `พอร์ตต้นแบบ (ย้อนหลัง ${dailyHistory.length} วัน)`)}
                         </span>
 
                         {/* 2x2 Grid of equal buttons */}
@@ -1464,7 +1515,7 @@ export default function DemoFarmClient({
                                         : 'bg-black/40 text-amber-200/60 border-amber-900/30 hover:text-white hover:bg-black/60'
                                 }`}
                             >
-                                พอร์ตหลัก
+                                {isLiveMode ? 'โมเดลหลัก' : 'พอร์ตหลัก'}
                             </button>
 
                             {/* สถิติผลงานระบบ Button */}
@@ -2400,6 +2451,36 @@ export default function DemoFarmClient({
                             กรุณารอสักครู่ ระบบกำลังดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์...
                         </p>
                     </div>
+                </div>
+            )}
+
+            {/* 🔴 Floating TikTok LIVE Mode Toggle (STRICTLY for juntarasate.jo@gmail.com) */}
+            {isAllowedLiveUser && (
+                <div className="fixed bottom-36 sm:bottom-44 right-3 sm:right-6 z-[120]">
+                    <button
+                        type="button"
+                        onClick={handleToggleLiveMode}
+                        className={`group relative flex items-center justify-center gap-1.5 px-3 py-2 rounded-full border-2 transition-all duration-300 backdrop-blur-xl cursor-pointer hover:scale-105 active:scale-95 shadow-2xl select-none ${
+                            isLiveMode
+                                ? 'bg-gradient-to-r from-rose-950/95 via-red-950/90 to-black/95 border-rose-500 text-rose-300 shadow-[0_0_25px_rgba(244,63,94,0.6)]'
+                                : 'bg-[#120f0a]/95 border-amber-400/80 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.5)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)]'
+                        }`}
+                        title={isLiveMode ? '🔴 TikTok LIVE Mode (เปิดอยู่) - คลิกเพื่อสลับเป็นโหมดปกติ' : '👑 คลิกเพื่อเปิด TikTok LIVE Safe Mode'}
+                    >
+                        <span className="relative flex h-2.5 w-2.5">
+                            {isLiveMode ? (
+                                <>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+                                </>
+                            ) : (
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
+                            )}
+                        </span>
+                        <span className="font-mono font-black text-xs uppercase tracking-wider">
+                            {isLiveMode ? 'LIVE DEMO' : 'LIVE MODE'}
+                        </span>
+                    </button>
                 </div>
             )}
         </div>
