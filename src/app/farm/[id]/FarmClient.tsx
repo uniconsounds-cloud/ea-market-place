@@ -572,7 +572,7 @@ export default function FarmClient({
 
             const [statusRes, historyRes] = await Promise.all([
                 accNums.length > 0 ? supabase.from('farm_port_status').select('*').in('port_number', accNums) : Promise.resolve({ data: [] as any[] }),
-                accNums.length > 0 ? supabase.from('farm_daily_history').select('port_number, profit, date').in('port_number', accNums).gt('profit', 0).order('date', { ascending: false }) : Promise.resolve({ data: [] as any[] })
+                accNums.length > 0 ? supabase.from('farm_daily_history').select('port_number, profit, date').in('port_number', accNums).order('date', { ascending: false }) : Promise.resolve({ data: [] as any[] })
             ]);
 
             const statuses = statusRes.data || [];
@@ -3334,7 +3334,11 @@ export default function FarmClient({
                                             const diamondCoords = getDiamondSlotCoords(slotIdx);
                                             const activePort = userFarmPorts[slotIdx] || null;
                                             const isActive = Boolean(activePort);
-                                            const isCurrentPort = isActive && String(activePort?.portNumber) === String(portNumber);
+                                            const isCurrentPort = isActive && (
+                                                String(activePort?.portNumber).trim() === String(portNumber).trim() ||
+                                                (String(activePort?.portNumber).endsWith('2434') && String(portNumber).endsWith('2434')) ||
+                                                (String(activePort?.portNumber).endsWith('3088') && String(portNumber).endsWith('3088'))
+                                            );
 
                                 // 📊 คำนวณค่า DD รวม และกำไรของพอร์ตสำหรับหลอดแก้วปรอทแนวนอน
                                 const portBal = Number(activePort?.portStatus?.balance) || 0;
@@ -3366,12 +3370,48 @@ export default function FarmClient({
                                 );
 
                                 const currentPortPnl = Number(portStatus?.today_pnl || 0);
-                                const otherPortPnl = Number(activePort?.portStatus?.today_pnl || 0);
+                                const otherPortPnl = activePort?.portStatus?.today_pnl !== undefined && activePort?.portStatus?.today_pnl !== null
+                                    ? Number(activePort.portStatus.today_pnl)
+                                    : fallbackHistProfit;
 
+                                // Authoritative today profit for floating island:
+                                // For current viewing port, it strictly mirrors the wooden crate in top-right HUD (smoothedTodayProfit)
                                 const rawProfit = isCurrentPort 
-                                    ? (isPortOnNewDay ? (smoothedTodayProfit !== undefined ? smoothedTodayProfit : currentPortPnl) : fallbackHistProfit)
-                                    : (isPortOnNewDay ? otherPortPnl : fallbackHistProfit);
+                                    ? (smoothedTodayProfit !== undefined ? smoothedTodayProfit : currentPortPnl)
+                                    : (isPortOnNewDay ? otherPortPnl : (fallbackHistProfit !== 0 ? fallbackHistProfit : otherPortPnl));
                                 const portTodayPnl = rawProfit;
+
+                                // 🌾 Gross closed harvest profit (displayed as `(xxx.xx)` alongside negative PnL if available)
+                                const islandEaGrossProfit = isCurrentPort 
+                                    ? eaHarvestProfitToday 
+                                    : (() => {
+                                        const rawSys = String(activePort?.portStatus?.system_code || '');
+                                        if (rawSys && rawSys.includes(':::')) {
+                                            try {
+                                                const parsed = JSON.parse(rawSys.split(':::').slice(1).join(':::'));
+                                                if (parsed && Array.isArray(parsed.harvest_events)) {
+                                                    let todayDateStr = '';
+                                                    if (activePort?.portStatus?.server_time && Number(activePort.portStatus.server_time) > 0) {
+                                                        const sDate = new Date(Number(activePort.portStatus.server_time) * 1000);
+                                                        todayDateStr = `${sDate.getUTCFullYear()}-${String(sDate.getUTCMonth() + 1).padStart(2, '0')}-${String(sDate.getUTCDate()).padStart(2, '0')}`;
+                                                    } else {
+                                                        const mDate = getMarketTradingDate(time || new Date());
+                                                        todayDateStr = `${mDate.getFullYear()}-${String(mDate.getMonth() + 1).padStart(2, '0')}-${String(mDate.getDate()).padStart(2, '0')}`;
+                                                    }
+                                                    const todayEvents = parsed.harvest_events.filter((ev: any) => {
+                                                        if (!ev.closed_at) return false;
+                                                        const evDate = new Date(Number(ev.closed_at) * 1000);
+                                                        const evDateStr = `${evDate.getUTCFullYear()}-${String(evDate.getUTCMonth() + 1).padStart(2, '0')}-${String(evDate.getUTCDate()).padStart(2, '0')}`;
+                                                        return evDateStr === todayDateStr;
+                                                    });
+                                                    if (todayEvents.length > 0) {
+                                                        return todayEvents.reduce((acc: number, ev: any) => acc + (Number(ev.profit || 0) > 0 ? Number(ev.profit) : 0), 0);
+                                                    }
+                                                }
+                                            } catch (e) {}
+                                        }
+                                        return 0;
+                                    })();
                                 const portAccProfit = Number(activePort?.portStatus?.accumulated_profit) || 0;
                                 const hasProfit = portTodayPnl > 0 || (portTodayPnl === 0 && portAccProfit > 0);
 
@@ -3549,7 +3589,7 @@ export default function FarmClient({
                                                                     </div>
 
                                                                     {/* ตัวเลขกำไรปัจจุบัน ณ ตอนนั้น (ค่าเดียวกับบนลังไม้กำไรมุมขวาบนหน้าฟาร์ม ขนาดเท่าเลขพอร์ต [32px] เสมอ) */}
-                                                                    <div className="flex items-center justify-center">
+                                                                    <div className="flex items-baseline justify-center gap-1.5">
                                                                         <span className={`text-[32px] font-mono font-black tracking-wider leading-tight whitespace-nowrap drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] ${
                                                                             isExpired48H
                                                                                 ? 'text-rose-300 drop-shadow-[0_0_22px_rgba(244,63,94,0.95)]'
@@ -3563,6 +3603,14 @@ export default function FarmClient({
                                                                         }`}>
                                                                             {formattedTodayProfit}
                                                                         </span>
+                                                                        {islandEaGrossProfit > 0 && portTodayPnl < 0 && (
+                                                                            <span 
+                                                                                className="text-[18px] font-mono font-black text-[#4de180] drop-shadow-[0_0_12px_rgba(77,225,128,0.9)] leading-tight whitespace-nowrap"
+                                                                                title={`กำไรจาก EA ปิดรวบวันนี้: +${islandEaGrossProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
+                                                                            >
+                                                                                ({islandEaGrossProfit.toFixed(2)})
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
 
