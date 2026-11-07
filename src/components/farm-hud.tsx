@@ -613,7 +613,16 @@ export function FarmMobileStatsOverlay({
             <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
                 <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
                     <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none whitespace-nowrap">
-                        {isLiveMode ? `Showcase ${String(portNumber).slice(-4)}` : (customName ? customName : `PORT: ${portNumber}`)}
+                        {(() => {
+                            if (!isLiveMode) {
+                                return customName ? customName : `PORT: ${portNumber}`;
+                            }
+                            const cleanPort = String(portNumber || '').trim();
+                            if (/^\d+$/.test(cleanPort)) {
+                                return `Showcase ${cleanPort.slice(-4)}`;
+                            }
+                            return customName || 'SHOWCASE';
+                        })()}
                     </div>
                 </div>
                 {adminMessage && (

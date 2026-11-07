@@ -4984,17 +4984,17 @@ export default function FarmClient({
                                     <div className="flex flex-col items-center pointer-events-none select-none">
                                         <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter whitespace-nowrap">{item.date}</span>
                                         {item.isHoliday ? (
-                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400/80 animate-pulse whitespace-nowrap" title={item.holidayName}>
+                                            <span className={`text-[10px] sm:text-[11px] font-mono font-bold animate-pulse whitespace-nowrap ${isLiveMode ? 'text-amber-400/80' : 'text-amber-400'}`} title={item.holidayName}>
                                                 {isLiveMode ? 'REST' : 'CLOSED'}
                                             </span>
                                         ) : (
-                                            <span className={`text-[9.5px] sm:text-[10.5px] font-mono font-bold whitespace-nowrap ${
+                                            <span className={`text-[10px] sm:text-[11px] font-mono font-bold whitespace-nowrap ${
                                                 item.pnl >= 0 
                                                     ? (isLiveMode ? 'text-emerald-400/90' : 'text-[#4de180]') 
                                                     : (isLiveMode ? 'text-rose-400/90' : 'text-red-500')
                                             }`}>
                                                 {isLiveMode 
-                                                    ? `Yield: ${item.pnl.toFixed(1)}` 
+                                                    ? `${item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(1)}` 
                                                     : `${item.pnl >= 0 ? '+' : ''}${(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}`
                                                 }
                                             </span>
