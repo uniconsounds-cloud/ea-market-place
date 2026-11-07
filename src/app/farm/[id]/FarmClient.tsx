@@ -3072,7 +3072,7 @@ export default function FarmClient({
             {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
-                    title={isLiveMode ? 'EasyM Prime | LIVE MODE' : (currentCustomName ? `${currentCustomName.toUpperCase()} (${portNumber})` : undefined)}
+                    title={isLiveMode ? 'EasyM Prime | LIVE DEMO MODE' : (currentCustomName ? `${currentCustomName.toUpperCase()} (${portNumber})` : undefined)}
                     portNumber={portNumber}
                     balance={Number(portStatus?.balance) || 0}
                     equity={Number(portStatus?.equity) || 0}
@@ -3755,7 +3755,7 @@ export default function FarmClient({
                                                                             </span>
                                                                         </div>
                                                                         <div className="text-[32px] font-mono font-black tracking-wider text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                                                                            {activePort.portNumber}
+                                                                            {`****${String(activePort.portNumber).slice(-4)}`}
                                                                         </div>
                                                                     </div>
                                                                 </div>

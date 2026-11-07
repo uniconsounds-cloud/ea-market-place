@@ -601,7 +601,7 @@ export function FarmMobileStatsOverlay({
             <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
                 <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
                     <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none">
-                        {customName ? customName : (isLiveMode ? `SHOWCASE #${String(portNumber).slice(-4)}` : `PORT: ${portNumber}`)}
+                        {isLiveMode ? `Showcase ${String(portNumber).slice(-4)}` : (customName ? customName : `PORT: ${portNumber}`)}
                     </div>
                 </div>
                 {adminMessage && (
@@ -646,7 +646,7 @@ export function FarmMobileStatsOverlay({
                 </div>
                 {/* Port Number on Bottom-Left */}
                 <div className="absolute left-[4px] bottom-1.5 z-20">
-                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{isLiveMode ? `#${String(portNumber).slice(-4)}` : portNumber}</span>
+                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{isLiveMode ? `****${String(portNumber).slice(-4)}` : portNumber}</span>
                 </div>
                 {/* Box Image on Bottom-Right */}
                 <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>

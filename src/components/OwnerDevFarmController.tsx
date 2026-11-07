@@ -259,15 +259,15 @@ export default function OwnerDevFarmController({
                                 ? 'bg-gradient-to-br from-rose-500/30 via-[#18090d]/95 to-red-950/90 border-rose-500/90 shadow-[0_0_25px_rgba(244,63,94,0.6),inset_0_0_10px_rgba(244,63,94,0.3)]'
                                 : 'bg-gradient-to-br from-amber-500/25 via-[#120f0a]/95 to-amber-950/90 border-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5),inset_0_0_10px_rgba(245,158,11,0.25)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)]'
                         }`}
-                        title={isLiveMode ? "🔴 TikTok LIVE Mode (คลิกเพื่อเปิดเมนู / ปิดโหมด)" : "👑 Owner Dev Menu (คลิกเพื่อเปิดเมนู / ลากเพื่อย้ายที่)"}
+                        title={isLiveMode ? "🔴 TikTok LIVE DEMO Mode (คลิกเพื่อเปิดเมนู / ปิดโหมด)" : "👑 Owner Dev Menu (คลิกเพื่อเปิดเมนู / ลากเพื่อย้ายที่)"}
                     >
-                        {/* Text "Dev" / "LIVE" */}
+                        {/* Text "Dev" / "DEMO" */}
                         <span className={`font-mono font-black text-xs tracking-wider drop-shadow-md ${
                             isLiveMode
                                 ? 'text-rose-300 drop-shadow-[0_0_8px_rgba(244,63,94,0.9)] text-[11px]'
                                 : 'text-amber-300 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] group-hover:text-amber-100'
                         }`}>
-                            {isLiveMode ? 'LIVE' : 'Dev'}
+                            {isLiveMode ? 'DEMO' : 'Dev'}
                         </span>
 
                         {/* Status Pulse Dot */}
@@ -403,7 +403,7 @@ export default function OwnerDevFarmController({
                                         <div className="flex items-center gap-1.5">
                                             <span className={`w-2.5 h-2.5 rounded-full ${isLiveMode ? 'bg-rose-500 animate-ping shadow-[0_0_8px_#f43f5e]' : 'bg-slate-500'}`} />
                                             <span className={`text-[11px] font-black uppercase tracking-wide ${isLiveMode ? 'text-rose-300' : 'text-amber-200/80'}`}>
-                                                🔴 TikTok LIVE Mode
+                                                🔴 TikTok LIVE DEMO Mode
                                             </span>
                                         </div>
                                         <button
@@ -411,8 +411,8 @@ export default function OwnerDevFarmController({
                                             onClick={() => {
                                                 const next = !isLiveMode;
                                                 onToggleLiveMode?.(next);
-                                                if (next) toast.success('เปิด TikTok LIVE Mode: พรางคำศัพท์ปลอดภัย 100%');
-                                                else toast.info('ปิด TikTok LIVE Mode: กลับสู่หน้า Dashboard ปกติ');
+                                                if (next) toast.success('เปิด TikTok LIVE DEMO Mode: พรางคำศัพท์ปลอดภัย 100%');
+                                                else toast.info('ปิด TikTok LIVE DEMO Mode: กลับสู่หน้า Dashboard ปกติ');
                                             }}
                                             className={`py-1 px-3 rounded-lg font-bold text-[10px] uppercase transition-all cursor-pointer flex items-center gap-1 ${
                                                 isLiveMode
