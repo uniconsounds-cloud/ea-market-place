@@ -90,6 +90,7 @@ type FarmHudProps = {
     adminMessage?: string | null;
     isNonLive10m?: boolean;
     onHarvestClick?: () => void;
+    isLiveMode?: boolean;
 };
 
 export default function FarmHud({
@@ -118,6 +119,7 @@ export default function FarmHud({
     adminMessage,
     isNonLive10m = false,
     onHarvestClick,
+    isLiveMode = false,
 }: FarmHudProps) {
     const [time, setTime] = useState<Date | null>(null);
     const [isClient, setIsClient] = useState(false);
@@ -157,8 +159,8 @@ export default function FarmHud({
     else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
 
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
-    const currencyPrefix = isUSC ? '' : '$';
-    const unitSuffix = isUSC ? ' USC' : ' USD';
+    const currencyPrefix = isLiveMode ? '' : (isUSC ? '' : '$');
+    const unitSuffix = isLiveMode ? '' : (isUSC ? ' USC' : ' USD');
     const slowBlinkClass = isNonLive10m ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : '';
 
     return (
@@ -322,13 +324,13 @@ export default function FarmHud({
                                     )}
                                 </div>
                                 <div className={`text-[10px] sm:text-sm font-bold tracking-wider text-[#0ea5e9] ${slowBlinkClass}`}>
-                                    <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">EQUITY</span>
+                                    <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase mr-1">{isLiveMode ? 'NET VAL' : 'EQUITY'}</span>
                                     {currencyPrefix}{equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                             </div>
                             <div className={`text-right flex flex-col items-end ${slowBlinkClass}`}>
                                 <div className="flex gap-1 sm:gap-2 items-center mb-0.5">
-                                    <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase">BALANCE</span>
+                                    <span className="text-[7px] sm:text-[8px] text-white/30 tracking-widest uppercase">{isLiveMode ? 'CAPACITY' : 'BALANCE'}</span>
                                     <span className="font-mono text-[10px] sm:text-sm font-bold text-[#cfa545] tracking-wider">
                                         {currencyPrefix}{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
@@ -423,7 +425,7 @@ export default function FarmHud({
                     </div>
                     <div className="flex flex-col pr-1 justify-center">
                         <span className={`hidden sm:flex items-center gap-1 text-[8px] lg:text-[10px] uppercase font-black tracking-widest leading-none mb-1 ${onHarvestClick ? 'text-amber-300 group-hover:text-amber-200' : 'text-amber-200/40'}`}>
-                            <span>Today Result</span>
+                            <span>{isLiveMode ? 'DAILY HARVEST' : 'Today Result'}</span>
                             {onHarvestClick && <span className="text-[7.5px] font-bold text-amber-400/80 bg-amber-400/10 px-1 py-0.2 rounded border border-amber-400/30">REPORT ↗</span>}
                         </span>
                         <div className="flex items-baseline gap-1 leading-none">
@@ -437,7 +439,7 @@ export default function FarmHud({
                             {eaTodayProfit !== undefined && eaTodayProfit > 0 && todayProfit < 0 && (
                                 <span 
                                     className="text-[9px] sm:text-xs lg:text-sm font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
-                                    title={`กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
+                                    title={isLiveMode ? `EA: +${eaTodayProfit.toFixed(2)}` : `กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
                                 >
                                     ({eaTodayProfit.toFixed(2)})
                                 </span>
@@ -445,13 +447,13 @@ export default function FarmHud({
                         </div>
                         {/* More visible USC Label */}
                         <div className="flex items-center gap-1 mt-0.5">
-                           <span className="inline sm:inline text-[8px] text-white/40 uppercase">LOTS:<span className="text-[#0ea5e9] ml-1">{todayClosedLots.toFixed(2)}</span></span>
+                           <span className="inline sm:inline text-[8px] text-white/40 uppercase">{isLiveMode ? 'SEEDS:' : 'LOTS:'}<span className="text-[#0ea5e9] ml-1">{todayClosedLots.toFixed(2)}</span></span>
                            <span className="inline sm:inline text-[7px] text-white/20 ml-1">|</span>
                            {(() => {
                                const maxDd = Math.abs(Number(dailyMaxDrawdown) || 0);
                                const displayMaxDd = maxDd > 0 ? `-${maxDd.toFixed(2)}%` : '0.00%';
                                return (
-                                   <span className="inline sm:inline text-[8px] text-white/40 uppercase" title="Max Drawdown วันนี้">MaxDD:<span className="text-red-500/80 ml-1 font-mono font-bold">{displayMaxDd}</span></span>
+                                   <span className="inline sm:inline text-[8px] text-white/40 uppercase" title={isLiveMode ? 'Drawdown' : 'Max Drawdown วันนี้'}>{isLiveMode ? 'DD:' : 'MaxDD:'}<span className="text-red-500/80 ml-1 font-mono font-bold">{displayMaxDd}</span></span>
                                );
                            })()}
                         </div>
@@ -488,6 +490,7 @@ export function FarmMobileStatsOverlay({
     customName,
     adminMessage,
     isNonLive10m = false,
+    isLiveMode = false,
     onHarvestClick,
 }: {
     portNumber: string;
@@ -508,6 +511,7 @@ export function FarmMobileStatsOverlay({
     customName?: string;
     adminMessage?: string | null;
     isNonLive10m?: boolean;
+    isLiveMode?: boolean;
     onHarvestClick?: () => void;
 }) {
     const [messageIndex, setMessageIndex] = useState(0);
@@ -522,7 +526,7 @@ export function FarmMobileStatsOverlay({
     }, [adminMessage]);
 
     const isUSC = accountType?.toUpperCase().trim() === 'USC' || accountType?.toUpperCase().trim() === 'CENT';
-    const currencyPrefix = isUSC ? '' : '$';
+    const currencyPrefix = isLiveMode ? '' : (isUSC ? '' : '$');
 
     const isUSD_Mobile = !isUSC;
     const centsValue_Mobile = isUSD_Mobile ? todayProfit * 100 : todayProfit;
@@ -597,7 +601,7 @@ export function FarmMobileStatsOverlay({
             <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
                 <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
                     <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none">
-                        {customName ? customName : `PORT: ${portNumber}`}
+                        {customName ? customName : (isLiveMode ? `SHOWCASE #${String(portNumber).slice(-4)}` : `PORT: ${portNumber}`)}
                     </div>
                 </div>
                 {adminMessage && (
@@ -623,7 +627,7 @@ export function FarmMobileStatsOverlay({
                         {eaTodayProfit !== undefined && eaTodayProfit > 0 && todayProfit < 0 && (
                             <span 
                                 className="text-[10px] sm:text-xs font-mono font-black text-[#4de180] drop-shadow-[0_0_8px_rgba(77,225,128,0.6)] leading-none"
-                                title={`กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
+                                title={isLiveMode ? `EA: +${eaTodayProfit.toFixed(2)}` : `กำไรจาก EA ปิดรวบวันนี้: +${eaTodayProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
                             >
                                 ({eaTodayProfit.toFixed(2)})
                             </span>
@@ -634,15 +638,15 @@ export function FarmMobileStatsOverlay({
                             const maxDd = Math.abs(Number(dailyMaxDrawdown) || 0);
                             const displayMaxDd = maxDd > 0 ? `-${maxDd.toFixed(2)}%` : '0.00%';
                             return (
-                                <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">MaxDD: <span className="text-red-500/80 font-mono font-bold">{displayMaxDd}</span></span>
+                                <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">{isLiveMode ? 'DD:' : 'MaxDD:'} <span className="text-red-500/80 font-mono font-bold">{displayMaxDd}</span></span>
                             );
                         })()}
-                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">Lots: <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
+                        <span className="text-[7px] text-white/40 uppercase font-black tracking-widest leading-tight">{isLiveMode ? 'Seeds:' : 'Lots:'} <span className="text-[#0ea5e9]">{todayClosedLots.toFixed(2)}</span></span>
                     </div>
                 </div>
                 {/* Port Number on Bottom-Left */}
                 <div className="absolute left-[4px] bottom-1.5 z-20">
-                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{portNumber}</span>
+                    <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">{isLiveMode ? `#${String(portNumber).slice(-4)}` : portNumber}</span>
                 </div>
                 {/* Box Image on Bottom-Right */}
                 <div className={`absolute -right-2 -bottom-4 w-20 h-20 flex-shrink-0 drop-shadow-xl transition-transform duration-300 pointer-events-none z-10 ${isShaking ? 'animate-box-shake' : ''}`}>

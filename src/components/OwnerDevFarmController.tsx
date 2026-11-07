@@ -37,6 +37,8 @@ export interface OwnerDevFarmControllerProps {
     onSetSimulatedThreshold: (val: number | null) => void;
     simulatedFarmStatus?: Record<number, 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H'>;
     onSetSimulatedFarmStatus?: (status: Record<number, 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H'>) => void;
+    isLiveMode?: boolean;
+    onToggleLiveMode?: (enabled: boolean) => void;
 }
 
 export default function OwnerDevFarmController({
@@ -57,7 +59,9 @@ export default function OwnerDevFarmController({
     simulatedThreshold,
     onSetSimulatedThreshold,
     simulatedFarmStatus,
-    onSetSimulatedFarmStatus
+    onSetSimulatedFarmStatus,
+    isLiveMode = false,
+    onToggleLiveMode
 }: OwnerDevFarmControllerProps) {
     // 🛡️ STRICT SAFETY GUARD: Never render anything for customers
     if (!isOwnerTestPort) return null;
@@ -250,17 +254,30 @@ export default function OwnerDevFarmController({
                         onMouseDown={handleMouseDown}
                         onTouchStart={handleTouchStart}
                         onClick={handleCircleClick}
-                        className="group relative flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-amber-500/25 via-[#120f0a]/95 to-amber-950/90 border-2 border-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5),inset_0_0_10px_rgba(245,158,11,0.25)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)] hover:scale-110 active:scale-95 transition-all duration-200 backdrop-blur-xl cursor-grab active:cursor-grabbing"
-                        title="👑 Owner Dev Menu (คลิกเพื่อเปิดเมนู / ลากเพื่อย้ายที่)"
+                        className={`group relative flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-200 backdrop-blur-xl cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 ${
+                            isLiveMode
+                                ? 'bg-gradient-to-br from-rose-500/30 via-[#18090d]/95 to-red-950/90 border-rose-500/90 shadow-[0_0_25px_rgba(244,63,94,0.6),inset_0_0_10px_rgba(244,63,94,0.3)]'
+                                : 'bg-gradient-to-br from-amber-500/25 via-[#120f0a]/95 to-amber-950/90 border-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5),inset_0_0_10px_rgba(245,158,11,0.25)] hover:shadow-[0_0_30px_rgba(245,158,11,0.8)]'
+                        }`}
+                        title={isLiveMode ? "🔴 TikTok LIVE Mode (คลิกเพื่อเปิดเมนู / ปิดโหมด)" : "👑 Owner Dev Menu (คลิกเพื่อเปิดเมนู / ลากเพื่อย้ายที่)"}
                     >
-                        {/* Text "Dev" */}
-                        <span className="font-mono font-black text-xs tracking-wider text-amber-300 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] group-hover:text-amber-100">
-                            Dev
+                        {/* Text "Dev" / "LIVE" */}
+                        <span className={`font-mono font-black text-xs tracking-wider drop-shadow-md ${
+                            isLiveMode
+                                ? 'text-rose-300 drop-shadow-[0_0_8px_rgba(244,63,94,0.9)] text-[11px]'
+                                : 'text-amber-300 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] group-hover:text-amber-100'
+                        }`}>
+                            {isLiveMode ? 'LIVE' : 'Dev'}
                         </span>
 
                         {/* Status Pulse Dot */}
                         <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                            {simulatedBuffer !== null ? (
+                            {isLiveMode ? (
+                                <>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-90" />
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border border-black/80" />
+                                </>
+                            ) : simulatedBuffer !== null ? (
                                 <>
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-90" />
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400 border border-black/80" />
@@ -373,6 +390,46 @@ export default function OwnerDevFarmController({
                                         : '👁️ กำลังจำลองหน้าจอ PrimeUI v1 ตามจริงที่ลูกค้ามองเห็นอยู่ตอนนี้'
                                     }
                                 </p>
+                            </div>
+
+                            {/* 🔴 Section: TikTok LIVE Mode (Safe Showcase) */}
+                            <div className="pt-2 border-t border-amber-500/20">
+                                <div className={`p-2 rounded-xl transition-all border ${
+                                    isLiveMode 
+                                        ? 'bg-gradient-to-r from-rose-950/80 via-red-950/60 to-black/80 border-rose-500/80 shadow-[0_0_20px_rgba(244,63,94,0.3)]' 
+                                        : 'bg-black/60 border-amber-500/30'
+                                }`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={`w-2.5 h-2.5 rounded-full ${isLiveMode ? 'bg-rose-500 animate-ping shadow-[0_0_8px_#f43f5e]' : 'bg-slate-500'}`} />
+                                            <span className={`text-[11px] font-black uppercase tracking-wide ${isLiveMode ? 'text-rose-300' : 'text-amber-200/80'}`}>
+                                                🔴 TikTok LIVE Mode
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = !isLiveMode;
+                                                onToggleLiveMode?.(next);
+                                                if (next) toast.success('เปิด TikTok LIVE Mode: พรางคำศัพท์ปลอดภัย 100%');
+                                                else toast.info('ปิด TikTok LIVE Mode: กลับสู่หน้า Dashboard ปกติ');
+                                            }}
+                                            className={`py-1 px-3 rounded-lg font-bold text-[10px] uppercase transition-all cursor-pointer flex items-center gap-1 ${
+                                                isLiveMode
+                                                    ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white font-black shadow-[0_0_12px_rgba(244,63,94,0.6)] animate-pulse'
+                                                    : 'bg-white/10 hover:bg-white/20 text-slate-300 border border-white/20'
+                                            }`}
+                                        >
+                                            <span>{isLiveMode ? 'ON (ปลอดภัย)' : 'OFF'}</span>
+                                        </button>
+                                    </div>
+                                    <div className="text-[9.5px] text-amber-200/60 leading-tight mt-1">
+                                        {isLiveMode 
+                                            ? '🛡️ กำลังเปิดโหมดพรางตัว: ซ่อน $, USC, PROFIT เปลี่ยนเป็น DAILY HARVEST, Seeds, DD ปลอดภัยต่อบอทตรวจจับ'
+                                            : 'คลิกเพื่อเปิดโหมดไลฟ์สด พรางคำศัพท์การเงินเป็นเกมฟาร์มผลไม้โดยคงตำแหน่งเดิม 100%'
+                                        }
+                                    </div>
+                                </div>
                             </div>
 
                             {/* 🧪 Section 2: Buffer Aura Testing Slider (หดขึ้นตามแนวตั้งได้เป็นเมนูทดสอบบัฟเฟอร์) */}

@@ -188,7 +188,8 @@ const GlowingDdOrb = ({
     onMouseLeave,
     displayText,
     isSlowBlink,
-    showWarning
+    showWarning,
+    customLabel
 }: {
     type: 'TOTAL' | 'ACTIVE' | 'QUARANTINE' | 'MANUAL' | 'EA';
     value: number;
@@ -202,6 +203,7 @@ const GlowingDdOrb = ({
     displayText?: string;
     isSlowBlink?: boolean;
     showWarning?: boolean;
+    customLabel?: string;
 }) => {
     // ระดับสีของค่า DD (ต่ำกว่า 18% เขียว, 18-28% เหลืองส้ม, เกิน 28% แดง)
     const levelTheme = getDDLevelTheme(value);
@@ -333,7 +335,7 @@ const GlowingDdOrb = ({
             {/* 🔢 Center Dial Gauge Value & Label (ย่อขนาดเล็กลงพอเหมาะ ไม่ทับสเกล - สีตัวเลขเปลี่ยนตามระดับ DD) */}
             <div className="relative z-20 flex flex-col items-center justify-center leading-none text-center pointer-events-none">
                 <span className={`font-black uppercase mb-0.5 ${type === 'EA' ? 'text-[8px] sm:text-[9.5px] tracking-wider' : 'text-[5px] sm:text-[6px] tracking-widest'} ${config.labelColor}`}>
-                    {config.label}
+                    {customLabel || config.label}
                 </span>
                 <span className={`font-mono font-black text-[7.5px] sm:text-[9px] tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${type === 'MANUAL' && value <= 0 ? 'text-cyan-300' : levelTheme.textColor} ${(isSlowBlink || type === 'MANUAL') ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : ''}`}>
                     {displayText !== undefined ? displayText : (value <= 0 ? `+${Math.abs(value).toFixed(1)}%` : `-${value.toFixed(1)}%`)}
@@ -534,6 +536,21 @@ export default function FarmClient({
     });
     const [devPreviewMode, setDevPreviewMode] = useState<'dev' | 'customer'>('dev');
     const isOwnerDevUser = (isAllowedDevMenuPort || isAdmin || isSuperAdmin) && devPreviewMode === 'dev';
+
+    // 🔴 TikTok LIVE Safe Mode: ซ่อนสัญลักษณ์การเงิน และปรับข้อความให้ปลอดภัยจากการแบน
+    const [isLiveMode, setIsLiveMode] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('easym_tiktok_live_mode') === 'true';
+        }
+        return false;
+    });
+
+    const handleToggleLiveMode = useCallback((val: boolean) => {
+        setIsLiveMode(val);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('easym_tiktok_live_mode', val ? 'true' : 'false');
+        }
+    }, []);
     // 🧪 Simulated Buffer & Threshold for testing dome buffer aura (Dev testing)
     const [simulatedBuffer, setSimulatedBuffer] = useState<number | null>(null);
     const [simulatedThreshold, setSimulatedThreshold] = useState<number | null>(null);
@@ -3055,7 +3072,7 @@ export default function FarmClient({
             {/* FIXED HEADER SECTION (HUD + TIMELINE) */}
             <div className="fixed top-0 left-0 w-full z-[100] bg-[#16120e] shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
                 <FarmHud
-                    title={currentCustomName ? `${currentCustomName.toUpperCase()} (${portNumber})` : undefined}
+                    title={isLiveMode ? 'EasyM Prime | LIVE MODE' : (currentCustomName ? `${currentCustomName.toUpperCase()} (${portNumber})` : undefined)}
                     portNumber={portNumber}
                     balance={Number(portStatus?.balance) || 0}
                     equity={Number(portStatus?.equity) || 0}
@@ -3077,6 +3094,7 @@ export default function FarmClient({
                     systemCode={portStatus?.system_code?.split(':::')[0]}
                     onClick={handleSecretToggle}
                     isNonLive10m={isFallback1Url}
+                    isLiveMode={isLiveMode}
                     onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
                 />
                 
@@ -3126,6 +3144,7 @@ export default function FarmClient({
                 isShaking={isShaking}
                 customName={currentCustomName || undefined}
                 isNonLive10m={isFallback1Url}
+                isLiveMode={isLiveMode}
                 onHarvestClick={isAllowedDevMenuPort ? () => setIsHarvestModalOpen(true) : undefined}
             />
 
@@ -3471,7 +3490,7 @@ export default function FarmClient({
                                 // 💰 ตัวเลขกำไรปัจจุบัน ณ ตอนนั้น (ค่าเดียวกับที่แสดงบนลังไม้กำไรมุมขวาบนหน้าฟาร์ม ไม่ต้องคำนวณใหม่)
                                 const portAccType = String(activePort?.portStatus?.account_type || '').toUpperCase().trim();
                                 const isUSC = portAccType === 'USC' || portAccType === 'CENT';
-                                const currencyPrefix = isUSC ? '' : '$';
+                                const currencyPrefix = isLiveMode ? '' : (isUSC ? '' : '$');
                                 const formattedTodayProfit = `${portTodayPnl >= 0 ? '+' : ''}${currencyPrefix}${portTodayPnl.toFixed(2)}`;
 
                                 return (
@@ -3605,7 +3624,7 @@ export default function FarmClient({
                                                                                     ? 'text-amber-300'
                                                                                     : (portTodayPnl >= 0 ? 'text-emerald-300' : 'text-rose-300')
                                                                         }`}>
-                                                                            TODAY PROFIT
+                                                                            {isLiveMode ? 'DAILY HARVEST' : 'TODAY PROFIT'}
                                                                         </span>
                                                                     </div>
 
@@ -3627,7 +3646,7 @@ export default function FarmClient({
                                                                         {islandEaGrossProfit > 0 && portTodayPnl < 0 && (
                                                                             <span 
                                                                                 className="text-[18px] font-mono font-black text-[#4de180] drop-shadow-[0_0_12px_rgba(77,225,128,0.9)] leading-tight whitespace-nowrap"
-                                                                                title={`กำไรจาก EA ปิดรวบวันนี้: +${islandEaGrossProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
+                                                                                title={isLiveMode ? `EA: +${islandEaGrossProfit.toFixed(2)}` : `กำไรจาก EA ปิดรวบวันนี้: +${islandEaGrossProfit.toFixed(2)} ${isUSC ? 'USC' : 'USD'}`}
                                                                             >
                                                                                 ({islandEaGrossProfit.toFixed(2)})
                                                                             </span>
@@ -5111,6 +5130,7 @@ export default function FarmClient({
                                     <div className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(0deg)] ${mainOrbMode === 'TOTAL' ? 'pointer-events-auto' : 'pointer-events-none'}`}>
                                         <GlowingDdOrb
                                             type="TOTAL"
+                                            customLabel={isLiveMode ? 'RISK' : undefined}
                                             value={totalPortDDPct}
                                             isSlowBlink={isFallback1Url}
                                             showPing
@@ -7066,6 +7086,8 @@ export default function FarmClient({
                     onSetSimulatedThreshold={setSimulatedThreshold}
                     simulatedFarmStatus={simulatedFarmStatus}
                     onSetSimulatedFarmStatus={setSimulatedFarmStatus}
+                    isLiveMode={isLiveMode}
+                    onToggleLiveMode={handleToggleLiveMode}
                 />
             )}
             {/* 🌾 Today Harvest Basket Closures Modal (Gated to Dev Ports 3088 & 2434) */}
