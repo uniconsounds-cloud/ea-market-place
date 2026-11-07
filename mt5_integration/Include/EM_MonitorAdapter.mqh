@@ -489,16 +489,16 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       double basketProfit = 0.0;
       string exitComment = closedDeals[i].comment;
       bool isManualExit = false;
-      bool isCut_i = (StringFind(closedDeals[i].comment, "CUT") >= 0 || StringFind(closedDeals[i].comment, "TRIM") >= 0 || StringFind(closedDeals[i].comment, "RescueCut") >= 0);
+      bool isCut_i = (StringFind(closedDeals[i].comment, "CUT") >= 0 || StringFind(closedDeals[i].comment, "TRIM") >= 0 || StringFind(closedDeals[i].comment, "RescueCut") >= 0 || StringFind(closedDeals[i].comment, "R_OUT") >= 0 || StringFind(closedDeals[i].comment, "RELIEF") >= 0);
 
       for(int j = i; j < closedCount; j++)
       {
          if(processed[j]) continue;
          if(closedDeals[j].symbol != sym) continue;
-         if(MathAbs((long)closedDeals[j].time - (long)baseTime) > 3) continue;
+         if(MathAbs((long)closedDeals[j].time - (long)baseTime) > 30) continue;
 
          // A relief cut-loss deal should NEVER merge with a take-profit/scalp deal
-         bool isCut_j = (StringFind(closedDeals[j].comment, "CUT") >= 0 || StringFind(closedDeals[j].comment, "TRIM") >= 0 || StringFind(closedDeals[j].comment, "RescueCut") >= 0);
+         bool isCut_j = (StringFind(closedDeals[j].comment, "CUT") >= 0 || StringFind(closedDeals[j].comment, "TRIM") >= 0 || StringFind(closedDeals[j].comment, "RescueCut") >= 0 || StringFind(closedDeals[j].comment, "R_OUT") >= 0 || StringFind(closedDeals[j].comment, "RELIEF") >= 0);
          if(isCut_i != isCut_j) continue;
 
          // If not a cut deal, they must share the same tier comment category (T1, T2, T3, or regular)
@@ -525,7 +525,7 @@ void EM_ReconstructTodayHarvestFromDeals(long magicBase)
       string exitType = "FULL_BASKET_TP";
       if(isManualExit)
          exitType = "MANUAL_CLOSE_EA";
-      else if(isCut_i || StringFind(exitComment, "CUT") >= 0 || StringFind(exitComment, "TRIM") >= 0 || StringFind(exitComment, "RescueCut") >= 0)
+      else if(isCut_i || StringFind(exitComment, "CUT") >= 0 || StringFind(exitComment, "TRIM") >= 0 || StringFind(exitComment, "RescueCut") >= 0 || StringFind(exitComment, "R_OUT") >= 0 || StringFind(exitComment, "RELIEF") >= 0)
          exitType = "RELIEF_TRIM";
       else if(StringFind(exitComment, "T1_OUT") >= 0 || StringFind(exitComment, "T1") >= 0)
          exitType = "RESCUE_T1_SCALP_TP";
