@@ -2894,10 +2894,14 @@ export default function FarmClient({
             const cents = isUSC ? pnl : pnl * 100;
             
             let asset = '/farm/base_farmbox_empty.webp';
-            if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
-            else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
-            else if (cents > 1000) asset = '/farm/base_farmbox_mid.webp';
-            else if (cents > 0) asset = '/farm/base_farmbox_min.webp';
+            if (isLiveMode && liveAssetType === 'island') {
+                asset = '/farm/mini_farm_island.webp';
+            } else {
+                if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
+                else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
+                else if (cents > 1000) asset = '/farm/base_farmbox_mid.webp';
+                else if (cents > 0) asset = '/farm/base_farmbox_min.webp';
+            }
             
             // Check if this date is a market holiday and profit is 0
             const dateMD = item.date.substring(5); // 'MM-DD'
@@ -2929,7 +2933,7 @@ export default function FarmClient({
                 isEndOfWeek
             };
         });
-    }, [history, brokerDateStr, portStatus?.account_type]);
+    }, [history, brokerDateStr, portStatus?.account_type, isLiveMode, liveAssetType]);
 
     const historyScrollRef = useRef<HTMLDivElement>(null);
     const hasInitialScrolled = useRef(false);
@@ -4949,7 +4953,7 @@ export default function FarmClient({
                     {/* Desktop header row */}
                     <div className="hidden sm:flex justify-between px-6 pt-2 mb-1">
                         <span className="text-[10px] text-amber-200/50 uppercase tracking-[0.2em] font-bold">
-                            Daily Harvest History ({dailyHistory.length}D)
+                            {isLiveMode ? `System Activity Timeline (${dailyHistory.length}D)` : `Daily Harvest History (${dailyHistory.length}D)`}
                         </span>
                     </div>
 
@@ -4968,17 +4972,31 @@ export default function FarmClient({
                             <div key={item.id || idx} className="flex items-center flex-shrink-0">
                                 <div className="flex flex-col items-center group relative pointer-events-none select-none">
                                     <div className="relative w-16 h-16 sm:w-20 sm:h-20 transition-transform duration-300 group-hover:scale-110 drop-shadow-xl pointer-events-none select-none">
-                                        <Image src={item.asset} alt="Box" fill className="object-contain" unoptimized draggable={false} />
+                                        <Image 
+                                            src={item.asset} 
+                                            alt="Box" 
+                                            fill 
+                                            className={`object-contain ${item.isHoliday && isLiveMode ? 'opacity-40 grayscale' : ''}`} 
+                                            unoptimized 
+                                            draggable={false} 
+                                        />
                                     </div>
                                     <div className="flex flex-col items-center pointer-events-none select-none">
-                                        <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter">{item.date}</span>
+                                        <span className="text-[8px] sm:text-[9px] text-amber-100/40 font-mono tracking-tighter whitespace-nowrap">{item.date}</span>
                                         {item.isHoliday ? (
-                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400 animate-pulse" title={item.holidayName}>
-                                                CLOSED
+                                            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-amber-400/80 animate-pulse whitespace-nowrap" title={item.holidayName}>
+                                                {isLiveMode ? 'REST' : 'CLOSED'}
                                             </span>
                                         ) : (
-                                            <span className={`text-[10px] sm:text-[11px] font-mono font-bold ${item.pnl >= 0 ? 'text-[#4de180]' : 'text-red-500'}`}>
-                                                {item.pnl >= 0 ? '+' : ''}{(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}
+                                            <span className={`text-[9.5px] sm:text-[10.5px] font-mono font-bold whitespace-nowrap ${
+                                                item.pnl >= 0 
+                                                    ? (isLiveMode ? 'text-emerald-400/90' : 'text-[#4de180]') 
+                                                    : (isLiveMode ? 'text-rose-400/90' : 'text-red-500')
+                                            }`}>
+                                                {isLiveMode 
+                                                    ? `Yield: ${item.pnl.toFixed(1)}` 
+                                                    : `${item.pnl >= 0 ? '+' : ''}${(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}`
+                                                }
                                             </span>
                                         )}
                                     </div>
@@ -4988,7 +5006,9 @@ export default function FarmClient({
                                 {item.isEndOfWeek && idx < dailyHistory.length - 1 && (
                                     <div className="flex flex-col items-center justify-center mx-2 sm:mx-3 h-16 sm:h-20 self-start">
                                         <div className="w-[1px] h-full bg-gradient-to-b from-amber-500/0 via-amber-500/40 to-amber-500/0"></div>
-                                        <span className="text-[7px] font-mono text-amber-400/40 font-bold uppercase tracking-widest mt-1 whitespace-nowrap">WEEK</span>
+                                        <span className="text-[7px] font-mono text-amber-400/40 font-bold uppercase tracking-widest mt-1 whitespace-nowrap">
+                                            {isLiveMode ? 'CYCLE' : 'WEEK'}
+                                        </span>
                                     </div>
                                 )}
                             </div>
