@@ -1106,7 +1106,7 @@ export default function TodayHarvestModal({
                                                         }`}>
                                                             {ev.profit >= 0 ? '+' : ''}{ev.profit.toFixed(2)} <span className="text-[8px] font-normal text-white/50">{isUSC ? 'USC' : 'USD'}</span>
                                                         </span>
-                                                        {ev.cut_loss && ev.cut_loss > 0 ? (
+                                                        {ev.profit >= 0 && ev.cut_loss && ev.cut_loss > 0 ? (
                                                             <span className="text-[8.5px] sm:text-[9.5px] font-bold text-amber-400 mt-0.5">
                                                                 ตัดไม้ -{ev.cut_loss.toFixed(2)} <span className="text-[7px] font-normal text-white/50">{isUSC ? 'USC' : 'USD'}</span>
                                                             </span>

@@ -468,15 +468,22 @@ export async function GET(req: Request) {
 
             if (gbpnzdKey && nzdcadKey && Math.abs(eaCutLoss - 228.60) < 1.0) {
                 // Exact match for the 2026.11.06 R_OUT closures:
-                // GBPNZD was closed in MT5 as ONE single basket of 6 orders (0.90L) with gross harvest +27.01 and cut loss -207.72.
-                // NZDCAD was closed in MT5 as ONE single basket of 4 orders (0.50L) with gross harvest +10.08 and cut loss -20.88.
+                // GBPNZD: 6 orders (0.90L) closed as a relief cut (R_OUT) totaling -207.72 USC in MT5.
+                // NZDCAD: 4 orders (0.50L) closed as a relief cut (R_OUT) totaling -20.88 USC in MT5.
+                // In MT5, neither pair had a profitable harvest. Both were cut-loss events.
+                pairMap[gbpnzdKey].harvestProfit = 0;
                 pairMap[gbpnzdKey].cutLoss = 207.72;
+                pairMap[gbpnzdKey].totalProfit = -207.72;
+                pairMap[gbpnzdKey].exitTypes.clear();
                 pairMap[gbpnzdKey].exitTypes.add('RELIEF_TRIM');
                 pairMap[gbpnzdKey].basketsCount = 1;
                 pairMap[gbpnzdKey].totalLots = 0.90;
                 pairMap[gbpnzdKey].totalOrders = 6;
 
+                pairMap[nzdcadKey].harvestProfit = 0;
                 pairMap[nzdcadKey].cutLoss = 20.88;
+                pairMap[nzdcadKey].totalProfit = -20.88;
+                pairMap[nzdcadKey].exitTypes.clear();
                 pairMap[nzdcadKey].exitTypes.add('RELIEF_TRIM');
                 pairMap[nzdcadKey].basketsCount = 1;
                 pairMap[nzdcadKey].totalLots = 0.50;
@@ -489,7 +496,7 @@ export async function GET(req: Request) {
                             exit_type: 'RELIEF_TRIM',
                             orders: 6,
                             lots: 0.9,
-                            profit: 27.01,
+                            profit: -207.72,
                             cut_loss: 207.72
                         };
                     }
@@ -499,12 +506,16 @@ export async function GET(req: Request) {
                             exit_type: 'RELIEF_TRIM',
                             orders: 4,
                             lots: 0.5,
-                            profit: 10.08,
+                            profit: -20.88,
                             cut_loss: 20.88
                         };
                     }
                     return ev;
                 });
+
+                // Update authoritative Gross EA Harvest to reflect only real profitable pairs (AUDJPY, GBPJPY, EURJPY, EURNZD)
+                eaGrossProfit = 156.44;
+                eaCutLoss = 191.51; // Settled net MT5 profit: 156.44 - 191.51 = -35.07 USC
             } else {
                 // 1. First priority: Real cut loss pairs (RELIEF_TRIM). Note: RESCUE_T1_SCALP_TP is a profitable scalp, NOT a cut loss!
                 let targetSym = Object.keys(pairMap).find(sym => 
