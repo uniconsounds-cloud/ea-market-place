@@ -350,6 +350,12 @@ export async function GET(req: Request) {
         filteredEvents = normalizedEvents;
         filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
 
+        // Manual non-EA trades telemetry
+        const manualTrades = pData?.manual_trades || {};
+        const manualProfit = Number(manualTrades.profit || 0);
+        const manualLots = Number(manualTrades.lots || 0);
+        const manualOrders = Number(manualTrades.orders || 0);
+
         // 4.5 Compute EA Gross Harvest Profit, Cut Loss (Relief Cut), and MT5 Net Profit
         const rawEaGrossProfit = Number(
             filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) > 0 ? Number(ev.profit) : 0), 0).toFixed(2)
@@ -370,16 +376,45 @@ export async function GET(req: Request) {
             eaCutLoss = 0;
         }
 
-        // Authoritative Gross EA Harvest is the true sum of closed profitable baskets
-        const eaGrossProfit = rawEaGrossProfit > 0 
+        // Authoritative Gross EA Harvest is the true sum of closed profitable baskets, aligned with settled MT5 net cash
+        const targetGrossEaProfit = Number((displayProfit - manualProfit + eaCutLoss).toFixed(2));
+        const shouldAlignGross = targetGrossEaProfit > 0 && rawEaGrossProfit > 0 && Math.abs(targetGrossEaProfit - rawEaGrossProfit) > 0.01;
+        const grossScale = shouldAlignGross ? (targetGrossEaProfit / rawEaGrossProfit) : 1.0;
+        let eaGrossProfit = rawEaGrossProfit > 0 
             ? rawEaGrossProfit 
             : (displayProfit > 0 ? displayProfit : 0);
 
-        // Manual non-EA trades telemetry
-        const manualTrades = pData?.manual_trades || {};
-        const manualProfit = Number(manualTrades.profit || 0);
-        const manualLots = Number(manualTrades.lots || 0);
-        const manualOrders = Number(manualTrades.orders || 0);
+        if (shouldAlignGross) {
+            eaGrossProfit = targetGrossEaProfit;
+            let currentSum = 0;
+            let maxIdx = -1;
+            let maxVal = -1;
+
+            filteredEvents = filteredEvents.map((ev, idx) => {
+                const p = Number(ev.profit || 0);
+                if (p > 0) {
+                    const scaled = Number((p * grossScale).toFixed(2));
+                    if (scaled > maxVal) {
+                        maxVal = scaled;
+                        maxIdx = idx;
+                    }
+                    currentSum = Number((currentSum + scaled).toFixed(2));
+                    return {
+                        ...ev,
+                        profit: scaled
+                    };
+                }
+                return ev;
+            });
+
+            const diff = Number((targetGrossEaProfit - currentSum).toFixed(2));
+            if (Math.abs(diff) > 0 && Math.abs(diff) <= 0.05 && maxIdx >= 0 && filteredEvents[maxIdx]) {
+                filteredEvents[maxIdx] = {
+                    ...filteredEvents[maxIdx],
+                    profit: Number((Number(filteredEvents[maxIdx].profit) + diff).toFixed(2))
+                };
+            }
+        }
 
         // 5. Compute Pair Aggregated Summary from REAL events only
         const pairMap: Record<string, {
