@@ -430,33 +430,51 @@ export default function FarmClient({
     // ─── Daily History Crates Dock Scroll State & Controller ───
     const historyScrollRef = useRef<HTMLDivElement>(null);
     const hasInitialScrolled = useRef(false);
+    const userHasInteractedHistory = useRef(false);
+    const isProgrammaticScroll = useRef(false);
+    const scrollTimersRef = useRef<NodeJS.Timeout[]>([]);
     const isHistoryDragging = useRef(false);
     const historyDragStartX = useRef(0);
     const historyScrollStartLeft = useRef(0);
 
-    // เลื่อนแถบประวัติกำไร (ลังไม้) ไปที่วันล่าสุดทางขวาสุดอย่างแม่นยำ พร้อม multi-step retry รองรับ dynamic layout
-    const scrollToLatestCrate = useCallback((smooth = false) => {
+    const clearScrollTimers = useCallback(() => {
+        scrollTimersRef.current.forEach(t => clearTimeout(t));
+        scrollTimersRef.current = [];
+    }, []);
+
+    // เลื่อนแถบประวัติกำไร (ลังไม้) ไปที่วันล่าสุดทางขวาสุดเฉพาะเมื่อเปิดหน้าฟาร์มใหม่เท่านั้น
+    const scrollToLatestCrate = useCallback((smooth = false, force = false) => {
+        // หากผู้ใช้เคยเลื่อนดูประวัติเองแล้ว และไม่ได้สั่ง force ให้ค้างไว้ที่ตำแหน่งที่ผู้ใช้ดู
+        if (userHasInteractedHistory.current && !force) return;
+
+        clearScrollTimers();
+
         const performScroll = () => {
+            if (userHasInteractedHistory.current && !force) return;
             const el = historyScrollRef.current;
             if (!el) return;
             const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+            isProgrammaticScroll.current = true;
             if (smooth) {
                 el.scrollTo({ left: maxScroll, behavior: 'smooth' });
             } else {
                 el.scrollLeft = maxScroll;
             }
+            setTimeout(() => {
+                isProgrammaticScroll.current = false;
+            }, 60);
         };
 
         performScroll();
         if (typeof window !== 'undefined') {
             requestAnimationFrame(performScroll);
-            setTimeout(performScroll, 50);
-            setTimeout(performScroll, 120);
-            setTimeout(performScroll, 250);
-            setTimeout(performScroll, 500);
-            setTimeout(performScroll, 800);
+            const t1 = setTimeout(performScroll, 50);
+            const t2 = setTimeout(performScroll, 120);
+            const t3 = setTimeout(performScroll, 250);
+            const t4 = setTimeout(performScroll, 500);
+            scrollTimersRef.current = [t1, t2, t3, t4];
         }
-    }, []);
+    }, [clearScrollTimers]);
     
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
@@ -2058,7 +2076,8 @@ export default function FarmClient({
     const prevMultiFarmRef = useRef(isMultiFarmView);
     useEffect(() => {
         if (prevMultiFarmRef.current && !isMultiFarmView) {
-            scrollToLatestCrate();
+            userHasInteractedHistory.current = false;
+            scrollToLatestCrate(false, true);
         }
         prevMultiFarmRef.current = isMultiFarmView;
     }, [isMultiFarmView, scrollToLatestCrate]);
@@ -2076,12 +2095,15 @@ export default function FarmClient({
 
         if (String(target.portNumber) === String(portNumber)) {
             // หากคลิกพอร์ตเดิมจากหน้า Multi Farm ให้เลื่อนแถบลังประวัติไปวันล่าสุดขวาสุดทันที
-            scrollToLatestCrate();
+            userHasInteractedHistory.current = false;
+            scrollToLatestCrate(false, true);
             return;
         }
 
         // สลับข้อมูลหน้าฟาร์มไปยังพอร์ตที่คลิกทันที
         hasInitialScrolled.current = false;
+        userHasInteractedHistory.current = false;
+        clearScrollTimers();
         setHistory([]); // เคลียร์ประวัติเดิมออกทันที ป้องกัน scrollLeft คำนวณจากขนาดพอร์ตเดิมก่อนหน้า
         setPortNumber(target.portNumber);
         setCurrentCustomName(target.portName || '');
@@ -2109,7 +2131,7 @@ export default function FarmClient({
             if (ordersRes.data) setOrders(ordersRes.data);
             if (histRes.data) {
                 setHistory([...histRes.data].reverse());
-                scrollToLatestCrate();
+                scrollToLatestCrate(false, true);
             }
         } catch (e) {
             console.warn('Switch farm port fetch error:', e);
@@ -2830,7 +2852,6 @@ export default function FarmClient({
 
             if (data) {
                 setHistory(data.reverse());
-                scrollToLatestCrate();
             }
         };
 
@@ -2985,17 +3006,25 @@ export default function FarmClient({
 
     useEffect(() => {
         hasInitialScrolled.current = false;
-    }, [portNumber]);
+        userHasInteractedHistory.current = false;
+        clearScrollTimers();
+    }, [portNumber, clearScrollTimers]);
 
     useEffect(() => {
         if (historyScrollRef.current && dailyHistory.length > 0 && !hasInitialScrolled.current) {
-            scrollToLatestCrate();
+            scrollToLatestCrate(false, true);
             hasInitialScrolled.current = true;
         }
     }, [isClient, dailyHistory, portNumber, scrollToLatestCrate]);
 
+    const handleUserInteraction = () => {
+        userHasInteractedHistory.current = true;
+        clearScrollTimers();
+    };
+
     const handleHistoryWheel = (e: React.WheelEvent<HTMLDivElement>) => {
         if (!historyScrollRef.current) return;
+        handleUserInteraction();
         if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
             historyScrollRef.current.scrollLeft += e.deltaY;
         }
@@ -3003,6 +3032,7 @@ export default function FarmClient({
 
     const handleHistoryMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!historyScrollRef.current) return;
+        handleUserInteraction();
         isHistoryDragging.current = true;
         historyDragStartX.current = e.clientX;
         historyScrollStartLeft.current = historyScrollRef.current.scrollLeft;
@@ -3011,12 +3041,23 @@ export default function FarmClient({
     const handleHistoryMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!isHistoryDragging.current || !historyScrollRef.current) return;
         e.preventDefault();
+        handleUserInteraction();
         const dx = e.clientX - historyDragStartX.current;
         historyScrollRef.current.scrollLeft = historyScrollStartLeft.current - dx;
     };
 
     const handleHistoryMouseUpOrLeave = () => {
         isHistoryDragging.current = false;
+    };
+
+    const handleHistoryTouchStart = () => {
+        handleUserInteraction();
+    };
+
+    const handleHistoryScroll = () => {
+        if (!isProgrammaticScroll.current) {
+            handleUserInteraction();
+        }
     };
 
     const handleSecretToggle = () => {
@@ -5002,6 +5043,8 @@ export default function FarmClient({
                         onMouseMove={handleHistoryMouseMove}
                         onMouseUp={handleHistoryMouseUpOrLeave}
                         onMouseLeave={handleHistoryMouseUpOrLeave}
+                        onTouchStart={handleHistoryTouchStart}
+                        onScroll={handleHistoryScroll}
                         className="flex-1 w-full overflow-x-auto overflow-y-hidden flex items-center gap-3 sm:gap-6 px-3 sm:px-6 py-1 sm:py-2 no-scrollbar cursor-grab active:cursor-grabbing select-none"
                         style={{ touchAction: 'pan-x' }}
                     >

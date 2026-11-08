@@ -555,8 +555,14 @@ export default function AdminPrimeFarmLabPage() {
         };
     }, [loadingAuth, portNumber]);
 
+    const hasInitialScrolledRef = useRef(false);
+    useEffect(() => {
+        hasInitialScrolledRef.current = false;
+    }, [portNumber]);
+
     // Auto-scroll history dock to right on mount
     useEffect(() => {
+        if (hasInitialScrolledRef.current) return;
         const performScroll = () => {
             const el = historyScrollRef.current;
             if (!el) return;
@@ -569,6 +575,9 @@ export default function AdminPrimeFarmLabPage() {
             setTimeout(performScroll, 150);
             setTimeout(performScroll, 300);
             setTimeout(performScroll, 600);
+        }
+        if (rawHistory && rawHistory.length > 0) {
+            hasInitialScrolledRef.current = true;
         }
     }, [rawHistory]);
 
