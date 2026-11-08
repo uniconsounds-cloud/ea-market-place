@@ -1454,7 +1454,7 @@ export default function DemoFarmClient({
                                             }`}>
                                                 {effectiveLiveMode 
                                                     ? `${item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(1)}` 
-                                                    : `${item.pnl >= 0 ? '+' : ''}${(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}{item.pnl.toFixed(2)}`
+                                                    : `${item.pnl >= 0 ? '+' : ''}${(portStatus?.account_type?.toUpperCase().trim() === 'USC' || portStatus?.account_type?.toUpperCase().trim() === 'CENT') ? '' : '$'}${item.pnl.toFixed(2)}`
                                                 }
                                             </span>
                                         )}
