@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Clock } from 'lucide-react';
+import { Clock, Rocket } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 // ─── Animated Number: Breathing pulse + Slot machine roll on value change ───
@@ -499,6 +499,7 @@ export function FarmMobileStatsOverlay({
     isLiveMode = false,
     liveAssetType = 'island',
     onHarvestClick,
+    onOpenRealAccountClick,
 }: {
     portNumber: string;
     buyCount: number;
@@ -521,6 +522,7 @@ export function FarmMobileStatsOverlay({
     isLiveMode?: boolean;
     liveAssetType?: 'island' | 'crate';
     onHarvestClick?: () => void;
+    onOpenRealAccountClick?: () => void;
 }) {
     const [messageIndex, setMessageIndex] = useState(0);
     const slowBlinkClass = isNonLive10m ? 'animate-[slowNonLiveBlink_2.8s_ease-in-out_infinite]' : '';
@@ -609,27 +611,51 @@ export function FarmMobileStatsOverlay({
                 </div>
             </div>
 
-            {/* Center Welcome/Port Name Section (The Red Area) */}
-            <div className="flex-1 mx-2 relative h-[80px] overflow-hidden">
-                <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
-                    <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none whitespace-nowrap">
-                        {(() => {
-                            if (!isLiveMode) {
-                                return customName ? customName : `PORT: ${portNumber}`;
-                            }
-                            const cleanPort = String(portNumber || '').trim();
-                            if (/^\d+$/.test(cleanPort)) {
-                                return `Showcase ${cleanPort.slice(-4)}`;
-                            }
-                            return customName || 'SHOWCASE';
-                        })()}
+            {/* Center Welcome/Port Name Section or Open Real Account CTA */}
+            <div className="flex-1 mx-1.5 relative h-[80px] flex flex-col items-center justify-center">
+                {!isLiveMode && onOpenRealAccountClick ? (
+                    <div className="w-full flex flex-col items-center justify-center gap-1 px-0.5">
+                        <button
+                            type="button"
+                            onClick={onOpenRealAccountClick}
+                            className="w-full py-2 px-1.5 bg-gradient-to-r from-[#ffd700] via-[#ffe066] to-[#cfa545] active:scale-95 text-black font-black text-[11px] rounded-xl shadow-[0_0_15px_rgba(255,215,0,0.45)] flex items-center justify-center gap-1 transition-all border border-[#fff2a8] cursor-pointer"
+                        >
+                            <Rocket className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate whitespace-nowrap">เปิดพอร์ตจริงรับสิทธิ์ฟรี</span>
+                        </button>
+                        {adminMessage ? (
+                            <div className="text-[8px] font-bold text-[#4de180] text-center tracking-tight leading-tight truncate w-full whitespace-nowrap">
+                                {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
+                            </div>
+                        ) : (
+                            <div className="text-[7.5px] font-bold text-amber-200/50 text-center tracking-widest uppercase leading-tight truncate w-full whitespace-nowrap">
+                                {customName || 'EASYM LIVE TRACKER'}
+                            </div>
+                        )}
                     </div>
-                </div>
-                {adminMessage && (
-                    <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
-                        <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-none truncate w-full whitespace-nowrap">
-                            {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
+                ) : (
+                    <div className="w-full relative h-[80px] overflow-hidden">
+                        <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${!adminMessage || messageIndex === 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+                            <div className="text-[10px] font-black text-amber-200 text-center tracking-widest truncate w-full uppercase leading-none whitespace-nowrap">
+                                {(() => {
+                                    if (!isLiveMode) {
+                                        return customName ? customName : `PORT: ${portNumber}`;
+                                    }
+                                    const cleanPort = String(portNumber || '').trim();
+                                    if (/^\d+$/.test(cleanPort)) {
+                                        return `Showcase ${cleanPort.slice(-4)}`;
+                                    }
+                                    return customName || 'SHOWCASE';
+                                })()}
+                            </div>
                         </div>
+                        {adminMessage && (
+                            <div className={`absolute inset-x-0 top-1.5 flex flex-col items-center w-full px-1 transition-all duration-700 ease-in-out ${messageIndex === 1 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+                                <div className="text-[9px] font-bold text-[#4de180] text-center tracking-wide leading-none truncate w-full whitespace-nowrap">
+                                    {adminMessage.replace('💬 ADMIN: ', '').replace('💬: ', '')}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -194,6 +194,7 @@ export default function DemoFarmClient({
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [hasIbMembership, setHasIbMembership] = useState<boolean | null>(null);
+    const [primeProductId, setPrimeProductId] = useState<string | null>(null);
     const EASYM_MAX_PRODUCT_ID = '0b5e3b69-e7cf-4aa2-8701-e62e6c3cc365';
     const EASYM_MINI_PRODUCT_ID = 'e5784a85-50bd-48c8-8da0-4a6237b91df8';
     const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
@@ -247,6 +248,16 @@ export default function DemoFarmClient({
             }
         };
         getCurrUser();
+
+        // Lookup EasyM Prime product ID for direct checkout / product link
+        supabase
+            .from('products')
+            .select('id')
+            .eq('product_key', 'EZM-PRIME-V1')
+            .maybeSingle()
+            .then(({ data }) => {
+                if (data?.id) setPrimeProductId(data.id);
+            });
     }, []);
 
     const fetchLeaderboard = async () => {
@@ -1285,6 +1296,20 @@ export default function DemoFarmClient({
                 </div>
             </div>
 
+            {/* DESKTOP OPEN REAL ACCOUNT FLOATING BUTTON (Centered directly under Timeline) */}
+            {!effectiveLiveMode && (
+                <div className="hidden sm:flex fixed top-[114px] left-1/2 -translate-x-1/2 z-[95] pointer-events-auto">
+                    <button
+                        type="button"
+                        onClick={() => setShowOpenRealAccountModal(true)}
+                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#ffd700] via-[#ffe066] to-[#cfa545] hover:from-[#ffe033] hover:to-[#dfb555] active:scale-95 text-black font-black text-xs sm:text-sm rounded-full shadow-[0_0_25px_rgba(255,215,0,0.5)] transition-all transform hover:scale-105 border border-[#fff2a8] cursor-pointer select-none"
+                    >
+                        <Rocket className="w-4 h-4 flex-shrink-0" />
+                        <span>เปิดพอร์ตจริงรับสิทธิ์ฟรี</span>
+                    </button>
+                </div>
+            )}
+
             {/* MOBILE ONLY OVERLAY DOCKED BELOW HEADER */}
             <FarmMobileStatsOverlay
                 portNumber={isSynthetic ? '10-PORT MODEL' : portNumber}
@@ -1305,6 +1330,7 @@ export default function DemoFarmClient({
                 adminMessage={effectiveLiveMode ? null : currentAdminMessage}
                 isLiveMode={effectiveLiveMode}
                 liveAssetType="island"
+                onOpenRealAccountClick={() => setShowOpenRealAccountModal(true)}
             />
 
             <div ref={containerRef} className="flex-1 w-full relative flex items-center justify-center pt-[182px] pb-[112px] sm:pt-[136px] sm:pb-[160px]">
@@ -2249,41 +2275,44 @@ export default function DemoFarmClient({
                         </button>
 
                         {/* Title Header */}
-                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-amber-500/20">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#ffd700]/30 to-[#cfa545]/10 border border-[#ffd700]/50 flex items-center justify-center text-2xl shadow-sm">
+                        <div className="flex items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4 pb-2.5 sm:pb-3 border-b border-amber-500/20">
+                            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-[#ffd700]/30 to-[#cfa545]/10 border border-[#ffd700]/50 flex items-center justify-center text-xl sm:text-2xl shadow-sm flex-shrink-0">
                                 🚀
                             </div>
                             <div>
-                                <h3 className="text-base sm:text-lg font-black text-[#ffd700]">
-                                    3 ขั้นตอนง่ายๆ ในการเปิดพอร์ตจริง (ฟรี 100%)
+                                <h3 className="text-sm sm:text-lg font-black text-[#ffd700] leading-tight">
+                                    <span className="sm:hidden">3 ขั้นตอนเปิดพอร์ตจริง (ฟรี 100%)</span>
+                                    <span className="hidden sm:inline">3 ขั้นตอนง่ายๆ ในการเปิดพอร์ตจริง (ฟรี 100%)</span>
                                 </h3>
-                                <p className="text-xs text-amber-200/60">
-                                    ใช้งาน EasyM ฟรีตลอดชีพ ภายใต้สายงาน IB พร้อมรับเงินคืน Rebate สูงสุด $15/lot
+                                <p className="text-[11px] sm:text-xs text-amber-200/60 leading-tight sm:leading-normal mt-0.5">
+                                    <span className="sm:hidden">ใช้ EasyM ฟรีตลอดชีพ พร้อมรับเงินคืน Rebate สูงสุด $15/lot</span>
+                                    <span className="hidden sm:inline">ใช้งาน EasyM ฟรีตลอดชีพ ภายใต้สายงาน IB พร้อมรับเงินคืน Rebate สูงสุด $15/lot</span>
                                 </p>
                             </div>
                         </div>
 
                         {/* 3 Steps */}
-                        <div className="space-y-3 text-xs text-amber-100/90 mb-4 font-sans">
+                        <div className="space-y-2.5 sm:space-y-3 text-xs text-amber-100/90 mb-3 sm:mb-4 font-sans">
                             {/* Step 1 */}
-                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
+                            <div className="p-2.5 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-1.5 sm:space-y-2">
                                 <div className="flex items-center gap-2">
                                     <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
                                         1
                                     </span>
-                                    <div className="font-extrabold text-white text-sm">
+                                    <div className="font-extrabold text-white text-xs sm:text-sm">
                                         สมัครเปิดบัญชีเทรดกับโบรกเกอร์ InterStellar
                                     </div>
                                 </div>
-                                <p className="text-amber-200/70 text-[11px] leading-relaxed pl-7">
-                                    สมัครบัญชีเทรดภายใต้ลิงก์สายงาน เพื่อรับสิทธิ์ใช้งาน EasyM ฟรีตลอดชีพ ไม่มีค่าบริการรายเดือน และรับสิทธิ์เงินคืนค่ารีเบท
+                                <p className="text-amber-200/70 text-[10.5px] sm:text-[11px] leading-relaxed pl-7">
+                                    <span className="sm:hidden">เปิดบัญชีผ่านลิงก์สายงานเพื่อรับสิทธิ์ EasyM ฟรีตลอดชีพ</span>
+                                    <span className="hidden sm:inline">สมัครบัญชีเทรดภายใต้ลิงก์สายงาน เพื่อรับสิทธิ์ใช้งาน EasyM ฟรีตลอดชีพ ไม่มีค่าบริการรายเดือน และรับสิทธิ์เงินคืนค่ารีเบท</span>
                                 </p>
-                                <div className="pl-7 pt-1">
+                                <div className="pl-7 pt-0.5 sm:pt-1">
                                     <a
                                         href="https://my.fisg.com/register/trader?link_id=qb9f9uqj&referrer_id=0DtW2XvtM"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-[#cfa545] hover:from-amber-400 hover:to-[#dfb555] text-black font-black text-xs rounded-lg shadow-sm transition-all"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-[#cfa545] hover:from-amber-400 hover:to-[#dfb555] text-black font-black text-[11px] sm:text-xs rounded-lg shadow-sm transition-all"
                                     >
                                         <span>คลิกสมัครเปิดบัญชี InterStellar</span>
                                         <ArrowUpRight className="w-3.5 h-3.5" />
@@ -2292,92 +2321,114 @@ export default function DemoFarmClient({
                             </div>
 
                             {/* Step 2 */}
-                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
+                            <div className="p-2.5 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-1.5 sm:space-y-2">
                                 <div className="flex items-center gap-2">
                                     <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
                                         2
                                     </span>
-                                    <div className="font-extrabold text-white text-sm">
+                                    <div className="font-extrabold text-white text-xs sm:text-sm">
                                         ฝากเงินเข้าพอร์ตตามขนาดที่ต้องการรัน
                                     </div>
                                 </div>
                                 <div className="pl-7 space-y-1.5 text-[11px]">
-                                    <div className="p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-start justify-between gap-2">
-                                        <div>
-                                            <span className="font-bold text-[#ffd700]">🌟 EasyM MAX (พร้อมหน้า Farm UI):</span>
-                                            <span className="text-amber-200/80 ml-1">ทุนที่เหมาะสม(แนะนำ)</span>
+                                    {/* EasyM Prime */}
+                                    <div className="p-1.5 sm:p-2 rounded-lg bg-[#1e140c] border border-cyan-500/30 flex items-center justify-between gap-2">
+                                        <div className="truncate">
+                                            <span className="font-bold text-cyan-400">💎 EasyM Prime:</span>
+                                            <span className="text-amber-200/80 ml-1 hidden sm:inline">ทุนที่เหมาะสม(แนะนำ)</span>
                                         </div>
-                                        <span className="font-mono font-black text-emerald-400 whitespace-nowrap">
-                                            100,000 cent ($1,000)
+                                        <span className="font-mono font-black text-cyan-300 text-[11px] sm:text-xs whitespace-nowrap">
+                                            100,000 cent <span className="text-amber-200/70 font-normal">($1,000)</span>
                                         </span>
                                     </div>
-                                    <div className="p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-start justify-between gap-2">
-                                        <div>
+                                    {/* EasyM MAX */}
+                                    <div className="p-1.5 sm:p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-center justify-between gap-2">
+                                        <div className="truncate">
+                                            <span className="font-bold text-[#ffd700]">🌟 EasyM MAX:</span>
+                                            <span className="text-amber-200/80 ml-1 hidden sm:inline">(พร้อม Farm UI) ทุนแนะนำ</span>
+                                        </div>
+                                        <span className="font-mono font-black text-emerald-400 text-[11px] sm:text-xs whitespace-nowrap">
+                                            100,000 cent <span className="text-amber-200/70 font-normal">($1,000)</span>
+                                        </span>
+                                    </div>
+                                    {/* EasyM mini */}
+                                    <div className="p-1.5 sm:p-2 rounded-lg bg-[#1e140c] border border-amber-500/20 flex items-center justify-between gap-2">
+                                        <div className="truncate">
                                             <span className="font-bold text-amber-300">⚡ EasyM mini:</span>
-                                            <span className="text-amber-200/80 ml-1">ทุนเริ่มต้น</span>
+                                            <span className="text-amber-200/80 ml-1 hidden sm:inline">ทุนเริ่มต้น</span>
                                         </div>
-                                        <span className="font-mono font-black text-emerald-400 whitespace-nowrap">
-                                            50,000 cent ($500)
+                                        <span className="font-mono font-black text-emerald-400 text-[11px] sm:text-xs whitespace-nowrap">
+                                            50,000 cent <span className="text-amber-200/70 font-normal">($500)</span>
                                         </span>
                                     </div>
-                                    <p className="text-[10px] text-amber-200/50 italic">
+                                    <p className="text-[10px] text-amber-200/50 italic leading-tight">
                                         * พอร์ต Cent ช่วยกระจายความเสี่ยงได้ 20 คู่เงินอย่างสมบูรณ์แบบและปลอดภัยสูงสุด
                                     </p>
                                 </div>
                             </div>
 
                             {/* Step 3 */}
-                            <div className="p-3 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2.5">
+                            <div className="p-2.5 sm:p-3.5 bg-black/40 rounded-xl border border-amber-500/25 space-y-2">
                                 <div className="flex items-center gap-2">
                                     <span className="w-5 h-5 rounded-full bg-[#ffd700] text-black font-black flex items-center justify-center text-xs flex-shrink-0">
                                         3
                                     </span>
-                                    <div className="font-extrabold text-white text-sm">
+                                    <div className="font-extrabold text-white text-xs sm:text-sm">
                                         ยื่นเลขพอร์ตเพื่อเปิดใช้งาน License ฟรี
                                     </div>
                                 </div>
-                                <p className="text-amber-200/70 text-[11px] leading-relaxed pl-7">
-                                    นำเลขบัญชี MT5 ที่เปิดกับ InterStellar ไปยื่นขอรับสิทธิ์ใช้งานระบบ EasyM ฟรีตลอดชีพ โดยเลือกสั่งซื้อเวอร์ชันที่ต้องการใช้งานด้านล่างนี้
+                                <p className="text-amber-200/70 text-[10.5px] sm:text-[11px] leading-relaxed pl-7">
+                                    <span className="sm:hidden">นำเลข MT5 มายื่นขอรับสิทธิ์ฟรี โดยเลือกรุ่นที่ต้องการด้านล่าง</span>
+                                    <span className="hidden sm:inline">นำเลขบัญชี MT5 ที่เปิดกับ InterStellar ไปยื่นขอรับสิทธิ์ใช้งานระบบ EasyM ฟรีตลอดชีพ โดยเลือกสั่งซื้อเวอร์ชันที่ต้องการใช้งานด้านล่างนี้</span>
                                 </p>
 
                                 {/* IB Explanation Notice */}
                                 <div className="pl-7">
-                                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200/90 leading-relaxed flex items-start gap-2">
-                                        <span className="text-base flex-shrink-0">🎁</span>
+                                    <div className="p-2 sm:p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10.5px] sm:text-[11px] text-amber-200/90 leading-relaxed flex items-start gap-2">
+                                        <span className="text-sm sm:text-base flex-shrink-0">🎁</span>
                                         <div>
                                             <span className="font-extrabold text-[#ffd700]">รับสิทธิ์ใช้ EA ฟรี (สมัครเป็น IB):</span>
-                                            <p className="mt-0.5 text-amber-100/80 text-[10.5px] leading-relaxed">
-                                                {hasIbMembership
-                                                    ? 'ท่านมีสิทธิ์ IB เรียบร้อยแล้ว สามารถกดสั่งซื้อเวอร์ชันที่ต้องการเพื่อกรอกเลขพอร์ตและเปิดใช้งานฟรี (0 ฿) ได้ทันที'
-                                                    : 'สมาชิกที่เปิดบัญชีผ่านสายงาน IB จะได้รับสิทธิ์ใช้งาน EA ฟรีตลอดชีพ หากท่านยังไม่เคยยื่นขอสิทธิ์ IB มาก่อน เมื่อคลิกสั่งซื้อระบบจะพาท่านไปยังหน้าขอสิทธิ์ใช้งานฟรีผ่าน IB เพื่อยืนยันสิทธิ์ก่อนสั่งซื้อครับ'}
+                                            <p className="mt-0.5 text-amber-100/80 text-[10px] sm:text-[10.5px] leading-relaxed">
+                                                {hasIbMembership ? (
+                                                    <span>ท่านมีสิทธิ์ IB แล้ว กดสั่งซื้อเวอร์ชันที่ต้องการเพื่อกรอกเลขพอร์ตเปิดใช้งานฟรี (0 ฿) ได้ทันที</span>
+                                                ) : (
+                                                    <span>สมาชิกที่เปิดบัญชีผ่านสายงานจะได้รับสิทธิ์ฟรีตลอดชีพ หากยังไม่เคยขอสิทธิ์ ระบบจะพาท่านไปยังหน้าขอสิทธิ์ IB ก่อนสั่งซื้อครับ</span>
+                                                )}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="pl-7 flex flex-wrap items-center gap-2 pt-1">
+                                <div className="pl-7 flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1">
+                                    <Link
+                                        href={hasIbMembership ? (primeProductId ? `/products/${primeProductId}` : '/dashboard/upgrade-prime') : '/?openIb=true'}
+                                        className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-[11px] sm:text-xs rounded-lg shadow-sm transition-all"
+                                    >
+                                        <span>💎 สั่งซื้อ EasyM Prime</span>
+                                        <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    </Link>
                                     <Link
                                         href={hasIbMembership ? `/products/${EASYM_MAX_PRODUCT_ID}` : '/?openIb=true'}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#ffd700] to-[#cfa545] hover:from-[#ffe033] hover:to-[#dfb555] text-black font-extrabold text-xs rounded-lg shadow-sm transition-all"
+                                        className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-[#ffd700] to-[#cfa545] hover:from-[#ffe033] hover:to-[#dfb555] text-black font-extrabold text-[11px] sm:text-xs rounded-lg shadow-sm transition-all"
                                     >
                                         <span>🌟 สั่งซื้อ EasyM MAX</span>
-                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                        <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                     </Link>
                                     <Link
                                         href={hasIbMembership ? `/products/${EASYM_MINI_PRODUCT_ID}` : '/?openIb=true'}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black font-extrabold text-xs rounded-lg shadow-sm transition-all"
+                                        className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black font-extrabold text-[11px] sm:text-xs rounded-lg shadow-sm transition-all"
                                     >
                                         <span>⚡ สั่งซื้อ EasyM mini</span>
-                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                        <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                     </Link>
                                     {!currentUserId && (
                                         <a
                                             href="https://eaeze.com/register?ref=REF-06A189"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-amber-200 border border-amber-500/30 text-[11px] rounded-lg transition-all"
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] rounded-lg transition-all"
                                         >
-                                            <span>ยังไม่เคยสมัครสมาชิกเว็บ? คลิกสมัครที่นี่</span>
+                                            <span>สมัครสมาชิกเว็บ</span>
                                             <ArrowUpRight className="w-3 h-3" />
                                         </a>
                                     )}
@@ -2386,32 +2437,34 @@ export default function DemoFarmClient({
                         </div>
 
                         {/* LINE OpenChat & Consultation Box */}
-                        <div className="bg-gradient-to-r from-emerald-950/40 via-black/50 to-emerald-950/30 border border-emerald-500/30 rounded-xl p-3 sm:p-3.5 mb-4">
-                            <div className="flex items-start gap-2.5">
-                                <span className="text-2xl flex-shrink-0">💬</span>
+                        <div className="bg-gradient-to-r from-emerald-950/40 via-black/50 to-emerald-950/30 border border-emerald-500/30 rounded-xl p-2.5 sm:p-3.5 mb-3 sm:mb-4">
+                            <div className="flex items-start gap-2 sm:gap-2.5">
+                                <span className="text-xl sm:text-2xl flex-shrink-0">💬</span>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                         <span className="font-extrabold text-white text-xs sm:text-sm">
-                                            มีข้อสงสัย หรือต้องการให้แอดมินช่วยเปิดพอร์ต?
+                                            <span className="sm:hidden">ปรึกษาหรือให้แอดมินช่วยเปิดพอร์ต</span>
+                                            <span className="hidden sm:inline">มีข้อสงสัย หรือต้องการให้แอดมินช่วยเปิดพอร์ต?</span>
                                         </span>
                                         <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold px-1.5 py-0.2 rounded">
-                                            ปรึกษาฟรี 100%
+                                            ฟรี 100%
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-amber-200/70 mt-1 leading-relaxed">
-                                        ยินดีให้คำปรึกษา แนะนำการตั้งค่า EA และดูแลช่วยเหลือตลอดการใช้งาน เข้ามาร่วมพูดคุยสอบถามใน LINE OpenChat ได้เลยครับ
+                                    <p className="text-[10.5px] sm:text-[11px] text-amber-200/70 mt-0.5 sm:mt-1 leading-relaxed">
+                                        <span className="sm:hidden">ยินดีแนะนำการตั้งค่าและดูแลตลอดการใช้งาน ทัก LINE ได้เลยครับ</span>
+                                        <span className="hidden sm:inline">ยินดีให้คำปรึกษา แนะนำการตั้งค่า EA และดูแลช่วยเหลือตลอดการใช้งาน เข้ามาร่วมพูดคุยสอบถามใน LINE OpenChat ได้เลยครับ</span>
                                     </p>
-                                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
                                         <a
                                             href="https://lin.ee/U8DdhPj"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-lg shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] sm:text-xs rounded-lg shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all"
                                         >
                                             <span>เข้า LINE OpenChat (@jharvest)</span>
                                             <ArrowUpRight className="w-3.5 h-3.5" />
                                         </a>
-                                        <span className="text-[10px] text-emerald-400 font-mono">
+                                        <span className="text-[10px] text-emerald-400 font-mono hidden sm:inline">
                                             LINE ID: @jharvest
                                         </span>
                                     </div>
