@@ -1561,7 +1561,7 @@ export default function DemoFarmClient({
                                         </h2>
                                         <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full flex items-center gap-1">
                                             <ShieldCheck className="w-3 h-3" />
-                                            Verified MT5 Live
+                                            {effectiveLiveMode ? 'Verified System Live' : 'Verified MT5 Live'}
                                         </span>
                                     </div>
                                     <p className="text-[10px] sm:text-xs text-amber-200/60 truncate mt-0.5">
@@ -1654,7 +1654,7 @@ export default function DemoFarmClient({
                                                 100%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-emerald-400 font-bold mt-0.5 truncate max-w-full">
-                                                ปลอดภัย ไม่เคยล้างฟาร์ม
+                                                {effectiveLiveMode ? 'เสถียรภาพ 100% ต่อเนื่อง' : 'ปลอดภัย ไม่เคยล้างฟาร์ม'}
                                             </div>
                                         </div>
 
@@ -1668,7 +1668,7 @@ export default function DemoFarmClient({
                                                 +{fleetStatsData?.daily30D?.returnPct ?? 0.58}%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-emerald-300/70 mt-0.5 truncate max-w-full font-mono">
-                                                ~{(fleetStatsData?.daily30D?.avgYield ?? 580).toLocaleString()} (ทุน {(fleetStatsData?.daily30D?.capital ?? 100000).toLocaleString()})
+                                                ~{(fleetStatsData?.daily30D?.avgYield ?? 580).toLocaleString()} ({effectiveLiveMode ? 'ฐาน' : 'ทุน'} {(fleetStatsData?.daily30D?.capital ?? 100000).toLocaleString()})
                                             </div>
                                         </div>
 
@@ -1682,7 +1682,7 @@ export default function DemoFarmClient({
                                                 +{fleetStatsData?.monthly3M?.returnPct ?? 18.5}%
                                             </div>
                                             <div className="text-[8px] sm:text-[9.5px] text-amber-300/70 mt-0.5 truncate max-w-full font-mono">
-                                                ~{(fleetStatsData?.monthly3M?.avgYield ?? 18450).toLocaleString()} (ทุน {(fleetStatsData?.monthly3M?.capital ?? 100000).toLocaleString()})
+                                                ~{(fleetStatsData?.monthly3M?.avgYield ?? 18450).toLocaleString()} ({effectiveLiveMode ? 'ฐาน' : 'ทุน'} {(fleetStatsData?.monthly3M?.capital ?? 100000).toLocaleString()})
                                             </div>
                                         </div>
                                     </div>
@@ -2103,16 +2103,18 @@ export default function DemoFarmClient({
                                                     {(fleetStatsData?.timeline?.recentDays || []).map((item: any, idx: number) => {
                                                         const pVal = item.profitUSC || 0;
                                                         const pLabel = `+${pVal.toLocaleString()}`;
-                                                        const asset = getFleetFarmBoxAsset(pVal);
+                                                        const asset = effectiveLiveMode ? '/farm/mini_farm_island.webp' : getFleetFarmBoxAsset(pVal);
                                                         const label = item.dateLabel || '';
                                                         return (
                                                             <div key={idx} className="flex items-center flex-shrink-0">
                                                                 <div className="flex flex-col items-center group relative min-w-[52px] sm:min-w-[62px]">
                                                                     {/* Profit above crate */}
-                                                                    <span className="text-[8px] sm:text-[10px] font-mono font-black text-[#4de180] whitespace-nowrap mb-0.5 drop-shadow-sm">
+                                                                    <span className={`text-[8px] sm:text-[10px] font-mono font-black whitespace-nowrap mb-0.5 drop-shadow-sm ${
+                                                                        effectiveLiveMode ? 'text-emerald-400/90' : 'text-[#4de180]'
+                                                                    }`}>
                                                                         {pLabel}
                                                                     </span>
-                                                                    {/* Crate Image */}
+                                                                    {/* Crate/Island Image */}
                                                                     <div className="relative w-10 h-10 sm:w-13 sm:h-13 transition-transform duration-200 group-hover:scale-110 drop-shadow-md">
                                                                         <Image src={asset} alt="Crate" fill className="object-contain" unoptimized />
                                                                     </div>
@@ -2128,7 +2130,9 @@ export default function DemoFarmClient({
                                                                 {item.isEndOfWeek && idx < (fleetStatsData?.timeline?.recentDays?.length ?? 0) - 1 && (
                                                                     <div className="flex flex-col items-center justify-center mx-1 h-10 self-center">
                                                                         <div className="w-[1px] h-7 bg-gradient-to-b from-amber-500/0 via-amber-500/40 to-amber-500/0"></div>
-                                                                        <span className="text-[6px] font-mono text-amber-400/50 font-bold uppercase tracking-widest mt-0.5">WK</span>
+                                                                        <span className="text-[6px] font-mono text-amber-400/50 font-bold uppercase tracking-widest mt-0.5">
+                                                                            {effectiveLiveMode ? 'CYCLE' : 'WK'}
+                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2141,32 +2145,32 @@ export default function DemoFarmClient({
                                 })()}
                             </div>
 
-                            {/* 4. Why Trade Real Account Feature Badges */}
+                            {/* 4. Feature Badges */}
                             <div className="bg-[#120a06] border border-[#cfa545]/20 rounded-xl p-3 sm:p-4">
                                 <div className="text-xs font-bold text-[#ffd700] mb-2 flex items-center gap-1.5">
                                     <Sparkles className="w-3.5 h-3.5 text-[#ffd700]" />
-                                    <span>ทำไมผู้ติดตามถึงตัดสินใจเปิดพอร์ตจริงกับ EasyM?</span>
+                                    <span>{effectiveLiveMode ? 'จุดเด่นและเสถียรภาพของสถาปัตยกรรมระบบ EasyM' : 'ทำไมผู้ติดตามถึงตัดสินใจเปิดพอร์ตจริงกับ EasyM?'}</span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-amber-200/80">
                                     <div className="flex items-start gap-2 bg-black/30 p-2.5 rounded-lg border border-amber-500/10">
                                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                                         <div>
-                                            <div className="font-bold text-white text-[11px]">คุม DD 3 ชั้นอัตโนมัติ</div>
-                                            <div className="text-[10px] text-amber-200/50">ล็อกกำไร ตัดความเสี่ยง ไม่ต้องเฝ้าจอ 24/5</div>
+                                            <div className="font-bold text-white text-[11px]">{effectiveLiveMode ? 'คุมความเสี่ยง 3 ชั้นอัตโนมัติ' : 'คุม DD 3 ชั้นอัตโนมัติ'}</div>
+                                            <div className="text-[10px] text-amber-200/50">{effectiveLiveMode ? 'รักษาสมดุล ตัดความเสี่ยง ทำงานอัตโนมัติ 24/5' : 'ล็อกกำไร ตัดความเสี่ยง ไม่ต้องเฝ้าจอ 24/5'}</div>
                                         </div>
                                     </div>
                                     <div className="flex items-start gap-2 bg-black/30 p-2.5 rounded-lg border border-amber-500/10">
                                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                                         <div>
-                                            <div className="font-bold text-white text-[11px]">กระจาย 20 คู่เงิน</div>
-                                            <div className="text-[10px] text-amber-200/50">Multi-Currency ลดความผันผวนของค่าเงิน</div>
+                                            <div className="font-bold text-white text-[11px]">{effectiveLiveMode ? 'กระจาย 20 อัลกอริทึม' : 'กระจาย 20 คู่เงิน'}</div>
+                                            <div className="text-[10px] text-amber-200/50">{effectiveLiveMode ? 'Multi-Strategy ถัวเฉลี่ยลดความผันผวนของตลาด' : 'Multi-Currency ลดความผันผวนของค่าเงิน'}</div>
                                         </div>
                                     </div>
                                     <div className="flex items-start gap-2 bg-black/30 p-2.5 rounded-lg border border-amber-500/10">
                                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                                         <div>
-                                            <div className="font-bold text-white text-[11px]">สมาชิก IB รันฟรี 100%</div>
-                                            <div className="text-[10px] text-amber-200/50">ฟรีค่าบริการ + รับเงินคืน Rebate $15/lot</div>
+                                            <div className="font-bold text-white text-[11px]">{effectiveLiveMode ? 'โมเดลประมวลผลอิสระ 100%' : 'สมาชิก IB รันฟรี 100%'}</div>
+                                            <div className="text-[10px] text-amber-200/50">{effectiveLiveMode ? 'บริหารจัดการรอบการทำงานและจัดเก็บสถิติแม่นยำ' : 'ฟรีค่าบริการ + รับเงินคืน Rebate $15/lot'}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -2175,33 +2179,59 @@ export default function DemoFarmClient({
 
                         {/* Modal Footer (Action CTA) */}
                         <div className="p-4 sm:p-5 bg-gradient-to-r from-[#2c1b10] via-[#1f130b] to-[#170e08] border-t border-[#cfa545]/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-                            <div className="text-center sm:text-left">
-                                <div className="text-xs sm:text-sm font-extrabold text-white">
-                                    พร้อมเปลี่ยนจากพอร์ตจำลองเป็นพอร์ตจริงหรือยัง?
-                                </div>
-                                <div className="text-[10px] text-amber-200/60">
-                                    เริ่มต้นเพียง $500 (50,000 USC) ก็รันได้เต็มระบบ
-                                </div>
-                            </div>
+                            {effectiveLiveMode ? (
+                                <>
+                                    <div className="text-center sm:text-left">
+                                        <div className="text-xs sm:text-sm font-extrabold text-white flex items-center gap-1.5 justify-center sm:justify-start">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                            <span>ระบบประมวลผลโมเดลและฟาร์มอัตโนมัติ (Automated Farm Engine)</span>
+                                        </div>
+                                        <div className="text-[10px] text-amber-200/60 mt-0.5">
+                                            รองรับการวิเคราะห์ผลผลิตและมอนิเตอร์ความเสถียรของอัลกอริทึมตลอด 24/5
+                                        </div>
+                                    </div>
 
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
-                                <button
-                                    onClick={() => setShowOpenRealAccountModal(true)}
-                                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#ffd700] to-[#cfa545] hover:from-[#ffe033] hover:to-[#dfb555] text-black font-extrabold text-xs sm:text-sm rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.35)] transition-all transform hover:scale-105"
-                                >
-                                    <Rocket className="w-4 h-4" />
-                                    <span>เปิดพอร์ตจริงรับสิทธิ์ฟรี</span>
-                                </button>
-                                <a
-                                    href="https://lin.ee/U8DdhPj"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-[0_0_12px_rgba(16,185,129,0.3)] flex items-center justify-center gap-1.5 transition-all"
-                                >
-                                    <span>💬 สอบถามแอดมิน</span>
-                                    <ArrowUpRight className="w-3.5 h-3.5" />
-                                </a>
-                            </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowFleetStats(false)}
+                                            className="flex-1 sm:flex-initial px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-200 border border-amber-500/30 font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                                        >
+                                            ปิดหน้าต่าง (Close)
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="text-center sm:text-left">
+                                        <div className="text-xs sm:text-sm font-extrabold text-white">
+                                            พร้อมเปลี่ยนจากพอร์ตจำลองเป็นพอร์ตจริงหรือยัง?
+                                        </div>
+                                        <div className="text-[10px] text-amber-200/60">
+                                            เริ่มต้นเพียง $500 (50,000 USC) ก็รันได้เต็มระบบ
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <button
+                                            onClick={() => setShowOpenRealAccountModal(true)}
+                                            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#ffd700] to-[#cfa545] hover:from-[#ffe033] hover:to-[#dfb555] text-black font-extrabold text-xs sm:text-sm rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.35)] transition-all transform hover:scale-105"
+                                        >
+                                            <Rocket className="w-4 h-4" />
+                                            <span>เปิดพอร์ตจริงรับสิทธิ์ฟรี</span>
+                                        </button>
+                                        <a
+                                            href="https://lin.ee/U8DdhPj"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-[0_0_12px_rgba(16,185,129,0.3)] flex items-center justify-center gap-1.5 transition-all"
+                                        >
+                                            <span>💬 สอบถามแอดมิน</span>
+                                            <ArrowUpRight className="w-3.5 h-3.5" />
+                                        </a>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
