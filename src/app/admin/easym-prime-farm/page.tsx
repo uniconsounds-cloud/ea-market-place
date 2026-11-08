@@ -557,8 +557,18 @@ export default function AdminPrimeFarmLabPage() {
 
     // Auto-scroll history dock to right on mount
     useEffect(() => {
-        if (historyScrollRef.current) {
-            historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth;
+        const performScroll = () => {
+            const el = historyScrollRef.current;
+            if (!el) return;
+            el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+        };
+        performScroll();
+        if (typeof window !== 'undefined') {
+            requestAnimationFrame(performScroll);
+            setTimeout(performScroll, 50);
+            setTimeout(performScroll, 150);
+            setTimeout(performScroll, 300);
+            setTimeout(performScroll, 600);
         }
     }, [rawHistory]);
 

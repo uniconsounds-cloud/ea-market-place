@@ -426,6 +426,37 @@ export default function FarmClient({
     const [recentlyClosed, setRecentlyClosed] = useState<any[]>([]);
     const [isShaking, setIsShaking] = useState(false);
     const [hiddenTickets, setHiddenTickets] = useState<number[]>([]);
+
+    // ─── Daily History Crates Dock Scroll State & Controller ───
+    const historyScrollRef = useRef<HTMLDivElement>(null);
+    const hasInitialScrolled = useRef(false);
+    const isHistoryDragging = useRef(false);
+    const historyDragStartX = useRef(0);
+    const historyScrollStartLeft = useRef(0);
+
+    // เลื่อนแถบประวัติกำไร (ลังไม้) ไปที่วันล่าสุดทางขวาสุดอย่างแม่นยำ พร้อม multi-step retry รองรับ dynamic layout
+    const scrollToLatestCrate = useCallback((smooth = false) => {
+        const performScroll = () => {
+            const el = historyScrollRef.current;
+            if (!el) return;
+            const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+            if (smooth) {
+                el.scrollTo({ left: maxScroll, behavior: 'smooth' });
+            } else {
+                el.scrollLeft = maxScroll;
+            }
+        };
+
+        performScroll();
+        if (typeof window !== 'undefined') {
+            requestAnimationFrame(performScroll);
+            setTimeout(performScroll, 50);
+            setTimeout(performScroll, 120);
+            setTimeout(performScroll, 250);
+            setTimeout(performScroll, 500);
+            setTimeout(performScroll, 800);
+        }
+    }, []);
     
     // Smooth out today's profit to ignore sudden 0s during EA "รวบไม้" heartbeat glitches
     const [smoothedTodayProfit, setSmoothedTodayProfit] = useState(0);
@@ -2023,6 +2054,15 @@ export default function FarmClient({
         resetFarmCleanState();
     }, [portNumber, resetFarmCleanState]);
 
+    // เมื่อออกจากหน้า Multi Farm กลับมาที่หน้าฟาร์มเดี่ยว ให้เลื่อนแถบลังประวัติไปที่วันล่าสุดขวาสุดเสมอ
+    const prevMultiFarmRef = useRef(isMultiFarmView);
+    useEffect(() => {
+        if (prevMultiFarmRef.current && !isMultiFarmView) {
+            scrollToLatestCrate();
+        }
+        prevMultiFarmRef.current = isMultiFarmView;
+    }, [isMultiFarmView, scrollToLatestCrate]);
+
     const handleSelectMultiFarmPort = async (target: {
         portNumber: string;
         portName: string | null;
@@ -2035,10 +2075,14 @@ export default function FarmClient({
         resetFarmCleanState();
 
         if (String(target.portNumber) === String(portNumber)) {
+            // หากคลิกพอร์ตเดิมจากหน้า Multi Farm ให้เลื่อนแถบลังประวัติไปวันล่าสุดขวาสุดทันที
+            scrollToLatestCrate();
             return;
         }
 
         // สลับข้อมูลหน้าฟาร์มไปยังพอร์ตที่คลิกทันที
+        hasInitialScrolled.current = false;
+        setHistory([]); // เคลียร์ประวัติเดิมออกทันที ป้องกัน scrollLeft คำนวณจากขนาดพอร์ตเดิมก่อนหน้า
         setPortNumber(target.portNumber);
         setCurrentCustomName(target.portName || '');
         setLicenseCreatedAt(target.createdAt || null);
@@ -2063,7 +2107,10 @@ export default function FarmClient({
             ]);
             if (statusRes.data) setPortStatus(statusRes.data);
             if (ordersRes.data) setOrders(ordersRes.data);
-            if (histRes.data) setHistory([...histRes.data].reverse());
+            if (histRes.data) {
+                setHistory([...histRes.data].reverse());
+                scrollToLatestCrate();
+            }
         } catch (e) {
             console.warn('Switch farm port fetch error:', e);
         }
@@ -2783,6 +2830,7 @@ export default function FarmClient({
 
             if (data) {
                 setHistory(data.reverse());
+                scrollToLatestCrate();
             }
         };
 
@@ -2935,27 +2983,16 @@ export default function FarmClient({
         });
     }, [history, brokerDateStr, portStatus?.account_type, isLiveMode, liveAssetType]);
 
-    const historyScrollRef = useRef<HTMLDivElement>(null);
-    const hasInitialScrolled = useRef(false);
-    const isHistoryDragging = useRef(false);
-    const historyDragStartX = useRef(0);
-    const historyScrollStartLeft = useRef(0);
-
     useEffect(() => {
         hasInitialScrolled.current = false;
     }, [portNumber]);
 
     useEffect(() => {
         if (historyScrollRef.current && dailyHistory.length > 0 && !hasInitialScrolled.current) {
-            const el = historyScrollRef.current;
-            el.scrollLeft = el.scrollWidth;
-            const timer = setTimeout(() => {
-                if (el) el.scrollLeft = el.scrollWidth;
-            }, 120);
+            scrollToLatestCrate();
             hasInitialScrolled.current = true;
-            return () => clearTimeout(timer);
         }
-    }, [isClient, dailyHistory]);
+    }, [isClient, dailyHistory, portNumber, scrollToLatestCrate]);
 
     const handleHistoryWheel = (e: React.WheelEvent<HTMLDivElement>) => {
         if (!historyScrollRef.current) return;
@@ -5013,6 +5050,8 @@ export default function FarmClient({
                                 )}
                             </div>
                         ))}
+                        {/* Spacing on the right to guarantee latest crate is fully visible */}
+                        <div className="w-4 sm:w-8 flex-shrink-0 pointer-events-none select-none" />
                     </div>
                 </div>
             )}
