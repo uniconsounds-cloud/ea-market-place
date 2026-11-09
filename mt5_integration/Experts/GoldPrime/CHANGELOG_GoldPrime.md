@@ -52,7 +52,25 @@
 
 ## 📋 ประวัติการแก้ไขราย Build (Build Changelog)
 
-### 🔹 [B261109.4] — GoldPrime v1.00 (Scalp TP Condition Fix for Any Order Count) (Current Production)
+### 🔹 [B261109.5] — GoldPrime v1.00 (Independent Tier Point-Gaps Engine) (Current Production)
+- **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_5.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_5.mq5) / [`GoldPrime_v100_B261109_5.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_5.ex5)
+- **วันที่ปล่อย**: 2026-11-09
+- **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
+- **เหตุผลในการปรับปรุง**:
+  - การใช้เงื่อนไข Drawdown % (เช่น +4% DD) ในชั้นลึก เมื่อมีจำนวนล็อตสะสมสะสมมากขึ้น (เช่น 7 ไม้ รวม 0.28 lot) กราฟขยับเพียงนิดเดียว Drawdown ก็พุ่งแตะ 4% ได้อย่างรวดเร็ว ทำให้ระยะราคาจริงแคบเกินไป ไม่สมเหตุสมผลกับพฤติกรรมราคาทองคำ
+- **รายละเอียดการแก้ไข**:
+  1. **เปลี่ยนรอยต่อจาก DD% เป็นระยะราคาจริง (Point-Gaps)**:
+     - ยกเลิกการอิง `InpTierDeltaDD_Pct` เปลี่ยนมาใช้ระยะห่างราคา (Points) จากไม้สุดท้ายของชุดก่อนหน้าโดยตรง
+  2. **แยกการตั้งค่ารอยต่ออย่างอิสระ 2 ระดับ**:
+     - `InpGapT1ToT2Points`: ระยะห่างจากไม้สุดท้ายของ Tier 1 สู่ไม้แรกของ Tier 2 (ค่าเริ่มต้น 500 จุด)
+     - `InpGapT2ToT3Points`: ระยะห่างจากไม้สุดท้ายปกติของ Tier 2 สู่ไม้แรกของ Tier 3 (ค่าเริ่มต้น 500 จุด)
+  3. **การบันทึกราคาอ้างอิง ณ จุดเปิดไม้ (OrderOpen Price Reference)**:
+     - บันทึกราคาเปิดจริงของไม้สุดท้ายปกติของแต่ละชุด (ไม่คิดจากไม้สมอ) เป็นจุดเริ่มต้นวัดระยะห่าง
+     - เมื่อชุดนั้นปิดรวบเก็บกำไร (Scalp Exit) ค่าราคาอ้างอิงจะถูกรีเซ็ตเพื่อความพร้อมในรอบใหม่
+  4. **อัปเกรดหน้าจอ HUD Dashboard**:
+     - แสดงค่าระยะ Gap 1->2 และ Gap 2->3 ให้เห็นแบบ Real-time บนกราฟพร้อมราคาอ้างอิงล่าสุด
+
+### 🔹 [B261109.4] — GoldPrime v1.00 (Scalp TP Condition Fix for Any Order Count)
 - **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_4.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_4.mq5) / [`GoldPrime_v100_B261109_4.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_4.ex5)
 - **วันที่ปล่อย**: 2026-11-09
 - **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
