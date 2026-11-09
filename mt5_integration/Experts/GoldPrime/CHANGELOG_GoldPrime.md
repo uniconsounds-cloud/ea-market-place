@@ -52,7 +52,21 @@
 
 ## 📋 ประวัติการแก้ไขราย Build (Build Changelog)
 
-### 🔹 [B261109.3] — GoldPrime v1.00 (Immediate Execution & Broker Compatibility Fix) (Current)
+### 🔹 [B261109.4] — GoldPrime v1.00 (Scalp TP Condition Fix for Any Order Count) (Current Production)
+- **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_4.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_4.mq5) / [`GoldPrime_v100_B261109_4.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_4.ex5)
+- **วันที่ปล่อย**: 2026-11-09
+- **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
+- **สาเหตุของปัญหา**:
+  - จากภาพทดสอบใน Strategy Tester ชุดที่ 2 ออกไป 2 ไม้ (`T2:#1` 0.08 lot กำไร +$121.04, `T2:#2` 0.09 lot กำไร +$164.16 รวมเป็นกำไร +$285.20) แต่ **ไม่ยอมปิดรวบ**
+  - เกิดจากเงื่อนไขในโค้ดเดิมเขียนไว้ว่า `snap.t2Count >= InpTier2Orders && snap.t2Profit >= InpTierScalpTargetMoney` ซึ่งไปบังคับว่าต้องออกครบ 3 ไม้ก่อนเท่านั้น (`snap.t2Count >= 3`) ถึงจะยอมปิดรวบ ทำให้ตอนที่มีแค่ 1 ไม้ หรือ 2 ไม้ แม้กำไรจะพุ่งเกินเป้าไปมหาศาล ระบบก็ปฏิเสธที่จะปิดรวบเก็บกำไร
+- **รายละเอียดการแก้ไข**:
+  1. **ปลดล็อกจำนวนไม้ออกของชุดที่ 2 และ 3**:
+     - เปลี่ยนเงื่อนไขเป็น `snap.t2Count > 0 && snap.t2Profit >= InpTierScalpTargetMoney` (และ `snap.t3Count > 0`)
+     - ส่งผลให้ **ไม่ว่าจะออกเพียง 1 ไม้, 2 ไม้ หรือครบ 3 ไม้** หากผลรวมกำไรของชุดถึงเป้าหมาย (`InpTierScalpTargetMoney` เช่น $5.00) ระบบจะ **ปิดรวบทำกำไร (Scalp TP) ทันที** ไม่ต้องรอให้ติดครบ 3 ไม้
+  2. **รีเซ็ตสถานะและเตรียมพร้อมรอบถัดไป**:
+     - เมื่อปิดรวบชุดที่ 2 ไม่ว่าจะปิดกี่ไม้ ระบบจะบันทึกกำไรเข้าพอร์ต และรีเซ็ต `Base DD Tier 2` กลับเป็น `0.0` ทันทีเพื่อพร้อมเปิดรอบใหม่
+
+### 🔹 [B261109.3] — GoldPrime v1.00 (Immediate Execution & Broker Compatibility Fix)
 - **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_3.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_3.mq5) / [`GoldPrime_v100_B261109_3.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_3.ex5)
 - **วันที่ปล่อย**: 2026-11-09
 - **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
