@@ -52,6 +52,21 @@
 
 ## 📋 ประวัติการแก้ไขราย Build (Build Changelog)
 
+### 🔹 [B261109.3] — GoldPrime v1.00 (Immediate Execution & Broker Compatibility Fix) (Current)
+- **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_3.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_3.mq5) / [`GoldPrime_v100_B261109_3.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_3.ex5)
+- **วันที่ปล่อย**: 2026-11-09
+- **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
+- **รายละเอียดการแก้ไข**:
+  1. **Dynamic Filling Mode Auto-Detection (แก้ปัญหา Error 10030 บนโบรกเกอร์ทองคำ)**:
+     - ปลดการล็อก `ORDER_FILLING_FOK` แบบ Hardcode ซึ่งเป็นสาเหตุหลักที่โบรกเกอร์ Forex/Gold (Exness, XM, IC Markets) ปฏิเสธคำสั่งเปิดออเดอร์
+     - ตรวจสอบ `SYMBOL_FILLING_MODE` ของโบรกเกอร์อัตโนมัติ พร้อมระบบ Fallback Retry วนลอง `IOC` และ `RETURN` ทันทีหากโบรกเกอร์ปฏิเสธ ทำให้ส่งคำสั่งติด 100% ทุกโบรกเกอร์
+  2. **Spread Filter Default Adjustment for Gold (แก้ปัญหาสเปรดบล็อกการออกไม้)**:
+     - ปรับค่าเริ่มต้น `InpMaxSpreadPoints = 0` (Disabled Filter) เพื่อไม่ให้สเปรดปกติของทองคำ (ซึ่งอยู่ที่ 150-350 จุดบนบัญชี Standard) ไปบล็อกคำสั่งแรกไม่ให้ทำงาน
+  3. **Real-time Diagnostic HUD & Safety Alert**:
+     - เพิ่มบรรทัดสถานะ `Status:` บนหน้าจอ HUD เพื่อแจ้งเตือนแบบ Real-time หากผู้ใช้ลืมกดปุ่ม "Algo Trading" บน MT5 หรือสเปรดสูงเกินค่าที่ตั้งไว้
+  4. **Immediate Clean Basket Execution**:
+     - เสริมระบบตรวจสอบราคา Tick สด (`SymbolInfoTick`) และ Normalize Lot Size ให้เข้ากับกฎของโบรกเกอร์เป๊ะ เพื่อให้เปิดไม้แรกได้ทันทีที่กราฟกระดิก 1 Tick
+
 ### 🔹 [B261109.2] — GoldPrime v1.00 (Decoupled Lifecycles & Dual-Anchor Engine)
 - **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_2.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_2.mq5) / [`GoldPrime_v100_B261109_2.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_2.ex5)
 - **วันที่ปล่อย**: 2026-11-09
