@@ -52,7 +52,25 @@
 
 ## 📋 ประวัติการแก้ไขราย Build (Build Changelog)
 
-### 🔹 [B261109.6] — GoldPrime v1.00 (Dynamic Lowest-Price Single Anchor Engine) (Current Production)
+### 🔹 [B261109.7] — GoldPrime v1.00 (Hybrid Volatility Exhaustion & Momentum Cooling) (Current Production)
+- **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_7.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_7.mq5) / [`GoldPrime_v100_B261109_7.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_7.ex5)
+- **วันที่ปล่อย**: 2026-11-09
+- **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
+- **ปัญหาเดิม**:
+  - การใช้ระยะ Point Gap คงที่เพียงอย่างเดียว ในสภาวะข่าวแรงหรือ Flash Crash บนกราฟ M1 อาจทำให้ EA เข้าไม้แรกของชุดกู้ภัยกลางอากาศขณะที่แท่งเทียนทิ้งดิ่งเป็นน้ำตก (Falling Knife)
+- **รายละเอียดการอัปเกรดระบบ Hybrid Dynamic Entry**:
+  1. **ผสานระบบ Hybrid (ระยะขั้นต่ำ + สัญญาณราคาหยุดวิ่งแรง)**:
+     - เมื่อราคาลงมาถึงระยะ Floor Gap (เช่น 500 จุด) แล้ว EA จะยังไม่รีบออกไม้ทันที แต่จะเข้าสู่โหมด Standby เพื่อรอการยืนยันว่า **"ความผันผวนลดลงและโมเมนตัมหยุดวิ่งแรงแล้ว"** บนไทม์เฟรม M1
+  2. **Multi-Factor Volatility Cooling Engine**:
+     - **Falling Knife Blocker:** สกัดกั้นการออกไม้สวนทันทีหากแท่ง M1 ล่าสุดเป็นแท่งเทียนทึบตัน (Bearish Body > 75% และไส้ล่าง < 20%)
+     - **Consecutive Low Failure (`InpConsecutiveLowBars = 2`):** ตรวจสอบว่าแท่ง M1 ได้หยุดทำ New Low ติดต่อกันอย่างน้อย 2 แท่งแล้ว แสดงว่าก้นเริ่มนิ่ง
+     - **Buyer Absorption Wick (`InpRejectionWickMinPct = 35%`):** ตรวจจับไส้เทียนล่างยาว มีแรงช้อนซื้อกลับอย่างมีนัยสำคัญ
+     - **Range Contraction (`InpContractionRatioPct = 50%`):** ตรวจจับการบีบตัวของแท่งเทียน โดยขนาดแท่ง M1 หดตัวลง $\le 50\%$ ของค่าเฉลี่ย 3 แท่งก่อนหน้า บ่งชี้ว่าแรงเทขายเริ่มแผ่วลงและเข้าสู่การพักตัว
+     - **Optional Fast EMA Reclaim (`InpRequireFastEmaReclaim`):** ตัวเลือกเสริมรอให้แท่ง M1 ปิดยืนเหนือ Fast EMA (เช่น EMA 5)
+  3. **On-Chart HUD Real-time Status**:
+     - แสดงสถานะตัวกรอง `Vol Cooling: ACTIVE 🛡️` พร้อมพารามิเตอร์ตรวจจับแบบ Real-time บนกราฟ
+
+### 🔹 [B261109.6] — GoldPrime v1.00 (Dynamic Lowest-Price Single Anchor Engine)
 - **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_6.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_6.mq5) / [`GoldPrime_v100_B261109_6.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_6.ex5)
 - **วันที่ปล่อย**: 2026-11-09
 - **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
