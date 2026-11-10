@@ -52,7 +52,27 @@
 
 ## 📋 ประวัติการแก้ไขราย Build (Build Changelog)
 
-### 🔹 [B261109.5] — GoldPrime v1.00 (Independent Tier Point-Gaps Engine) (Current Production)
+### 🔹 [B261109.6] — GoldPrime v1.00 (Dynamic Lowest-Price Single Anchor Engine) (Current Production)
+- **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_6.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_6.mq5) / [`GoldPrime_v100_B261109_6.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_6.ex5)
+- **วันที่ปล่อย**: 2026-11-09
+- **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
+- **รายละเอียดการยกเครื่องระบบไม้สมอ**:
+  1. **Continuous Lot Pipeline (ขนาดล็อตต่อเนื่อง 3 ชุด ไม่รวมสมอ)**:
+     - เรียงลำดับสล็อตล็อตสำหรับ 3 ชุดอย่างต่อเนื่อง (Tier 1 $\rightarrow$ Tier 2 $\rightarrow$ Tier 3)
+     - ไม้สมอจะใช้ขนาดล็อต **เท่ากับไม้สุดท้ายของชุดนั้น** ไม่ต้องกันสล็อตแยก
+  2. **Single Anchor at Absolute Lowest Price (มีสมอเพียงไม้เดียวและอยู่ที่ราคาต่ำสุดเสมอ)**:
+     - ในพอร์ตจะคงสถานะไม้สมอเพียง **1 ไม้ถ้วน** เสมอ
+     - ไม้สมอเริ่มต้นที่ชุดที่ 2 หลังจากออกไม้ปกติครบแล้วและราคายังลงต่อ
+  3. **Dynamic Anchor Swap & Absorption (สลับตำแหน่งสมอ & ดูดกลับเข้าชุด)**:
+     - เมื่อชุดที่ 2 หรือ 3 ปิดรวบเก็บกำไร (Scalp TP) จะปิดเฉพาะไม้ปกติของชุดนั้น **และคงไม้สมอเดี่ยวไว้ช่วยถ่วงชุดที่ 1**
+     - หากราคาลงต่อและชุดเริ่มเปิดไม้ในรอบใหม่:
+       - **ถ้าไม้ใหม่เปิดต่ำกว่าราคาไม้สมอเดิม:** ไม้ใหม่จะได้รับการสถาปนาขึ้นเป็น **⚓ ไม้สมอตัวใหม่ทันที**
+       - **ไม้สมอเดิมจะถูกดูดกลับเข้ามาเป็นส่วนหนึ่งของชุดปกติ** เพื่อรอจังหวะปิดรวบไปกับรอบใหม่ต่อไป
+     - ส่งผลให้ไม้สมอเลื่อนลงไปเกาะที่ราคาต่ำสุดของเหวเสมอ ดึงจุด Break-Even ของชุดที่ 1 ให้ขยับต่ำลงตามราคาตลาดได้เต็มประสิทธิภาพ
+  4. **Any-Order-Count Take Profit (ปิดรวบได้ทุกจำนวนไม้)**:
+     - ทุกชุด (Tier 1, Tier 2, Tier 3) ปิดรวบทำกำไรได้ตลอดเวลาเมื่อผลกำไรรวมถึงเป้าหมาย (`snap.tXCount > 0`) ไม่ต้องรอให้ออกครบจำนวนไม้
+
+### 🔹 [B261109.5] — GoldPrime v1.00 (Independent Tier Point-Gaps Engine)
 - **ไฟล์ซอร์สโค้ด**: [`GoldPrime_v100_B261109_5.mq5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_5.mq5) / [`GoldPrime_v100_B261109_5.ex5`](file:///Users/suphakorn/EA%20Market%20Place/Finishing%20EAeze%20Products/GoldPrime_v100_B261109_5.ex5)
 - **วันที่ปล่อย**: 2026-11-09
 - **สถานะ**: คอมไพล์ผ่านสมบูรณ์ (0 Errors, 0 Warnings)
