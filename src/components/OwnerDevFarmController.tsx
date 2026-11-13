@@ -95,14 +95,29 @@ export default function OwnerDevFarmController({
         onSetSimulatedFarmStatus(current);
     };
 
-    // Draggable position state
+    // Clamp position within safe visible viewport boundaries
+    const clampPosition = (pos: { x: number; y: number }) => {
+        if (typeof window === 'undefined') return pos;
+        const maxX = Math.max(10, window.innerWidth - 65);
+        const maxY = Math.max(60, window.innerHeight - 65);
+        const validX = Number.isFinite(pos?.x) ? pos.x : maxX;
+        const validY = Number.isFinite(pos?.y) ? pos.y : 130;
+        return {
+            x: Math.max(10, Math.min(maxX, validX)),
+            y: Math.max(60, Math.min(maxY, validY))
+        };
+    };
+
+    // Draggable position state (always clamped to visible screen)
     const [position, setPosition] = useState<{ x: number; y: number }>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('owner_dev_controller_pos');
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    return parsed;
+                    if (Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)) {
+                        return clampPosition(parsed);
+                    }
                 } catch (e) {}
             }
             return { x: Math.max(10, window.innerWidth - 65), y: 130 };
@@ -112,12 +127,27 @@ export default function OwnerDevFarmController({
 
     const isDraggingRef = useRef(false);
     const hasDraggedRef = useRef(false);
+    const latestPosRef = useRef<{ x: number; y: number }>(position);
     const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
         mouseX: 0,
         mouseY: 0,
         startX: 0,
         startY: 0
     });
+
+    // Ensure button is always clamped and visible on mount and upon window resize
+    useEffect(() => {
+        const handleResize = () => {
+            setPosition(prev => {
+                const clamped = clampPosition(prev);
+                latestPosRef.current = clamped;
+                return clamped;
+            });
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Handle Dragging via Mouse
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -139,17 +169,22 @@ export default function OwnerDevFarmController({
                 hasDraggedRef.current = true;
             }
 
-            const newX = Math.max(10, Math.min(window.innerWidth - 60, dragStartRef.current.startX + deltaX));
-            const newY = Math.max(60, Math.min(window.innerHeight - 60, dragStartRef.current.startY + deltaY));
+            const newPos = clampPosition({
+                x: dragStartRef.current.startX + deltaX,
+                y: dragStartRef.current.startY + deltaY
+            });
 
-            setPosition({ x: newX, y: newY });
+            latestPosRef.current = newPos;
+            setPosition(newPos);
         };
 
         const handleMouseUp = () => {
             isDraggingRef.current = false;
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
-            localStorage.setItem('owner_dev_controller_pos', JSON.stringify(position));
+            if (latestPosRef.current) {
+                localStorage.setItem('owner_dev_controller_pos', JSON.stringify(latestPosRef.current));
+            }
         };
 
         window.addEventListener('mousemove', handleMouseMove);
@@ -179,17 +214,22 @@ export default function OwnerDevFarmController({
                 hasDraggedRef.current = true;
             }
 
-            const newX = Math.max(10, Math.min(window.innerWidth - 60, dragStartRef.current.startX + deltaX));
-            const newY = Math.max(60, Math.min(window.innerHeight - 60, dragStartRef.current.startY + deltaY));
+            const newPos = clampPosition({
+                x: dragStartRef.current.startX + deltaX,
+                y: dragStartRef.current.startY + deltaY
+            });
 
-            setPosition({ x: newX, y: newY });
+            latestPosRef.current = newPos;
+            setPosition(newPos);
         };
 
         const handleTouchEnd = () => {
             isDraggingRef.current = false;
             window.removeEventListener('touchmove', handleTouchMove);
             window.removeEventListener('touchend', handleTouchEnd);
-            localStorage.setItem('owner_dev_controller_pos', JSON.stringify(position));
+            if (latestPosRef.current) {
+                localStorage.setItem('owner_dev_controller_pos', JSON.stringify(latestPosRef.current));
+            }
         };
 
         window.addEventListener('touchmove', handleTouchMove);

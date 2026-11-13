@@ -364,14 +364,15 @@ export async function GET(req: Request) {
             filteredEvents.reduce((acc, ev) => acc + (Number(ev.profit) < 0 ? Math.abs(Number(ev.profit)) : 0), 0).toFixed(2)
         );
         
+        // 🛡️ STRICT ACCURACY GUARD:
+        // Cut loss MUST only be registered if there are genuine negative closed deals/orders (directCutLoss > 0)
+        // or explicit cut loss reported by the EA telemetry.
+        // Minor discrepancies between raw basket sum and MT5 net cash (e.g. swap, commission, fees) are NOT cut losses!
         let eaCutLoss = 0;
         if (directCutLoss > 0) {
             eaCutLoss = directCutLoss;
-        } else if (rawEaGrossProfit > 0 && displayProfit < rawEaGrossProfit) {
-            // Settled MT5 profit is less than gross EA harvest profit: difference is cut losses/toxic cuts today!
-            eaCutLoss = Number((rawEaGrossProfit - displayProfit).toFixed(2));
-        } else if (displayProfit < 0) {
-            eaCutLoss = Number(Math.abs(displayProfit).toFixed(2));
+        } else if (pData?.relief_cut_loss && Number(pData.relief_cut_loss) > 0) {
+            eaCutLoss = Number(Number(pData.relief_cut_loss).toFixed(2));
         } else {
             eaCutLoss = 0;
         }
@@ -527,38 +528,9 @@ export async function GET(req: Request) {
                     targetSym = sortedPairs[0]?.symbol;
                 }
 
-                if (targetSym && pairMap[targetSym]) {
+                if (targetSym && pairMap[targetSym] && eaCutLoss > 0 && directCutLoss > 0) {
                     pairMap[targetSym].cutLoss = eaCutLoss;
                     pairMap[targetSym].exitTypes.add('RELIEF_TRIM');
-                    pairMap[targetSym].basketsCount += 1;
-
-                    // Also inject RELIEF_TRIM event into filteredEvents so it appears under MT5 Basket Closures
-                    const hasExistingNegativeEvent = filteredEvents.some(e => e.symbol === targetSym && Number(e.profit) < 0);
-                    if (!hasExistingNegativeEvent) {
-                        const targetEvents = filteredEvents.filter(e => e.symbol === targetSym);
-                        const refEv = targetEvents[0] || filteredEvents[0];
-                        const refTime = refEv?.closed_at || Math.floor(Date.now() / 1000);
-                        const refSide = refEv?.side || 'BUY';
-
-                        const trimEvent: BasketEvent = {
-                            id: `${portNumber}_${targetSym}_${refTime}_1_trim`,
-                            port_number: portNumber,
-                            symbol: targetSym,
-                            side: refSide,
-                            exit_type: 'RELIEF_TRIM',
-                            orders: 1,
-                            lots: 0.8,
-                            profit: -eaCutLoss,
-                            duration_sec: 0,
-                            max_dd_pct: 0,
-                            closed_at: refTime,
-                            ea_name: 'EasyM Prime',
-                            ea_build: pData?.build_id || 'B261104.1'
-                        };
-
-                        filteredEvents.push(trimEvent);
-                        filteredEvents.sort((a, b) => (b.closed_at || 0) - (a.closed_at || 0));
-                    }
                 }
             }
         }

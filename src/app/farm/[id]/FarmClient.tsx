@@ -362,6 +362,7 @@ const GlowingDdOrb = ({
 
 export default function FarmClient({ 
     portNumber: initialPortNumber, 
+    currentUserEmail = null,
     initialOrders, 
     initialPortStatus,
     initialUserFarmPorts = [],
@@ -377,6 +378,7 @@ export default function FarmClient({
     licenseInfo: initialLicenseInfo = null
 }: { 
     portNumber: string;
+    currentUserEmail?: string | null;
     initialOrders: any[];
     initialPortStatus?: any;
     initialUserFarmPorts?: Array<{
@@ -555,19 +557,36 @@ export default function FarmClient({
                     assetType === 'FOREX';
 
     // 👑 Owner Developer Sandbox & Customer Release Gate:
-    // 1. Only Port 97053088 has access to the Draggable Floating Controller Dock.
-    // 2. Port 97053088 (3088) and Port 21692434 (2434) are unlocked for Menu 3 (Multi-Farm 2.5D) and Menu 4 (Interactive Guide).
-    // 3. All other ports lock Menu 3 and Menu 4.
+    // 🛡️ STRICT DEV GATING:
+    // ปุ่มลอยตัว Dev จะแสดงเฉพาะบัญชีทดสอบ juntarasate.jo@gmail.com และบัญชีผู้ดูแลระบบ (Admin / Super Admin) เท่านั้น!
+    // หากเป็นบัญชีผู้ใช้ทั่วไปรายอื่น (Customer Accounts) จะไม่มีทางมองเห็นหรือเปิดใช้งานปุ่มนี้ได้โดยเด็ดขาด
+    const normalizedUserEmail = String(currentUserEmail || '').toLowerCase().trim();
+    const isOwnerTesterAccount = 
+        normalizedUserEmail === 'juntarasate.jo@gmail.com' || 
+        normalizedUserEmail === 'juntarasate@gmail.com' || 
+        normalizedUserEmail === 'juntatasate@gmail.com';
+
+    const isAuthorizedDevUser = isOwnerTesterAccount || Boolean(isAdmin) || Boolean(isSuperAdmin);
+
+    const initPortStr = String(initialPortNumber || '').trim();
     const activePortStr = String(portNumber || initialPortNumber || '').trim();
     const isDevPort3088 =
         activePortStr === '97053088' ||
         activePortStr.endsWith('3088') ||
-        activePortStr === '3088';
+        activePortStr === '3088' ||
+        initPortStr === '97053088' ||
+        initPortStr.endsWith('3088') ||
+        initPortStr === '3088';
     const isDevPort2434 =
         activePortStr === '21692434' ||
         activePortStr.endsWith('2434') ||
-        activePortStr === '2434';
-    const isAllowedDevMenuPort = isDevPort3088 || isDevPort2434;
+        activePortStr === '2434' ||
+        initPortStr === '21692434' ||
+        initPortStr.endsWith('2434') ||
+        initPortStr === '2434';
+
+    // เฉพาะผู้ที่ผ่านการยืนยันตัวตนว่าเป็น juntarasate.jo@gmail.com หรือบัญชีแอดมินเท่านั้นที่จะได้รับสิทธิ์ปุ่ม Dev
+    const isAllowedDevMenuPort = isAuthorizedDevUser && (isDevPort3088 || isDevPort2434 || Boolean(isAdmin) || Boolean(isSuperAdmin));
     const isOwnerTestPort = isAllowedDevMenuPort;
     const [isGlobalPrimeReleased, setIsGlobalPrimeReleased] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {

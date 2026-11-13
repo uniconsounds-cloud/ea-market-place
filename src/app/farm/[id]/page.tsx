@@ -46,9 +46,12 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
     }
 
     const sessionEmail = session.user.email;
-    const isSuperAdmin = sessionEmail === 'juntarasate@gmail.com' || sessionEmail === 'juntatasate@gmail.com';
+    const sessionEmailNormalized = (sessionEmail || '').toLowerCase().trim();
+    const isSuperAdmin = sessionEmailNormalized === 'juntarasate@gmail.com' || 
+                         sessionEmailNormalized === 'juntatasate@gmail.com' ||
+                         sessionEmailNormalized === 'juntarasate.jo@gmail.com';
 
-    if (!isAdmin && (!license || license.user_id !== session.user.id)) {
+    if (!isAdmin && !isSuperAdmin && (!license || license.user_id !== session.user.id)) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-[#1c1917] text-white p-4">
                 <script dangerouslySetInnerHTML={{ __html: `
@@ -284,6 +287,7 @@ export default async function FarmPage({ params }: { params: { id: string } }) {
         <div className="min-h-screen bg-[#1a120b] text-amber-50">
             <FarmClient
                 portNumber={portNumber}
+                currentUserEmail={sessionEmail}
                 initialOrders={initialOrders || []}
                 initialPortStatus={portStatus || null}
                 initialUserFarmPorts={initialUserFarmPorts}
