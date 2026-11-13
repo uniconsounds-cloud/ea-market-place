@@ -620,14 +620,14 @@ export default function FarmClient({
         }
     }, []);
 
-    const [liveAssetType, setLiveAssetType] = useState<'island' | 'crate'>(() => {
+    const [liveAssetType, setLiveAssetType] = useState<'basket' | 'island' | 'crate'>(() => {
         if (typeof window !== 'undefined') {
-            return (localStorage.getItem('easym_live_asset_type') as 'island' | 'crate') || 'island';
+            return (localStorage.getItem('easym_live_asset_type') as 'basket' | 'island' | 'crate') || 'basket';
         }
-        return 'island';
+        return 'basket';
     });
 
-    const handleSetLiveAssetType = useCallback((val: 'island' | 'crate') => {
+    const handleSetLiveAssetType = useCallback((val: 'basket' | 'island' | 'crate') => {
         setLiveAssetType(val);
         if (typeof window !== 'undefined') {
             localStorage.setItem('easym_live_asset_type', val);
@@ -2982,8 +2982,22 @@ export default function FarmClient({
             const cents = isUSC ? pnl : pnl * 100;
             
             let asset = '/farm/base_farmbox_empty.webp';
-            if (isLiveMode && liveAssetType === 'island') {
-                asset = '/farm/mini_farm_island.webp';
+            if (isLiveMode) {
+                if (liveAssetType === 'island') {
+                    asset = '/farm/mini_farm_island.webp';
+                } else if (liveAssetType === 'crate') {
+                    if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
+                    else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
+                    else if (cents > 1000) asset = '/farm/base_farmbox_mid.webp';
+                    else if (cents > 0) asset = '/farm/base_farmbox_min.webp';
+                } else {
+                    // Default TikTok Live: Green Apple Basket
+                    if (pnl < 0) asset = '/farm/basket_lose.png';
+                    else if (cents > 2000) asset = '/farm/basket_full.png';
+                    else if (cents > 1000) asset = '/farm/basket_mid.png';
+                    else if (cents > 0) asset = '/farm/basket_min.png';
+                    else asset = '/farm/basket_empty.png';
+                }
             } else {
                 if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
                 else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';

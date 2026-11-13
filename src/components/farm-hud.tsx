@@ -91,7 +91,7 @@ type FarmHudProps = {
     isNonLive10m?: boolean;
     onHarvestClick?: () => void;
     isLiveMode?: boolean;
-    liveAssetType?: 'island' | 'crate';
+    liveAssetType?: 'basket' | 'island' | 'crate';
 };
 
 export default function FarmHud({
@@ -155,8 +155,22 @@ export default function FarmHud({
     const centsValue = isUSD ? todayProfit * 100 : todayProfit;
 
     let todayHarvestAsset = '/farm/base_farmbox_empty.webp';
-    if (isLiveMode && liveAssetType === 'island') {
-        todayHarvestAsset = '/farm/mini_farm_island.webp';
+    if (isLiveMode) {
+        if (liveAssetType === 'island') {
+            todayHarvestAsset = '/farm/mini_farm_island.webp';
+        } else if (liveAssetType === 'crate') {
+            if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
+            else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
+            else if (centsValue > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
+            else if (centsValue > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
+        } else {
+            // Default TikTok Live: Green Apple Basket
+            if (todayProfit < 0) todayHarvestAsset = '/farm/basket_lose.png';
+            else if (centsValue > 2000) todayHarvestAsset = '/farm/basket_full.png';
+            else if (centsValue > 1000) todayHarvestAsset = '/farm/basket_mid.png';
+            else if (centsValue > 0) todayHarvestAsset = '/farm/basket_min.png';
+            else todayHarvestAsset = '/farm/basket_empty.png';
+        }
     } else {
         if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
         else if (centsValue > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
@@ -520,7 +534,7 @@ export function FarmMobileStatsOverlay({
     adminMessage?: string | null;
     isNonLive10m?: boolean;
     isLiveMode?: boolean;
-    liveAssetType?: 'island' | 'crate';
+    liveAssetType?: 'basket' | 'island' | 'crate';
     onHarvestClick?: () => void;
     onOpenRealAccountClick?: () => void;
 }) {
@@ -542,8 +556,22 @@ export function FarmMobileStatsOverlay({
     const centsValue_Mobile = isUSD_Mobile ? todayProfit * 100 : todayProfit;
 
     let todayHarvestAsset = '/farm/base_farmbox_empty.webp';
-    if (isLiveMode && liveAssetType === 'island') {
-        todayHarvestAsset = '/farm/mini_farm_island.webp';
+    if (isLiveMode) {
+        if (liveAssetType === 'island') {
+            todayHarvestAsset = '/farm/mini_farm_island.webp';
+        } else if (liveAssetType === 'crate') {
+            if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
+            else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';
+            else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/base_farmbox_mid.webp';
+            else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/base_farmbox_min.webp';
+        } else {
+            // Default TikTok Live: Green Apple Basket
+            if (todayProfit < 0) todayHarvestAsset = '/farm/basket_lose.png';
+            else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/basket_full.png';
+            else if (centsValue_Mobile > 1000) todayHarvestAsset = '/farm/basket_mid.png';
+            else if (centsValue_Mobile > 0) todayHarvestAsset = '/farm/basket_min.png';
+            else todayHarvestAsset = '/farm/basket_empty.png';
+        }
     } else {
         if (todayProfit < 0) todayHarvestAsset = '/farm/base_farmbox_lose.webp';
         else if (centsValue_Mobile > 2000) todayHarvestAsset = '/farm/base_farmbox_full.webp';

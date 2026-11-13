@@ -39,8 +39,8 @@ export interface OwnerDevFarmControllerProps {
     onSetSimulatedFarmStatus?: (status: Record<number, 'NORMAL' | 'EXPIRED_12H' | 'EXPIRED_48H'>) => void;
     isLiveMode?: boolean;
     onToggleLiveMode?: (enabled: boolean) => void;
-    liveAssetType?: 'island' | 'crate';
-    onSetLiveAssetType?: (type: 'island' | 'crate') => void;
+    liveAssetType?: 'basket' | 'island' | 'crate';
+    onSetLiveAssetType?: (type: 'basket' | 'island' | 'crate') => void;
 }
 
 export default function OwnerDevFarmController({
@@ -64,7 +64,7 @@ export default function OwnerDevFarmController({
     onSetSimulatedFarmStatus,
     isLiveMode = false,
     onToggleLiveMode,
-    liveAssetType = 'island',
+    liveAssetType = 'basket',
     onSetLiveAssetType
 }: OwnerDevFarmControllerProps) {
     // 🛡️ STRICT SAFETY GUARD: Never render anything for customers
@@ -474,11 +474,23 @@ export default function OwnerDevFarmController({
                                         }
                                     </div>
 
-                                    {/* 🎨 Live Asset Selector: เกาะมินิ vs ลังไม้ */}
+                                    {/* 🎨 Live Asset Selector: ตะกร้าผลไม้ vs เกาะมินิ vs ลังไม้ */}
                                     {isLiveMode && (
                                         <div className="mt-2 pt-2 border-t border-rose-500/25 flex items-center justify-between">
                                             <span className="text-[9px] text-rose-200/80 font-bold uppercase tracking-wider">Live Graphic:</span>
                                             <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onSetLiveAssetType?.('basket')}
+                                                    className={`px-2 py-0.5 rounded text-[8.5px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                                        liveAssetType === 'basket'
+                                                            ? 'bg-emerald-500 text-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.5)] font-black'
+                                                            : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    <span>🧺</span>
+                                                    <span>ตะกร้าผลไม้</span>
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => onSetLiveAssetType?.('island')}
@@ -489,7 +501,7 @@ export default function OwnerDevFarmController({
                                                     }`}
                                                 >
                                                     <span>🌱</span>
-                                                    <span>เกาะมินิ (ปลอดภัยสุด)</span>
+                                                    <span>เกาะมินิ</span>
                                                 </button>
                                                 <button
                                                     type="button"
@@ -501,7 +513,7 @@ export default function OwnerDevFarmController({
                                                     }`}
                                                 >
                                                     <span>📦</span>
-                                                    <span>ลังผลไม้</span>
+                                                    <span>ลังไม้</span>
                                                 </button>
                                             </div>
                                         </div>

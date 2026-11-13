@@ -1074,7 +1074,11 @@ export default function DemoFarmClient({
             
             let asset = '/farm/base_farmbox_empty.webp';
             if (effectiveLiveMode) {
-                asset = '/farm/mini_farm_island.webp';
+                if (pnl < 0) asset = '/farm/basket_lose.png';
+                else if (cents > 2000) asset = '/farm/basket_full.png';
+                else if (cents > 1000) asset = '/farm/basket_mid.png';
+                else if (cents > 0) asset = '/farm/basket_min.png';
+                else asset = '/farm/basket_empty.png';
             } else {
                 if (pnl < 0) asset = '/farm/base_farmbox_lose.webp';
                 else if (cents > 2000) asset = '/farm/base_farmbox_full.webp';
@@ -1266,7 +1270,7 @@ export default function DemoFarmClient({
                     systemCode={portStatus?.system_code}
                     onClick={handleSecretToggle}
                     isLiveMode={effectiveLiveMode}
-                    liveAssetType="island"
+                    liveAssetType="basket"
                 />
                 
                 {/* 1-Day Trading Timeline Bar: left=open, right=close, bar shrinks from right */}
@@ -1329,7 +1333,7 @@ export default function DemoFarmClient({
                 customName={effectiveLiveMode ? 'SHOWCASE 10-PORT' : currentCustomName}
                 adminMessage={effectiveLiveMode ? null : currentAdminMessage}
                 isLiveMode={effectiveLiveMode}
-                liveAssetType="island"
+                liveAssetType="basket"
                 onOpenRealAccountClick={() => setShowOpenRealAccountModal(true)}
             />
 
