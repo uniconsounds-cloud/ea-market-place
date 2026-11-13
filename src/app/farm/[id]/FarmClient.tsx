@@ -3164,14 +3164,16 @@ export default function FarmClient({
                     todayClosedLots={Number(portStatus?.today_closed_lots) || 0}
                     isFirstSyncLoading={forceShowEALoader}
                 />
-                {/* Admin Diagnostic Overlay for juntarasate@gmail.com */}
-                <AdminFarmDiagnosticOverlay
-                    isSuperAdmin={isSuperAdmin}
-                    portNumber={portNumber}
-                    portStatus={portStatus}
-                    ordersCount={orders.length}
-                    licenseInfo={licenseInfo}
-                />
+                {/* Admin Diagnostic Overlay for juntarasate@gmail.com (ซ่อนเมื่อมีปุ่มลอยตัว Dev แล้วเพื่อไม่ให้บังแถบประวัติกำไร) */}
+                {!isOwnerTestPort && (
+                    <AdminFarmDiagnosticOverlay
+                        isSuperAdmin={isSuperAdmin}
+                        portNumber={portNumber}
+                        portStatus={portStatus}
+                        ordersCount={orders.length}
+                        licenseInfo={licenseInfo}
+                    />
+                )}
                 {/* Visual indicator for secret toggle back */}
                 <div 
                     className="fixed top-0 left-0 w-20 h-20 z-[100] cursor-pointer opacity-0 hover:opacity-10"
@@ -7060,14 +7062,16 @@ export default function FarmClient({
                 </div>
             )}
 
-            {/* Admin Diagnostic Overlay for juntarasate@gmail.com */}
-            <AdminFarmDiagnosticOverlay
-                isSuperAdmin={isSuperAdmin}
-                portNumber={portNumber}
-                portStatus={portStatus}
-                ordersCount={orders.length}
-                licenseInfo={licenseInfo}
-            />
+            {/* Admin Diagnostic Overlay for juntarasate@gmail.com (ซ่อนเมื่อมีปุ่มลอยตัว Dev แล้วเพื่อไม่ให้บังแถบประวัติกำไร) */}
+            {!isOwnerTestPort && (
+                <AdminFarmDiagnosticOverlay
+                    isSuperAdmin={isSuperAdmin}
+                    portNumber={portNumber}
+                    portStatus={portStatus}
+                    ordersCount={orders.length}
+                    licenseInfo={licenseInfo}
+                />
+            )}
 
             {/* 🌟 EXPANDED MERCURY THERMOMETER ZOOM MODAL (เมื่อคลิกที่ปรอทของต้นไม้) */}
             {selectedTreeModal && (
