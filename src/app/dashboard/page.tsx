@@ -45,6 +45,14 @@ interface GroupedProduct {
     items: ProductItem[];
 }
 
+export type DashboardGroupTab = 'easygold' | 'easym_others' | 'all';
+
+export const isEasyGoldGroup = (group: GroupedProduct): boolean => {
+    const key = (group.productKey || '').toUpperCase();
+    const name = (group.productName || '').toLowerCase();
+    return key.includes('GOLD') || key.includes('EZG') || name.includes('gold');
+};
+
 export default function DashboardPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -54,6 +62,7 @@ export default function DashboardPage() {
     const [pendingIbRequests, setPendingIbRequests] = useState<any[]>([]);
     const [rejectedIbRequests, setRejectedIbRequests] = useState<any[]>([]);
     const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'expiring' | 'expired' | 'rejected'>('all');
+    const [activeGroup, setActiveGroup] = useState<DashboardGroupTab>('all');
     const [hasDemoChallenge, setHasDemoChallenge] = useState<boolean>(false);
     const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
     const [tempPortName, setTempPortName] = useState<string>('');
@@ -489,6 +498,62 @@ export default function DashboardPage() {
                 </div>
             )}
 
+            {/* 🌟 2 Main Category Tabs (EasyGold vs EasyM & Others) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-1 border-b border-border/40">
+                <div className="inline-flex p-1 bg-muted/50 backdrop-blur-md rounded-xl border border-border/60 gap-1.5 overflow-x-auto max-w-full">
+                    {/* Menu 1: EasyGold */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveGroup('easygold')}
+                        className={`h-9 sm:h-10 flex items-center gap-2 px-3.5 sm:px-5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            activeGroup === 'easygold'
+                                ? 'bg-gradient-to-r from-amber-500 via-amber-500 to-yellow-500 text-slate-950 shadow-md shadow-amber-500/30 font-black scale-[1.02]'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                        }`}
+                    >
+                        <span className="text-sm">🥇</span>
+                        <span>กลุ่ม EasyGold (ทองคำ)</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                            activeGroup === 'easygold' ? 'bg-black/25 text-slate-950' : 'bg-background/80 text-muted-foreground'
+                        }`}>
+                            {groupedProducts.filter(isEasyGoldGroup).length}
+                        </span>
+                    </button>
+
+                    {/* Menu 2: EasyM & Others */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveGroup('easym_others')}
+                        className={`h-9 sm:h-10 flex items-center gap-2 px-3.5 sm:px-5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            activeGroup === 'easym_others'
+                                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-blue-500/30 font-black scale-[1.02]'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                        }`}
+                    >
+                        <span className="text-sm">🌐</span>
+                        <span>กลุ่ม EasyM & อื่นๆ (คู่เงิน Forex)</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                            activeGroup === 'easym_others' ? 'bg-white/20 text-white' : 'bg-background/80 text-muted-foreground'
+                        }`}>
+                            {groupedProducts.filter(g => !isEasyGoldGroup(g)).length}
+                        </span>
+                    </button>
+
+                    {/* All Products Option */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveGroup('all')}
+                        className={`h-9 sm:h-10 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                            activeGroup === 'all'
+                                ? 'bg-secondary text-secondary-foreground font-bold shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                        }`}
+                    >
+                        ทั้งหมด ({groupedProducts.length})
+                    </button>
+                </div>
+            </div>
+
             {/* Filters */}
             <div className="flex flex-wrap gap-2">
                 <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
@@ -511,347 +576,102 @@ export default function DashboardPage() {
                 </Button>
             </div>
 
-            {/* Product List */}
-            <div className="space-y-6">
-                {groupedProducts.filter(group => group.items.some(item => isItemVisible(item, filter))).length > 0 ? (
-                    groupedProducts.map((group) => {
-                        // Filter items based on selected tab
-                        const visibleItems = group.items.filter(item => isItemVisible(item, filter));
-                        if (visibleItems.length === 0) return null;
+            {/* Product List Content */}
+            {(() => {
+                const goldGroups = groupedProducts.filter(isEasyGoldGroup);
+                const easymGroups = groupedProducts.filter(g => !isEasyGoldGroup(g));
 
-                        const isPrime = group.productName.toLowerCase().includes('prime') || group.productKey?.toUpperCase().includes('PRIME');
+                const visibleGoldGroups = goldGroups.filter(g => g.items.some(item => isItemVisible(item, filter)));
+                const visibleEasymGroups = easymGroups.filter(g => g.items.some(item => isItemVisible(item, filter)));
 
-                        return (
-                            <Card key={group.productId} className="overflow-hidden border-border/50">
-                                <CardHeader className="bg-muted/30 py-4 border-b border-border/30">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center overflow-hidden border border-border/50 shadow-sm">
-                                                {group.productImage ? (
-                                                    <img src={group.productImage} alt={group.productName} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <Key className="h-6 w-6 text-muted-foreground" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <CardTitle className="text-lg">{group.productName}</CardTitle>
-                                                    {group.productKey && (
-                                                        <Badge variant="secondary" className="text-xs font-mono bg-background/50 border-border/50">
-                                                            {group.productKey}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-muted-foreground">{visibleItems.length} รายการ (พอร์ต/ไอดี)</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            {/* Upgrade to Prime for EasyM products (except Prime itself) */}
-                                            {((group.productKey?.toUpperCase().startsWith('EZM') || group.productName?.toLowerCase().includes('easym') || group.productName?.toLowerCase().includes('easy m')) && !group.productName?.toLowerCase().includes('prime') && !group.productKey?.toUpperCase().includes('PRIME')) && (
-                                                <Link href={`/dashboard/upgrade-prime?fromProductId=${group.productId}`}>
-                                                    <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-semibold shadow-md shadow-cyan-500/20 border border-cyan-400/40 text-xs sm:text-sm whitespace-nowrap">
-                                                        <Sparkles className="h-3.5 w-3.5 text-yellow-300 animate-spin shrink-0" />
-                                                        ✨ อัปเกรดสู่ Prime ฟรี
-                                                    </Button>
-                                                </Link>
-                                            )}
-                                            {group.fileUrl && (
-                                                hasActiveLicense(group) ? (
-                                                    <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
-                                                        <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-muted font-bold text-primary border-primary/20">
-                                                            <Download className="h-4 w-4" />
-                                                            ดาวน์โหลดไฟล์
-                                                        </Button>
-                                                    </a>
-                                                ) : (
-                                                    <Button size="sm" variant="outline" className="gap-2 bg-muted/50 text-muted-foreground cursor-not-allowed border-dashed" disabled>
-                                                        <Download className="h-4 w-4 text-muted-foreground/50" />
-                                                        ไม่มีสิทธิ์ดาวน์โหลด (พอร์ตหมดอายุ)
-                                                    </Button>
-                                                )
-                                            )}
-                                            <Link href={`/products/${group.productId}`}>
-                                                <Button size="sm">เพิ่มพอร์ตรับ EA</Button>
-                                            </Link>
-                                        </div>
+                const renderMt5WebRequestGuide = () => (
+                    <div className="bg-gradient-to-r from-sky-950/40 via-sky-900/30 to-blue-950/40 border border-sky-500/30 rounded-xl p-3.5 sm:p-4 text-xs shadow-lg shadow-sky-950/20">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-start sm:items-center gap-2.5 text-sky-200">
+                                <div className="p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg shrink-0">
+                                    <Globe className="w-4 h-4 text-sky-400" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-sky-300 text-sm">คำแนะนำตั้งค่า MT5:</span>
+                                        <Badge variant="outline" className="text-[10px] bg-sky-500/10 text-sky-300 border-sky-500/30 py-0">
+                                            จำเป็นสำหรับ EasyM
+                                        </Badge>
                                     </div>
-                                </CardHeader>
+                                    <p className="text-muted-foreground text-xs mt-0.5">
+                                        เพิ่ม Allow WebRequest 2 รายการใน MT5 (เมนู Tools &gt; Options &gt; Expert Advisors)
+                                    </p>
+                                </div>
+                            </div>
 
-                                {/* EasyM Prime WebRequest Advice Ribbon */}
-                                {isPrime && (
-                                    <div className="bg-sky-500/10 dark:bg-sky-950/30 border-b border-sky-500/20 px-4 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
-                                        <div className="flex items-center gap-2 text-sky-200">
-                                            <Globe className="w-4 h-4 text-sky-400 shrink-0" />
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                <span className="font-semibold text-sky-300">คำแนะนำตั้งค่า MT5:</span>
-                                                <span className="text-muted-foreground text-[11px]">
-                                                    เพิ่ม Allow WebRequest 2 รายการ (Tools &gt; Options &gt; Expert Advisors)
-                                                </span>
-                                            </div>
-                                        </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* URL 1 */}
+                                <div className="flex items-center gap-1.5 bg-background/90 dark:bg-stone-900/90 border border-sky-500/30 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-sky-200 shadow-sm">
+                                    <span className="select-all font-medium">https://eaeze.com</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopy('https://eaeze.com', 'url1')}
+                                        className="ml-1 text-sky-400 hover:text-sky-200 p-0.5 rounded transition-colors inline-flex items-center"
+                                        title="คัดลอก https://eaeze.com"
+                                    >
+                                        {copiedUrl === 'url1' ? (
+                                            <span className="text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-0.5">
+                                                <Check className="w-3 h-3" /> คัดลอกแล้ว
+                                            </span>
+                                        ) : (
+                                            <Copy className="w-3 h-3" />
+                                        )}
+                                    </button>
+                                </div>
 
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            {/* URL 1 */}
-                                            <div className="flex items-center gap-1.5 bg-background/80 dark:bg-stone-900/90 border border-sky-500/30 rounded px-2 py-1 text-[11px] font-mono text-sky-200 shadow-sm">
-                                                <span className="select-all">https://eaeze.com</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopy('https://eaeze.com', 'url1')}
-                                                    className="ml-1 text-sky-400 hover:text-sky-200 p-0.5 rounded transition-colors inline-flex items-center"
-                                                    title="คัดลอก https://eaeze.com"
-                                                >
-                                                    {copiedUrl === 'url1' ? (
-                                                        <span className="text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-0.5">
-                                                            <Check className="w-3 h-3" /> คัดลอกแล้ว
-                                                        </span>
-                                                    ) : (
-                                                        <Copy className="w-3 h-3" />
-                                                    )}
-                                                </button>
-                                            </div>
+                                {/* URL 2 */}
+                                <div className="flex items-center gap-1.5 bg-background/90 dark:bg-stone-900/90 border border-sky-500/30 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-sky-200 shadow-sm">
+                                    <span className="select-all font-medium">https://mfrspvzxmpksqnzcrysz.supabase.co</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopy('https://mfrspvzxmpksqnzcrysz.supabase.co', 'url2')}
+                                        className="ml-1 text-sky-400 hover:text-sky-200 p-0.5 rounded transition-colors inline-flex items-center"
+                                        title="คัดลอก https://mfrspvzxmpksqnzcrysz.supabase.co"
+                                    >
+                                        {copiedUrl === 'url2' ? (
+                                            <span className="text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-0.5">
+                                                <Check className="w-3 h-3" /> คัดลอกแล้ว
+                                            </span>
+                                        ) : (
+                                            <Copy className="w-3 h-3" />
+                                        )}
+                                    </button>
+                                </div>
 
-                                            {/* URL 2 */}
-                                            <div className="flex items-center gap-1.5 bg-background/80 dark:bg-stone-900/90 border border-sky-500/30 rounded px-2 py-1 text-[11px] font-mono text-sky-200 shadow-sm">
-                                                <span className="select-all">https://mfrspvzxmpksqnzcrysz.supabase.co</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopy('https://mfrspvzxmpksqnzcrysz.supabase.co', 'url2')}
-                                                    className="ml-1 text-sky-400 hover:text-sky-200 p-0.5 rounded transition-colors inline-flex items-center"
-                                                    title="คัดลอก https://mfrspvzxmpksqnzcrysz.supabase.co"
-                                                >
-                                                    {copiedUrl === 'url2' ? (
-                                                        <span className="text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-0.5">
-                                                            <Check className="w-3 h-3" /> คัดลอกแล้ว
-                                                        </span>
-                                                    ) : (
-                                                        <Copy className="w-3 h-3" />
-                                                    )}
-                                                </button>
-                                            </div>
+                                {/* Quick Copy Both */}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleCopy('https://eaeze.com\nhttps://mfrspvzxmpksqnzcrysz.supabase.co', 'both')}
+                                    className="h-8 px-3 text-xs bg-sky-500/10 text-sky-300 hover:text-sky-100 hover:bg-sky-500/20 border-sky-500/30 font-medium"
+                                    title="คัดลอกทั้ง 2 URLs พร้อมกัน"
+                                >
+                                    {copiedUrl === 'both' ? (
+                                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                            <Check className="w-3.5 h-3.5" /> คัดลอกครบ 2 ลิงก์
+                                        </span>
+                                    ) : (
+                                        'คัดลอกทั้งคู่'
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                );
 
-                                            {/* Quick Copy Both */}
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => handleCopy('https://eaeze.com\nhttps://mfrspvzxmpksqnzcrysz.supabase.co', 'both')}
-                                                className="h-6 px-2 text-[10px] text-sky-400 hover:text-sky-200 hover:bg-sky-950/40 border border-sky-500/20"
-                                                title="คัดลอกทั้ง 2 URLs พร้อมกัน"
-                                            >
-                                                {copiedUrl === 'both' ? (
-                                                    <span className="text-emerald-400 font-bold flex items-center gap-0.5">
-                                                        <Check className="w-3 h-3" /> คัดลอกครบ 2 ลิงก์
-                                                    </span>
-                                                ) : (
-                                                    'คัดลอกทั้งคู่'
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <CardContent className="p-0 bg-card">
-                                    <div className="divide-y divide-border/40">
-                                        {visibleItems.map((item) => {
-                                            const isOrder = item.source === 'order';
-                                            let timeInfo = null;
-                                            if (!isOrder && item.expiry_date) {
-                                                timeInfo = calculateTimeRemaining(item);
-                                            }
-
-                                            return (
-                                                <div key={item.id} className="p-4 hover:bg-muted/10 transition-colors">
-                                                    <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
-
-                                                        {/* Port Info & Badge */}
-                                                        <div className="flex items-start md:items-center gap-3 min-w-[200px]">
-                                                            {isOrder ? (
-                                                                <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.status === 'pending' ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                                    <Clock className="h-4 w-4" />
-                                                                </div>
-                                                            ) : (
-                                                                <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.is_active && timeInfo?.days! > 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                                    <Activity className="h-4 w-4" />
-                                                                </div>
-                                                            )}
-
-                                                            <div>
-                                                                <div className="font-mono font-medium flex items-center gap-2 placeholder-transparent flex-wrap">
-                                                                    Port: {item.account_number || <span className="text-muted-foreground italic text-xs">รอการระบุ</span>}
-                                                                    {item.last_update_ms ? (
-                                                                        <span className="text-[10px] text-muted-foreground/75 font-sans font-normal inline-flex items-center gap-1">
-                                                                            <span className={`w-1.5 h-1.5 rounded-full ${item.is_online ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'}`}></span>
-                                                                            อัปเดต: {formatLastUpdated(item.last_update_ms)}
-                                                                        </span>
-                                                                    ) : null}
-
-                                                                    {/* Status Badges */}
-                                                                    {isOrder && item.status === 'pending' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 border-orange-500/20">รออนุมัติ</Badge>}
-                                                                    {isOrder && item.status === 'rejected' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">ถูกปฏิเสธ</Badge>}
-                                                                    {!isOrder && item.is_active && timeInfo?.days! > 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">ใช้งานอยู่</Badge>}
-                                                                    {!isOrder && item.is_active && timeInfo?.days! > 0 && timeInfo?.days! <= 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-500/30">ใกล้หมดอายุ</Badge>}
-                                                                    {!isOrder && (!item.is_active || timeInfo?.days! <= 0) && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">หมดอายุ</Badge>}
-                                                                </div>
-                                                                <div className="flex items-center gap-2 mt-0.5">
-                                                                    {item.is_ib && (
-                                                                        <Badge variant="outline" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20 uppercase tracking-wider">
-                                                                            IB {item.ib_broker_name || 'Customer'}
-                                                                        </Badge>
-                                                                    )}
-                                                                    {!item.is_ib && (item.type === 'monthly' || item.type === 'quarterly' || item.type === 'yearly') && (
-                                                                        <div className="text-xs text-muted-foreground capitalize">
-                                                                            {item.type === 'monthly' ? 'เช่ารายเดือน' :
-                                                                                item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
-                                                                                    'เช่ารายปี'}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                {!isOrder && item.account_number && (
-                                                                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                                        <span className="text-[10px] text-amber-500/80 uppercase tracking-wider font-bold">ชื่อพอร์ต:</span>
-                                                                        {editingLicenseId === item.id ? (
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <input 
-                                                                                    type="text" 
-                                                                                    value={tempPortName}
-                                                                                    onChange={(e) => setTempPortName(e.target.value)}
-                                                                                    className="bg-stone-900 border border-amber-900/30 px-1.5 py-0.5 rounded text-xs text-amber-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 w-36 h-6"
-                                                                                    placeholder="ตั้งชื่อพอร์ต..."
-                                                                                    maxLength={24}
-                                                                                />
-                                                                                <button 
-                                                                                    onClick={() => handleSavePortName(item.id)}
-                                                                                    disabled={savingPortName}
-                                                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded h-6 disabled:opacity-50 transition-colors"
-                                                                                >
-                                                                                    {savingPortName ? '...' : 'บันทึก'}
-                                                                                </button>
-                                                                                <button 
-                                                                                    onClick={() => setEditingLicenseId(null)}
-                                                                                    className="bg-stone-700 hover:bg-stone-600 text-white text-[10px] font-bold px-2 py-0.5 rounded h-6 transition-colors"
-                                                                                >
-                                                                                    ยกเลิก
-                                                                                </button>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <span className="font-semibold text-stone-200">{item.port_name || 'ยังไม่ได้ตั้งชื่อ'}</span>
-                                                                                <button 
-                                                                                    onClick={() => {
-                                                                                        setEditingLicenseId(item.id);
-                                                                                        setTempPortName(item.port_name || '');
-                                                                                    }}
-                                                                                    className="text-amber-500 hover:text-amber-400 text-[10px] font-bold hover:underline transition-colors flex items-center gap-0.5"
-                                                                                >
-                                                                                    ✏️ แก้ไขชื่อ
-                                                                                </button>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Central Status Area (Progress or Reject Reason) */}
-                                                        <div className="flex-1 max-w-md space-y-2">
-                                                            {isOrder ? (
-                                                                // For Orders
-                                                                <div className="text-sm bg-muted/30 p-2.5 rounded-md border border-border/40">
-                                                                    {item.status === 'pending' && "ระบบกำลังดำเนินการตรวจสอบออเดอร์ หากคุณชำระเงิน/ใช้ IB Quota แล้ว โปรดรอแอดมินอนุมัติ 1-12 ชม."}
-                                                                    {item.status === 'rejected' && "คำสั่งซื้อถูกปฏิเสธ: รูปสลิปอาจไม่ชัดเจน หรือ ข้อมูล IB ไม่ถูกต้อง หากมีข้อสงสัยโปรดติดต่อแอดมิน"}
-                                                                </div>
-                                                            ) : (
-                                                                // For Licenses
-                                                                <>
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <div className="flex items-center gap-1 text-muted-foreground">
-                                                                            <Clock className="h-3 w-3" />
-                                                                            <span>เวลาที่เหลือ</span>
-                                                                        </div>
-                                                                        <span className={`font-medium ${timeInfo?.days! <= 7 && !timeInfo?.isLifetime ? 'text-red-500' : ''}`}>
-                                                                            {timeInfo?.label}
-                                                                        </span>
-                                                                    </div>
-                                                                    {!timeInfo?.isLifetime && (
-                                                                        <Progress value={timeInfo?.percent} className="h-1.5 bg-muted/50" indicatorClassName={timeInfo?.color} />
-                                                                    )}
-                                                                    {timeInfo?.isLifetime && (
-                                                                        <div className="h-1.5 w-full bg-green-500/10 rounded-full relative overflow-hidden">
-                                                                            <div className="absolute inset-0 bg-green-500 w-full" />
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                                                                        <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
-                                                                        <span>หมดอายุ: {timeInfo?.isLifetime ? 'ตลอดชีพ' : new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Right Action Menu */}
-                                                        <div className="flex justify-end items-center gap-2 min-w-[150px]">
-                                                            {/* View Farm Button (Auto-enabled for EasyM Prime; requires admin show_farm approval for EasyM MAX and other products) */}
-                                                            {!isOrder && item.account_number && (item.show_farm || Boolean(item.products?.name?.toLowerCase().includes('prime') || item.products?.product_key?.toUpperCase().includes('PRIME'))) && (
-                                                                <Link href={`/farm/${item.account_number}`} target="_blank">
-                                                                    <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20">
-                                                                        <Activity className="w-3 h-3" />
-                                                                        ดูฟาร์ม
-                                                                    </Button>
-                                                                </Link>
-                                                            )}
-
-                                                            {/* Delete Button (Cleanup) */}
-                                                            {(isOrder && (item.status === 'pending' || item.status === 'rejected')) || 
-                                                             (!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 0))) ? (
-                                                                <Button 
-                                                                    size="sm" 
-                                                                    variant="ghost" 
-                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                                                                    onClick={() => handleDeleteItem(item.id, isOrder ? 'order' : 'license')}
-                                                                    title="ลบออกจากรายการ"
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            ) : null}
-
-                                                            {!isOrder && (!item.is_active || !timeInfo?.isLifetime) ? (
-                                                                (() => {
-                                                                    const isPrimeProduct = isPrime || item.type === 'pro';
-                                                                    const isIb = !isPrimeProduct && (item.type === 'ib' || item.is_ib);
-                                                                    const brokerParam = item.ib_broker_name ? `&ibBrokerName=${encodeURIComponent(item.ib_broker_name)}` : '';
-                                                                    const planParam = isPrimeProduct
-                                                                        ? (item.type === 'quarterly' || item.type === 'lifetime' ? item.type : 'monthly')
-                                                                        : (item.type || (isIb ? 'lifetime' : 'monthly'));
-                                                                    const renewCheckoutUrl = `/checkout/${group.productId}?accountNumber=${item.account_number}&plan=${planParam}${isIb ? '&isIbRequest=true' : ''}${brokerParam}`;
-                                                                    return (
-                                                                        <Link href={renewCheckoutUrl}>
-                                                                            <Button size="sm" variant="outline" className="h-8 text-xs bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-300 font-medium">
-                                                                                ต่ออายุ
-                                                                            </Button>
-                                                                        </Link>
-                                                                    );
-                                                                })()
-                                                            ) : (
-                                                                <div className="w-[32px]"></div> // Minimal placeholder if no renew but has delete
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })
-                ) : (
+                const renderEmptyState = (msg = 'ไม่พบรายการสินค้าในสถานะออเดอร์นี้') => (
                     <Card className="border-border/50 bg-card/50">
                         <CardContent className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
                             <div className="p-5 bg-muted rounded-full mb-4 ring-8 ring-background">
                                 <ShoppingCart className="h-10 w-10 text-muted-foreground/40" />
                             </div>
-                            <h3 className="text-xl font-medium text-foreground">ไม่พบรายการสินค้าในสถานะออเดอร์นี้</h3>
+                            <h3 className="text-xl font-medium text-foreground">{msg}</h3>
                             <p className="max-w-sm mt-2 mb-6 text-sm">หากคุณสั่งซื้อเรียบร้อยแล้ว แต่ออเดอร์หายไป โปรดติดต่อเราเพื่อตรวจสอบ</p>
                             {filter !== 'all' ? (
                                 <Button variant="outline" onClick={() => setFilter('all')}>ดูรายการทั้งหมด</Button>
@@ -862,8 +682,343 @@ export default function DashboardPage() {
                             )}
                         </CardContent>
                     </Card>
-                )}
-            </div>
+                );
+
+                const renderProductCard = (group: GroupedProduct) => {
+                    const visibleItems = group.items.filter(item => isItemVisible(item, filter));
+                    if (visibleItems.length === 0) return null;
+
+                    const isPrime = group.productName.toLowerCase().includes('prime') || group.productKey?.toUpperCase().includes('PRIME');
+
+                    return (
+                        <Card key={group.productId} className="overflow-hidden border-border/50">
+                            <CardHeader className="bg-muted/30 py-4 border-b border-border/30">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center overflow-hidden border border-border/50 shadow-sm">
+                                            {group.productImage ? (
+                                                <img src={group.productImage} alt={group.productName} className="h-full w-full object-cover" />
+                                            ) : (
+                                                <Key className="h-6 w-6 text-muted-foreground" />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <CardTitle className="text-lg">{group.productName}</CardTitle>
+                                                {group.productKey && (
+                                                    <Badge variant="secondary" className="text-xs font-mono bg-background/50 border-border/50">
+                                                        {group.productKey}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">{visibleItems.length} รายการ (พอร์ต/ไอดี)</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {/* Upgrade to Prime for EasyM products (except Prime itself) */}
+                                        {((group.productKey?.toUpperCase().startsWith('EZM') || group.productName?.toLowerCase().includes('easym') || group.productName?.toLowerCase().includes('easy m')) && !group.productName?.toLowerCase().includes('prime') && !group.productKey?.toUpperCase().includes('PRIME')) && (
+                                            <Link href={`/dashboard/upgrade-prime?fromProductId=${group.productId}`}>
+                                                <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-semibold shadow-md shadow-cyan-500/20 border border-cyan-400/40 text-xs sm:text-sm whitespace-nowrap">
+                                                    <Sparkles className="h-3.5 w-3.5 text-yellow-300 animate-spin shrink-0" />
+                                                    ✨ อัปเกรดสู่ Prime ฟรี
+                                                </Button>
+                                            </Link>
+                                        )}
+                                        {group.fileUrl && (
+                                            hasActiveLicense(group) ? (
+                                                <a href={group.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                    <Button size="sm" variant="outline" className="gap-2 bg-background hover:bg-muted font-bold text-primary border-primary/20">
+                                                        <Download className="h-4 w-4" />
+                                                        ดาวน์โหลดไฟล์
+                                                    </Button>
+                                                </a>
+                                            ) : (
+                                                <Button size="sm" variant="outline" className="gap-2 bg-muted/50 text-muted-foreground cursor-not-allowed border-dashed" disabled>
+                                                    <Download className="h-4 w-4 text-muted-foreground/50" />
+                                                    ไม่มีสิทธิ์ดาวน์โหลด (พอร์ตหมดอายุ)
+                                                </Button>
+                                            )
+                                        )}
+                                        <Link href={`/products/${group.productId}`}>
+                                            <Button size="sm">เพิ่มพอร์ตรับ EA</Button>
+                                        </Link>
+                                    </div>
+                                </div>
+                            </CardHeader>
+
+                            <CardContent className="p-0 bg-card">
+                                <div className="divide-y divide-border/40">
+                                    {visibleItems.map((item) => {
+                                        const isOrder = item.source === 'order';
+                                        let timeInfo = null;
+                                        if (!isOrder && item.expiry_date) {
+                                            timeInfo = calculateTimeRemaining(item);
+                                        }
+
+                                        return (
+                                            <div key={item.id} className="p-4 hover:bg-muted/10 transition-colors">
+                                                <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
+
+                                                    {/* Port Info & Badge */}
+                                                    <div className="flex items-start md:items-center gap-3 min-w-[200px]">
+                                                        {isOrder ? (
+                                                            <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.status === 'pending' ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                                <Clock className="h-4 w-4" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.is_active && timeInfo?.days! > 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                                <Activity className="h-4 w-4" />
+                                                            </div>
+                                                        )}
+
+                                                        <div>
+                                                            <div className="font-mono font-medium flex items-center gap-2 placeholder-transparent flex-wrap">
+                                                                Port: {item.account_number || <span className="text-muted-foreground italic text-xs">รอการระบุ</span>}
+                                                                {item.last_update_ms ? (
+                                                                    <span className="text-[10px] text-muted-foreground/75 font-sans font-normal inline-flex items-center gap-1">
+                                                                        <span className={`w-1.5 h-1.5 rounded-full ${item.is_online ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'}`}></span>
+                                                                        อัปเดต: {formatLastUpdated(item.last_update_ms)}
+                                                                    </span>
+                                                                ) : null}
+
+                                                                {/* Status Badges */}
+                                                                {isOrder && item.status === 'pending' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 border-orange-500/20">รออนุมัติ</Badge>}
+                                                                {isOrder && item.status === 'rejected' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">ถูกปฏิเสธ</Badge>}
+                                                                {!isOrder && item.is_active && timeInfo?.days! > 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">ใช้งานอยู่</Badge>}
+                                                                {!isOrder && item.is_active && timeInfo?.days! > 0 && timeInfo?.days! <= 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-500/30">ใกล้หมดอายุ</Badge>}
+                                                                {!isOrder && (!item.is_active || timeInfo?.days! <= 0) && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">หมดอายุ</Badge>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                {item.is_ib && (
+                                                                    <Badge variant="outline" className="h-4 px-1 text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20 uppercase tracking-wider">
+                                                                        IB {item.ib_broker_name || 'Customer'}
+                                                                    </Badge>
+                                                                )}
+                                                                {!item.is_ib && (item.type === 'monthly' || item.type === 'quarterly' || item.type === 'yearly') && (
+                                                                    <div className="text-xs text-muted-foreground capitalize">
+                                                                        {item.type === 'monthly' ? 'เช่ารายเดือน' :
+                                                                            item.type === 'quarterly' ? 'เช่าราย 3 เดือน' :
+                                                                                'เช่ารายปี'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {!isOrder && item.account_number && (
+                                                                <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                                    <span className="text-[10px] text-amber-500/80 uppercase tracking-wider font-bold">ชื่อพอร์ต:</span>
+                                                                    {editingLicenseId === item.id ? (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <input 
+                                                                                type="text" 
+                                                                                value={tempPortName}
+                                                                                onChange={(e) => setTempPortName(e.target.value)}
+                                                                                className="bg-stone-900 border border-amber-900/30 px-1.5 py-0.5 rounded text-xs text-amber-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 w-36 h-6"
+                                                                                placeholder="ตั้งชื่อพอร์ต..."
+                                                                                maxLength={24}
+                                                                            />
+                                                                            <button 
+                                                                                onClick={() => handleSavePortName(item.id)}
+                                                                                disabled={savingPortName}
+                                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded h-6 disabled:opacity-50 transition-colors"
+                                                                            >
+                                                                                {savingPortName ? '...' : 'บันทึก'}
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={() => setEditingLicenseId(null)}
+                                                                                className="bg-stone-700 hover:bg-stone-600 text-white text-[10px] font-bold px-2 py-0.5 rounded h-6 transition-colors"
+                                                                            >
+                                                                                ยกเลิก
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="font-semibold text-stone-200">{item.port_name || 'ยังไม่ได้ตั้งชื่อ'}</span>
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    setEditingLicenseId(item.id);
+                                                                                    setTempPortName(item.port_name || '');
+                                                                                }}
+                                                                                className="text-amber-500 hover:text-amber-400 text-[10px] font-bold hover:underline transition-colors flex items-center gap-0.5"
+                                                                            >
+                                                                                ✏️ แก้ไขชื่อ
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Central Status Area (Progress or Reject Reason) */}
+                                                    <div className="flex-1 max-w-md space-y-2">
+                                                        {isOrder ? (
+                                                            // For Orders
+                                                            <div className="text-sm bg-muted/30 p-2.5 rounded-md border border-border/40">
+                                                                {item.status === 'pending' && "ระบบกำลังดำเนินการตรวจสอบออเดอร์ หากคุณชำระเงิน/ใช้ IB Quota แล้ว โปรดรอแอดมินอนุมัติ 1-12 ชม."}
+                                                                {item.status === 'rejected' && "คำสั่งซื้อถูกปฏิเสธ: รูปสลิปอาจไม่ชัดเจน หรือ ข้อมูล IB ไม่ถูกต้อง หากมีข้อสงสัยโปรดติดต่อแอดมิน"}
+                                                            </div>
+                                                        ) : (
+                                                            // For Licenses
+                                                            <>
+                                                                <div className="flex justify-between text-xs">
+                                                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                                                        <Clock className="h-3 w-3" />
+                                                                        <span>เวลาที่เหลือ</span>
+                                                                    </div>
+                                                                    <span className={`font-medium ${timeInfo?.days! <= 7 && !timeInfo?.isLifetime ? 'text-red-500' : ''}`}>
+                                                                        {timeInfo?.label}
+                                                                    </span>
+                                                                </div>
+                                                                {!timeInfo?.isLifetime && (
+                                                                    <Progress value={timeInfo?.percent} className="h-1.5 bg-muted/50" indicatorClassName={timeInfo?.color} />
+                                                                )}
+                                                                {timeInfo?.isLifetime && (
+                                                                    <div className="h-1.5 w-full bg-green-500/10 rounded-full relative overflow-hidden">
+                                                                        <div className="absolute inset-0 bg-green-500 w-full" />
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                                    <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
+                                                                    <span>หมดอายุ: {timeInfo?.isLifetime ? 'ตลอดชีพ' : new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Right Action Menu */}
+                                                    <div className="flex justify-end items-center gap-2 min-w-[150px]">
+                                                        {/* View Farm Button (Auto-enabled for EasyM Prime; requires admin show_farm approval for EasyM MAX and other products) */}
+                                                        {!isOrder && item.account_number && (item.show_farm || Boolean(item.products?.name?.toLowerCase().includes('prime') || item.products?.product_key?.toUpperCase().includes('PRIME'))) && (
+                                                            <Link href={`/farm/${item.account_number}`} target="_blank">
+                                                                <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20">
+                                                                    <Activity className="w-3 h-3" />
+                                                                    ดูฟาร์ม
+                                                                </Button>
+                                                            </Link>
+                                                        )}
+
+                                                        {/* Delete Button (Cleanup) */}
+                                                        {(isOrder && (item.status === 'pending' || item.status === 'rejected')) || 
+                                                         (!isOrder && (!item.is_active || (!timeInfo?.isLifetime && timeInfo?.days! <= 0))) ? (
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="ghost" 
+                                                                className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                                                onClick={() => handleDeleteItem(item.id, isOrder ? 'order' : 'license')}
+                                                                title="ลบออกจากรายการ"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        ) : null}
+
+                                                        {!isOrder && (!item.is_active || !timeInfo?.isLifetime) ? (
+                                                            (() => {
+                                                                const isPrimeProduct = isPrime || item.type === 'pro';
+                                                                const isIb = !isPrimeProduct && (item.type === 'ib' || item.is_ib);
+                                                                const brokerParam = item.ib_broker_name ? `&ibBrokerName=${encodeURIComponent(item.ib_broker_name)}` : '';
+                                                                const planParam = isPrimeProduct
+                                                                    ? (item.type === 'quarterly' || item.type === 'lifetime' ? item.type : 'monthly')
+                                                                    : (item.type || (isIb ? 'lifetime' : 'monthly'));
+                                                                const renewCheckoutUrl = `/checkout/${group.productId}?accountNumber=${item.account_number}&plan=${planParam}${isIb ? '&isIbRequest=true' : ''}${brokerParam}`;
+                                                                return (
+                                                                    <Link href={renewCheckoutUrl}>
+                                                                        <Button size="sm" variant="outline" className="h-8 text-xs bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-300 font-medium">
+                                                                            ต่ออายุ
+                                                                        </Button>
+                                                                    </Link>
+                                                                );
+                                                            })()
+                                                        ) : (
+                                                            <div className="w-[32px]"></div> // Minimal placeholder if no renew but has delete
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                };
+
+                // Group 1 only: EasyGold
+                if (activeGroup === 'easygold') {
+                    return (
+                        <div className="space-y-6">
+                            {visibleGoldGroups.length > 0 ? (
+                                visibleGoldGroups.map(renderProductCard)
+                            ) : (
+                                renderEmptyState('ไม่พบรายการสินค้าในกลุ่ม EasyGold ตามสถานะที่เลือก')
+                            )}
+                        </div>
+                    );
+                }
+
+                // Group 2 only: EasyM & Others
+                if (activeGroup === 'easym_others') {
+                    return (
+                        <div className="space-y-6">
+                            {renderMt5WebRequestGuide()}
+                            {visibleEasymGroups.length > 0 ? (
+                                visibleEasymGroups.map(renderProductCard)
+                            ) : (
+                                renderEmptyState('ไม่พบรายการสินค้าในกลุ่ม EasyM & อื่นๆ ตามสถานะที่เลือก')
+                            )}
+                        </div>
+                    );
+                }
+
+                // Both Groups: All
+                const totalVisible = visibleGoldGroups.length + visibleEasymGroups.length;
+                if (totalVisible === 0) {
+                    return renderEmptyState();
+                }
+
+                return (
+                    <div className="space-y-8">
+                        {/* 1. EasyGold Section */}
+                        {visibleGoldGroups.length > 0 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base sm:text-lg">🥇</span>
+                                        <h2 className="text-base sm:text-lg font-bold text-foreground">กลุ่มผลิตภัณฑ์ EasyGold (ทองคำ)</h2>
+                                        <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20 font-bold">
+                                            {visibleGoldGroups.length} สินค้า
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="space-y-6">
+                                    {visibleGoldGroups.map(renderProductCard)}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. EasyM & Others Section with MT5 Setup Guide on top */}
+                        {visibleEasymGroups.length > 0 && (
+                            <div className="space-y-4 pt-2">
+                                <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base sm:text-lg">🌐</span>
+                                        <h2 className="text-base sm:text-lg font-bold text-foreground">กลุ่มผลิตภัณฑ์ EasyM & อื่นๆ (คู่เงิน Forex)</h2>
+                                        <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20 font-bold">
+                                            {visibleEasymGroups.length} สินค้า
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                {/* MT5 WebRequest Setup Guide directly on top of EasyM section */}
+                                {renderMt5WebRequestGuide()}
+
+                                <div className="space-y-6">
+                                    {visibleEasymGroups.map(renderProductCard)}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
         </div>
     );
 }
