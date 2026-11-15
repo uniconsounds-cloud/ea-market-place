@@ -17,6 +17,8 @@ export const isEasyGoldProduct = (p: any): boolean => {
     const key = (p.product_key || '').toUpperCase();
     const name = (p.name || '').toLowerCase();
     const asset = (p.asset_class || '').toLowerCase();
+    const strategy = (p.strategy || '').toLowerCase();
+    if (key.startsWith('SMART-') || strategy === 'smart ea') return false;
     return key.includes('GOLD') || key.includes('EZG') || name.includes('gold') || asset === 'gold';
 };
 

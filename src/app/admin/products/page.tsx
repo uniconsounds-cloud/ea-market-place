@@ -360,6 +360,8 @@ export default function AdminProductsPage() {
         const asset = (p.asset_class || '').toLowerCase().trim();
         const name = (p.name || '').toLowerCase().trim();
         const key = (p.product_key || '').toLowerCase().trim();
+        const strategy = (p.strategy || '').toLowerCase().trim();
+        if (key.startsWith('smart-') || strategy === 'smart ea') return false;
         return asset === 'gold' || name.includes('gold') || key.includes('gold') || key.startsWith('ezg-');
     };
 
