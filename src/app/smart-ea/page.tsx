@@ -1,0 +1,586 @@
+'use client';
+
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Navbar } from '@/components/navbar';
+import { Footer } from '@/components/footer';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import {
+    Activity,
+    CheckCircle2,
+    Loader2,
+    PauseCircle,
+    PlayCircle,
+    RefreshCw,
+    Send,
+    ShieldAlert,
+    Sliders,
+    Wifi,
+    WifiOff,
+    XCircle,
+} from 'lucide-react';
+
+interface ActiveConfig {
+    first_distance: number;
+    spacing: number;
+    pending_per_side: number;
+    initial_lot: number;
+    lot_increment: number;
+    target_profit: number;
+    stop_mode: string;
+}
+
+interface EAState {
+    port_number: string;
+    ea_name: string;
+    ea_version: string;
+    symbol: string;
+    currency: string;
+    balance: number;
+    equity: number;
+    cycle_pnl: number;
+    anchor: number;
+    open_pos: number;
+    open_buy: number;
+    open_sell: number;
+    pending_buy: number;
+    pending_sell: number;
+    conn_status: string;
+    config_status: string;
+    trade_status: string;
+    ea_status: string;
+    last_ack_seq: number;
+    active_config: ActiveConfig;
+    last_ping: string;
+}
+
+function SmartEACockpitContent() {
+    const searchParams = useSearchParams();
+    const initialPortParam = searchParams.get('port') || '';
+
+    const [portInput, setPortInput] = useState(initialPortParam);
+    const [activePort, setActivePort] = useState(initialPortParam);
+    const [loading, setLoading] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [isOnline, setIsOnline] = useState(false);
+    const [eaState, setEaState] = useState<EAState | null>(null);
+    const [lastCommand, setLastCommand] = useState<any>(null);
+    const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+
+    // Form fields
+    const [firstDistance, setFirstDistance] = useState('100');
+    const [spacing, setSpacing] = useState('50');
+    const [pendingPerSide, setPendingPerSide] = useState('10');
+    const [initialLot, setInitialLot] = useState('0.03');
+    const [lotIncrement, setLotIncrement] = useState('0.03');
+    const [targetProfit, setTargetProfit] = useState('20');
+    const [formInitialized, setFormInitialized] = useState(false);
+
+    useEffect(() => {
+        if (!initialPortParam) {
+            const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_ea_port') : '';
+            if (saved) {
+                setPortInput(saved);
+                setActivePort(saved);
+            }
+        }
+    }, [initialPortParam]);
+
+    const fetchTelemetry = useCallback(async (portToFetch: string) => {
+        if (!portToFetch) return;
+        try {
+            const res = await fetch(`/api/smart-ea/control?port=${encodeURIComponent(portToFetch)}`, {
+                cache: 'no-store',
+            });
+            const data = await res.json();
+            if (data.success) {
+                setIsOnline(Boolean(data.is_online));
+                setEaState(data.state || null);
+                setLastCommand(data.command || null);
+
+                // Populate form once from live EA or saved command
+                if (!formInitialized) {
+                    const src = data.command?.command_seq > 0
+                        ? data.command
+                        : data.state?.active_config;
+                    if (src) {
+                        if (src.first_distance !== undefined) setFirstDistance(String(src.first_distance));
+                        if (src.spacing !== undefined) setSpacing(String(src.spacing));
+                        if (src.pending_per_side !== undefined) setPendingPerSide(String(src.pending_per_side));
+                        if (src.initial_lot !== undefined) setInitialLot(String(src.initial_lot));
+                        if (src.lot_increment !== undefined) setLotIncrement(String(src.lot_increment));
+                        if (src.target_profit !== undefined) setTargetProfit(String(src.target_profit));
+                        setFormInitialized(true);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Failed to poll Smart EA:', err);
+        }
+    }, [formInitialized]);
+
+    useEffect(() => {
+        if (!activePort) return;
+        fetchTelemetry(activePort);
+        const timer = setInterval(() => fetchTelemetry(activePort), 3000);
+        return () => clearInterval(timer);
+    }, [activePort, fetchTelemetry]);
+
+    const handleConnectPort = (e: React.FormEvent) => {
+        e.preventDefault();
+        const clean = portInput.trim();
+        if (!clean) {
+            toast.error('กรุณากรอกหมายเลขพอร์ต MT5');
+            return;
+        }
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('smart_ea_port', clean);
+        }
+        setFormInitialized(false);
+        setActivePort(clean);
+        setLoading(true);
+        fetchTelemetry(clean).finally(() => setLoading(false));
+    };
+
+    const sendCommand = async (payload: Record<string, any>, successMsg: string) => {
+        if (!activePort) {
+            toast.error('กรุณาเชื่อมต่อหมายเลขพอร์ตก่อน');
+            return;
+        }
+        setSending(true);
+        try {
+            const res = await fetch('/api/smart-ea/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ port_number: activePort, ...payload }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setLastCommand(data.command);
+                toast.success(successMsg);
+                setTimeout(() => fetchTelemetry(activePort), 1000);
+            } else {
+                toast.error(data.error || 'ส่งคำสั่งไม่สำเร็จ');
+            }
+        } catch {
+            toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const handleUpdateSettings = (e: React.FormEvent) => {
+        e.preventDefault();
+        const fDist = parseInt(firstDistance, 10);
+        const spc = parseInt(spacing, 10);
+        const pend = parseInt(pendingPerSide, 10);
+        const lot = parseFloat(initialLot);
+        const inc = parseFloat(lotIncrement);
+        const tp = parseFloat(targetProfit);
+
+        if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
+            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || tp <= 0) {
+            toast.error('กรุณาตรวจสอบค่าตัวเลขที่กรอกให้ถูกต้อง');
+            return;
+        }
+
+        sendCommand(
+            {
+                first_distance: fDist,
+                spacing: spc,
+                pending_per_side: pend,
+                initial_lot: lot,
+                lot_increment: inc,
+                target_profit: tp,
+                close_all: false,
+            },
+            'ส่งค่าใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
+        );
+    };
+
+    const isPendingAck = Boolean(
+        lastCommand?.command_seq &&
+        eaState &&
+        Number(lastCommand.command_seq) > Number(eaState.last_ack_seq || 0)
+    );
+
+    const cur = eaState?.currency || 'USD';
+
+    return (
+        <div className="container mx-auto px-4 py-6 max-w-5xl space-y-6">
+            {/* Header & Port Selector */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border rounded-xl p-4 shadow-sm">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight">Smart Vortex Cockpit</h1>
+                        <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30">
+                            Smart EA Series
+                        </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        ควบคุมและติดตามสถานะ EA แบบ Real-time 2 ทาง (มือถือ / คอมพิวเตอร์)
+                    </p>
+                </div>
+
+                <form onSubmit={handleConnectPort} className="flex items-center gap-2 w-full md:w-auto">
+                    <Input
+                        placeholder="เลขพอร์ต MT5 (เช่น 58013626)"
+                        value={portInput}
+                        onChange={(e) => setPortInput(e.target.value)}
+                        className="w-full md:w-52 font-mono"
+                    />
+                    <Button type="submit" disabled={loading}>
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'เชื่อมต่อ'}
+                    </Button>
+                </form>
+            </div>
+
+            {!activePort ? (
+                <Card className="border-dashed">
+                    <CardContent className="py-16 text-center space-y-3">
+                        <Activity className="w-10 h-10 mx-auto text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">กรุณาระบุเลขพอร์ต MT5 ที่ต้องการควบคุม</h3>
+                        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                            ติดตั้ง EA Smart Vortex บน MT5 ของคุณ และเพิ่ม URL https://eaeze.com ใน MT5 WebRequest จากนั้นกรอกเลขพอร์ตด้านบนเพื่อเริ่มใช้งาน
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
+                    {/* Live Status Badges Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Card className="border bg-card/60">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground font-medium">การเชื่อมต่อ (MT5)</span>
+                                {isOnline ? (
+                                    <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30 gap-1.5">
+                                        <Wifi className="w-3.5 h-3.5" /> เชื่อมต่อสำเร็จ
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="destructive" className="gap-1.5">
+                                        <WifiOff className="w-3.5 h-3.5" /> ออฟไลน์ / รอสัญญาณ
+                                    </Badge>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border bg-card/60">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground font-medium">สถานะการโหลดค่า</span>
+                                {isPendingAck ? (
+                                    <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 gap-1.5">
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> กำลังส่งค่าเข้า EA...
+                                    </Badge>
+                                ) : eaState?.config_status === 'WEB_LOADED' ? (
+                                    <Badge className="bg-sky-500/15 text-sky-400 border-sky-500/30 gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> โหลดค่าแล้ว (Web)
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="gap-1.5">
+                                        ค่าเริ่มต้นจาก MT5
+                                    </Badge>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border bg-card/60">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground font-medium">สถานะการทำงาน</span>
+                                <Badge
+                                    className={
+                                        eaState?.trade_status === 'RUNNING'
+                                            ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
+                                            : eaState?.trade_status === 'PAUSED_NEXT'
+                                            ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                            : 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                                    }
+                                >
+                                    {eaState?.trade_status === 'RUNNING'
+                                        ? 'กำลังรันเทรด (Running)'
+                                        : eaState?.trade_status === 'PAUSED_NEXT'
+                                        ? 'รอปิดรอบแล้วหยุด'
+                                        : eaState?.trade_status === 'FROZEN'
+                                        ? 'หยุดกางไม้ (Frozen)'
+                                        : eaState?.trade_status || 'WAITING'}
+                                </Badge>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Live Metrics Grid */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Balance / Equity</CardDescription>
+                                <CardTitle className="text-xl font-mono">
+                                    {eaState ? `${eaState.balance.toFixed(2)}` : '---'} {cur}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-xs text-muted-foreground font-mono">
+                                Equity: {eaState ? `${eaState.equity.toFixed(2)} ${cur}` : '---'}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>กำไรรอบปัจจุบัน (Cycle Net)</CardDescription>
+                                <CardTitle
+                                    className={`text-xl font-mono ${
+                                        (eaState?.cycle_pnl || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                                    }`}
+                                >
+                                    {eaState
+                                        ? `${eaState.cycle_pnl >= 0 ? '+' : ''}${eaState.cycle_pnl.toFixed(2)} ${cur}`
+                                        : '---'}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-xs text-muted-foreground font-mono">
+                                เป้าปิดรวบ: {eaState?.active_config?.target_profit ?? targetProfit} {cur}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>คู่เงิน & จุดอ้างอิง (Anchor)</CardDescription>
+                                <CardTitle className="text-xl font-mono">
+                                    {eaState?.symbol || 'XAUUSD'}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-xs text-muted-foreground font-mono">
+                                Anchor: {eaState?.anchor ? eaState.anchor.toFixed(2) : 'รอเปิดรอบ'}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>จำนวนไม้ (Open / Pending)</CardDescription>
+                                <CardTitle className="text-xl font-mono">
+                                    {eaState ? `${eaState.open_pos} ไม้เปิด` : '---'}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-xs text-muted-foreground font-mono">
+                                {eaState
+                                    ? `Open B:${eaState.open_buy} S:${eaState.open_sell} | Pend B:${eaState.pending_buy} S:${eaState.pending_sell}`
+                                    : '---'}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Control & Settings Split */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* Left: 2-Way Execution Controls */}
+                        <Card className="lg:col-span-5">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg">
+                                    <Activity className="w-5 h-5 text-primary" /> คำสั่งควบคุมการทำงาน
+                                </CardTitle>
+                                <CardDescription>
+                                    สั่งเริ่มหรือหยุดการทำงานของ EA ได้ทันทีจากหน้าจอนี้
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <Button
+                                    className="w-full justify-start gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    disabled={sending}
+                                    onClick={() =>
+                                        sendCommand(
+                                            { stop_mode: 'RUN', close_all: false },
+                                            'สั่งเริ่มเทรด (RUN) ไปยัง EA แล้ว'
+                                        )
+                                    }
+                                >
+                                    <PlayCircle className="w-4 h-4" />
+                                    เริ่มเทรด / ทำงานต่อ (Start / Resume)
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className="w-full justify-start gap-2 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                                    disabled={sending}
+                                    onClick={() =>
+                                        sendCommand(
+                                            { stop_mode: 'PAUSE_NEXT', close_all: false },
+                                            'สั่งหยุดหลังจบรอบปัจจุบัน (Pause Next Cycle) แล้ว'
+                                        )
+                                    }
+                                >
+                                    <PauseCircle className="w-4 h-4" />
+                                    หยุดหลังจบรอบนี้ (Pause Next Cycle)
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className="w-full justify-start gap-2 border-rose-500/40 text-rose-500 hover:bg-rose-500/10"
+                                    disabled={sending}
+                                    onClick={() =>
+                                        sendCommand(
+                                            { stop_mode: 'FREEZE_STOP', close_all: false },
+                                            'สั่งหยุดกางไม้และลบ Pending ทันทีแล้ว'
+                                        )
+                                    }
+                                >
+                                    <XCircle className="w-4 h-4" />
+                                    หยุดกางไม้ & ลบ Pending ทันที (Freeze Stop)
+                                </Button>
+
+                                <div className="pt-3 border-t">
+                                    {!confirmCloseAll ? (
+                                        <Button
+                                            variant="destructive"
+                                            className="w-full justify-start gap-2"
+                                            disabled={sending}
+                                            onClick={() => setConfirmCloseAll(true)}
+                                        >
+                                            <ShieldAlert className="w-4 h-4" />
+                                            ปิดรวบออเดอร์ทั้งหมดทันที (Close All Now)
+                                        </Button>
+                                    ) : (
+                                        <div className="p-3 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
+                                            <p className="text-xs font-medium text-destructive">
+                                                ยืนยันปิดรวบทุกไม้และลบ Pending ทั้งหมดทันที?
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="flex-1"
+                                                    disabled={sending}
+                                                    onClick={() => {
+                                                        setConfirmCloseAll(false);
+                                                        sendCommand(
+                                                            { stop_mode: 'PAUSE_NEXT', close_all: true },
+                                                            'ส่งคำสั่ง Close All Now ไปยัง EA แล้ว!'
+                                                        );
+                                                    }}
+                                                >
+                                                    ยืนยันปิดทันที
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="flex-1"
+                                                    onClick={() => setConfirmCloseAll(false)}
+                                                >
+                                                    ยกเลิก
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Right: Live Settings Editor */}
+                        <Card className="lg:col-span-7">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg">
+                                    <Sliders className="w-5 h-5 text-primary" /> ตั้งค่าระบบเทรด (อัปเดตทันที)
+                                </CardTitle>
+                                <CardDescription>
+                                    เมื่อกดบันทึก EA จะลบ Pending เดิมที่ยังไม่เกี่ยวทั้งหมด แล้ววางชุดใหม่ตามค่าที่ตั้งทันที
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form onSubmit={handleUpdateSettings} className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label>ระยะไม้แรก (First Distance Points)</Label>
+                                            <Input
+                                                type="number"
+                                                value={firstDistance}
+                                                onChange={(e) => setFirstDistance(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label>ระยะห่างระหว่างไม้ (Grid Spacing Points)</Label>
+                                            <Input
+                                                type="number"
+                                                value={spacing}
+                                                onChange={(e) => setSpacing(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label>จำนวน Pending ต่อฝั่ง (Pending/Side)</Label>
+                                            <Input
+                                                type="number"
+                                                value={pendingPerSide}
+                                                onChange={(e) => setPendingPerSide(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label>เป้ากำไรปิดรวบ (Target Profit {cur})</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                value={targetProfit}
+                                                onChange={(e) => setTargetProfit(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label>ล็อตเริ่มต้น (Initial Lot)</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={initialLot}
+                                                onChange={(e) => setInitialLot(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label>ล็อตเพิ่มต่อชั้น (Lot Increment)</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={lotIncrement}
+                                                onChange={(e) => setLotIncrement(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {eaState?.active_config && (
+                                        <div className="p-3 rounded-lg bg-muted/40 border text-xs font-mono text-muted-foreground">
+                                            ค่าที่กำลังรันอยู่ใน EA ขณะนี้: Dist={eaState.active_config.first_distance}pt | Spacing={eaState.active_config.spacing}pt | Pend={eaState.active_config.pending_per_side} | Lot={eaState.active_config.initial_lot}+{eaState.active_config.lot_increment} | TP={eaState.active_config.target_profit}
+                                        </div>
+                                    )}
+
+                                    <Button type="submit" className="w-full gap-2" disabled={sending}>
+                                        {sending ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Send className="w-4 h-4" />
+                                        )}
+                                        อัปเดตและส่งค่าเข้า EA ทันที (Update & Sync)
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+export default function SmartEACockpitPage() {
+    return (
+        <main className="min-h-screen flex flex-col bg-background">
+            <Navbar />
+            <div className="flex-1">
+                <Suspense fallback={<div className="p-12 text-center">Loading Smart EA Cockpit...</div>}>
+                    <SmartEACockpitContent />
+                </Suspense>
+            </div>
+            <Footer />
+        </main>
+    );
+}
