@@ -217,16 +217,35 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                 return;
             }
 
-            const pendingOrders = userOrders.filter(o => o.account_number && o.account_number.split(',').some((p: string) => filledPorts.includes(p)));
-            if (pendingOrders.length > 0) {
-                setPortValidationMsg({ text: 'คุณมีคำสั่งซื้อที่รอตรวจสอบแพ็คเกจหน้านี้สำหรับพอร์ตที่กรอกอยู่แล้ว', type: 'error' });
+            // 1. Check pending orders across all products for these ports
+            const { data: globalPendingOrders } = await supabase
+                .from('orders')
+                .select('id, product_id, account_number, user_id, status, products(name)')
+                .eq('status', 'pending');
+
+            const pendingConflict = (globalPendingOrders || []).find(o => {
+                const oPorts = (o.account_number || '').split(',').map((p: string) => p.trim()).filter(Boolean);
+                return filledPorts.some(p => oPorts.includes(p));
+            });
+
+            if (pendingConflict) {
+                const prodName = (pendingConflict.products as any)?.name || 'EA ตัวอื่น';
+                const isCurrentProduct = pendingConflict.product_id === product.id;
+                const isSelf = pendingConflict.user_id === userId;
+                const pendingMsg = isCurrentProduct
+                    ? 'คุณมีคำสั่งซื้อที่รอการอนุมัติสำหรับพอร์ตนี้ในสินค้านี้อยู่แล้ว โปรดรอการตรวจสอบ'
+                    : isSelf
+                        ? `หมายเลขพอร์ตนี้มีคำสั่งซื้อรอตรวจสอบอยู่กับ ${prodName} (กรุณารอการอนุมัติหรือแจ้งยกเลิกรายการเดิมก่อน)`
+                        : 'หมายเลขพอร์ตนี้มีคำสั่งซื้อของผู้ใช้อื่นกำลังรอการอนุมัติอยู่ในระบบ';
+                setPortValidationMsg({ text: pendingMsg, type: 'error' });
                 setIsRenewal(false);
                 return;
             }
 
+            // 2. Check active licenses across all products
             const { data: globalLicenses } = await supabase
                 .from('licenses')
-                .select('id, account_number, user_id, is_active, expiry_date, type')
+                .select('id, account_number, user_id, product_id, is_active, expiry_date, type, products(name)')
                 .in('account_number', filledPorts)
                 .eq('is_active', true);
 
@@ -244,16 +263,25 @@ export function ProductPurchaseSection({ product }: ProductPurchaseSectionProps)
                         .then();
                 }
 
-                // Only consider truly active and unexpired licenses of OTHER users as conflicts
-                const trulyActiveConflicts = globalLicenses.filter(l => {
-                    if (l.user_id === userId) return false;
-                    if (l.type === 'lifetime') return true;
-                    if (!l.expiry_date) return true;
-                    return new Date(l.expiry_date) >= now;
+                // Check active unexpired conflicts
+                // A port cannot be used on multiple EAs simultaneously.
+                // A license is an active conflict if:
+                // 1. It belongs to another user
+                // 2. It belongs to current user, but on a DIFFERENT product
+                const activeConflict = globalLicenses.find(l => {
+                    const isUnexpired = l.type === 'lifetime' || !l.expiry_date || new Date(l.expiry_date) >= now;
+                    if (!isUnexpired) return false;
+                    return !userId || l.user_id !== userId || l.product_id !== product.id;
                 });
 
-                if (trulyActiveConflicts.length > 0) {
-                    setPortValidationMsg({ text: `หมายเลขพอร์ต ${trulyActiveConflicts[0].account_number} มีการใช้งานในระบบแล้วโดยผู้ใช้อื่น และยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`, type: 'error' });
+                if (activeConflict) {
+                    const conflictProductName = (activeConflict.products as any)?.name || 'EA ตัวอื่น';
+                    const isSelf = activeConflict.user_id === userId;
+                    const errorText = isSelf
+                        ? `หมายเลขพอร์ต ${activeConflict.account_number} กำลังใช้งานอยู่กับ ${conflictProductName} (ต้องขอให้แอดมินยกเลิกพอร์ตเดิมก่อน จึงจะนำมาใช้กับตัวใหม่ได้)`
+                        : `หมายเลขพอร์ต ${activeConflict.account_number} มีการใช้งานในระบบแล้วโดยผู้ใช้อื่น และยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`;
+
+                    setPortValidationMsg({ text: errorText, type: 'error' });
                     setIsRenewal(false);
                     return;
                 }

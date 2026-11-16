@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2, Sparkles, Copy, Check, Globe } from 'lucide-react';
+import { Activity, CreditCard, Key, ShoppingCart, Loader2, AlertTriangle, Clock, Calendar, MoreVertical, Download, ShieldCheck, XCircle, Trash2, Sparkles, Copy, Check, Globe, Sliders } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -569,7 +569,7 @@ export default function DashboardPage() {
                     ใกล้หมดอายุ
                 </Button>
                 <Button variant={filter === 'expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('expired')}>
-                    หมดอายุ
+                    หมดอายุ / ยกเลิก
                 </Button>
                 <Button variant={filter === 'rejected' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('rejected')} className={filter === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}>
                     ถูกปฏิเสธ
@@ -755,6 +755,8 @@ export default function DashboardPage() {
                                         if (!isOrder && item.expiry_date) {
                                             timeInfo = calculateTimeRemaining(item);
                                         }
+                                        const isDeactivatedByAdmin = !isOrder && !item.is_active && ((timeInfo?.days ?? 0) > 0 || Boolean(timeInfo?.isLifetime));
+                                        const isExpired = !isOrder && (timeInfo?.days ?? 0) <= 0;
 
                                         return (
                                             <div key={item.id} className="p-4 hover:bg-muted/10 transition-colors">
@@ -767,7 +769,13 @@ export default function DashboardPage() {
                                                                 <Clock className="h-4 w-4" />
                                                             </div>
                                                         ) : (
-                                                            <div className={`p-2 rounded-full mt-1 md:mt-0 ${item.is_active && timeInfo?.days! > 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                            <div className={`p-2 rounded-full mt-1 md:mt-0 ${
+                                                                item.is_active && timeInfo?.days! > 0 
+                                                                    ? 'bg-green-500/10 text-green-500' 
+                                                                    : isDeactivatedByAdmin 
+                                                                        ? 'bg-amber-500/10 text-amber-500' 
+                                                                        : 'bg-red-500/10 text-red-500'
+                                                            }`}>
                                                                 <Activity className="h-4 w-4" />
                                                             </div>
                                                         )}
@@ -787,7 +795,16 @@ export default function DashboardPage() {
                                                                 {isOrder && item.status === 'rejected' && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">ถูกปฏิเสธ</Badge>}
                                                                 {!isOrder && item.is_active && timeInfo?.days! > 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">ใช้งานอยู่</Badge>}
                                                                 {!isOrder && item.is_active && timeInfo?.days! > 0 && timeInfo?.days! <= 7 && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-500/30">ใกล้หมดอายุ</Badge>}
-                                                                {!isOrder && (!item.is_active || timeInfo?.days! <= 0) && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">หมดอายุ</Badge>}
+                                                                {isDeactivatedByAdmin && (
+                                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/30 font-medium">
+                                                                        ยกเลิกโดยแอดมิน
+                                                                    </Badge>
+                                                                )}
+                                                                {!isOrder && !isDeactivatedByAdmin && (!item.is_active || timeInfo?.days! <= 0) && (
+                                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">
+                                                                        หมดอายุ
+                                                                    </Badge>
+                                                                )}
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-0.5">
                                                                 {item.is_ib && (
@@ -857,8 +874,44 @@ export default function DashboardPage() {
                                                                 {item.status === 'pending' && "ระบบกำลังดำเนินการตรวจสอบออเดอร์ หากคุณชำระเงิน/ใช้ IB Quota แล้ว โปรดรอแอดมินอนุมัติ 1-12 ชม."}
                                                                 {item.status === 'rejected' && "คำสั่งซื้อถูกปฏิเสธ: รูปสลิปอาจไม่ชัดเจน หรือ ข้อมูล IB ไม่ถูกต้อง หากมีข้อสงสัยโปรดติดต่อแอดมิน"}
                                                             </div>
+                                                        ) : isDeactivatedByAdmin ? (
+                                                            // For Licenses Deactivated by Admin (Released for another EA)
+                                                            <div className="bg-amber-500/10 border border-amber-500/25 rounded-md p-2.5 text-xs space-y-1">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[11px] sm:text-xs">
+                                                                        <XCircle className="w-3.5 h-3.5 shrink-0" />
+                                                                        <span>ยกเลิกการใช้งานโดยแอดมิน</span>
+                                                                    </div>
+                                                                    <span className="text-[10px] text-amber-400/80 font-mono">
+                                                                        {timeInfo?.isLifetime ? 'ตลอดชีพเดิม' : `สิทธิ์เดิมคงเหลือ ${timeInfo?.days} วัน`}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                                                    พอร์ตนี้ถูกยกเลิกการผูกกับ EA ตัวนี้แล้ว สามารถนำเลขพอร์ตไปขอรับ EA ตัวใหม่ได้ทันที
+                                                                </p>
+                                                                <div className="flex justify-between text-[10px] text-muted-foreground/75 pt-0.5 border-t border-amber-500/10">
+                                                                    <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
+                                                                    <span>หมดอายุเดิม: {timeInfo?.isLifetime ? 'ตลอดชีพ' : new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
+                                                                </div>
+                                                            </div>
+                                                        ) : isExpired ? (
+                                                            // For Actually Expired Licenses
+                                                            <div className="space-y-1.5">
+                                                                <div className="flex justify-between text-xs">
+                                                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                                                        <Clock className="h-3 w-3" />
+                                                                        <span>สถานะ</span>
+                                                                    </div>
+                                                                    <span className="font-medium text-red-500">หมดอายุแล้ว</span>
+                                                                </div>
+                                                                <Progress value={0} className="h-1.5 bg-muted/50" indicatorClassName="bg-red-500" />
+                                                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                                    <span>เริ่ม: {new Date(item.created_at).toLocaleDateString('th-TH')}</span>
+                                                                    <span>หมดอายุ: {new Date(item.expiry_date!).toLocaleDateString('th-TH')}</span>
+                                                                </div>
+                                                            </div>
                                                         ) : (
-                                                            // For Licenses
+                                                            // For Active Licenses
                                                             <>
                                                                 <div className="flex justify-between text-xs">
                                                                     <div className="flex items-center gap-1 text-muted-foreground">
@@ -887,15 +940,37 @@ export default function DashboardPage() {
 
                                                     {/* Right Action Menu */}
                                                     <div className="flex justify-end items-center gap-2 min-w-[150px]">
-                                                        {/* View Farm Button (Auto-enabled for EasyM Prime; requires admin show_farm approval for EasyM MAX and other products) */}
-                                                        {!isOrder && item.account_number && (item.show_farm || Boolean(item.products?.name?.toLowerCase().includes('prime') || item.products?.product_key?.toUpperCase().includes('PRIME'))) && (
-                                                            <Link href={`/farm/${item.account_number}`} target="_blank">
-                                                                <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20">
-                                                                    <Activity className="w-3 h-3" />
-                                                                    ดูฟาร์ม
-                                                                </Button>
-                                                            </Link>
-                                                        )}
+                                                        {(() => {
+                                                            const isSmartEa = Boolean(
+                                                                item.products?.product_key?.toUpperCase().startsWith('SMART-') ||
+                                                                item.products?.name?.toLowerCase().includes('smart vortex') ||
+                                                                (item.products as any)?.strategy === 'Smart EA'
+                                                            );
+                                                            if (isSmartEa) {
+                                                                if (!isOrder && item.account_number && item.is_active) {
+                                                                    return (
+                                                                        <Link href={`/smart-ea?port=${item.account_number}`} target="_blank">
+                                                                            <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-cyan-500/10 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/20">
+                                                                                <Sliders className="w-3 h-3" />
+                                                                                ควบคุม Smart EA
+                                                                            </Button>
+                                                                        </Link>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }
+                                                            if (!isOrder && item.account_number && (item.show_farm || Boolean(item.products?.name?.toLowerCase().includes('prime') || item.products?.product_key?.toUpperCase().includes('PRIME')))) {
+                                                                return (
+                                                                    <Link href={`/farm/${item.account_number}`} target="_blank">
+                                                                        <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1.5 bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20">
+                                                                            <Activity className="w-3 h-3" />
+                                                                            ดูฟาร์ม
+                                                                        </Button>
+                                                                    </Link>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })()}
 
                                                         {/* Delete Button (Cleanup) */}
                                                         {(isOrder && (item.status === 'pending' || item.status === 'rejected')) || 

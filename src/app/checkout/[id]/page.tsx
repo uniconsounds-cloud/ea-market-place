@@ -183,7 +183,7 @@ function CheckoutContent({ productId }: { productId: string }) {
             const ports = accountNumber.split(',').map(p => p.trim()).filter(Boolean);
             const { data: globalLicenses } = await supabase
                 .from('licenses')
-                .select('id, user_id, product_id, account_number, expiry_date, type')
+                .select('id, user_id, product_id, account_number, expiry_date, type, products(name)')
                 .in('account_number', ports) // Check each individual port
                 .eq('is_active', true);
 
@@ -212,27 +212,36 @@ function CheckoutContent({ productId }: { productId: string }) {
             });
 
             if (activeConflict) {
-                alert(`หมายเลขพอร์ต ${activeConflict.account_number} ถูกใช้งานแล้วและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`);
+                const conflictProdName = (activeConflict.products as any)?.name || 'EA ตัวอื่น';
+                const isSelf = user && activeConflict.user_id === user.id;
+                const alertMsg = isSelf
+                    ? `หมายเลขพอร์ต ${activeConflict.account_number} กำลังใช้งานอยู่กับ ${conflictProdName} (ต้องขอให้แอดมินยกเลิกพอร์ตเดิมก่อน จึงจะนำมาใช้กับตัวใหม่ได้)`
+                    : `หมายเลขพอร์ต ${activeConflict.account_number} ถูกใช้งานแล้วโดยผู้ใช้อื่นและยังไม่หมดอายุ ไม่สามารถใช้ซ้ำได้`;
+                alert(alertMsg);
                 setSubmitting(false);
                 return;
             }
 
             // 1.8 PENDING ORDERS VALIDATION (Duplicate Check)
-            // We check if this user already requested these ports for this product
+            // Check if this user already requested these ports on ANY product
             const { data: allPendingOrders } = await supabase
                 .from('orders')
-                .select('id, status, account_number')
+                .select('id, status, account_number, product_id, products(name)')
                 .eq('user_id', user.id)
-                .eq('product_id', product.id)
                 .eq('status', 'pending');
 
-            const hasPendingConflict = allPendingOrders?.some(order => {
+            const pendingConflict = (allPendingOrders || []).find(order => {
                 const existingOrderPorts = (order.account_number || '').split(',').map((p: string) => p.trim()).filter(Boolean);
                 return ports.some(p => existingOrderPorts.includes(p));
             });
 
-            if (hasPendingConflict) {
-                alert('คุณมีคำขอสิทธิ์สำหรับพอร์ตหนึ่งในรายการนี้ที่กำลังรอตรวจสอบอยู่แล้ว ไม่สามารถส่งซ้ำได้');
+            if (pendingConflict) {
+                const pendingProdName = (pendingConflict.products as any)?.name || 'EA ตัวอื่น';
+                const isCurrentProduct = pendingConflict.product_id === product.id;
+                const pendingAlert = isCurrentProduct
+                    ? 'คุณมีคำขอสิทธิ์สำหรับพอร์ตหนึ่งในรายการนี้ที่กำลังรอตรวจสอบอยู่แล้ว ไม่สามารถส่งซ้ำได้'
+                    : `พอร์ตในรายการนี้มีคำขอสั่งซื้อกำลังรอตรวจสอบอยู่กับ ${pendingProdName} ไม่สามารถส่งซ้ำได้`;
+                alert(pendingAlert);
                 setSubmitting(false);
                 return;
             }
