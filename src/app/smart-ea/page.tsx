@@ -32,6 +32,7 @@ interface ActiveConfig {
     initial_lot: number;
     lot_increment: number;
     target_profit: number;
+    enable_cap_freeze?: boolean;
     max_both_sides_cap?: number;
     stop_mode: string;
 }
@@ -51,6 +52,8 @@ interface EAState {
     open_sell: number;
     pending_buy: number;
     pending_sell: number;
+    protection_frozen?: boolean;
+    frozen_side?: string;
     conn_status: string;
     config_status: string;
     trade_status: string;
@@ -82,6 +85,7 @@ function SmartEACockpitContent() {
     const [initialLot, setInitialLot] = useState('0.01');
     const [lotIncrement, setLotIncrement] = useState('0.01');
     const [targetProfit, setTargetProfit] = useState('20');
+    const [enableCapFreeze, setEnableCapFreeze] = useState(true);
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [formInitialized, setFormInitialized] = useState(false);
 
@@ -121,6 +125,7 @@ function SmartEACockpitContent() {
                         if (src.initial_lot !== undefined) setInitialLot(String(src.initial_lot));
                         if (src.lot_increment !== undefined) setLotIncrement(String(src.lot_increment));
                         if (src.target_profit !== undefined) setTargetProfit(String(src.target_profit));
+                        if (src.enable_cap_freeze !== undefined) setEnableCapFreeze(Boolean(src.enable_cap_freeze));
                         if (src.max_both_sides_cap !== undefined) setMaxBothSidesCap(String(src.max_both_sides_cap));
                         setFormInitialized(true);
                     }
@@ -206,6 +211,7 @@ function SmartEACockpitContent() {
                 initial_lot: lot,
                 lot_increment: inc,
                 target_profit: tp,
+                enable_cap_freeze: enableCapFreeze,
                 max_both_sides_cap: cap,
                 close_all: false,
             },
@@ -291,14 +297,18 @@ function SmartEACockpitContent() {
                         </div>
                     )}
 
-                    {/* 7x7 Protection Freeze Banner + Quick TP Rescue */}
-                    {(eaState?.trade_status === 'FROZEN_7X7' || (eaState as any)?.protection_frozen) && (
+                    {/* One-Side Cap Freeze Banner + Quick TP Rescue */}
+                    {(eaState?.trade_status === 'FROZEN_BUY' || eaState?.trade_status === 'FROZEN_SELL' || eaState?.trade_status === 'FROZEN_7X7' || eaState?.protection_frozen) && (
                         <div className="rounded-xl border border-rose-500/50 bg-rose-500/10 p-4 space-y-3">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
                                     <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
                                     <h3 className="font-bold text-rose-300 text-sm sm:text-base">
-                                        ระบบป้องกัน {eaState?.active_config?.max_both_sides_cap ?? 7}x{eaState?.active_config?.max_both_sides_cap ?? 7} ทำงาน: เข้าสู่สถานะ Freeze อัตโนมัติ
+                                        {eaState?.frozen_side === 'BUY' || eaState?.trade_status === 'FROZEN_BUY'
+                                            ? `One-Side Freeze (${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7}): ฝั่ง Buy ถูกหยุด • ฝั่ง Sell ออกต่อได้`
+                                            : eaState?.frozen_side === 'SELL' || eaState?.trade_status === 'FROZEN_SELL'
+                                            ? `One-Side Freeze (${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7}): ฝั่ง Sell ถูกหยุด • ฝั่ง Buy ออกต่อได้`
+                                            : `ระบบป้องกัน ${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7} ทำงาน: เข้าสู่สถานะ Freeze`}
                                     </h3>
                                 </div>
                                 <Badge variant="destructive" className="w-fit font-mono">
@@ -306,7 +316,7 @@ function SmartEACockpitContent() {
                                 </Badge>
                             </div>
                             <p className="text-xs text-rose-200/90 leading-relaxed">
-                                ทั้งสองฝั่งเปิดครบ 7 ไม้แล้ว EA ได้ลบ Pending ออกทั้งหมดเพื่อหยุดความเสี่ยงเพิ่ม คุณสามารถปล่อยรอรวบตามปกติ, กด <strong>Close All</strong>, หรือปรับ <strong>Target Profit เป็น 0 (เท่าทุน) หรือค่าติดลบ</strong> เพื่อให้ EA รวบปิดให้อัตโนมัติโดยไม่ต้องนั่งเฝ้า
+                                ทั้งสองฝั่งเปิดครบเกณฑ์แล้ว EA จึงลบ Pending ของฝั่งตรงข้ามออก (ห้ามออกเพิ่มแม้ราคาย้อนกลับ) ส่วนฝั่งที่เพิ่งนับครบยังออกไม้ต่อได้เรื่อยๆ เพื่อลุ้นปิดรวบ หรือปรับ <strong>Target Profit เป็น 0 / ค่าติดลบ</strong> เพื่อปิดอัตโนมัติ
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-xs text-muted-foreground mr-1">ตั้งเป้าปิดรวบด่วน:</span>
@@ -632,19 +642,36 @@ function SmartEACockpitContent() {
                                                 className="font-mono"
                                             />
                                         </div>
-                                        <div className="space-y-1.5 sm:col-span-2">
-                                            <Label>ล็อก Freeze เมื่อเปิดครบทั้ง 2 ฝั่ง (จำนวนไม้/ฝั่ง, 0 = ปิดระบบป้องกัน)</Label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="50"
-                                                value={maxBothSidesCap}
-                                                onChange={(e) => setMaxBothSidesCap(e.target.value)}
-                                                className="font-mono"
-                                            />
-                                            <p className="text-[11px] text-muted-foreground">
-                                                ค่าเริ่มต้นคือ 7 (หาก Buy และ Sell เปิดถึง {maxBothSidesCap || 7} ไม้พร้อมกัน จะลบ Pending และหยุดเปิดไม้เพิ่มทันที)
-                                            </p>
+                                        <div className="space-y-2 sm:col-span-2 rounded-lg border p-3 bg-muted/20">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                <div>
+                                                    <Label className="text-sm font-semibold">ระบบป้องกัน One-Side Freeze (ล็อกฝั่งตรงข้ามเมื่อครบทั้ง 2 ฝั่ง)</Label>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        เมื่อทั้งสองฝั่งเปิดถึง {maxBothSidesCap || 7} ไม้ ฝั่งที่เพิ่งครบยังออกต่อได้ ส่วนฝั่งตรงข้ามจะถูก Freeze ห้ามออกเพิ่ม
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableCapFreeze ? 'default' : 'outline'}
+                                                    onClick={() => setEnableCapFreeze((v) => !v)}
+                                                    className="shrink-0"
+                                                >
+                                                    {enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}
+                                                </Button>
+                                            </div>
+                                            <div className="pt-1">
+                                                <Label className="text-xs text-muted-foreground">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    max="50"
+                                                    disabled={!enableCapFreeze}
+                                                    value={maxBothSidesCap}
+                                                    onChange={(e) => setMaxBothSidesCap(e.target.value)}
+                                                    className="font-mono mt-1"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
