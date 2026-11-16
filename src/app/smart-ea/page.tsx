@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
 import { BasketRiskAnalyzer } from '@/components/basket-risk-analyzer';
+import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { toast } from 'sonner';
 import {
     Activity,
@@ -591,6 +592,15 @@ function SmartEACockpitContent() {
                                 `ตั้งเป้า Target Profit = ${newTp} ${cur} เรียบร้อย`
                             );
                         }}
+                    />
+
+                    {/* Dual Comparison: Model A (Vector Axis) & Model B (Radar Needle) + Per-Trade Matrix */}
+                    <PnlVectorVisualizer
+                        currency={cur}
+                        cyclePnl={eaState?.cycle_pnl || 0}
+                        targetProfit={activeTp}
+                        pnlJitter={pnlJitter}
+                        chart={eaState?.chart}
                     />
 
                     {/* Control & Settings Split */}

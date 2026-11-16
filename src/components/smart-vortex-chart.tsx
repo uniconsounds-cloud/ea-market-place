@@ -9,6 +9,7 @@ export interface ChartOrderItem {
     t: 'B' | 'S' | 'BS' | 'SS';
     p: number;
     l: number;
+    u?: number;
     tm: number;
 }
 
@@ -17,6 +18,8 @@ export interface SmartChartData {
     bid: number;
     ask: number;
     round_started: number;
+    buy_pnl?: number;
+    sell_pnl?: number;
     est_tp_price: number;
     tp_dir: 'UP' | 'DOWN' | 'HEDGED' | 'NONE' | string;
     freeze_price: number;
