@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Radar, GitCommitHorizontal } from 'lucide-react';
 import type { SmartChartData } from './smart-vortex-chart';
@@ -10,6 +10,7 @@ interface PnlVectorVisualizerProps {
     cyclePnl: number;
     targetProfit: number;
     pnlJitter: number;
+    isOnline?: boolean;
     chart: SmartChartData | null | undefined;
 }
 
@@ -18,12 +19,43 @@ export function PnlVectorVisualizer({
     cyclePnl,
     targetProfit,
     pnlJitter,
+    isOnline = false,
     chart,
 }: PnlVectorVisualizerProps) {
+    const [bidOffset, setBidOffset] = useState(0);
+    const digits = chart?.digits ?? 2;
+    const rawBid = chart?.bid ?? 0;
+
+    useEffect(() => {
+        setBidOffset(0);
+    }, [rawBid]);
+
+    useEffect(() => {
+        if (!isOnline || !rawBid) {
+            setBidOffset(0);
+            return;
+        }
+        const step = Math.pow(10, -digits) * (digits <= 2 ? 8 : 5);
+        const timer = setInterval(() => {
+            setBidOffset((prev) => {
+                const next = prev + (Math.random() - 0.48) * step * 2.0;
+                const cap = step * 5;
+                if (next > cap) return cap * 0.85;
+                if (next < -cap) return -cap * 0.85;
+                return next;
+            });
+        }, 650);
+        return () => clearInterval(timer);
+    }, [isOnline, rawBid, digits]);
+
+    const liveBid = rawBid > 0 ? rawBid + bidOffset : 0;
+
     const data = useMemo(() => {
         const orders = (chart?.orders || []).filter((o) => o.t === 'B' || o.t === 'S');
-        const buyOrders = orders.filter((o) => o.t === 'B').sort((a, b) => a.tm - b.tm);
-        const sellOrders = orders.filter((o) => o.t === 'S').sort((a, b) => a.tm - b.tm);
+        // Order Buy ascending by price (lowest Buy closest to BUY sum, highest Buy at top)
+        const buyOrders = orders.filter((o) => o.t === 'B').sort((a, b) => a.p - b.p);
+        // Order Sell descending by price (highest Sell closest to SELL sum, lowest Sell at bottom)
+        const sellOrders = orders.filter((o) => o.t === 'S').sort((a, b) => b.p - a.p);
 
         const hasExactSidePnl =
             typeof chart?.buy_pnl === 'number' && typeof chart?.sell_pnl === 'number';
@@ -62,21 +94,20 @@ export function PnlVectorVisualizer({
 
     const { buyOrders, sellOrders, buySum, sellSum, netSum, maxMag, maxOrderMag } = data;
 
-    // SVG Model A: Unified Stack
-    // Top-to-bottom: [Bn ... B1] -> BUY TOTAL -> NET (CENTER) -> SELL TOTAL -> [S1 ... Sn]
+    // SVG Model A: Tightly-spaced 3 center summary bars + Price-ordered Buy/Sell stacks + Floating BID line
     const W = 440;
     const CX = W / 2;
-    const HALF_SPAN = 148;
-    const ROW_STEP = 16;
+    const HALF_SPAN = 140;
+    const ROW_STEP = 15;
 
     const buyStackCount = buyOrders.length;
     const sellStackCount = sellOrders.length;
-    const TOP_PAD = 24;
-    const Y_BUY = TOP_PAD + buyStackCount * ROW_STEP + (buyStackCount > 0 ? 12 : 8);
-    const Y_NET = Y_BUY + 38;
-    const Y_SELL = Y_NET + 38;
-    const SELL_STACK_START = Y_SELL + 20;
-    const H_MODEL_A = SELL_STACK_START + sellStackCount * ROW_STEP + 18;
+    const TOP_PAD = 28;
+    const Y_BUY = TOP_PAD + buyStackCount * ROW_STEP + (buyStackCount > 0 ? 12 : 6);
+    const Y_NET = Y_BUY + 20;  // Tightly packed summary lines (20px apart)
+    const Y_SELL = Y_NET + 20;
+    const SELL_STACK_START = Y_SELL + 18;
+    const H_MODEL_A = SELL_STACK_START + sellStackCount * ROW_STEP + 20;
 
     const clampRatio = (v: number, scale: number) => Math.max(-1, Math.min(1, v / scale));
     const buyX = CX + clampRatio(buySum, maxMag) * HALF_SPAN;
@@ -85,6 +116,43 @@ export function PnlVectorVisualizer({
     const oppositeSign = (buySum > 0 && sellSum < 0) || (buySum < 0 && sellSum > 0);
     const netStartX = buyX;
     const netEndX = sellX;
+
+    // Compute floating horizontal BID line Y position based on actual open trade prices
+    const computeBidY = () => {
+        if (liveBid <= 0) return null;
+        const pts: { p: number; y: number }[] = [];
+        // Buy orders (idx 0 = lowest Buy near Y_BUY, idx n-1 = highest Buy at top)
+        for (let i = buyOrders.length - 1; i >= 0; i--) {
+            pts.push({ p: buyOrders[i].p, y: Y_BUY - 16 - i * ROW_STEP });
+        }
+        // Sell orders (idx 0 = highest Sell near Y_SELL, idx m-1 = lowest Sell at bottom)
+        for (let i = 0; i < sellOrders.length; i++) {
+            pts.push({ p: sellOrders[i].p, y: SELL_STACK_START + i * ROW_STEP });
+        }
+        // Sort strictly by price descending (top -> bottom)
+        pts.sort((a, b) => b.p - a.p);
+
+        if (pts.length === 0) return Y_NET;
+        if (liveBid >= pts[0].p) {
+            return Math.max(18, pts[0].y - 10);
+        }
+        const last = pts[pts.length - 1];
+        if (liveBid <= last.p) {
+            return Math.min(H_MODEL_A - 10, last.y + 10);
+        }
+        for (let i = 0; i < pts.length - 1; i++) {
+            const hi = pts[i];
+            const lo = pts[i + 1];
+            if (liveBid <= hi.p && liveBid >= lo.p) {
+                const spanP = Math.max(1e-9, hi.p - lo.p);
+                const ratio = (hi.p - liveBid) / spanP;
+                return hi.y + ratio * (lo.y - hi.y);
+            }
+        }
+        return Y_NET;
+    };
+
+    const bidY = computeBidY();
 
     // SVG Model B: Dual-Arc Radar + Balance Needle (280 x 185)
     const RW = 280;
@@ -100,7 +168,7 @@ export function PnlVectorVisualizer({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* ===================================================== */}
-            {/* MODEL A: Integrated Buy Stack -> BUY -> NET -> SELL -> Sell Stack */}
+            {/* MODEL A: Unified Stack + Floating Live BID Price Line  */}
             {/* ===================================================== */}
             <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3.5 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
                 <div className="flex items-center justify-between mb-2">
@@ -126,10 +194,10 @@ export function PnlVectorVisualizer({
                         B(+) / S(-)
                     </text>
 
-                    {/* Individual BUY Orders stacked UPWARD above BUY TOTAL (B1 closest to BUY TOTAL) */}
+                    {/* Individual BUY Orders stacked UPWARD above BUY TOTAL (sorted by price ascending) */}
                     {buyOrders.map((o, idx) => {
                         const u = o.u ?? 0;
-                        const y = Y_BUY - 18 - idx * ROW_STEP;
+                        const y = Y_BUY - 16 - idx * ROW_STEP;
                         const xEnd = CX + clampRatio(u, maxOrderMag) * HALF_SPAN;
                         return (
                             <g key={`b-ord-${idx}`}>
@@ -144,10 +212,10 @@ export function PnlVectorVisualizer({
                                     strokeLinecap="round"
                                     opacity="0.85"
                                 />
-                                <text x={8} y={y + 3} fontSize="8.5" fill="#38bdf8">
-                                    B{idx + 1} <tspan fill="#64748b">{o.l.toFixed(2)}</tspan>
+                                <text x={6} y={y + 3} fontSize="8" fill="#38bdf8">
+                                    B{idx + 1} <tspan fill="#64748b">{o.p.toFixed(digits)}</tspan>
                                 </text>
-                                <text x={W - 8} y={y + 3} textAnchor="end" fontSize="8.5" fontWeight="bold" fill={u >= 0 ? '#34d399' : '#fb7185'}>
+                                <text x={W - 6} y={y + 3} textAnchor="end" fontSize="8.5" fontWeight="bold" fill={u >= 0 ? '#34d399' : '#fb7185'}>
                                     {u >= 0 ? `+${u.toFixed(2)}` : u.toFixed(2)}
                                 </text>
                             </g>
@@ -155,68 +223,68 @@ export function PnlVectorVisualizer({
                     })}
 
                     {/* Connector Guides from BUY Tip & SELL Tip into Center NET Line */}
-                    <line x1={buyX} y1={Y_BUY + 5} x2={buyX} y2={Y_NET} stroke="#22d3ee" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.7" />
-                    <line x1={sellX} y1={Y_SELL - 5} x2={sellX} y2={Y_NET} stroke="#fb923c" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.7" />
+                    <line x1={buyX} y1={Y_BUY + 4} x2={buyX} y2={Y_NET} stroke="#22d3ee" strokeWidth="1.1" strokeDasharray="2 2" opacity="0.7" />
+                    <line x1={sellX} y1={Y_SELL - 4} x2={sellX} y2={Y_NET} stroke="#fb923c" strokeWidth="1.1" strokeDasharray="2 2" opacity="0.7" />
 
                     {/* BUY TOTAL (- Left | + Right) */}
-                    <line x1={CX - HALF_SPAN} y1={Y_BUY} x2={CX + HALF_SPAN} y2={Y_BUY} stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
+                    <line x1={CX - HALF_SPAN} y1={Y_BUY} x2={CX + HALF_SPAN} y2={Y_BUY} stroke="#1e293b" strokeWidth="7" strokeLinecap="round" />
                     <line
                         x1={CX}
                         y1={Y_BUY}
                         x2={buyX}
                         y2={Y_BUY}
                         stroke={buySum >= 0 ? '#22d3ee' : '#f43f5e'}
-                        strokeWidth="8"
+                        strokeWidth="7"
                         strokeLinecap="round"
                     />
-                    <circle cx={buyX} cy={Y_BUY} r="5" fill={buySum >= 0 ? '#22d3ee' : '#f43f5e'} stroke="#050811" strokeWidth="1.5" />
-                    <text x={8} y={Y_BUY + 3} fontSize="9.5" fontWeight="bold" fill="#22d3ee">
+                    <circle cx={buyX} cy={Y_BUY} r="4.5" fill={buySum >= 0 ? '#22d3ee' : '#f43f5e'} stroke="#050811" strokeWidth="1.2" />
+                    <text x={6} y={Y_BUY + 3} fontSize="9" fontWeight="bold" fill="#22d3ee">
                         BUY ∑
                     </text>
-                    <text x={W - 8} y={Y_BUY + 3} textAnchor="end" fontSize="9.5" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
+                    <text x={W - 6} y={Y_BUY + 3} textAnchor="end" fontSize="9" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
                         {buySum >= 0 ? `+${buySum.toFixed(2)}` : buySum.toFixed(2)}
                     </text>
 
-                    {/* NET TOTAL IN THE MIDDLE (Span between buyX and sellX) */}
-                    <line x1={CX - HALF_SPAN} y1={Y_NET} x2={CX + HALF_SPAN} y2={Y_NET} stroke="#1e293b" strokeWidth="10" strokeLinecap="round" />
+                    {/* NET TOTAL IN THE MIDDLE (Tight 20px spacing) */}
+                    <line x1={CX - HALF_SPAN} y1={Y_NET} x2={CX + HALF_SPAN} y2={Y_NET} stroke="#1e293b" strokeWidth="8.5" strokeLinecap="round" />
                     <line
                         x1={netStartX}
                         y1={Y_NET}
                         x2={netEndX}
                         y2={Y_NET}
                         stroke={netSum >= 0 ? '#10b981' : '#f43f5e'}
-                        strokeWidth="10"
+                        strokeWidth="8.5"
                         strokeLinecap="round"
                     />
-                    <circle cx={netStartX} cy={Y_NET} r="4.5" fill="#e2e8f0" stroke="#050811" strokeWidth="1.2" />
-                    <circle cx={netEndX} cy={Y_NET} r="6.5" fill={netSum >= 0 ? '#10b981' : '#f43f5e'} stroke="#ffffff" strokeWidth="1.5" />
-                    <text x={8} y={Y_NET + 3} fontSize="10" fontWeight="bold" fill="#f8fafc">
+                    <circle cx={netStartX} cy={Y_NET} r="4" fill="#e2e8f0" stroke="#050811" strokeWidth="1.2" />
+                    <circle cx={netEndX} cy={Y_NET} r="5.5" fill={netSum >= 0 ? '#10b981' : '#f43f5e'} stroke="#ffffff" strokeWidth="1.4" />
+                    <text x={6} y={Y_NET + 3} fontSize="9.5" fontWeight="bold" fill="#f8fafc">
                         NET
                     </text>
-                    <text x={W - 8} y={Y_NET + 4} textAnchor="end" fontSize="10.5" fontWeight="bold" fill={netSum >= 0 ? '#34d399' : '#fb7185'}>
+                    <text x={W - 6} y={Y_NET + 3.5} textAnchor="end" fontSize="10" fontWeight="bold" fill={netSum >= 0 ? '#34d399' : '#fb7185'}>
                         {netSum >= 0 ? `+${netSum.toFixed(2)}` : netSum.toFixed(2)}
                     </text>
 
                     {/* SELL TOTAL (+ Left | - Right, mirrored) */}
-                    <line x1={CX - HALF_SPAN} y1={Y_SELL} x2={CX + HALF_SPAN} y2={Y_SELL} stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
+                    <line x1={CX - HALF_SPAN} y1={Y_SELL} x2={CX + HALF_SPAN} y2={Y_SELL} stroke="#1e293b" strokeWidth="7" strokeLinecap="round" />
                     <line
                         x1={CX}
                         y1={Y_SELL}
                         x2={sellX}
                         y2={Y_SELL}
                         stroke={sellSum >= 0 ? '#10b981' : '#fb923c'}
-                        strokeWidth="8"
+                        strokeWidth="7"
                         strokeLinecap="round"
                     />
-                    <circle cx={sellX} cy={Y_SELL} r="5" fill={sellSum >= 0 ? '#10b981' : '#fb923c'} stroke="#050811" strokeWidth="1.5" />
-                    <text x={8} y={Y_SELL + 3} fontSize="9.5" fontWeight="bold" fill="#fb923c">
+                    <circle cx={sellX} cy={Y_SELL} r="4.5" fill={sellSum >= 0 ? '#10b981' : '#fb923c'} stroke="#050811" strokeWidth="1.2" />
+                    <text x={6} y={Y_SELL + 3} fontSize="9" fontWeight="bold" fill="#fb923c">
                         SELL ∑
                     </text>
-                    <text x={W - 8} y={Y_SELL + 3} textAnchor="end" fontSize="9.5" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
+                    <text x={W - 6} y={Y_SELL + 3} textAnchor="end" fontSize="9" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
                         {sellSum >= 0 ? `+${sellSum.toFixed(2)}` : sellSum.toFixed(2)}
                     </text>
 
-                    {/* Individual SELL Orders stacked DOWNWARD below SELL TOTAL (S1 at top closest to SELL TOTAL) */}
+                    {/* Individual SELL Orders stacked DOWNWARD below SELL TOTAL (sorted by price descending) */}
                     {sellOrders.map((o, idx) => {
                         const u = o.u ?? 0;
                         const y = SELL_STACK_START + idx * ROW_STEP;
@@ -234,15 +302,51 @@ export function PnlVectorVisualizer({
                                     strokeLinecap="round"
                                     opacity="0.85"
                                 />
-                                <text x={8} y={y + 3} fontSize="8.5" fill="#fb923c">
-                                    S{idx + 1} <tspan fill="#64748b">{o.l.toFixed(2)}</tspan>
+                                <text x={6} y={y + 3} fontSize="8" fill="#fb923c">
+                                    S{idx + 1} <tspan fill="#64748b">{o.p.toFixed(digits)}</tspan>
                                 </text>
-                                <text x={W - 8} y={y + 3} textAnchor="end" fontSize="8.5" fontWeight="bold" fill={u >= 0 ? '#34d399' : '#fb7185'}>
+                                <text x={W - 6} y={y + 3} textAnchor="end" fontSize="8.5" fontWeight="bold" fill={u >= 0 ? '#34d399' : '#fb7185'}>
                                     {u >= 0 ? `+${u.toFixed(2)}` : u.toFixed(2)}
                                 </text>
                             </g>
                         );
                     })}
+
+                    {/* Floating Live Market Price Line overlaid at true relative price position */}
+                    {bidY !== null && (
+                        <g>
+                            <line
+                                x1={CX - HALF_SPAN}
+                                y1={bidY}
+                                x2={CX + HALF_SPAN}
+                                y2={bidY}
+                                stroke="#facc15"
+                                strokeWidth="1.6"
+                                strokeDasharray="5 3"
+                                opacity="0.95"
+                            />
+                            <rect
+                                x={CX - 42}
+                                y={bidY - 7.5}
+                                width={84}
+                                height={15}
+                                rx={4}
+                                fill="#facc15"
+                                stroke="#050811"
+                                strokeWidth="1"
+                            />
+                            <text
+                                x={CX}
+                                y={bidY + 3}
+                                textAnchor="middle"
+                                fontSize="8.5"
+                                fontWeight="bold"
+                                fill="#050811"
+                            >
+                                BID {liveBid.toFixed(digits)}
+                            </text>
+                        </g>
+                    )}
 
                     <text x={CX} y={H_MODEL_A - 4} textAnchor="middle" fontSize="8" fill="#475569">
                         {oppositeSign ? 'CENTER NET = DIFF SPAN' : 'CENTER NET = COMBINED SPAN'}

@@ -629,12 +629,13 @@ function SmartEACockpitContent() {
                         }}
                     />
 
-                    {/* Dual Comparison: Model A (Vector Axis) & Model B (Radar Needle) + Per-Trade Matrix */}
+                    {/* Dual Comparison: Model A (Vector Axis) & Model B (Radar Needle) */}
                     <PnlVectorVisualizer
                         currency={cur}
                         cyclePnl={eaState?.cycle_pnl || 0}
                         targetProfit={activeTp}
                         pnlJitter={pnlJitter}
+                        isOnline={isOnline && !isWaitingFreshData}
                         chart={eaState?.chart}
                     />
                     </div>
