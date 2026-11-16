@@ -20,11 +20,33 @@ export async function POST(req: Request) {
         const supabase = getSupabaseAdmin();
         const nowIso = new Date().toISOString();
 
-        // 1. Persist latest EA live state in farm_port_status under sv_state_<port>
+        // Check if a viewer is currently active on /smart-ea (last_viewed_at within 60s)
+        const [{ data: existingStateRow }, { data: cmdRow }] = await Promise.all([
+            supabase
+                .from('farm_port_status')
+                .select('last_viewed_at')
+                .eq('port_number', `sv_state_${port}`)
+                .maybeSingle(),
+            supabase
+                .from('farm_port_status')
+                .select('system_code')
+                .eq('port_number', `sv_cmd_${port}`)
+                .maybeSingle(),
+        ]);
+
+        const lastViewedMs = existingStateRow?.last_viewed_at
+            ? new Date(existingStateRow.last_viewed_at).getTime()
+            : 0;
+        const hasActiveViewer = lastViewedMs > 0 && (Date.now() - lastViewedMs) < 60000;
+
+        // Prime-style Adaptive Sync: 15s when viewer is open, 180s (3 min) in Standby
+        const adaptiveInterval = hasActiveViewer ? 15 : 180;
+
         const statePayload = {
             port_number: port,
             ea_name: body.ea_name || 'Smart Vortex',
             ea_version: body.ea_version || '1.00',
+            ea_build: body.ea_build || '',
             symbol: body.symbol || 'XAUUSD',
             currency: body.currency || 'USD',
             balance: Number(body.balance || 0),
@@ -36,6 +58,8 @@ export async function POST(req: Request) {
             open_sell: Number(body.open_sell || 0),
             pending_buy: Number(body.pending_buy || 0),
             pending_sell: Number(body.pending_sell || 0),
+            protection_frozen: Boolean(body.protection_frozen),
+            sync_interval_sec: Number(body.sync_interval_sec || adaptiveInterval),
             conn_status: 'CONNECTED',
             config_status: body.config_status || 'MT5_DEFAULT',
             trade_status: body.trade_status || 'RUNNING',
@@ -61,13 +85,6 @@ export async function POST(req: Request) {
                 updated_at: nowIso,
             }, { onConflict: 'port_number' });
 
-        // 2. Fetch latest Web Command config from sv_cmd_<port>
-        const { data: cmdRow } = await supabase
-            .from('farm_port_status')
-            .select('system_code')
-            .eq('port_number', `sv_cmd_${port}`)
-            .maybeSingle();
-
         let webConfig: any = null;
         if (cmdRow?.system_code) {
             try {
@@ -77,10 +94,10 @@ export async function POST(req: Request) {
             }
         }
 
-        // If EA already acknowledged close_all, clear close_all flag on next command read if needed
         return NextResponse.json({
             success: true,
-            sync_interval: 3, // Fast 3-second polling for responsive 2-way Smart EA control
+            sync_interval: adaptiveInterval,
+            viewer_active: hasActiveViewer,
             timestamp: nowIso,
             web_config: webConfig,
         });

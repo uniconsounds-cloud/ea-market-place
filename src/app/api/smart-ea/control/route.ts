@@ -19,10 +19,22 @@ export async function GET(req: Request) {
 
         const supabase = getSupabaseAdmin();
 
-        const [{ data: stateRow }, { data: cmdRow }] = await Promise.all([
+        const nowIso = new Date().toISOString();
+
+        const [{ data: stateRow }, { data: cmdRow }, { data: productRow }] = await Promise.all([
             supabase.from('farm_port_status').select('system_code, last_ping').eq('port_number', `sv_state_${port}`).maybeSingle(),
             supabase.from('farm_port_status').select('system_code').eq('port_number', `sv_cmd_${port}`).maybeSingle(),
+            supabase.from('products').select('version, file_url').eq('product_key', 'SMART-VORTEX-01').maybeSingle(),
         ]);
+
+        // Record active viewer heartbeat so EA switches from 180s Standby to 15s Live mode
+        if (stateRow) {
+            supabase
+                .from('farm_port_status')
+                .update({ last_viewed_at: nowIso })
+                .eq('port_number', `sv_state_${port}`)
+                .then(() => {}, () => {});
+        }
 
         let state: any = null;
         let command: any = null;
@@ -34,15 +46,18 @@ export async function GET(req: Request) {
             try { command = JSON.parse(cmdRow.system_code); } catch { command = null; }
         }
 
-        // Compute online status (online if ping within last 20 seconds)
+        const expectedIntervalSec = Number(state?.sync_interval_sec || 20);
+        const onlineThresholdMs = Math.max(45000, (expectedIntervalSec + 60) * 1000);
         const isOnline = state?.last_ping
-            ? (Date.now() - new Date(state.last_ping).getTime()) < 20000
+            ? (Date.now() - new Date(state.last_ping).getTime()) < onlineThresholdMs
             : false;
 
         return NextResponse.json({
             success: true,
             port_number: port,
             is_online: isOnline,
+            latest_version: productRow?.version || '1.10',
+            download_url: productRow?.file_url || null,
             state,
             command,
         });

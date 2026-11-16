@@ -70,6 +70,8 @@ function SmartEACockpitContent() {
     const [isOnline, setIsOnline] = useState(false);
     const [eaState, setEaState] = useState<EAState | null>(null);
     const [lastCommand, setLastCommand] = useState<any>(null);
+    const [latestVersion, setLatestVersion] = useState<string>('1.10');
+    const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
 
     // Form fields
@@ -102,6 +104,8 @@ function SmartEACockpitContent() {
                 setIsOnline(Boolean(data.is_online));
                 setEaState(data.state || null);
                 setLastCommand(data.command || null);
+                if (data.latest_version) setLatestVersion(String(data.latest_version));
+                if (data.download_url) setDownloadUrl(String(data.download_url));
 
                 // Populate form once from live EA or saved command
                 if (!formInitialized) {
@@ -127,7 +131,8 @@ function SmartEACockpitContent() {
     useEffect(() => {
         if (!activePort) return;
         fetchTelemetry(activePort);
-        const timer = setInterval(() => fetchTelemetry(activePort), 3000);
+        // Prime-standard 15s polling when cockpit is open (also keeps viewer-ping alive for 15s EA sync)
+        const timer = setInterval(() => fetchTelemetry(activePort), 15000);
         return () => clearInterval(timer);
     }, [activePort, fetchTelemetry]);
 
@@ -184,7 +189,7 @@ function SmartEACockpitContent() {
         const tp = parseFloat(targetProfit);
 
         if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
-            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || tp <= 0) {
+            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp)) {
             toast.error('กรุณาตรวจสอบค่าตัวเลขที่กรอกให้ถูกต้อง');
             return;
         }
@@ -252,6 +257,80 @@ function SmartEACockpitContent() {
                 </Card>
             ) : (
                 <>
+                    {/* Version Update Alert Banner */}
+                    {eaState?.ea_version && eaState.ea_version !== latestVersion && (
+                        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <Badge className="bg-amber-500 text-slate-950 font-semibold">
+                                        มีอัปเดตเวอร์ชันใหม่ v{latestVersion}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                        พอร์ตของคุณกำลังรัน v{eaState.ea_version}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-amber-200/90">
+                                    สามารถดาวน์โหลดไฟล์ .ex5 เวอร์ชันใหม่ไปวางทับบนกราฟเดิมได้เลยโดยไม่ต้องลบออเดอร์เก่า ระบบจะกู้รอบเทรดเดิมต่อทันที
+                                </p>
+                            </div>
+                            {downloadUrl && (
+                                <a
+                                    href={downloadUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-semibold shrink-0 text-center"
+                                >
+                                    ดาวน์โหลด v{latestVersion}
+                                </a>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 7x7 Protection Freeze Banner + Quick TP Rescue */}
+                    {(eaState?.trade_status === 'FROZEN_7X7' || (eaState as any)?.protection_frozen) && (
+                        <div className="rounded-xl border border-rose-500/50 bg-rose-500/10 p-4 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
+                                    <h3 className="font-bold text-rose-300 text-sm sm:text-base">
+                                        ระบบป้องกัน 7x7 ทำงาน: เข้าสู่สถานะ Freeze อัตโนมัติ
+                                    </h3>
+                                </div>
+                                <Badge variant="destructive" className="w-fit font-mono">
+                                    Buy {eaState?.open_buy ?? 0} / Sell {eaState?.open_sell ?? 0}
+                                </Badge>
+                            </div>
+                            <p className="text-xs text-rose-200/90 leading-relaxed">
+                                ทั้งสองฝั่งเปิดครบ 7 ไม้แล้ว EA ได้ลบ Pending ออกทั้งหมดเพื่อหยุดความเสี่ยงเพิ่ม คุณสามารถปล่อยรอรวบตามปกติ, กด <strong>Close All</strong>, หรือปรับ <strong>Target Profit เป็น 0 (เท่าทุน) หรือค่าติดลบ</strong> เพื่อให้ EA รวบปิดให้อัตโนมัติโดยไม่ต้องนั่งเฝ้า
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs text-muted-foreground mr-1">ตั้งเป้าปิดรวบด่วน:</span>
+                                {[
+                                    { label: 'TP = 0 (เท่าทุน)', val: 0 },
+                                    { label: `TP = -20 ${cur}`, val: -20 },
+                                    { label: `TP = -50 ${cur}`, val: -50 },
+                                ].map((preset) => (
+                                    <Button
+                                        key={preset.val}
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={sending}
+                                        className="h-7 text-xs border-rose-500/40 hover:bg-rose-500/20"
+                                        onClick={() => {
+                                            setTargetProfit(String(preset.val));
+                                            sendCommand(
+                                                { target_profit: preset.val, close_all: false },
+                                                `ตั้งเป้า Target Profit = ${preset.val} ${cur} แล้ว EA จะรวบปิดอัตโนมัติเมื่อถึงเป้า`
+                                            );
+                                        }}
+                                    >
+                                        {preset.label}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Live Status Badges Bar */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <Card className="border bg-card/60">
@@ -524,6 +603,9 @@ function SmartEACockpitContent() {
                                                 onChange={(e) => setTargetProfit(e.target.value)}
                                                 className="font-mono"
                                             />
+                                            <p className="text-[11px] text-muted-foreground">
+                                                ใส่ 0 (เท่าทุน) หรือค่าติดลบ (เช่น -50) ได้ เพื่อรวบปิดจำกัดขาดทุนอัตโนมัติ
+                                            </p>
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label>ล็อตเริ่มต้น (Initial Lot)</Label>
