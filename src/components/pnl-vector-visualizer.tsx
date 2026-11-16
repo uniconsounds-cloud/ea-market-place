@@ -36,12 +36,10 @@ export function PnlVectorVisualizer({
             : sellOrders.reduce((acc, o) => acc + (o.u ?? 0), 0);
 
         const netSum = hasExactSidePnl ? buySum + sellSum + pnlJitter : cyclePnl + pnlJitter;
-        const sameSign = (buySum >= 0 && sellSum >= 0) || (buySum <= 0 && sellSum <= 0);
         const maxMag = Math.max(
             20,
             Math.abs(buySum),
             Math.abs(sellSum),
-            sameSign ? Math.abs(buySum) + Math.abs(sellSum) : Math.abs(netSum),
             Math.abs(targetProfit)
         );
         const maxOrderMag = Math.max(
@@ -76,8 +74,9 @@ export function PnlVectorVisualizer({
     const sellX = CX - clampRatio(sellSum) * HALF_SPAN;
 
     const oppositeSign = (buySum > 0 && sellSum < 0) || (buySum < 0 && sellSum > 0);
-    const netStartX = oppositeSign ? buyX : CX;
-    const netEndX = oppositeSign ? sellX : CX + clampRatio(netSum) * HALF_SPAN;
+    // In BOTH same-sign and opposite-sign cases, the exact span between buyX and sellX equals |Buy + Sell|!
+    const netStartX = buyX;
+    const netEndX = sellX;
 
     const Y_BUY = 46;
     const Y_SELL = 96;
@@ -205,7 +204,7 @@ export function PnlVectorVisualizer({
                             {netSum >= 0 ? `+${netSum.toFixed(2)}` : netSum.toFixed(2)}
                         </text>
                         <text x={CX} y={177} textAnchor="middle" fontSize="8.5" fill="#64748b">
-                            {oppositeSign ? 'DIFF SPAN (BUY ↔ SELL)' : 'COMBINED SUM (FROM 0)'}
+                            {oppositeSign ? 'DIFF SPAN (BUY ↔ SELL)' : 'COMBINED SPAN (BUY ↔ SELL)'}
                         </text>
                     </svg>
                 </div>
