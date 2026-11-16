@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
 import { toast } from 'sonner';
 import {
     Activity,
@@ -63,6 +64,7 @@ interface EAState {
     ea_status: string;
     last_ack_seq: number;
     active_config: ActiveConfig;
+    chart?: SmartChartData | null;
     last_ping: string;
 }
 
@@ -482,6 +484,16 @@ function SmartEACockpitContent() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* Live M1 Candlestick Chart with TP & Freeze Overlays */}
+                    <SmartVortexChart
+                        symbol={eaState?.symbol || 'XAUUSD'}
+                        currency={cur}
+                        anchor={eaState?.anchor || 0}
+                        targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
+                        frozenSide={eaState?.frozen_side}
+                        chart={eaState?.chart}
+                    />
 
                     {/* Control & Settings Split */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

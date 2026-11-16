@@ -69,6 +69,7 @@ export async function POST(req: Request) {
             ea_status: body.ea_status || 'Running',
             last_ack_seq: Number(body.last_ack_seq || 0),
             active_config: body.active_config || {},
+            chart: body.chart || null,
             last_ping: nowIso,
         };
 
