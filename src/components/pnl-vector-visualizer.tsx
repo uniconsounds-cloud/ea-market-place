@@ -36,11 +36,12 @@ export function PnlVectorVisualizer({
             : sellOrders.reduce((acc, o) => acc + (o.u ?? 0), 0);
 
         const netSum = hasExactSidePnl ? buySum + sellSum + pnlJitter : cyclePnl + pnlJitter;
+        const sameSign = (buySum >= 0 && sellSum >= 0) || (buySum <= 0 && sellSum <= 0);
         const maxMag = Math.max(
             20,
             Math.abs(buySum),
             Math.abs(sellSum),
-            Math.abs(netSum),
+            sameSign ? Math.abs(buySum) + Math.abs(sellSum) : Math.abs(netSum),
             Math.abs(targetProfit)
         );
         const maxOrderMag = Math.max(
@@ -63,20 +64,24 @@ export function PnlVectorVisualizer({
 
     const { buyOrders, sellOrders, buySum, sellSum, netSum, maxMag, maxOrderMag } = data;
 
-    // SVG Model A: Bipolar Vector Axis + Convergence (420 x 195)
+    // SVG Model A: 3 Parallel Differential Axes (420 x 195)
+    // BUY:  - Left  | + Right
+    // SELL: + Left  | - Right (mirrored so opposite signs align on the same side!)
+    // NET:  Span between buyX & sellX when opposite signs; combined sum from 0 when same sign
     const W = 420;
     const CX = W / 2;
-    const HALF_SPAN = 165;
-    const valToX = (v: number) => CX + Math.max(-1, Math.min(1, v / maxMag)) * HALF_SPAN;
+    const HALF_SPAN = 158;
+    const clampRatio = (v: number) => Math.max(-1, Math.min(1, v / maxMag));
+    const buyX = CX + clampRatio(buySum) * HALF_SPAN;
+    const sellX = CX - clampRatio(sellSum) * HALF_SPAN;
 
-    const buyX = valToX(buySum);
-    const sellX = valToX(sellSum);
-    const netX = valToX(netSum);
-    const tpX = valToX(targetProfit);
+    const oppositeSign = (buySum > 0 && sellSum < 0) || (buySum < 0 && sellSum > 0);
+    const netStartX = oppositeSign ? buyX : CX;
+    const netEndX = oppositeSign ? sellX : CX + clampRatio(netSum) * HALF_SPAN;
 
-    const Y_BUY = 44;
-    const Y_SELL = 94;
-    const Y_NET = 154;
+    const Y_BUY = 46;
+    const Y_SELL = 96;
+    const Y_NET = 152;
 
     // SVG Model B: Dual-Arc Radar + Balance Needle (280 x 185)
     const RW = 280;
@@ -100,45 +105,49 @@ export function PnlVectorVisualizer({
                     <div className="flex items-center justify-between mb-2">
                         <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
                             <GitCommitHorizontal className="w-4 h-4 text-cyan-400" />
-                            MODEL A // VECTOR AXIS
+                            MODEL A // DIFFERENTIAL SPAN
                         </span>
                         <Badge className="bg-slate-900 text-slate-300 border-slate-700 font-mono text-[10px]">
-                            B + S = NET
+                            B(-/+) vs S(+/-) → NET
                         </Badge>
                     </div>
 
                     <svg viewBox={`0 0 ${W} 185`} className="w-full h-auto font-mono select-none">
                         {/* Center Zero Axis */}
-                        <line x1={CX} y1={18} x2={CX} y2={170} stroke="#334155" strokeWidth="1.2" strokeDasharray="3 3" />
-                        <text x={CX} y={13} textAnchor="middle" fontSize="9" fill="#64748b">
+                        <line x1={CX} y1={22} x2={CX} y2={170} stroke="#334155" strokeWidth="1.2" strokeDasharray="3 3" />
+                        <text x={CX} y={14} textAnchor="middle" fontSize="9" fill="#64748b">
                             0.00
                         </text>
-                        <text x={CX - HALF_SPAN} y={13} textAnchor="start" fontSize="9" fill="#f43f5e">
-                            -{maxMag.toFixed(0)}
+                        <text x={CX - HALF_SPAN} y={14} textAnchor="start" fontSize="8.5" fill="#94a3b8">
+                            B(-) / S(+)
                         </text>
-                        <text x={CX + HALF_SPAN} y={13} textAnchor="end" fontSize="9" fill="#10b981">
-                            +{maxMag.toFixed(0)}
+                        <text x={CX + HALF_SPAN} y={14} textAnchor="end" fontSize="8.5" fill="#94a3b8">
+                            B(+) / S(-)
                         </text>
 
-                        {/* Convergence Laser Lines from Buy Tip & Sell Tip -> Net Node */}
-                        <path
-                            d={`M ${buyX} ${Y_BUY + 6} C ${buyX} ${Y_BUY + 42}, ${netX} ${Y_NET - 42}, ${netX} ${Y_NET - 7}`}
-                            fill="none"
+                        {/* Vertical Drop Guides from Buy Tip & Sell Tip down to Net Line */}
+                        <line
+                            x1={buyX}
+                            y1={Y_BUY + 5}
+                            x2={buyX}
+                            y2={Y_NET}
                             stroke="#22d3ee"
-                            strokeWidth="1.4"
-                            strokeDasharray="4 3"
-                            opacity="0.75"
+                            strokeWidth="1.1"
+                            strokeDasharray="3 3"
+                            opacity="0.65"
                         />
-                        <path
-                            d={`M ${sellX} ${Y_SELL + 6} C ${sellX} ${Y_SELL + 26}, ${netX} ${Y_NET - 26}, ${netX} ${Y_NET - 7}`}
-                            fill="none"
+                        <line
+                            x1={sellX}
+                            y1={Y_SELL + 5}
+                            x2={sellX}
+                            y2={Y_NET}
                             stroke="#fb923c"
-                            strokeWidth="1.4"
-                            strokeDasharray="4 3"
-                            opacity="0.75"
+                            strokeWidth="1.1"
+                            strokeDasharray="3 3"
+                            opacity="0.65"
                         />
 
-                        {/* Row 1: BUY VECTOR */}
+                        {/* Row 1: BUY (- Left | + Right) */}
                         <line x1={CX - HALF_SPAN} y1={Y_BUY} x2={CX + HALF_SPAN} y2={Y_BUY} stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
                         <line
                             x1={CX}
@@ -150,54 +159,53 @@ export function PnlVectorVisualizer({
                             strokeLinecap="round"
                         />
                         <circle cx={buyX} cy={Y_BUY} r="5" fill={buySum >= 0 ? '#22d3ee' : '#f43f5e'} stroke="#050811" strokeWidth="1.5" />
-                        <text x={14} y={Y_BUY + 3} fontSize="10" fontWeight="bold" fill="#22d3ee">
+                        <text x={10} y={Y_BUY + 3} fontSize="10" fontWeight="bold" fill="#22d3ee">
                             BUY
                         </text>
-                        <text x={W - 10} y={Y_BUY + 3} textAnchor="end" fontSize="10" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
+                        <text x={W - 8} y={Y_BUY + 3} textAnchor="end" fontSize="10" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
                             {buySum >= 0 ? `+${buySum.toFixed(2)}` : buySum.toFixed(2)}
                         </text>
 
-                        {/* Row 2: SELL VECTOR */}
+                        {/* Row 2: SELL (+ Left | - Right) */}
                         <line x1={CX - HALF_SPAN} y1={Y_SELL} x2={CX + HALF_SPAN} y2={Y_SELL} stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
                         <line
                             x1={CX}
                             y1={Y_SELL}
                             x2={sellX}
                             y2={Y_SELL}
-                            stroke={sellSum >= 0 ? '#fb923c' : '#f43f5e'}
+                            stroke={sellSum >= 0 ? '#10b981' : '#fb923c'}
                             strokeWidth="8"
                             strokeLinecap="round"
                         />
-                        <circle cx={sellX} cy={Y_SELL} r="5" fill={sellSum >= 0 ? '#fb923c' : '#f43f5e'} stroke="#050811" strokeWidth="1.5" />
-                        <text x={14} y={Y_SELL + 3} fontSize="10" fontWeight="bold" fill="#fb923c">
+                        <circle cx={sellX} cy={Y_SELL} r="5" fill={sellSum >= 0 ? '#10b981' : '#fb923c'} stroke="#050811" strokeWidth="1.5" />
+                        <text x={10} y={Y_SELL + 3} fontSize="10" fontWeight="bold" fill="#fb923c">
                             SELL
                         </text>
-                        <text x={W - 10} y={Y_SELL + 3} textAnchor="end" fontSize="10" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
+                        <text x={W - 8} y={Y_SELL + 3} textAnchor="end" fontSize="10" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
                             {sellSum >= 0 ? `+${sellSum.toFixed(2)}` : sellSum.toFixed(2)}
                         </text>
 
-                        {/* Row 3: NET SUM CONVERGENCE NODE */}
+                        {/* Row 3: NET SUM (Difference span [buyX..sellX] or Combined sum from 0) */}
                         <line x1={CX - HALF_SPAN} y1={Y_NET} x2={CX + HALF_SPAN} y2={Y_NET} stroke="#1e293b" strokeWidth="10" strokeLinecap="round" />
-                        {/* TP Target Tick */}
-                        <line x1={tpX} y1={Y_NET - 9} x2={tpX} y2={Y_NET + 9} stroke="#22c55e" strokeWidth="2" />
-                        <text x={tpX} y={Y_NET + 20} textAnchor="middle" fontSize="8" fill="#22c55e">
-                            TP
-                        </text>
                         <line
-                            x1={CX}
+                            x1={netStartX}
                             y1={Y_NET}
-                            x2={netX}
+                            x2={netEndX}
                             y2={Y_NET}
                             stroke={netSum >= 0 ? '#10b981' : '#f43f5e'}
                             strokeWidth="10"
                             strokeLinecap="round"
                         />
-                        <circle cx={netX} cy={Y_NET} r="7" fill={netSum >= 0 ? '#10b981' : '#f43f5e'} stroke="#ffffff" strokeWidth="1.5" />
-                        <text x={14} y={Y_NET + 3} fontSize="10" fontWeight="bold" fill="#e2e8f0">
+                        <circle cx={netStartX} cy={Y_NET} r="4.5" fill="#e2e8f0" stroke="#050811" strokeWidth="1.2" />
+                        <circle cx={netEndX} cy={Y_NET} r="6.5" fill={netSum >= 0 ? '#10b981' : '#f43f5e'} stroke="#ffffff" strokeWidth="1.5" />
+                        <text x={10} y={Y_NET + 3} fontSize="10" fontWeight="bold" fill="#e2e8f0">
                             NET
                         </text>
-                        <text x={W - 10} y={Y_NET + 4} textAnchor="end" fontSize="11" fontWeight="bold" fill={netSum >= 0 ? '#34d399' : '#fb7185'}>
+                        <text x={W - 8} y={Y_NET + 4} textAnchor="end" fontSize="11" fontWeight="bold" fill={netSum >= 0 ? '#34d399' : '#fb7185'}>
                             {netSum >= 0 ? `+${netSum.toFixed(2)}` : netSum.toFixed(2)}
+                        </text>
+                        <text x={CX} y={177} textAnchor="middle" fontSize="8.5" fill="#64748b">
+                            {oppositeSign ? 'DIFF SPAN (BUY ↔ SELL)' : 'COMBINED SUM (FROM 0)'}
                         </text>
                     </svg>
                 </div>
