@@ -34,6 +34,8 @@ interface ActiveConfig {
     target_profit: number;
     enable_cap_freeze?: boolean;
     max_both_sides_cap?: number;
+    freeze_flip_max_extra?: number;
+    freeze_flip_continuous?: boolean;
     stop_mode: string;
 }
 
@@ -54,6 +56,7 @@ interface EAState {
     pending_sell: number;
     protection_frozen?: boolean;
     frozen_side?: string;
+    freeze_flip_count?: number;
     conn_status: string;
     config_status: string;
     trade_status: string;
@@ -87,6 +90,8 @@ function SmartEACockpitContent() {
     const [targetProfit, setTargetProfit] = useState('20');
     const [enableCapFreeze, setEnableCapFreeze] = useState(true);
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
+    const [freezeFlipMaxExtra, setFreezeFlipMaxExtra] = useState('3');
+    const [freezeFlipContinuous, setFreezeFlipContinuous] = useState(true);
     const [formInitialized, setFormInitialized] = useState(false);
 
     useEffect(() => {
@@ -127,6 +132,8 @@ function SmartEACockpitContent() {
                         if (src.target_profit !== undefined) setTargetProfit(String(src.target_profit));
                         if (src.enable_cap_freeze !== undefined) setEnableCapFreeze(Boolean(src.enable_cap_freeze));
                         if (src.max_both_sides_cap !== undefined) setMaxBothSidesCap(String(src.max_both_sides_cap));
+                        if (src.freeze_flip_max_extra !== undefined) setFreezeFlipMaxExtra(String(src.freeze_flip_max_extra));
+                        if (src.freeze_flip_continuous !== undefined) setFreezeFlipContinuous(Boolean(src.freeze_flip_continuous));
                         setFormInitialized(true);
                     }
                 }
@@ -196,9 +203,11 @@ function SmartEACockpitContent() {
         const inc = parseFloat(lotIncrement);
         const tp = parseFloat(targetProfit);
         const cap = parseInt(maxBothSidesCap, 10);
+        const fmax = parseInt(freezeFlipMaxExtra, 10);
 
         if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
-            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50) {
+            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50 ||
+            isNaN(fmax) || fmax < 0 || fmax > 50) {
             toast.error('กรุณาตรวจสอบค่าตัวเลขที่กรอกให้ถูกต้อง');
             return;
         }
@@ -213,6 +222,8 @@ function SmartEACockpitContent() {
                 target_profit: tp,
                 enable_cap_freeze: enableCapFreeze,
                 max_both_sides_cap: cap,
+                freeze_flip_max_extra: fmax,
+                freeze_flip_continuous: freezeFlipContinuous,
                 close_all: false,
             },
             'ส่งค่าใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
@@ -311,9 +322,16 @@ function SmartEACockpitContent() {
                                             : `ระบบป้องกัน ${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7} ทำงาน: เข้าสู่สถานะ Freeze`}
                                     </h3>
                                 </div>
-                                <Badge variant="destructive" className="w-fit font-mono">
-                                    Buy {eaState?.open_buy ?? 0} / Sell {eaState?.open_sell ?? 0}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    {(eaState?.freeze_flip_count ?? 0) > 0 && (
+                                        <Badge variant="outline" className="border-amber-400/50 text-amber-300 font-mono">
+                                            Flipped x{eaState?.freeze_flip_count}
+                                        </Badge>
+                                    )}
+                                    <Badge variant="destructive" className="w-fit font-mono">
+                                        Buy {eaState?.open_buy ?? 0} / Sell {eaState?.open_sell ?? 0}
+                                    </Badge>
+                                </div>
                             </div>
                             <p className="text-xs text-rose-200/90 leading-relaxed">
                                 ทั้งสองฝั่งเปิดครบเกณฑ์แล้ว EA จึงลบ Pending ของฝั่งตรงข้ามออก (ห้ามออกเพิ่มแม้ราคาย้อนกลับ) ส่วนฝั่งที่เพิ่งนับครบยังออกไม้ต่อได้เรื่อยๆ เพื่อลุ้นปิดรวบ หรือปรับ <strong>Target Profit เป็น 0 / ค่าติดลบ</strong> เพื่อปิดอัตโนมัติ
@@ -660,17 +678,44 @@ function SmartEACockpitContent() {
                                                     {enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}
                                                 </Button>
                                             </div>
-                                            <div className="pt-1">
-                                                <Label className="text-xs text-muted-foreground">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</Label>
-                                                <Input
-                                                    type="number"
-                                                    min="1"
-                                                    max="50"
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                                <div>
+                                                    <Label className="text-xs text-muted-foreground">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        max="50"
+                                                        disabled={!enableCapFreeze}
+                                                        value={maxBothSidesCap}
+                                                        onChange={(e) => setMaxBothSidesCap(e.target.value)}
+                                                        className="font-mono mt-1"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs text-muted-foreground">สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง (ไม้, 0 = ไม่สลับ)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="50"
+                                                        disabled={!enableCapFreeze}
+                                                        value={freezeFlipMaxExtra}
+                                                        onChange={(e) => setFreezeFlipMaxExtra(e.target.value)}
+                                                        className="font-mono mt-1"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <span className="text-xs text-muted-foreground">รูปแบบการสลับสิทธิ์เมื่อราคาตีกลับ</span>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
                                                     disabled={!enableCapFreeze}
-                                                    value={maxBothSidesCap}
-                                                    onChange={(e) => setMaxBothSidesCap(e.target.value)}
-                                                    className="font-mono mt-1"
-                                                />
+                                                    onClick={() => setFreezeFlipContinuous((v) => !v)}
+                                                    className="h-7 text-xs"
+                                                >
+                                                    {freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>

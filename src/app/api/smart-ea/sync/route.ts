@@ -60,6 +60,8 @@ export async function POST(req: Request) {
             pending_sell: Number(body.pending_sell || 0),
             protection_frozen: Boolean(body.protection_frozen),
             frozen_side: body.frozen_side || 'NONE',
+            freeze_flip_count: Number(body.freeze_flip_count || 0),
+            freeze_base_count: Number(body.freeze_base_count || 0),
             sync_interval_sec: Number(body.sync_interval_sec || adaptiveInterval),
             conn_status: 'CONNECTED',
             config_status: body.config_status || 'MT5_DEFAULT',

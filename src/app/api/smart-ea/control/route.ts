@@ -94,6 +94,8 @@ export async function POST(req: Request) {
             target_profit: 20.0,
             enable_cap_freeze: true,
             max_both_sides_cap: 7,
+            freeze_flip_max_extra: 3,
+            freeze_flip_continuous: true,
             stop_mode: 'RUN',
             close_all: false,
         };
@@ -117,6 +119,8 @@ export async function POST(req: Request) {
             target_profit: body.target_profit !== undefined ? Number(body.target_profit) : prevCmd.target_profit,
             enable_cap_freeze: body.enable_cap_freeze !== undefined ? Boolean(body.enable_cap_freeze) : (prevCmd.enable_cap_freeze ?? true),
             max_both_sides_cap: body.max_both_sides_cap !== undefined ? Number(body.max_both_sides_cap) : (prevCmd.max_both_sides_cap ?? 7),
+            freeze_flip_max_extra: body.freeze_flip_max_extra !== undefined ? Number(body.freeze_flip_max_extra) : (prevCmd.freeze_flip_max_extra ?? 3),
+            freeze_flip_continuous: body.freeze_flip_continuous !== undefined ? Boolean(body.freeze_flip_continuous) : (prevCmd.freeze_flip_continuous ?? true),
             stop_mode: body.stop_mode !== undefined ? String(body.stop_mode) : prevCmd.stop_mode,
             close_all: Boolean(body.close_all === true),
             updated_at: new Date().toISOString(),
