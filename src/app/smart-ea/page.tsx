@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
+import { BasketRiskAnalyzer } from '@/components/basket-risk-analyzer';
 import { toast } from 'sonner';
 import {
     Activity,
@@ -523,6 +524,24 @@ function SmartEACockpitContent() {
                         frozenSide={eaState?.frozen_side}
                         isOnline={isOnline}
                         chart={eaState?.chart}
+                    />
+
+                    {/* Basket Risk & Recovery Analyzer */}
+                    <BasketRiskAnalyzer
+                        currency={cur}
+                        cyclePnl={eaState?.cycle_pnl || 0}
+                        targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
+                        openPos={eaState?.open_pos || 0}
+                        frozenSide={eaState?.frozen_side}
+                        sending={sending}
+                        chart={eaState?.chart}
+                        onQuickSetTp={(newTp) => {
+                            setTargetProfit(String(newTp));
+                            sendCommand(
+                                { target_profit: newTp, close_all: false },
+                                `ตั้งเป้า Target Profit = ${newTp} ${cur} เรียบร้อย`
+                            );
+                        }}
                     />
 
                     {/* Control & Settings Split */}
