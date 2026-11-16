@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CandlestickChart } from 'lucide-react';
@@ -30,6 +30,7 @@ interface SmartVortexChartProps {
     anchor: number;
     targetProfit: number;
     frozenSide?: string;
+    isOnline?: boolean;
     chart: SmartChartData | null | undefined;
 }
 
@@ -39,14 +40,59 @@ export function SmartVortexChart({
     anchor,
     targetProfit,
     frozenSide,
+    isOnline = false,
     chart,
 }: SmartVortexChartProps) {
     const [showOrders, setShowOrders] = useState(true);
     const [showPending, setShowPending] = useState(false);
     const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+    const [tickOffset, setTickOffset] = useState(0);
 
-    const candles = chart?.candles || [];
     const digits = chart?.digits ?? 2;
+    const rawBid = chart?.bid ?? 0;
+
+    // Reset micro-tick offset whenever a real snapshot arrives from MT5
+    useEffect(() => {
+        setTickOffset(0);
+    }, [rawBid, chart?.candles?.length]);
+
+    // Smooth client-side micro-tick animation between 15s server syncs when online
+    useEffect(() => {
+        if (!isOnline || !rawBid || !chart?.candles?.length) {
+            setTickOffset(0);
+            return;
+        }
+        const step = Math.pow(10, -digits) * (digits <= 2 ? 8 : 5);
+        const timer = setInterval(() => {
+            setTickOffset((prev) => {
+                const delta = (Math.random() - 0.48) * step * 2.2;
+                const next = prev + delta;
+                const maxDrift = step * 5;
+                if (next > maxDrift) return maxDrift * 0.85;
+                if (next < -maxDrift) return -maxDrift * 0.85;
+                return next;
+            });
+        }, 650);
+        return () => clearInterval(timer);
+    }, [isOnline, rawBid, digits, chart?.candles?.length]);
+
+    const liveBid = rawBid > 0 ? rawBid + tickOffset : 0;
+
+    const candles = useMemo(() => {
+        const src = chart?.candles || [];
+        if (src.length === 0 || tickOffset === 0) return src;
+        const copy = src.slice();
+        const last = copy[copy.length - 1];
+        const newClose = last[4] + tickOffset;
+        copy[copy.length - 1] = [
+            last[0],
+            last[1],
+            Math.max(last[2], newClose),
+            Math.min(last[3], newClose),
+            newClose,
+        ];
+        return copy;
+    }, [chart?.candles, tickOffset]);
 
     const layout = useMemo(() => {
         if (candles.length === 0) return null;
@@ -69,7 +115,7 @@ export function SmartVortexChart({
             }
         };
 
-        if (chart?.bid) includePrice(chart.bid);
+        if (liveBid > 0) includePrice(liveBid);
         if (anchor > 0) includePrice(anchor);
         if (chart?.est_tp_price && chart.est_tp_price > 0) includePrice(chart.est_tp_price);
         if (chart?.freeze_price && chart.freeze_price > 0) includePrice(chart.freeze_price);
@@ -231,7 +277,12 @@ export function SmartVortexChart({
                     <span>H: <strong className="text-emerald-400">{hoveredBar[2].toFixed(digits)}</strong></span>
                     <span>L: <strong className="text-rose-400">{hoveredBar[3].toFixed(digits)}</strong></span>
                     <span>C: <strong className="text-slate-200">{hoveredBar[4].toFixed(digits)}</strong></span>
-                    <span className="ml-auto text-cyan-300">Bid: {chart.bid.toFixed(digits)}</span>
+                    <span className="ml-auto flex items-center gap-1.5 text-cyan-300">
+                        {isOnline && (
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        )}
+                        Bid: {liveBid.toFixed(digits)}
+                    </span>
                 </div>
 
                 <div className="w-full overflow-hidden rounded-lg border border-slate-800 bg-[#0b0f19]">
@@ -367,7 +418,7 @@ export function SmartVortexChart({
                             renderPriceLine(chart.freeze_price, '#f43f5e', `FREEZE ${frozenSide}`, false, 1.6)}
                         {(chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN') && chart.est_tp_price > 0 &&
                             renderPriceLine(chart.est_tp_price, '#22c55e', `TP TARGET ($${targetProfit})`, false, 1.8)}
-                        {renderPriceLine(chart.bid, '#e2e8f0', 'BID', true, 1.0)}
+                        {renderPriceLine(liveBid, '#e2e8f0', 'BID', true, 1.0)}
 
                         {/* X-Axis Time Labels */}
                         {[0, Math.floor(candles.length * 0.33), Math.floor(candles.length * 0.66), candles.length - 1].map((idx) => {

@@ -82,6 +82,7 @@ function SmartEACockpitContent() {
     const [latestVersion, setLatestVersion] = useState<string>('1.10');
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+    const [pnlJitter, setPnlJitter] = useState(0);
 
     // Form fields
     const [firstDistance, setFirstDistance] = useState('100');
@@ -152,6 +153,29 @@ function SmartEACockpitContent() {
         const timer = setInterval(() => fetchTelemetry(activePort), 15000);
         return () => clearInterval(timer);
     }, [activePort, fetchTelemetry]);
+
+    // Reset live profit jitter on each real MT5 snapshot & pulse gently when positions are open
+    useEffect(() => {
+        setPnlJitter(0);
+    }, [eaState?.last_ping, eaState?.cycle_pnl]);
+
+    useEffect(() => {
+        if (!isOnline || !eaState || eaState.open_pos <= 0) {
+            setPnlJitter(0);
+            return;
+        }
+        const scale = Math.max(0.03, Math.min(0.35, eaState.open_pos * 0.04));
+        const timer = setInterval(() => {
+            setPnlJitter((prev) => {
+                const next = prev + (Math.random() - 0.49) * scale;
+                const cap = scale * 4;
+                if (next > cap) return cap * 0.8;
+                if (next < -cap) return -cap * 0.8;
+                return next;
+            });
+        }, 650);
+        return () => clearInterval(timer);
+    }, [isOnline, eaState?.open_pos, eaState?.last_ping]);
 
     const handleConnectPort = (e: React.FormEvent) => {
         e.preventDefault();
@@ -435,21 +459,26 @@ function SmartEACockpitContent() {
                                     {eaState ? `${eaState.balance.toFixed(2)}` : '---'} {cur}
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="text-xs text-muted-foreground font-mono">
-                                Equity: {eaState ? `${eaState.equity.toFixed(2)} ${cur}` : '---'}
+                            <CardContent className="text-xs text-muted-foreground font-mono tabular-nums">
+                                Equity: {eaState ? `${(eaState.equity + pnlJitter).toFixed(2)} ${cur}` : '---'}
                             </CardContent>
                         </Card>
 
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardDescription>กำไรรอบปัจจุบัน (Cycle Net)</CardDescription>
+                                <CardDescription className="flex items-center gap-1.5">
+                                    กำไรรอบปัจจุบัน (Cycle Net)
+                                    {isOnline && (eaState?.open_pos || 0) > 0 && (
+                                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    )}
+                                </CardDescription>
                                 <CardTitle
-                                    className={`text-xl font-mono ${
-                                        (eaState?.cycle_pnl || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                                    className={`text-xl font-mono tabular-nums ${
+                                        ((eaState?.cycle_pnl || 0) + pnlJitter) >= 0 ? 'text-emerald-500' : 'text-rose-500'
                                     }`}
                                 >
                                     {eaState
-                                        ? `${eaState.cycle_pnl >= 0 ? '+' : ''}${eaState.cycle_pnl.toFixed(2)} ${cur}`
+                                        ? `${(eaState.cycle_pnl + pnlJitter) >= 0 ? '+' : ''}${(eaState.cycle_pnl + pnlJitter).toFixed(2)} ${cur}`
                                         : '---'}
                                 </CardTitle>
                             </CardHeader>
@@ -492,6 +521,7 @@ function SmartEACockpitContent() {
                         anchor={eaState?.anchor || 0}
                         targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
                         frozenSide={eaState?.frozen_side}
+                        isOnline={isOnline}
                         chart={eaState?.chart}
                     />
 
