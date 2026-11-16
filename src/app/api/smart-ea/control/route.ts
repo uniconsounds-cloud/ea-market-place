@@ -87,11 +87,12 @@ export async function POST(req: Request) {
         let prevCmd: any = {
             command_seq: 0,
             first_distance: 100,
-            spacing: 50,
+            spacing: 100,
             pending_per_side: 10,
-            initial_lot: 0.03,
-            lot_increment: 0.03,
+            initial_lot: 0.01,
+            lot_increment: 0.01,
             target_profit: 20.0,
+            max_both_sides_cap: 7,
             stop_mode: 'RUN',
             close_all: false,
         };
@@ -113,6 +114,7 @@ export async function POST(req: Request) {
             initial_lot: body.initial_lot !== undefined ? Number(body.initial_lot) : prevCmd.initial_lot,
             lot_increment: body.lot_increment !== undefined ? Number(body.lot_increment) : prevCmd.lot_increment,
             target_profit: body.target_profit !== undefined ? Number(body.target_profit) : prevCmd.target_profit,
+            max_both_sides_cap: body.max_both_sides_cap !== undefined ? Number(body.max_both_sides_cap) : (prevCmd.max_both_sides_cap ?? 7),
             stop_mode: body.stop_mode !== undefined ? String(body.stop_mode) : prevCmd.stop_mode,
             close_all: Boolean(body.close_all === true),
             updated_at: new Date().toISOString(),

@@ -32,6 +32,7 @@ interface ActiveConfig {
     initial_lot: number;
     lot_increment: number;
     target_profit: number;
+    max_both_sides_cap?: number;
     stop_mode: string;
 }
 
@@ -76,11 +77,12 @@ function SmartEACockpitContent() {
 
     // Form fields
     const [firstDistance, setFirstDistance] = useState('100');
-    const [spacing, setSpacing] = useState('50');
+    const [spacing, setSpacing] = useState('100');
     const [pendingPerSide, setPendingPerSide] = useState('10');
-    const [initialLot, setInitialLot] = useState('0.03');
-    const [lotIncrement, setLotIncrement] = useState('0.03');
+    const [initialLot, setInitialLot] = useState('0.01');
+    const [lotIncrement, setLotIncrement] = useState('0.01');
     const [targetProfit, setTargetProfit] = useState('20');
+    const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [formInitialized, setFormInitialized] = useState(false);
 
     useEffect(() => {
@@ -119,6 +121,7 @@ function SmartEACockpitContent() {
                         if (src.initial_lot !== undefined) setInitialLot(String(src.initial_lot));
                         if (src.lot_increment !== undefined) setLotIncrement(String(src.lot_increment));
                         if (src.target_profit !== undefined) setTargetProfit(String(src.target_profit));
+                        if (src.max_both_sides_cap !== undefined) setMaxBothSidesCap(String(src.max_both_sides_cap));
                         setFormInitialized(true);
                     }
                 }
@@ -187,9 +190,10 @@ function SmartEACockpitContent() {
         const lot = parseFloat(initialLot);
         const inc = parseFloat(lotIncrement);
         const tp = parseFloat(targetProfit);
+        const cap = parseInt(maxBothSidesCap, 10);
 
         if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
-            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp)) {
+            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50) {
             toast.error('กรุณาตรวจสอบค่าตัวเลขที่กรอกให้ถูกต้อง');
             return;
         }
@@ -202,6 +206,7 @@ function SmartEACockpitContent() {
                 initial_lot: lot,
                 lot_increment: inc,
                 target_profit: tp,
+                max_both_sides_cap: cap,
                 close_all: false,
             },
             'ส่งค่าใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
@@ -293,7 +298,7 @@ function SmartEACockpitContent() {
                                 <div className="flex items-center gap-2">
                                     <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
                                     <h3 className="font-bold text-rose-300 text-sm sm:text-base">
-                                        ระบบป้องกัน 7x7 ทำงาน: เข้าสู่สถานะ Freeze อัตโนมัติ
+                                        ระบบป้องกัน {eaState?.active_config?.max_both_sides_cap ?? 7}x{eaState?.active_config?.max_both_sides_cap ?? 7} ทำงาน: เข้าสู่สถานะ Freeze อัตโนมัติ
                                     </h3>
                                 </div>
                                 <Badge variant="destructive" className="w-fit font-mono">
@@ -626,6 +631,20 @@ function SmartEACockpitContent() {
                                                 onChange={(e) => setLotIncrement(e.target.value)}
                                                 className="font-mono"
                                             />
+                                        </div>
+                                        <div className="space-y-1.5 sm:col-span-2">
+                                            <Label>ล็อก Freeze เมื่อเปิดครบทั้ง 2 ฝั่ง (จำนวนไม้/ฝั่ง, 0 = ปิดระบบป้องกัน)</Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                max="50"
+                                                value={maxBothSidesCap}
+                                                onChange={(e) => setMaxBothSidesCap(e.target.value)}
+                                                className="font-mono"
+                                            />
+                                            <p className="text-[11px] text-muted-foreground">
+                                                ค่าเริ่มต้นคือ 7 (หาก Buy และ Sell เปิดถึง {maxBothSidesCap || 7} ไม้พร้อมกัน จะลบ Pending และหยุดเปิดไม้เพิ่มทันที)
+                                            </p>
                                         </div>
                                     </div>
 
