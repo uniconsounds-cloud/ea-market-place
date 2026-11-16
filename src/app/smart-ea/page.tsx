@@ -85,6 +85,7 @@ function SmartEACockpitContent() {
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
     const [pnlJitter, setPnlJitter] = useState(0);
+    const [sessionOpenedAt, setSessionOpenedAt] = useState<number>(() => Date.now());
 
     // Form fields
     const [firstDistance, setFirstDistance] = useState('100');
@@ -150,11 +151,23 @@ function SmartEACockpitContent() {
 
     useEffect(() => {
         if (!activePort) return;
+        setSessionOpenedAt(Date.now());
         fetchTelemetry(activePort);
         // Prime-standard 15s polling when cockpit is open (also keeps viewer-ping alive for 15s EA sync)
         const timer = setInterval(() => fetchTelemetry(activePort), 15000);
         return () => clearInterval(timer);
     }, [activePort, fetchTelemetry]);
+
+    const isWaitingFreshData = Boolean(
+        activePort &&
+        eaState &&
+        (
+            !isOnline ||
+            !eaState.chart ||
+            (((eaState as any)?.sync_interval_sec ?? 15) > 30 &&
+                new Date(eaState.last_ping).getTime() < sessionOpenedAt)
+        )
+    );
 
     // Reset live profit jitter on each real MT5 snapshot & pulse gently when positions are open
     useEffect(() => {
@@ -162,7 +175,7 @@ function SmartEACockpitContent() {
     }, [eaState?.last_ping, eaState?.cycle_pnl]);
 
     useEffect(() => {
-        if (!isOnline || !eaState || eaState.open_pos <= 0) {
+        if (!isOnline || isWaitingFreshData || !eaState || eaState.open_pos <= 0) {
             setPnlJitter(0);
             return;
         }
@@ -177,7 +190,7 @@ function SmartEACockpitContent() {
             });
         }, 650);
         return () => clearInterval(timer);
-    }, [isOnline, eaState?.open_pos, eaState?.last_ping]);
+    }, [isOnline, isWaitingFreshData, eaState?.open_pos, eaState?.last_ping]);
 
     const handleConnectPort = (e: React.FormEvent) => {
         e.preventDefault();
@@ -408,11 +421,32 @@ function SmartEACockpitContent() {
                         </div>
                     )}
 
+                    {/* Waiting for Fresh Data Banner (when waking from Standby or Offline) */}
+                    {isWaitingFreshData && (
+                        <div className="rounded-xl border border-slate-700 bg-slate-900/70 px-3.5 py-2.5 flex items-center justify-between gap-3 font-mono">
+                            <div className="flex items-center gap-2.5 text-xs text-slate-300">
+                                <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin shrink-0" />
+                                <span>
+                                    {!isOnline
+                                        ? 'กำลังรอสัญญาณจาก MT5 (ตัวเลขด้านล่างเป็นค่าล่าสุดก่อนออฟไลน์)...'
+                                        : 'กำลังรอข้อมูลรอบใหม่จาก MT5 (กำลังปลุกจากโหมดประหยัด 180s → 15s)...'}
+                                </span>
+                            </div>
+                            <Badge className="bg-slate-800 text-slate-300 border-slate-700 text-[10px] shrink-0 animate-pulse">
+                                WAIT DATA
+                            </Badge>
+                        </div>
+                    )}
+
                     {/* Compact Tactical Status Rail */}
                     <div className="grid grid-cols-3 gap-2 font-mono">
                         <div className="rounded-lg border border-slate-800 bg-[#070b16]/90 px-3 py-2 flex items-center justify-between">
                             <span className="text-[10px] text-slate-400">LINK</span>
-                            {isOnline ? (
+                            {isWaitingFreshData ? (
+                                <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 animate-pulse">
+                                    <RefreshCw className="w-3 h-3 animate-spin text-amber-400" /> WAIT
+                                </span>
+                            ) : isOnline ? (
                                 <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
                                     <Wifi className="w-3.5 h-3.5" /> ONLINE
                                 </span>
@@ -455,7 +489,7 @@ function SmartEACockpitContent() {
                     </div>
 
                     {/* Sci-Fi HUD Gauges & Dual-Side Radar Cluster */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
+                    <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono transition-all duration-500 ${isWaitingFreshData ? 'opacity-55 grayscale animate-pulse' : ''}`}>
                         {/* Gauge 1: Balance & Equity Arc */}
                         <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex items-center gap-3">
                             <svg viewBox="0 0 44 44" className="w-12 h-12 shrink-0 -rotate-90">
@@ -566,13 +600,14 @@ function SmartEACockpitContent() {
                     </div>
 
                     {/* Live M1 Candlestick Chart with TP & Freeze Overlays */}
+                    <div className={`space-y-4 transition-all duration-500 ${isWaitingFreshData ? 'opacity-55 grayscale animate-pulse' : ''}`}>
                     <SmartVortexChart
                         symbol={eaState?.symbol || 'XAUUSD'}
                         currency={cur}
                         anchor={eaState?.anchor || 0}
                         targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
                         frozenSide={eaState?.frozen_side}
-                        isOnline={isOnline}
+                        isOnline={isOnline && !isWaitingFreshData}
                         chart={eaState?.chart}
                     />
 
@@ -602,6 +637,7 @@ function SmartEACockpitContent() {
                         pnlJitter={pnlJitter}
                         chart={eaState?.chart}
                     />
+                    </div>
 
                     {/* Control & Settings Split */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
