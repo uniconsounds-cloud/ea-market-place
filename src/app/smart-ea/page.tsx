@@ -264,32 +264,48 @@ function SmartEACockpitContent() {
     );
 
     const cur = eaState?.currency || 'USD';
+    const liveCyclePnl = (eaState?.cycle_pnl || 0) + pnlJitter;
+    const liveEquity = (eaState?.equity || 0) + pnlJitter;
+    const activeTp = eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20);
+    const activeCap = eaState?.active_config?.max_both_sides_cap ?? (parseInt(maxBothSidesCap, 10) || 7);
+    const eqRatio = eaState && eaState.balance > 0 ? Math.max(0, Math.min(130, (liveEquity / eaState.balance) * 100)) : 100;
+    const tpProgress = activeTp > 0 ? Math.max(0, Math.min(100, (liveCyclePnl / activeTp) * 100)) : (liveCyclePnl >= activeTp ? 100 : 0);
 
     return (
-        <div className="container mx-auto px-4 py-6 max-w-5xl space-y-6">
-            {/* Header & Port Selector */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border rounded-xl p-4 shadow-sm">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold tracking-tight">Smart Vortex Cockpit</h1>
-                        <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30">
-                            Smart EA Series
-                        </Badge>
+        <div className="min-h-screen bg-[#040711] text-slate-100">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-5xl space-y-4">
+            {/* Starship Bridge Header & Port Selector */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border border-cyan-500/30 bg-[#070b16]/95 p-3.5 sm:p-4 shadow-[0_0_24px_rgba(6,182,212,0.08)]">
+                <div className="flex items-center justify-between md:justify-start gap-2.5">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                            <h1 className="text-lg sm:text-xl font-mono font-bold tracking-widest uppercase text-cyan-300">
+                                VORTEX // BRIDGE
+                            </h1>
+                            <Badge className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-mono text-[10px]">
+                                SMART EA
+                            </Badge>
+                        </div>
+                        <p className="text-[11px] font-mono text-slate-400 mt-0.5 hidden sm:block">
+                            2-WAY TELEMETRY & TACTICAL GRID COMMAND
+                        </p>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        ควบคุมและติดตามสถานะ EA แบบ Real-time 2 ทาง (มือถือ / คอมพิวเตอร์)
-                    </p>
                 </div>
 
                 <form onSubmit={handleConnectPort} className="flex items-center gap-2 w-full md:w-auto">
                     <Input
-                        placeholder="เลขพอร์ต MT5 (เช่น 58013626)"
+                        placeholder="PORT # (e.g. 58013626)"
                         value={portInput}
                         onChange={(e) => setPortInput(e.target.value)}
-                        className="w-full md:w-52 font-mono"
+                        className="w-full md:w-48 font-mono text-xs bg-slate-950/90 border-cyan-500/30 text-cyan-100"
                     />
-                    <Button type="submit" disabled={loading}>
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'เชื่อมต่อ'}
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs shrink-0"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'LINK'}
                     </Button>
                 </form>
             </div>
@@ -391,128 +407,161 @@ function SmartEACockpitContent() {
                         </div>
                     )}
 
-                    {/* Live Status Badges Bar */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Card className="border bg-card/60">
-                            <CardContent className="p-4 flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground font-medium">การเชื่อมต่อ (MT5)</span>
-                                {isOnline ? (
-                                    <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30 gap-1.5">
-                                        <Wifi className="w-3.5 h-3.5" /> เชื่อมต่อสำเร็จ
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="destructive" className="gap-1.5">
-                                        <WifiOff className="w-3.5 h-3.5" /> ออฟไลน์ / รอสัญญาณ
-                                    </Badge>
-                                )}
-                            </CardContent>
-                        </Card>
+                    {/* Compact Tactical Status Rail */}
+                    <div className="grid grid-cols-3 gap-2 font-mono">
+                        <div className="rounded-lg border border-slate-800 bg-[#070b16]/90 px-3 py-2 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400">LINK</span>
+                            {isOnline ? (
+                                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
+                                    <Wifi className="w-3.5 h-3.5" /> ONLINE
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1.5 text-[11px] font-bold text-rose-400">
+                                    <WifiOff className="w-3.5 h-3.5" /> OFFLINE
+                                </span>
+                            )}
+                        </div>
 
-                        <Card className="border bg-card/60">
-                            <CardContent className="p-4 flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground font-medium">สถานะการโหลดค่า</span>
-                                {isPendingAck ? (
-                                    <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 gap-1.5">
-                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> กำลังส่งค่าเข้า EA...
-                                    </Badge>
-                                ) : eaState?.config_status === 'WEB_LOADED' ? (
-                                    <Badge className="bg-sky-500/15 text-sky-400 border-sky-500/30 gap-1.5">
-                                        <CheckCircle2 className="w-3.5 h-3.5" /> โหลดค่าแล้ว (Web)
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline" className="gap-1.5">
-                                        ค่าเริ่มต้นจาก MT5
-                                    </Badge>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <div className="rounded-lg border border-slate-800 bg-[#070b16]/90 px-3 py-2 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400">CFG</span>
+                            {isPendingAck ? (
+                                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-400">
+                                    <RefreshCw className="w-3 h-3 animate-spin" /> SYNCING
+                                </span>
+                            ) : eaState?.config_status === 'WEB_LOADED' ? (
+                                <span className="flex items-center gap-1 text-[11px] font-bold text-cyan-400">
+                                    <CheckCircle2 className="w-3 h-3" /> WEB
+                                </span>
+                            ) : (
+                                <span className="text-[11px] font-bold text-slate-300">MT5</span>
+                            )}
+                        </div>
 
-                        <Card className="border bg-card/60">
-                            <CardContent className="p-4 flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground font-medium">สถานะการทำงาน</span>
-                                <Badge
-                                    className={
-                                        eaState?.trade_status === 'RUNNING'
-                                            ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
-                                            : eaState?.trade_status === 'PAUSED_NEXT'
-                                            ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                            : 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                                    }
-                                >
-                                    {eaState?.trade_status === 'RUNNING'
-                                        ? 'กำลังรันเทรด (Running)'
+                        <div className="rounded-lg border border-slate-800 bg-[#070b16]/90 px-3 py-2 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400">MODE</span>
+                            <span
+                                className={`text-[11px] font-bold ${
+                                    eaState?.trade_status === 'RUNNING'
+                                        ? 'text-emerald-400'
                                         : eaState?.trade_status === 'PAUSED_NEXT'
-                                        ? 'รอปิดรอบแล้วหยุด'
-                                        : eaState?.trade_status === 'FROZEN'
-                                        ? 'หยุดกางไม้ (Frozen)'
-                                        : eaState?.trade_status || 'WAITING'}
-                                </Badge>
-                            </CardContent>
-                        </Card>
+                                        ? 'text-amber-400'
+                                        : 'text-rose-400'
+                                }`}
+                            >
+                                {eaState?.trade_status || 'WAIT'}
+                            </span>
+                        </div>
                     </div>
 
-                    {/* Live Metrics Grid */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Balance / Equity</CardDescription>
-                                <CardTitle className="text-xl font-mono">
-                                    {eaState ? `${eaState.balance.toFixed(2)}` : '---'} {cur}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-xs text-muted-foreground font-mono tabular-nums">
-                                Equity: {eaState ? `${(eaState.equity + pnlJitter).toFixed(2)} ${cur}` : '---'}
-                            </CardContent>
-                        </Card>
+                    {/* Sci-Fi HUD Gauges & Dual-Side Radar Cluster */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
+                        {/* Gauge 1: Balance & Equity Arc */}
+                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex items-center gap-3">
+                            <svg viewBox="0 0 44 44" className="w-12 h-12 shrink-0 -rotate-90">
+                                <circle cx="22" cy="22" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
+                                <circle
+                                    cx="22"
+                                    cy="22"
+                                    r="18"
+                                    fill="none"
+                                    stroke={eqRatio >= 100 ? '#10b981' : '#38bdf8'}
+                                    strokeWidth="4"
+                                    strokeDasharray={`${(Math.min(100, eqRatio) / 100) * 113.1} 113.1`}
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                            <div className="min-w-0">
+                                <div className="text-[10px] text-slate-400">BAL // EQ ({cur})</div>
+                                <div className="text-sm font-bold text-slate-100 truncate tabular-nums">
+                                    {eaState ? eaState.balance.toFixed(2) : '---'}
+                                </div>
+                                <div className="text-[11px] text-cyan-300 truncate tabular-nums">
+                                    EQ {eaState ? liveEquity.toFixed(2) : '---'}
+                                </div>
+                            </div>
+                        </div>
 
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription className="flex items-center gap-1.5">
-                                    กำไรรอบปัจจุบัน (Cycle Net)
+                        {/* Gauge 2: Cycle Net & Target Progress Arc */}
+                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex items-center gap-3">
+                            <svg viewBox="0 0 44 44" className="w-12 h-12 shrink-0 -rotate-90">
+                                <circle cx="22" cy="22" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
+                                <circle
+                                    cx="22"
+                                    cy="22"
+                                    r="18"
+                                    fill="none"
+                                    stroke={liveCyclePnl >= 0 ? '#22c55e' : '#f43f5e'}
+                                    strokeWidth="4"
+                                    strokeDasharray={`${(tpProgress / 100) * 113.1} 113.1`}
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                            <div className="min-w-0">
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    CYCLE NET
                                     {isOnline && (eaState?.open_pos || 0) > 0 && (
                                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                     )}
-                                </CardDescription>
-                                <CardTitle
-                                    className={`text-xl font-mono tabular-nums ${
-                                        ((eaState?.cycle_pnl || 0) + pnlJitter) >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                                </div>
+                                <div
+                                    className={`text-sm font-bold truncate tabular-nums ${
+                                        liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
                                     }`}
                                 >
-                                    {eaState
-                                        ? `${(eaState.cycle_pnl + pnlJitter) >= 0 ? '+' : ''}${(eaState.cycle_pnl + pnlJitter).toFixed(2)} ${cur}`
-                                        : '---'}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-xs text-muted-foreground font-mono">
-                                เป้าปิดรวบ: {eaState?.active_config?.target_profit ?? targetProfit} {cur}
-                            </CardContent>
-                        </Card>
+                                    {eaState ? `${liveCyclePnl >= 0 ? '+' : ''}${liveCyclePnl.toFixed(2)}` : '---'}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate tabular-nums">
+                                    TP {activeTp} {cur}
+                                </div>
+                            </div>
+                        </div>
 
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>คู่เงิน & จุดอ้างอิง (Anchor)</CardDescription>
-                                <CardTitle className="text-xl font-mono">
-                                    {eaState?.symbol || 'XAUUSD'}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-xs text-muted-foreground font-mono">
-                                Anchor: {eaState?.anchor ? eaState.anchor.toFixed(2) : 'รอเปิดรอบ'}
-                            </CardContent>
-                        </Card>
+                        {/* Gauge 3: Dual-Side Cap Radar */}
+                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex flex-col justify-between">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <span>RADAR B // S</span>
+                                <span className="text-cyan-400">CAP {activeCap}</span>
+                            </div>
+                            <div className="space-y-1.5 my-1">
+                                <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="w-4 text-cyan-400 font-bold">B</span>
+                                    <div className="flex-1 h-1.5 rounded-full bg-slate-900 overflow-hidden">
+                                        <div
+                                            className="h-full bg-cyan-400 transition-all"
+                                            style={{ width: `${Math.min(100, ((eaState?.open_buy || 0) / Math.max(1, activeCap)) * 100)}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-slate-200 tabular-nums">{eaState?.open_buy ?? 0}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="w-4 text-orange-400 font-bold">S</span>
+                                    <div className="flex-1 h-1.5 rounded-full bg-slate-900 overflow-hidden">
+                                        <div
+                                            className="h-full bg-orange-400 transition-all"
+                                            style={{ width: `${Math.min(100, ((eaState?.open_sell || 0) / Math.max(1, activeCap)) * 100)}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-slate-200 tabular-nums">{eaState?.open_sell ?? 0}</span>
+                                </div>
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                                PEND B:{eaState?.pending_buy ?? 0} S:{eaState?.pending_sell ?? 0}
+                            </div>
+                        </div>
 
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>จำนวนไม้ (Open / Pending)</CardDescription>
-                                <CardTitle className="text-xl font-mono">
-                                    {eaState ? `${eaState.open_pos} ไม้เปิด` : '---'}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-xs text-muted-foreground font-mono">
-                                {eaState
-                                    ? `Open B:${eaState.open_buy} S:${eaState.open_sell} | Pend B:${eaState.pending_buy} S:${eaState.pending_sell}`
-                                    : '---'}
-                            </CardContent>
-                        </Card>
+                        {/* Gauge 4: Anchor & Telemetry Sync */}
+                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex flex-col justify-between">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <span>{eaState?.symbol || 'XAUUSD'}</span>
+                                <span className="text-emerald-400">v{eaState?.ea_version || '1.10'}</span>
+                            </div>
+                            <div className="text-sm font-bold text-amber-400 truncate tabular-nums">
+                                {eaState?.anchor ? eaState.anchor.toFixed(2) : 'WAIT'}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                                ANCHOR // SYNC {(eaState as any)?.sync_interval_sec || 15}s
+                            </div>
+                        </div>
                     </div>
 
                     {/* Live M1 Candlestick Chart with TP & Freeze Overlays */}
@@ -545,20 +594,17 @@ function SmartEACockpitContent() {
                     />
 
                     {/* Control & Settings Split */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                         {/* Left: 2-Way Execution Controls */}
-                        <Card className="lg:col-span-5">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-lg">
-                                    <Activity className="w-5 h-5 text-primary" /> คำสั่งควบคุมการทำงาน
+                        <Card className="lg:col-span-5 border-cyan-500/25 bg-[#070b16]/95 text-slate-100">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
+                                    <Activity className="w-4 h-4 text-cyan-400" /> FLIGHT CONTROL // MODE
                                 </CardTitle>
-                                <CardDescription>
-                                    สั่งเริ่มหรือหยุดการทำงานของ EA ได้ทันทีจากหน้าจอนี้
-                                </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3">
+                            <CardContent className="space-y-2.5 font-mono">
                                 <Button
-                                    className="w-full justify-start gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="w-full justify-between bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs"
                                     disabled={sending}
                                     onClick={() =>
                                         sendCommand(
@@ -567,8 +613,10 @@ function SmartEACockpitContent() {
                                         )
                                     }
                                 >
-                                    <PlayCircle className="w-4 h-4" />
-                                    เริ่มเทรด / ทำงานต่อ (Start / Resume)
+                                    <span className="flex items-center gap-2">
+                                        <PlayCircle className="w-4 h-4" /> ENGAGE // RUN
+                                    </span>
+                                    <span className="text-[10px] opacity-80">START</span>
                                 </Button>
 
                                 <Button
@@ -649,34 +697,31 @@ function SmartEACockpitContent() {
                         </Card>
 
                         {/* Right: Live Settings Editor */}
-                        <Card className="lg:col-span-7">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-lg">
-                                    <Sliders className="w-5 h-5 text-primary" /> ตั้งค่าระบบเทรด (อัปเดตทันที)
+                        <Card className="lg:col-span-7 border-cyan-500/25 bg-[#070b16]/95 text-slate-100">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
+                                    <Sliders className="w-4 h-4 text-cyan-400" /> GRID MATRIX // PARAMS
                                 </CardTitle>
-                                <CardDescription>
-                                    เมื่อกดบันทึก EA จะลบ Pending เดิมที่ยังไม่เกี่ยวทั้งหมด แล้ววางชุดใหม่ตามค่าที่ตั้งทันที
-                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <form onSubmit={handleUpdateSettings} className="space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label>ระยะไม้แรก (First Distance Points)</Label>
+                                    <div className="grid grid-cols-2 gap-3 font-mono">
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400">FIRST DIST (PT)</Label>
                                             <Input
                                                 type="number"
                                                 value={firstDistance}
                                                 onChange={(e) => setFirstDistance(e.target.value)}
-                                                className="font-mono"
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-100 h-9"
                                             />
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <Label>ระยะห่างระหว่างไม้ (Grid Spacing Points)</Label>
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400">SPACING (PT)</Label>
                                             <Input
                                                 type="number"
                                                 value={spacing}
                                                 onChange={(e) => setSpacing(e.target.value)}
-                                                className="font-mono"
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-100 h-9"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
@@ -787,13 +832,13 @@ function SmartEACockpitContent() {
                                         </div>
                                     )}
 
-                                    <Button type="submit" className="w-full gap-2" disabled={sending}>
+                                    <Button type="submit" className="w-full gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs" disabled={sending}>
                                         {sending ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                         ) : (
                                             <Send className="w-4 h-4" />
                                         )}
-                                        อัปเดตและส่งค่าเข้า EA ทันที (Update & Sync)
+                                        UPLOAD & SYNC PARAMS
                                     </Button>
                                 </form>
                             </CardContent>
@@ -801,6 +846,7 @@ function SmartEACockpitContent() {
                     </div>
                 </>
             )}
+        </div>
         </div>
     );
 }

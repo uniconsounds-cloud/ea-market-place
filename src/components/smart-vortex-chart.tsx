@@ -224,12 +224,12 @@ export function SmartVortexChart({
     };
 
     return (
-        <Card className="border bg-slate-950/90 text-slate-100">
+        <Card className="border border-cyan-500/25 bg-[#060a14]/95 text-slate-100 shadow-[0_0_28px_rgba(6,182,212,0.08)]">
             <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
+                    <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
                         <CandlestickChart className="w-4 h-4 text-cyan-400" />
-                        {symbol} M1 (ช่วงเวลาเทรดสด)
+                        SCANNER // {symbol} M1
                     </CardTitle>
                     {chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN' ? (
                         <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-mono text-[11px]">
@@ -247,7 +247,7 @@ export function SmartVortexChart({
                     )}
                 </div>
 
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-3 text-[11px] font-mono">
                     <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
                         <input
                             type="checkbox"
@@ -255,7 +255,7 @@ export function SmartVortexChart({
                             onChange={(e) => setShowOrders(e.target.checked)}
                             className="accent-cyan-400"
                         />
-                        ออเดอร์เปิดอยู่
+                        POS
                     </label>
                     <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
                         <input
@@ -264,7 +264,7 @@ export function SmartVortexChart({
                             onChange={(e) => setShowPending(e.target.checked)}
                             className="accent-cyan-400"
                         />
-                        Pending Grid
+                        GRID
                     </label>
                 </div>
             </CardHeader>
