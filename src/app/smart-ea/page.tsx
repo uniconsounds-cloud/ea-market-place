@@ -1,12 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { supabase } from '@/lib/supabaseClient';
@@ -22,6 +31,7 @@ import {
     Send,
     ShieldAlert,
     Sliders,
+    Target,
     Wifi,
     WifiOff,
     XCircle,
@@ -67,6 +77,132 @@ interface EAState {
     active_config: ActiveConfig;
     chart?: SmartChartData | null;
     last_ping: string;
+}
+
+function TpScrollWheelPicker({
+    value,
+    onChange,
+    currency,
+}: {
+    value: number;
+    onChange: (val: number) => void;
+    currency: string;
+}) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const isUserScrollingRef = useRef<boolean>(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const itemHeight = 36; // px
+
+    const baseValues = useMemo(() => {
+        const list = [
+            20, 10, 5, 0,
+            -5, -10, -15, -20, -25, -30, -35, -40, -45, -50,
+            -60, -70, -80, -90, -100, -110, -120, -130, -140, -150,
+            -160, -170, -180, -190, -200, -225, -250, -275, -300,
+            -350, -400, -450, -500, -600, -700, -800, -900, -1000
+        ];
+        if (!list.includes(value)) {
+            list.push(value);
+            list.sort((a, b) => b - a); // descending order: 20 down to -1000
+        }
+        return list;
+    }, [value]);
+
+    useEffect(() => {
+        if (isUserScrollingRef.current) return;
+        const idx = baseValues.indexOf(value);
+        if (idx !== -1 && containerRef.current) {
+            containerRef.current.scrollTo({
+                top: idx * itemHeight,
+                behavior: 'smooth',
+            });
+        }
+    }, [value, baseValues]);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        isUserScrollingRef.current = true;
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+        const target = e.currentTarget;
+        scrollTimeoutRef.current = setTimeout(() => {
+            const top = target.scrollTop;
+            const idx = Math.min(
+                baseValues.length - 1,
+                Math.max(0, Math.round(top / itemHeight))
+            );
+            if (baseValues[idx] !== undefined && baseValues[idx] !== value) {
+                onChange(baseValues[idx]);
+            }
+            isUserScrollingRef.current = false;
+        }, 100);
+    };
+
+    const adjustStep = (delta: number) => {
+        isUserScrollingRef.current = false;
+        onChange(value + delta);
+    };
+
+    return (
+        <div className="flex flex-col items-center w-full">
+            {/* Scroll Wheel Drum */}
+            <div className="relative w-full h-[144px] overflow-hidden select-none bg-slate-950/80 rounded-xl border border-cyan-500/25">
+                {/* 3D Wheel Mask Vignette */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-[#0b0f19] via-[#0b0f19]/80 to-transparent z-10" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/80 to-transparent z-10" />
+
+                {/* Center target cursor bar */}
+                <div className="pointer-events-none absolute top-[54px] inset-x-2 h-[36px] border-y border-cyan-400/50 bg-cyan-500/10 rounded-md z-0 flex items-center justify-between px-3">
+                    <span className="text-[10px] text-cyan-400 font-mono">▶</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">◀</span>
+                </div>
+
+                {/* Scroll container */}
+                <div
+                    ref={containerRef}
+                    onScroll={handleScroll}
+                    className="h-full overflow-y-auto snap-y snap-mandatory py-[54px] text-center"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                    {baseValues.map((v) => {
+                        const isSelected = v === value;
+                        return (
+                            <div
+                                key={v}
+                                onClick={() => {
+                                    isUserScrollingRef.current = false;
+                                    onChange(v);
+                                }}
+                                className={cn(
+                                    "h-[36px] flex items-center justify-center font-mono cursor-pointer snap-center transition-all",
+                                    isSelected
+                                        ? "text-base font-bold text-cyan-300 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]"
+                                        : "text-xs text-slate-500 hover:text-slate-300 opacity-60"
+                                )}
+                            >
+                                <span>{v > 0 ? `+${v}` : v} {currency}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Micro Stepper buttons */}
+            <div className="grid grid-cols-6 gap-1 w-full mt-2.5">
+                {[-50, -10, -1, 1, 10, 50].map((step) => (
+                    <Button
+                        key={step}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-1 text-[11px] font-mono border-slate-700/80 bg-slate-900/60 hover:bg-cyan-950/40 hover:border-cyan-500/50 text-slate-200"
+                        onClick={() => adjustStep(step)}
+                    >
+                        {step > 0 ? `+${step}` : step}
+                    </Button>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 function SmartEACockpitContent() {
@@ -352,6 +488,30 @@ function SmartEACockpitContent() {
     const balanceVal = eaState?.balance || 0;
     const safeBalance = Math.max(1, balanceVal);
     const pnlPct = balanceVal > 0 ? (liveCyclePnl / balanceVal) * 100 : 0;
+
+    // Custom Target Profit Modal State & Calculations
+    const [customTpModalOpen, setCustomTpModalOpen] = useState(false);
+    const [customTpVal, setCustomTpVal] = useState<number>(-100);
+
+    const minusOnePct = balanceVal > 0 ? -Math.max(1, Math.round(balanceVal * 0.01)) : -100;
+    const minusTwoPct = balanceVal > 0 ? -Math.max(2, Math.round(balanceVal * 0.02)) : -200;
+    const currentDd = Math.round(liveCyclePnl < 0 ? liveCyclePnl : (eaState?.cycle_pnl || 0));
+
+    const openCustomTpModal = useCallback(() => {
+        const bal = eaState?.balance || 0;
+        const defaultMinusOne = bal > 0 ? -Math.max(1, Math.round(bal * 0.01)) : -100;
+        setCustomTpVal(defaultMinusOne);
+        setCustomTpModalOpen(true);
+    }, [eaState?.balance]);
+
+    const handleConfirmCustomTp = () => {
+        setTargetProfit(String(customTpVal));
+        sendCommand(
+            { target_profit: customTpVal, close_all: false },
+            `ตั้งเป้า Target Profit = ${customTpVal} ${cur} แล้ว EA จะรวบปิดอัตโนมัติเมื่อถึงเป้า`
+        );
+        setCustomTpModalOpen(false);
+    };
 
     // 1-Day Trading Timeline (05:00 AM Bangkok -> 05:00 AM next day): shrinks from left to right
     const bkkStr = clockNow.toLocaleTimeString('en-GB', {
@@ -645,8 +805,7 @@ function SmartEACockpitContent() {
                                 <span className="text-[11px] text-muted-foreground mr-1">ตั้งเป้าปิดรวบด่วน:</span>
                                 {[
                                     { label: 'TP = 0 (เท่าทุน)', val: 0 },
-                                    { label: `TP = -20 ${cur}`, val: -20 },
-                                    { label: `TP = -50 ${cur}`, val: -50 },
+                                    { label: `TP = -100 ${cur}`, val: -100 },
                                 ].map((preset) => (
                                     <Button
                                         key={preset.val}
@@ -665,9 +824,136 @@ function SmartEACockpitContent() {
                                         {preset.label}
                                     </Button>
                                 ))}
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={sending}
+                                    className="h-6 text-[11px] px-2 border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/20 flex items-center gap-1"
+                                    onClick={openCustomTpModal}
+                                >
+                                    <Sliders className="w-3 h-3 text-cyan-400" />
+                                    กำหนดเอง...
+                                </Button>
                             </div>
                         </div>
                     )}
+
+                    {/* Custom Target Profit Dialog with Interactive Scroll Wheel */}
+                    <Dialog open={customTpModalOpen} onOpenChange={setCustomTpModalOpen}>
+                        <DialogContent className="bg-[#0b0f19] border border-cyan-500/30 text-slate-100 max-w-sm sm:max-w-md p-5 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.15)]">
+                            <DialogHeader className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <Target className="w-5 h-5 text-cyan-400" />
+                                    <DialogTitle className="text-base sm:text-lg font-bold font-mono text-cyan-300">
+                                        ตั้งเป้า TP ปิดรวบเอง (Custom TP)
+                                    </DialogTitle>
+                                </div>
+                                <DialogDescription className="text-xs text-slate-400">
+                                    เลือกเป้าหมายกำไร/ตัดขาดทุนด่วน หรือหมุนวงล้อปรับตัวเลขได้ทันทีโดยไม่ต้องพิมพ์
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            {/* Prominent Display Box for selected value */}
+                            <div className="flex flex-col items-center justify-center p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 shadow-inner">
+                                <span className="text-[10px] font-mono text-cyan-400/90 uppercase tracking-widest mb-0.5">
+                                    Target Profit ที่เลือก
+                                </span>
+                                <div className="flex items-baseline gap-2 font-mono">
+                                    <span
+                                        className={cn(
+                                            "text-3xl sm:text-4xl font-extrabold tracking-tight",
+                                            customTpVal >= 0 ? "text-emerald-400" : "text-rose-400"
+                                        )}
+                                    >
+                                        {customTpVal > 0 ? `+${customTpVal}` : customTpVal}
+                                    </span>
+                                    <span className="text-slate-400 text-sm font-semibold">{cur}</span>
+                                </div>
+                                {balanceVal > 0 ? (
+                                    <span className="text-[10px] text-slate-400 mt-1 font-mono">
+                                        ≈ {((customTpVal / balanceVal) * 100).toFixed(1)}% ของ Balance ({balanceVal.toLocaleString()} {cur})
+                                    </span>
+                                ) : null}
+                            </div>
+
+                            {/* Quick Preset Chips */}
+                            <div className="space-y-1.5">
+                                <span className="text-[11px] font-mono text-slate-400">เลือกค่าด่วน (ไม่ต้องพิมพ์):</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        {
+                                            label: `-1% (${minusOnePct} ${cur})`,
+                                            val: minusOnePct,
+                                        },
+                                        {
+                                            label: `-2% (${minusTwoPct} ${cur})`,
+                                            val: minusTwoPct,
+                                        },
+                                        {
+                                            label: `DD ปัจจุบัน (${currentDd} ${cur})`,
+                                            val: currentDd,
+                                        },
+                                        {
+                                            label: `เท่าทุน (0 ${cur})`,
+                                            val: 0,
+                                        },
+                                    ].map((chip) => (
+                                        <Button
+                                            key={chip.label}
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className={cn(
+                                                "h-7 text-[11px] font-mono px-2.5 rounded-lg transition-all",
+                                                customTpVal === chip.val
+                                                    ? "border-cyan-400 bg-cyan-500/20 text-cyan-200 font-bold shadow-[0_0_8px_rgba(6,182,212,0.4)]"
+                                                    : "border-slate-700 bg-slate-900/50 hover:bg-slate-800 text-slate-300"
+                                            )}
+                                            onClick={() => setCustomTpVal(chip.val)}
+                                        >
+                                            {chip.label}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Scroll Wheel Picker Section */}
+                            <div className="space-y-1.5">
+                                <span className="text-[11px] font-mono text-slate-400">หมุนวงล้อขึ้น-ลง เพื่อปรับตัวเลข:</span>
+                                <TpScrollWheelPicker
+                                    value={customTpVal}
+                                    onChange={(val) => setCustomTpVal(val)}
+                                    currency={cur}
+                                />
+                            </div>
+
+                            <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-2 border-t border-slate-800/80">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                                    onClick={() => setCustomTpModalOpen(false)}
+                                >
+                                    ยกเลิก / ปิด
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={sending}
+                                    className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                    onClick={handleConfirmCustomTp}
+                                >
+                                    {sending ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                    ) : (
+                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                    )}
+                                    ตกลง (OK) ตั้งค่า
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     {/* Waiting for Fresh Data Banner */}
                     {isWaitingFreshData && (
