@@ -324,9 +324,11 @@ function SmartEACockpitContent() {
         ? String(lastCommand.stop_mode)
         : (eaState?.active_config?.stop_mode || eaState?.trade_status || 'RUN');
 
-    const isRunning = effectiveStopMode === 'RUN' && (eaState?.trade_status === 'RUNNING' || !eaState?.trade_status);
     const isPauseNextActive = effectiveStopMode === 'PAUSE_NEXT' || eaState?.trade_status === 'PAUSED_NEXT';
     const isFreezeStopActive = effectiveStopMode === 'FREEZE_STOP' || eaState?.trade_status === 'FREEZE_STOP';
+    const isStoppedActive = effectiveStopMode === 'STOPPED' || eaState?.trade_status === 'STOPPED';
+    // EA is running unless explicitly paused or stopped (FROZEN_BUY/SELL is active cap protection while EA is running)
+    const isRunning = !isPauseNextActive && !isFreezeStopActive && !isStoppedActive;
 
     const cur = eaState?.currency || 'USD';
     const liveCyclePnl = (eaState?.cycle_pnl || 0) + pnlJitter;

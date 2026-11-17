@@ -446,9 +446,6 @@ export function SmartVortexChart({
         ...(chart.freeze_price > 0 && frozenSide && frozenSide !== 'NONE'
             ? [{ label: `FRZ ${frozenSide}`, price: chart.freeze_price, colorClass: 'border-rose-500/40 bg-rose-500/15 text-rose-300' }]
             : []),
-        ...((chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN') && chart.est_tp_price > 0
-            ? [{ label: `TP (${targetProfit})`, price: chart.est_tp_price, colorClass: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' }]
-            : []),
         ...(tpLevels.priceTp0 > 0 ? [{ label: 'TP 0', price: tpLevels.priceTp0, colorClass: 'border-sky-500/40 bg-sky-500/15 text-sky-300' }] : []),
         ...(tpLevels.priceNeg3 > 0 ? [{ label: '-3%', price: tpLevels.priceNeg3, colorClass: 'border-amber-500/40 bg-amber-500/15 text-amber-300' }] : []),
         ...(tpLevels.priceNeg6 > 0 ? [{ label: '-6%', price: tpLevels.priceNeg6, colorClass: 'border-rose-500/40 bg-rose-500/15 text-rose-300' }] : []),
