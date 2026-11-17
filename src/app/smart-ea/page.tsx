@@ -667,6 +667,8 @@ function SmartEACockpitContent() {
                         pendSell={eaState?.pending_sell ?? 0}
                         cap={activeCap}
                         liveCyclePnl={liveCyclePnl}
+                        balance={balanceVal}
+                        cyclePnl={eaState?.cycle_pnl || 0}
                         chart={eaState?.chart}
                     />
 

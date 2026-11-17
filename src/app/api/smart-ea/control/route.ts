@@ -21,10 +21,11 @@ export async function GET(req: Request) {
 
         const nowIso = new Date().toISOString();
 
-        const [{ data: stateRow }, { data: cmdRow }, { data: productRow }] = await Promise.all([
+        const [{ data: stateRow }, { data: cmdRow }, { data: productRow }, { data: mainPortRow }] = await Promise.all([
             supabase.from('farm_port_status').select('system_code, last_ping').eq('port_number', `sv_state_${port}`).maybeSingle(),
             supabase.from('farm_port_status').select('system_code').eq('port_number', `sv_cmd_${port}`).maybeSingle(),
             supabase.from('products').select('version, file_url').eq('product_key', 'SMART-VORTEX-01').maybeSingle(),
+            supabase.from('farm_port_status').select('account_type').eq('port_number', port).maybeSingle(),
         ]);
 
         // Record active viewer heartbeat so EA switches from 180s Standby to 15s Live mode
@@ -41,6 +42,11 @@ export async function GET(req: Request) {
 
         if (stateRow?.system_code) {
             try { state = JSON.parse(stateRow.system_code); } catch { state = null; }
+        }
+        if (state && mainPortRow?.account_type && (mainPortRow.account_type === 'USC' || mainPortRow.account_type === 'USD')) {
+            if (!state.currency || mainPortRow.account_type === 'USC') {
+                state.currency = mainPortRow.account_type;
+            }
         }
         if (cmdRow?.system_code) {
             try { command = JSON.parse(cmdRow.system_code); } catch { command = null; }

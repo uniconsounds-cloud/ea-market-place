@@ -40,6 +40,8 @@ interface SmartVortexChartProps {
     pendSell?: number;
     cap?: number;
     liveCyclePnl?: number;
+    balance?: number;
+    cyclePnl?: number;
     chart: SmartChartData | null | undefined;
 }
 
@@ -56,6 +58,8 @@ export function SmartVortexChart({
     pendSell = 0,
     cap = 7,
     liveCyclePnl = 0,
+    balance = 0,
+    cyclePnl = 0,
     chart,
 }: SmartVortexChartProps) {
     const [showOrders, setShowOrders] = useState(true);
@@ -109,6 +113,26 @@ export function SmartVortexChart({
         return copy;
     }, [chart?.candles, tickOffset]);
 
+    const tpLevels = useMemo(() => {
+        if (!chart || (chart.tp_dir !== 'UP' && chart.tp_dir !== 'DOWN') || !chart.est_tp_price) {
+            return { priceTp0: 0, priceNeg3: 0, priceNeg6: 0 };
+        }
+        const refPrice = chart.tp_dir === 'UP' ? chart.bid : (chart.ask || chart.bid);
+        const deltaP = chart.est_tp_price - refPrice;
+        const deltaUsd = targetProfit - cyclePnl;
+        if (!refPrice || Math.abs(deltaP) < 1e-7 || Math.abs(deltaUsd) < 1e-4) {
+            return { priceTp0: 0, priceNeg3: 0, priceNeg6: 0 };
+        }
+        const perUnit = deltaUsd / deltaP;
+        if (!isFinite(perUnit) || Math.abs(perUnit) < 1e-9) {
+            return { priceTp0: 0, priceNeg3: 0, priceNeg6: 0 };
+        }
+        const priceTp0 = refPrice + (0 - cyclePnl) / perUnit;
+        const priceNeg3 = balance > 0 ? refPrice + (-0.03 * balance - cyclePnl) / perUnit : 0;
+        const priceNeg6 = balance > 0 ? refPrice + (-0.06 * balance - cyclePnl) / perUnit : 0;
+        return { priceTp0, priceNeg3, priceNeg6 };
+    }, [chart, targetProfit, cyclePnl, balance]);
+
     const layout = useMemo(() => {
         if (candles.length === 0) return null;
 
@@ -133,6 +157,9 @@ export function SmartVortexChart({
         if (liveBid > 0) includePrice(liveBid);
         if (anchor > 0) includePrice(anchor);
         if (chart?.est_tp_price && chart.est_tp_price > 0) includePrice(chart.est_tp_price);
+        if (tpLevels.priceTp0 > 0) includePrice(tpLevels.priceTp0);
+        if (tpLevels.priceNeg3 > 0) includePrice(tpLevels.priceNeg3);
+        if (tpLevels.priceNeg6 > 0) includePrice(tpLevels.priceNeg6);
         if (chart?.freeze_price && chart.freeze_price > 0) includePrice(chart.freeze_price);
         if (showOrders && chart?.orders) {
             for (const o of chart.orders) {
@@ -305,50 +332,27 @@ export function SmartVortexChart({
                             );
                         })}
 
-                {/* Open Positions: thin/faint lines when POS checked, or small entry dots when POS hidden */}
-                {showOrders
-                    ? chart.orders
-                          ?.filter((o) => o.t === 'B' || o.t === 'S')
-                          .map((o, idx) => {
-                              if (o.p < layout.minP || o.p > layout.maxP) return null;
-                              const y = priceToY(o.p);
-                              return (
-                                  <line
-                                      key={`pos-${idx}`}
-                                      x1={PAD_L}
-                                      x2={W - PAD_R}
-                                      y1={y}
-                                      y2={y}
-                                      stroke={o.t === 'B' ? '#22d3ee' : '#f97316'}
-                                      strokeWidth={0.55}
-                                      strokeDasharray="2 2"
-                                      opacity={0.32}
-                                  />
-                              );
-                          })
-                    : chart.orders
-                          ?.filter((o) => o.t === 'B' || o.t === 'S')
-                          .map((o, idx) => {
-                              if (o.p < layout.minP || o.p > layout.maxP) return null;
-                              const y = priceToY(o.p);
-                              let barIdx = candles.findIndex((c) => o.tm >= c[0] && o.tm < c[0] + 60);
-                              if (barIdx < 0) {
-                                  barIdx = o.tm < candles[0][0] ? 0 : candles.length - 1;
-                              }
-                              const cx = PAD_L + (barIdx + 0.5) * barStep;
-                              return (
-                                  <circle
-                                      key={`pos-dot-${idx}`}
-                                      cx={cx}
-                                      cy={y}
-                                      r={isMobileSquare ? 3 : 3.5}
-                                      fill={o.t === 'B' ? '#22d3ee' : '#fb923c'}
-                                      stroke="#050811"
-                                      strokeWidth={1}
-                                      opacity={0.92}
-                                  />
-                              );
-                          })}
+                {/* Open Positions: thin/faint lines when POS checked */}
+                {showOrders &&
+                    chart.orders
+                        ?.filter((o) => o.t === 'B' || o.t === 'S')
+                        .map((o, idx) => {
+                            if (o.p < layout.minP || o.p > layout.maxP) return null;
+                            const y = priceToY(o.p);
+                            return (
+                                <line
+                                    key={`pos-${idx}`}
+                                    x1={PAD_L}
+                                    x2={W - PAD_R}
+                                    y1={y}
+                                    y2={y}
+                                    stroke={o.t === 'B' ? '#22d3ee' : '#f97316'}
+                                    strokeWidth={0.55}
+                                    strokeDasharray="2 2"
+                                    opacity={0.32}
+                                />
+                            );
+                        })}
 
                 {/* M1 Candlesticks */}
                 {candles.map(([tm, o, h, l, c], idx) => {
@@ -388,12 +392,44 @@ export function SmartVortexChart({
                     );
                 })}
 
+                {/* Entry Dots rendered AFTER Candlesticks so they always sit ON TOP of candles */}
+                {!showOrders &&
+                    chart.orders
+                        ?.filter((o) => o.t === 'B' || o.t === 'S')
+                        .map((o, idx) => {
+                            if (o.p < layout.minP || o.p > layout.maxP) return null;
+                            const y = priceToY(o.p);
+                            let barIdx = candles.findIndex((c) => o.tm >= c[0] && o.tm < c[0] + 60);
+                            if (barIdx < 0) {
+                                barIdx = o.tm < candles[0][0] ? 0 : candles.length - 1;
+                            }
+                            const cx = PAD_L + (barIdx + 0.5) * barStep;
+                            return (
+                                <circle
+                                    key={`pos-dot-${idx}`}
+                                    cx={cx}
+                                    cy={y}
+                                    r={isMobileSquare ? 3.2 : 3.8}
+                                    fill={o.t === 'B' ? '#22d3ee' : '#fb923c'}
+                                    stroke="#050811"
+                                    strokeWidth={1.2}
+                                    opacity={0.96}
+                                />
+                            );
+                        })}
+
                 {/* Key Reference Overlays */}
                 {anchor > 0 && renderPriceLine(anchor, '#f59e0b', 'ANCHOR', true, 1.2)}
                 {chart.freeze_price > 0 && frozenSide && frozenSide !== 'NONE' &&
                     renderPriceLine(chart.freeze_price, '#f43f5e', `FREEZE ${frozenSide}`, false, 1.6)}
+                {tpLevels.priceNeg6 > 0 &&
+                    renderPriceLine(tpLevels.priceNeg6, '#fb7185', 'TP -6%', true, 1.1)}
+                {tpLevels.priceNeg3 > 0 &&
+                    renderPriceLine(tpLevels.priceNeg3, '#f59e0b', 'TP -3%', true, 1.1)}
+                {tpLevels.priceTp0 > 0 &&
+                    renderPriceLine(tpLevels.priceTp0, '#38bdf8', 'TP 0 (BE)', true, 1.2)}
                 {(chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN') && chart.est_tp_price > 0 &&
-                    renderPriceLine(chart.est_tp_price, '#22c55e', `TP ($${targetProfit})`, false, 1.8)}
+                    renderPriceLine(chart.est_tp_price, '#22c55e', `TP (${targetProfit})`, false, 1.8)}
                 {renderPriceLine(liveBid, '#e2e8f0', 'BID', true, 1.0)}
 
                 {/* X-Axis Time Labels */}
