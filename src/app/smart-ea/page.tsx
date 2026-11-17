@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Navbar } from '@/components/navbar';
-import { Footer } from '@/components/footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +14,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import {
     Activity,
+    ArrowLeft,
     CheckCircle2,
     Loader2,
     PauseCircle,
@@ -106,6 +105,12 @@ function SmartEACockpitContent() {
         const t = setInterval(() => setClockNow(new Date()), 1000);
         return () => clearInterval(t);
     }, []);
+
+    useEffect(() => {
+        if (typeof document !== 'undefined') {
+            document.title = activePort ? `Smart EA #${activePort}` : 'Smart EA Cockpit';
+        }
+    }, [activePort]);
 
     useEffect(() => {
         if (initialPortParam) {
@@ -356,7 +361,24 @@ function SmartEACockpitContent() {
 
     return (
         <div className="min-h-screen bg-[#040711] text-slate-100">
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-5 max-w-5xl space-y-4">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-5xl space-y-3 sm:space-y-4">
+            {/* Minimal Top Cockpit Header: Back to Dashboard & Status Tag */}
+            <div className="flex items-center justify-between pb-1 pt-1">
+                <a
+                    href="/dashboard"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 text-cyan-300 hover:text-cyan-100 text-xs font-mono transition-all duration-200 active:scale-95 shadow-sm"
+                >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>กลับแดชบอร์ด</span>
+                </a>
+
+                <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono font-semibold tracking-wider text-cyan-400/90 bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        SMART EA COCKPIT
+                    </span>
+                </div>
+            </div>
             {!activePort ? (
                 <Card className="border-cyan-500/30 bg-[#070b16]/95 text-slate-100">
                     <CardContent className="py-12 text-center space-y-4">
@@ -961,14 +983,14 @@ function SmartEACockpitContent() {
 
 export default function SmartEACockpitPage() {
     return (
-        <main className="min-h-screen flex flex-col bg-background">
-            <Navbar />
-            <div className="flex-1">
-                <Suspense fallback={<div className="p-12 text-center">Loading Smart EA Cockpit...</div>}>
-                    <SmartEACockpitContent />
-                </Suspense>
-            </div>
-            <Footer />
+        <main className="min-h-screen bg-[#040711] text-slate-100">
+            <Suspense fallback={
+                <div className="min-h-screen flex items-center justify-center p-12 text-center text-cyan-400 font-mono text-sm">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2 inline" /> Loading Smart EA Cockpit...
+                </div>
+            }>
+                <SmartEACockpitContent />
+            </Suspense>
         </main>
     );
 }
