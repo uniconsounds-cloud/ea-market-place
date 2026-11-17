@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         const [{ data: existingStateRow }, { data: cmdRow }] = await Promise.all([
             supabase
                 .from('farm_port_status')
-                .select('last_viewed_at')
+                .select('last_viewed_at, system_code')
                 .eq('port_number', `sv_state_${port}`)
                 .maybeSingle(),
             supabase
@@ -33,6 +33,18 @@ export async function POST(req: Request) {
                 .eq('port_number', `sv_cmd_${port}`)
                 .maybeSingle(),
         ]);
+
+        let existingRoundHistory: unknown = null;
+        if (body.round_history == null && existingStateRow?.system_code) {
+            try {
+                const prev = JSON.parse(existingStateRow.system_code);
+                if (Array.isArray(prev?.round_history)) {
+                    existingRoundHistory = prev.round_history;
+                }
+            } catch {
+                // ignore malformed JSON
+            }
+        }
 
         const lastViewedMs = existingStateRow?.last_viewed_at
             ? new Date(existingStateRow.last_viewed_at).getTime()
@@ -70,6 +82,7 @@ export async function POST(req: Request) {
             last_ack_seq: Number(body.last_ack_seq || 0),
             active_config: body.active_config || {},
             chart: body.chart || null,
+            round_history: body.round_history ?? existingRoundHistory ?? null,
             last_ping: nowIso,
         };
 

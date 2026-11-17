@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
+import RoundHistoryBar, { RoundHistoryTuple } from '@/components/round-history-bar';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -77,6 +78,7 @@ interface EAState {
     last_ack_seq: number;
     active_config: ActiveConfig;
     chart?: SmartChartData | null;
+    round_history?: RoundHistoryTuple[] | null;
     last_ping: string;
 }
 
@@ -1104,6 +1106,10 @@ function SmartEACockpitContent() {
 
                     {/* Live M1 Candlestick Chart with TP & Freeze Overlays */}
                     <div className={`space-y-1.5 sm:space-y-2 transition-all duration-500 ${isWaitingFreshData ? 'opacity-55 grayscale animate-pulse' : ''}`}>
+                    <RoundHistoryBar
+                        rounds={eaState?.round_history}
+                        currency={cur}
+                    />
                     <SmartVortexChart
                         symbol={eaState?.symbol || 'XAUUSD'}
                         currency={cur}
