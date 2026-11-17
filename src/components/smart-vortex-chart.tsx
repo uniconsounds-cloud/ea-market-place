@@ -293,26 +293,50 @@ export function SmartVortexChart({
                             );
                         })}
 
-                {/* Open Positions */}
-                {showOrders &&
-                    chart.orders
-                        ?.filter((o) => o.t === 'B' || o.t === 'S')
-                        .map((o, idx) => {
-                            if (o.p < layout.minP || o.p > layout.maxP) return null;
-                            const y = priceToY(o.p);
-                            return (
-                                <line
-                                    key={`pos-${idx}`}
-                                    x1={PAD_L}
-                                    x2={W - PAD_R}
-                                    y1={y}
-                                    y2={y}
-                                    stroke={o.t === 'B' ? '#22d3ee' : '#f97316'}
-                                    strokeWidth={0.9}
-                                    opacity={0.75}
-                                />
-                            );
-                        })}
+                {/* Open Positions: thin/faint lines when POS checked, or small entry dots when POS hidden */}
+                {showOrders
+                    ? chart.orders
+                          ?.filter((o) => o.t === 'B' || o.t === 'S')
+                          .map((o, idx) => {
+                              if (o.p < layout.minP || o.p > layout.maxP) return null;
+                              const y = priceToY(o.p);
+                              return (
+                                  <line
+                                      key={`pos-${idx}`}
+                                      x1={PAD_L}
+                                      x2={W - PAD_R}
+                                      y1={y}
+                                      y2={y}
+                                      stroke={o.t === 'B' ? '#22d3ee' : '#f97316'}
+                                      strokeWidth={0.55}
+                                      strokeDasharray="2 2"
+                                      opacity={0.32}
+                                  />
+                              );
+                          })
+                    : chart.orders
+                          ?.filter((o) => o.t === 'B' || o.t === 'S')
+                          .map((o, idx) => {
+                              if (o.p < layout.minP || o.p > layout.maxP) return null;
+                              const y = priceToY(o.p);
+                              let barIdx = candles.findIndex((c) => o.tm >= c[0] && o.tm < c[0] + 60);
+                              if (barIdx < 0) {
+                                  barIdx = o.tm < candles[0][0] ? 0 : candles.length - 1;
+                              }
+                              const cx = PAD_L + (barIdx + 0.5) * barStep;
+                              return (
+                                  <circle
+                                      key={`pos-dot-${idx}`}
+                                      cx={cx}
+                                      cy={y}
+                                      r={isMobileSquare ? 3 : 3.5}
+                                      fill={o.t === 'B' ? '#22d3ee' : '#fb923c'}
+                                      stroke="#050811"
+                                      strokeWidth={1}
+                                      opacity={0.92}
+                                  />
+                              );
+                          })}
 
                 {/* M1 Candlesticks */}
                 {candles.map(([tm, o, h, l, c], idx) => {
