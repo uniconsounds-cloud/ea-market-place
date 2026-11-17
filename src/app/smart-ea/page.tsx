@@ -24,6 +24,7 @@ import {
     Activity,
     ArrowLeft,
     CheckCircle2,
+    ChevronDown,
     Loader2,
     PauseCircle,
     PlayCircle,
@@ -200,6 +201,107 @@ function TpScrollWheelPicker({
                         {step > 0 ? `+${step}` : step}
                     </Button>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+function ParamWheelPicker({
+    value,
+    onChange,
+    values,
+    unit,
+    isDecimal,
+}: {
+    value: number;
+    onChange: (val: number) => void;
+    values: number[];
+    unit?: string;
+    isDecimal?: boolean;
+}) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const isUserScrollingRef = useRef<boolean>(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const itemHeight = 36; // px
+
+    const sortedValues = useMemo(() => {
+        const set = new Set(values);
+        set.add(value);
+        const arr = Array.from(set);
+        arr.sort((a, b) => b - a); // descending
+        return arr;
+    }, [values, value]);
+
+    useEffect(() => {
+        if (isUserScrollingRef.current) return;
+        const idx = sortedValues.findIndex((v) => Math.abs(v - value) < (isDecimal ? 0.005 : 0.001));
+        if (idx !== -1 && containerRef.current) {
+            containerRef.current.scrollTo({
+                top: idx * itemHeight,
+                behavior: 'smooth',
+            });
+        }
+    }, [value, sortedValues, isDecimal]);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        isUserScrollingRef.current = true;
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+        const target = e.currentTarget;
+        scrollTimeoutRef.current = setTimeout(() => {
+            const top = target.scrollTop;
+            const idx = Math.min(
+                sortedValues.length - 1,
+                Math.max(0, Math.round(top / itemHeight))
+            );
+            if (sortedValues[idx] !== undefined && Math.abs(sortedValues[idx] - value) >= (isDecimal ? 0.005 : 0.001)) {
+                onChange(sortedValues[idx]);
+            }
+            isUserScrollingRef.current = false;
+        }, 100);
+    };
+
+    return (
+        <div className="relative w-full h-[144px] overflow-hidden select-none bg-slate-950/80 rounded-xl border border-cyan-500/25">
+            {/* 3D Wheel Mask Vignette */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-[#0b0f19] via-[#0b0f19]/80 to-transparent z-10" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/80 to-transparent z-10" />
+
+            {/* Center target cursor bar */}
+            <div className="pointer-events-none absolute top-[54px] inset-x-2 h-[36px] border-y border-cyan-400/50 bg-cyan-500/10 rounded-md z-0 flex items-center justify-between px-3">
+                <span className="text-[10px] text-cyan-400 font-mono">▶</span>
+                <span className="text-[10px] text-cyan-400 font-mono">◀</span>
+            </div>
+
+            {/* Scroll container */}
+            <div
+                ref={containerRef}
+                onScroll={handleScroll}
+                className="h-full overflow-y-auto snap-y snap-mandatory py-[54px] text-center"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+                {sortedValues.map((v) => {
+                    const isSelected = Math.abs(v - value) < (isDecimal ? 0.005 : 0.001);
+                    return (
+                        <div
+                            key={v}
+                            onClick={() => {
+                                isUserScrollingRef.current = false;
+                                onChange(v);
+                            }}
+                            className={cn(
+                                "h-[36px] flex items-center justify-center font-mono cursor-pointer snap-center transition-all",
+                                isSelected
+                                    ? "text-base font-bold text-cyan-300 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]"
+                                    : "text-xs text-slate-500 hover:text-slate-300 opacity-60"
+                            )}
+                        >
+                            <span>
+                                {isDecimal ? v.toFixed(2) : v} {unit || ''}
+                            </span>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -512,6 +614,34 @@ function SmartEACockpitContent() {
         );
         setCustomTpModalOpen(false);
     };
+
+    // Parameters Collapsible Accordion & Wheel Picker Modal State
+    interface ParamModalConfig {
+        title: string;
+        unit: string;
+        currentVal: number;
+        step: number;
+        isDecimal?: boolean;
+        presetValues: number[];
+        quickSteps: number[];
+        onApply: (newVal: number) => void;
+    }
+
+    const [isParamsOpen, setIsParamsOpen] = useState(false);
+    const [paramModalConfig, setParamModalConfig] = useState<ParamModalConfig | null>(null);
+    const [paramModalValue, setParamModalValue] = useState<number>(0);
+
+    const openParamModal = useCallback((config: ParamModalConfig) => {
+        setParamModalConfig(config);
+        setParamModalValue(config.currentVal);
+    }, []);
+
+    const applyParamModal = useCallback(() => {
+        if (paramModalConfig) {
+            paramModalConfig.onApply(paramModalValue);
+        }
+        setParamModalConfig(null);
+    }, [paramModalConfig, paramModalValue]);
 
     // 1-Day Trading Timeline (05:00 AM Bangkok -> 05:00 AM next day): shrinks from left to right
     const bkkStr = clockNow.toLocaleTimeString('en-GB', {
@@ -1201,154 +1331,372 @@ function SmartEACockpitContent() {
                             </CardContent>
                         </Card>
 
-                        {/* Right: Live Settings Editor */}
-                        <Card className="lg:col-span-7 border-cyan-500/25 bg-[#070b16]/95 text-slate-100">
-                            <CardHeader className="p-2.5 sm:p-3 pb-2">
-                                <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
-                                    <Sliders className="w-4 h-4 text-cyan-400" /> GRID MATRIX // PARAMS
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-2.5 sm:p-3 pt-0">
-                                <form onSubmit={handleUpdateSettings} className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-2 font-mono">
-                                        <div className="space-y-1">
-                                            <Label className="text-[11px] text-slate-400">FIRST DIST (PT)</Label>
-                                            <Input
-                                                type="number"
-                                                value={firstDistance}
-                                                onChange={(e) => setFirstDistance(e.target.value)}
-                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-100 h-9"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[11px] text-slate-400">SPACING (PT)</Label>
-                                            <Input
-                                                type="number"
-                                                value={spacing}
-                                                onChange={(e) => setSpacing(e.target.value)}
-                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-100 h-9"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label>จำนวน Pending ต่อฝั่ง (Pending/Side)</Label>
-                                            <Input
-                                                type="number"
-                                                value={pendingPerSide}
-                                                onChange={(e) => setPendingPerSide(e.target.value)}
-                                                className="font-mono"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label>เป้ากำไรปิดรวบ (Target Profit {cur})</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.1"
-                                                value={targetProfit}
-                                                onChange={(e) => setTargetProfit(e.target.value)}
-                                                className="font-mono"
-                                            />
-                                            <p className="text-[11px] text-muted-foreground">
-                                                ใส่ 0 (เท่าทุน) หรือค่าติดลบ (เช่น -50) ได้ เพื่อรวบปิดจำกัดขาดทุนอัตโนมัติ
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label>ล็อตเริ่มต้น (Initial Lot)</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={initialLot}
-                                                onChange={(e) => setInitialLot(e.target.value)}
-                                                className="font-mono"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label>ล็อตเพิ่มต่อชั้น (Lot Increment)</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={lotIncrement}
-                                                onChange={(e) => setLotIncrement(e.target.value)}
-                                                className="font-mono"
-                                            />
-                                        </div>
-                                        <div className="space-y-2 sm:col-span-2 rounded-lg border p-3 bg-muted/20">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                                <div>
-                                                    <Label className="text-sm font-semibold">ระบบป้องกัน One-Side Freeze (ล็อกฝั่งตรงข้ามเมื่อครบทั้ง 2 ฝั่ง)</Label>
-                                                    <p className="text-[11px] text-muted-foreground">
-                                                        เมื่อทั้งสองฝั่งเปิดถึง {maxBothSidesCap || 7} ไม้ ฝั่งที่เพิ่งครบยังออกต่อได้ ส่วนฝั่งตรงข้ามจะถูก Freeze ห้ามออกเพิ่ม
-                                                    </p>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={enableCapFreeze ? 'default' : 'outline'}
-                                                    onClick={() => setEnableCapFreeze((v) => !v)}
-                                                    className="shrink-0"
-                                                >
-                                                    {enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}
-                                                </Button>
-                                            </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                                                <div>
-                                                    <Label className="text-xs text-muted-foreground">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="1"
-                                                        max="50"
-                                                        disabled={!enableCapFreeze}
-                                                        value={maxBothSidesCap}
-                                                        onChange={(e) => setMaxBothSidesCap(e.target.value)}
-                                                        className="font-mono mt-1"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-xs text-muted-foreground">สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง (ไม้, 0 = ไม่สลับ)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        max="50"
-                                                        disabled={!enableCapFreeze}
-                                                        value={freezeFlipMaxExtra}
-                                                        onChange={(e) => setFreezeFlipMaxExtra(e.target.value)}
-                                                        className="font-mono mt-1"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between pt-1">
-                                                <span className="text-xs text-muted-foreground">รูปแบบการสลับสิทธิ์เมื่อราคาตีกลับ</span>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={!enableCapFreeze}
-                                                    onClick={() => setFreezeFlipContinuous((v) => !v)}
-                                                    className="h-7 text-xs"
-                                                >
-                                                    {freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {eaState?.active_config && (
-                                        <div className="p-3 rounded-lg bg-muted/40 border text-xs font-mono text-muted-foreground">
-                                            ค่าที่กำลังรันอยู่ใน EA ขณะนี้: Dist={eaState.active_config.first_distance}pt | Spacing={eaState.active_config.spacing}pt | Pend={eaState.active_config.pending_per_side} | Lot={eaState.active_config.initial_lot}+{eaState.active_config.lot_increment} | TP={eaState.active_config.target_profit}
-                                        </div>
+                        {/* Right: Live Settings Editor (Collapsible Accordion) */}
+                        <Card className="lg:col-span-7 border-cyan-500/25 bg-[#070b16]/95 text-slate-100 overflow-hidden shadow-md">
+                            {/* Collapsible Header Bar: PARAMS SETTING */}
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setIsParamsOpen((prev) => !prev)}
+                                className="p-2.5 sm:p-3 flex items-center justify-between cursor-pointer select-none hover:bg-cyan-950/20 transition-colors"
+                            >
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Sliders className="w-4 h-4 text-cyan-400 shrink-0" />
+                                    <span className="text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300 font-bold truncate">
+                                        PARAMS SETTING
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {!isParamsOpen && (
+                                        <span className="text-[10px] font-mono text-slate-400 hidden sm:inline-block">
+                                            D:{firstDistance} | S:{spacing} | TP:{targetProfit} | Lot:{initialLot}
+                                        </span>
                                     )}
-
-                                    <Button type="submit" className="w-full gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs" disabled={sending}>
-                                        {sending ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <Send className="w-4 h-4" />
+                                    <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[10px] font-mono py-0 px-1.5">
+                                        {isParamsOpen ? 'ย่อแถบ' : 'แตะเพื่อตั้งค่า'}
+                                    </Badge>
+                                    <ChevronDown
+                                        className={cn(
+                                            "w-4 h-4 text-cyan-400 transition-transform duration-200",
+                                            isParamsOpen && "rotate-180"
                                         )}
-                                        UPLOAD & SYNC PARAMS
-                                    </Button>
-                                </form>
-                            </CardContent>
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Collapsible Form Body */}
+                            {isParamsOpen && (
+                                <CardContent className="p-2.5 sm:p-3 pt-2.5 border-t border-cyan-500/15 animate-in fade-in-50 duration-200">
+                                    <form onSubmit={handleUpdateSettings} className="space-y-2.5 sm:space-y-3 font-mono">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {/* 1. First Dist */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                    <span className="sm:hidden">First Dist</span>
+                                                    <span className="hidden sm:inline">FIRST DIST (PT)</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={firstDistance}
+                                                    onClick={() => openParamModal({
+                                                        title: 'FIRST DIST (ระยะแรก)',
+                                                        unit: 'PT',
+                                                        currentVal: parseFloat(firstDistance) || 100,
+                                                        step: 10,
+                                                        presetValues: [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500],
+                                                        quickSteps: [-50, -10, 10, 50],
+                                                        onApply: (v) => setFirstDistance(String(Math.max(10, Math.round(v)))),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                            </div>
+
+                                            {/* 2. Spacing */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                    <span className="sm:hidden">Spacing</span>
+                                                    <span className="hidden sm:inline">SPACING (PT)</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={spacing}
+                                                    onClick={() => openParamModal({
+                                                        title: 'SPACING (ระยะห่าง)',
+                                                        unit: 'PT',
+                                                        currentVal: parseFloat(spacing) || 60,
+                                                        step: 10,
+                                                        presetValues: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500],
+                                                        quickSteps: [-50, -10, 10, 50],
+                                                        onApply: (v) => setSpacing(String(Math.max(5, Math.round(v)))),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                            </div>
+
+                                            {/* 3. Pending Per Side */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                    <span className="sm:hidden">Pending/ฝั่ง</span>
+                                                    <span className="hidden sm:inline">จำนวน Pending ต่อฝั่ง (Pending/Side)</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={pendingPerSide}
+                                                    onClick={() => openParamModal({
+                                                        title: 'PENDING ต่อฝั่ง',
+                                                        unit: 'ไม้',
+                                                        currentVal: parseInt(pendingPerSide, 10) || 10,
+                                                        step: 1,
+                                                        presetValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 30],
+                                                        quickSteps: [-5, -1, 1, 5],
+                                                        onApply: (v) => setPendingPerSide(String(Math.max(1, Math.round(v)))),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                            </div>
+
+                                            {/* 4. Target Profit */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                    <span className="sm:hidden">เป้าปิดรวบ (TP)</span>
+                                                    <span className="hidden sm:inline">เป้ากำไรปิดรวบ (Target Profit {cur})</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={targetProfit}
+                                                    onClick={() => openParamModal({
+                                                        title: `TARGET PROFIT (${cur})`,
+                                                        unit: cur,
+                                                        currentVal: parseFloat(targetProfit) || 10,
+                                                        step: 5,
+                                                        presetValues: [100, 50, 40, 30, 25, 20, 15, 10, 5, 0, -5, -10, -15, -20, -25, -30, -40, -50, -60, -70, -80, -90, -100, -150, -200],
+                                                        quickSteps: [-50, -10, -1, 1, 10, 50],
+                                                        onApply: (v) => setTargetProfit(String(v)),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                                <p className="text-[10px] text-muted-foreground hidden sm:block">
+                                                    ใส่ 0 (เท่าทุน) หรือค่าติดลบ (เช่น -50) เพื่อรวบปิดจำกัดขาดทุนอัตโนมัติ
+                                                </p>
+                                            </div>
+
+                                            {/* 5. Initial Lot */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                    <span className="sm:hidden">Lot เริ่มต้น</span>
+                                                    <span className="hidden sm:inline">ล็อตเริ่มต้น (Initial Lot)</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={initialLot}
+                                                    onClick={() => openParamModal({
+                                                        title: 'LOT เริ่มต้น (INITIAL LOT)',
+                                                        unit: 'Lot',
+                                                        currentVal: parseFloat(initialLot) || 0.01,
+                                                        step: 0.01,
+                                                        isDecimal: true,
+                                                        presetValues: [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.12, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 1.00],
+                                                        quickSteps: [-0.05, -0.01, 0.01, 0.05],
+                                                        onApply: (v) => setInitialLot(String(Math.max(0.01, Math.round(v * 100) / 100))),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                            </div>
+
+                                            {/* 6. Lot Increment */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                    <span className="sm:hidden">Lot เพิ่ม/ชั้น</span>
+                                                    <span className="hidden sm:inline">ล็อตเพิ่มต่อชั้น (Lot Increment)</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={lotIncrement}
+                                                    onClick={() => openParamModal({
+                                                        title: 'LOT เพิ่มต่อชั้น (INCREMENT)',
+                                                        unit: 'Lot',
+                                                        currentVal: parseFloat(lotIncrement) || 0.01,
+                                                        step: 0.01,
+                                                        isDecimal: true,
+                                                        presetValues: [0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50],
+                                                        quickSteps: [-0.05, -0.01, 0.01, 0.05],
+                                                        onApply: (v) => setLotIncrement(String(Math.max(0, Math.round(v * 100) / 100))),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                            </div>
+
+                                            {/* 7. One-Side Freeze Setting Box */}
+                                            <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
+                                                <div className="flex items-center justify-between gap-1.5">
+                                                    <div className="min-w-0">
+                                                        <span className="text-xs sm:text-sm font-semibold text-rose-300 truncate block">
+                                                            <span className="sm:hidden">One-Side Freeze (Cap)</span>
+                                                            <span className="hidden sm:inline">ระบบป้องกัน One-Side Freeze (ล็อกฝั่งตรงข้ามเมื่อครบทั้ง 2 ฝั่ง)</span>
+                                                        </span>
+                                                        <p className="text-[10px] text-muted-foreground hidden sm:block mt-0.5">
+                                                            เมื่อทั้งสองฝั่งเปิดถึง {maxBothSidesCap || 7} ไม้ ฝั่งที่เพิ่งครบยังออกต่อได้ ส่วนฝั่งตรงข้ามจะถูก Freeze ห้ามออกเพิ่ม
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={enableCapFreeze ? 'default' : 'outline'}
+                                                        onClick={() => setEnableCapFreeze((v) => !v)}
+                                                        className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                    >
+                                                        <span className="sm:hidden">{enableCapFreeze ? 'ON' : 'OFF'}</span>
+                                                        <span className="hidden sm:inline">{enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                    </Button>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                                    <div>
+                                                        <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                            <span className="sm:hidden">ไม้เริ่ม Freeze</span>
+                                                            <span className="hidden sm:inline">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</span>
+                                                        </Label>
+                                                        <Input
+                                                            readOnly
+                                                            disabled={!enableCapFreeze}
+                                                            value={maxBothSidesCap}
+                                                            onClick={() => enableCapFreeze && openParamModal({
+                                                                title: 'ไม้เริ่ม FREEZE (CAP)',
+                                                                unit: 'ไม้',
+                                                                currentVal: parseInt(maxBothSidesCap, 10) || 7,
+                                                                step: 1,
+                                                                presetValues: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+                                                                quickSteps: [-5, -1, 1, 5],
+                                                                onApply: (v) => setMaxBothSidesCap(String(Math.max(1, Math.round(v)))),
+                                                            })}
+                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                            <span className="sm:hidden">สลับสิทธิ์ถ้าไม่เพิ่ม</span>
+                                                            <span className="hidden sm:inline">สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง (ไม้, 0 = ไม่สลับ)</span>
+                                                        </Label>
+                                                        <Input
+                                                            readOnly
+                                                            disabled={!enableCapFreeze}
+                                                            value={freezeFlipMaxExtra}
+                                                            onClick={() => enableCapFreeze && openParamModal({
+                                                                title: 'สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง',
+                                                                unit: 'ไม้',
+                                                                currentVal: parseInt(freezeFlipMaxExtra, 10) || 3,
+                                                                step: 1,
+                                                                presetValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
+                                                                quickSteps: [-5, -1, 1, 5],
+                                                                onApply: (v) => setFreezeFlipMaxExtra(String(Math.max(0, Math.round(v)))),
+                                                            })}
+                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between gap-1 pt-1">
+                                                    <span className="text-[11px] text-muted-foreground truncate">
+                                                        <span className="sm:hidden">สลับสิทธิ์เมื่อราคาตีกลับ</span>
+                                                        <span className="hidden sm:inline">รูปแบบการสลับสิทธิ์เมื่อราคาตีกลับ</span>
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={!enableCapFreeze}
+                                                        onClick={() => setFreezeFlipContinuous((v) => !v)}
+                                                        className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 shrink-0 font-mono"
+                                                    >
+                                                        <span className="sm:hidden">{freezeFlipContinuous ? 'ต่อเนื่อง' : 'ครั้งเดียว'}</span>
+                                                        <span className="hidden sm:inline">{freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}</span>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {eaState?.active_config && (
+                                            <div className="p-2 sm:p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-400 whitespace-nowrap overflow-x-auto">
+                                                EA Active: Dist={eaState.active_config.first_distance}pt | Spacing={eaState.active_config.spacing}pt | Pend={eaState.active_config.pending_per_side} | Lot={eaState.active_config.initial_lot}+{eaState.active_config.lot_increment} | TP={eaState.active_config.target_profit}
+                                            </div>
+                                        )}
+
+                                        <Button
+                                            type="submit"
+                                            className="w-full gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs h-9 shadow-md"
+                                            disabled={sending}
+                                        >
+                                            {sending ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Send className="w-4 h-4" />
+                                            )}
+                                            <span className="sm:hidden">UPLOAD & SYNC</span>
+                                            <span className="hidden sm:inline">UPLOAD & SYNC PARAMS</span>
+                                        </Button>
+                                    </form>
+                                </CardContent>
+                            )}
                         </Card>
                     </div>
+
+                    {/* Quick Parameter Adjust Modal (Wheel Picker) */}
+                    <Dialog open={Boolean(paramModalConfig)} onOpenChange={(open) => !open && setParamModalConfig(null)}>
+                        <DialogContent className="bg-[#0b0f19] border border-cyan-500/30 text-slate-100 max-w-[310px] p-4 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.2)]">
+                            <DialogHeader className="space-y-0.5 text-center">
+                                <DialogTitle className="text-sm font-bold font-mono text-cyan-300 tracking-wide">
+                                    {paramModalConfig?.title}
+                                </DialogTitle>
+                            </DialogHeader>
+
+                            {/* Clean glowing number display */}
+                            <div className="flex flex-col items-center justify-center py-2 px-3 rounded-xl bg-slate-900/90 border border-cyan-500/30 my-0.5 shadow-inner">
+                                <div className="flex items-baseline gap-1.5 font-mono">
+                                    <span className="text-3xl font-extrabold text-cyan-300 tracking-tight">
+                                        {paramModalConfig?.isDecimal ? paramModalValue.toFixed(2) : paramModalValue}
+                                    </span>
+                                    {paramModalConfig?.unit && (
+                                        <span className="text-slate-400 text-xs font-semibold">{paramModalConfig.unit}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Scroll Wheel */}
+                            {paramModalConfig && (
+                                <ParamWheelPicker
+                                    value={paramModalValue}
+                                    onChange={(val) => setParamModalValue(val)}
+                                    values={paramModalConfig.presetValues}
+                                    unit={paramModalConfig.unit}
+                                    isDecimal={paramModalConfig.isDecimal}
+                                />
+                            )}
+
+                            {/* Steppers */}
+                            {paramModalConfig && (
+                                <div className="flex flex-wrap items-center justify-center gap-1 w-full pt-0.5">
+                                    {paramModalConfig.quickSteps.map((step) => (
+                                        <Button
+                                            key={step}
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2 text-[11px] font-mono border-slate-700/80 bg-slate-900/60 hover:bg-cyan-950/40 hover:border-cyan-500/50 text-slate-200"
+                                            onClick={() => {
+                                                const next = paramModalConfig.isDecimal
+                                                    ? Math.max(0, Math.round((paramModalValue + step) * 100) / 100)
+                                                    : paramModalValue + step;
+                                                setParamModalValue(next);
+                                            }}
+                                        >
+                                            {step > 0 ? `+${step}` : step}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-2 border-t border-slate-800/80 mt-1">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs text-slate-400 hover:text-slate-200"
+                                    onClick={() => setParamModalConfig(null)}
+                                >
+                                    ยกเลิก
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-4 shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+                                    onClick={applyParamModal}
+                                >
+                                    ตกลง (OK)
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </>
             )}
         </div>
