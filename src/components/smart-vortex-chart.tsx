@@ -143,36 +143,23 @@ export function SmartVortexChart({
             if (l < minP) minP = l;
         }
 
-        const includePrice = (p: number) => {
-            if (p > 0 && isFinite(p)) {
-                // Only expand bounds if reasonably close to current range (within 3x candle span)
-                const span = Math.max(maxP - minP, 0.0001);
-                if (Math.abs(p - (maxP + minP) / 2) <= span * 3.5) {
-                    if (p > maxP) maxP = p;
-                    if (p < minP) minP = p;
-                }
-            }
-        };
-
-        if (liveBid > 0) includePrice(liveBid);
-        if (anchor > 0) includePrice(anchor);
-        if (chart?.est_tp_price && chart.est_tp_price > 0) includePrice(chart.est_tp_price);
-        if (tpLevels.priceTp0 > 0) includePrice(tpLevels.priceTp0);
-        if (tpLevels.priceNeg3 > 0) includePrice(tpLevels.priceNeg3);
-        if (tpLevels.priceNeg6 > 0) includePrice(tpLevels.priceNeg6);
-        if (chart?.freeze_price && chart.freeze_price > 0) includePrice(chart.freeze_price);
-        if (showOrders && chart?.orders) {
-            for (const o of chart.orders) {
-                if (o.t === 'B' || o.t === 'S') includePrice(o.p);
-            }
+        // Keep candlesticks full-height: only include liveBid and nearby anchor (< 1.2x candle span)
+        const candleSpan = Math.max(maxP - minP, 0.0001);
+        if (liveBid > 0) {
+            if (liveBid > maxP) maxP = liveBid;
+            if (liveBid < minP) minP = liveBid;
+        }
+        if (anchor > 0 && Math.abs(anchor - (maxP + minP) / 2) <= candleSpan * 1.2) {
+            if (anchor > maxP) maxP = anchor;
+            if (anchor < minP) minP = anchor;
         }
 
-        const pad = Math.max((maxP - minP) * 0.12, 0.01);
+        const pad = Math.max((maxP - minP) * 0.14, 0.01);
         minP -= pad;
         maxP += pad;
 
         return { minP, maxP };
-    }, [candles, chart, anchor, showOrders]);
+    }, [candles, liveBid, anchor]);
 
     if (!chart || candles.length === 0 || !layout) {
         return (
@@ -454,6 +441,21 @@ export function SmartVortexChart({
         );
     };
 
+    const allLevels = [
+        ...(anchor > 0 ? [{ label: 'ANCHOR', price: anchor, colorClass: 'border-amber-500/40 bg-amber-500/15 text-amber-300' }] : []),
+        ...(chart.freeze_price > 0 && frozenSide && frozenSide !== 'NONE'
+            ? [{ label: `FRZ ${frozenSide}`, price: chart.freeze_price, colorClass: 'border-rose-500/40 bg-rose-500/15 text-rose-300' }]
+            : []),
+        ...((chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN') && chart.est_tp_price > 0
+            ? [{ label: `TP (${targetProfit})`, price: chart.est_tp_price, colorClass: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' }]
+            : []),
+        ...(tpLevels.priceTp0 > 0 ? [{ label: 'TP 0', price: tpLevels.priceTp0, colorClass: 'border-sky-500/40 bg-sky-500/15 text-sky-300' }] : []),
+        ...(tpLevels.priceNeg3 > 0 ? [{ label: '-3%', price: tpLevels.priceNeg3, colorClass: 'border-amber-500/40 bg-amber-500/15 text-amber-300' }] : []),
+        ...(tpLevels.priceNeg6 > 0 ? [{ label: '-6%', price: tpLevels.priceNeg6, colorClass: 'border-rose-500/40 bg-rose-500/15 text-rose-300' }] : []),
+    ];
+    const aboveEdgeLevels = allLevels.filter((lv) => lv.price > layout.maxP).sort((a, b) => b.price - a.price);
+    const belowEdgeLevels = allLevels.filter((lv) => lv.price < layout.minP).sort((a, b) => b.price - a.price);
+
     return (
         <Card className="border border-cyan-500/25 bg-[#060a14]/95 text-slate-100 shadow-[0_0_28px_rgba(6,182,212,0.08)] overflow-hidden">
             {/* Separated Header Section (Info + Controls) */}
@@ -526,13 +528,41 @@ export function SmartVortexChart({
 
             {/* Full-bleed Chart Area: 1:1 Square on Mobile, Wide on Desktop */}
             <CardContent className="p-0">
-                <div className="w-full aspect-square sm:aspect-auto bg-[#0b0f19]">
+                <div className="relative w-full aspect-square sm:aspect-auto bg-[#0b0f19]">
+                    {/* Out-of-range levels docked neatly at TOP edge */}
+                    {aboveEdgeLevels.length > 0 && (
+                        <div className="absolute top-1.5 left-1.5 right-1.5 z-10 flex flex-wrap gap-1 pointer-events-none font-mono">
+                            {aboveEdgeLevels.map((lv) => (
+                                <span
+                                    key={`top-${lv.label}`}
+                                    className={`px-1.5 py-0.5 rounded border text-[9.5px] font-bold backdrop-blur-sm ${lv.colorClass}`}
+                                >
+                                    ↑ {lv.label} {lv.price.toFixed(digits)}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="w-full h-full sm:hidden">
                         {renderChartSvg(420, 420, true)}
                     </div>
                     <div className="hidden sm:block w-full">
                         {renderChartSvg(860, 320, false)}
                     </div>
+
+                    {/* Out-of-range levels docked neatly at BOTTOM edge */}
+                    {belowEdgeLevels.length > 0 && (
+                        <div className="absolute bottom-6 left-1.5 right-1.5 z-10 flex flex-wrap gap-1 pointer-events-none font-mono">
+                            {belowEdgeLevels.map((lv) => (
+                                <span
+                                    key={`bot-${lv.label}`}
+                                    className={`px-1.5 py-0.5 rounded border text-[9.5px] font-bold backdrop-blur-sm ${lv.colorClass}`}
+                                >
+                                    ↓ {lv.label} {lv.price.toFixed(digits)}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>
