@@ -145,62 +145,59 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
                 </div>
             </div>
 
-            {/* 📲 PWA Installation Guide Modal (Especially for iOS Safari & In-App browsers) */}
+            {/* 📲 PWA Installation Guide Modal: Floating in center/upper area, compact, not full width */}
             {isModalOpen && (
                 <div 
-                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
                     onClick={() => setIsModalOpen(false)}
                 >
                     <div 
-                        className="w-full sm:max-w-md bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 border-t sm:border border-amber-500/30 rounded-t-3xl sm:rounded-2xl p-5 sm:p-6 text-stone-100 shadow-2xl relative animate-in slide-in-from-bottom-8 duration-300"
+                        className="w-[90vw] max-w-[340px] bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 border border-amber-500/40 rounded-2xl p-4 text-stone-100 shadow-[0_10px_35px_rgba(0,0,0,0.9)] relative animate-in zoom-in-95 duration-200 select-none"
                         onClick={e => e.stopPropagation()}
                     >
-                        {/* Header bar indicator for mobile bottom sheet */}
-                        <div className="w-12 h-1 bg-stone-700 rounded-full mx-auto mb-4 sm:hidden" />
-
                         {/* Close button */}
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
-                            className="absolute top-4 right-4 p-1.5 rounded-full text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+                            className="absolute top-3 right-3 p-1 rounded-full text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4" />
                         </button>
 
                         {/* App Icon & Title */}
-                        <div className="flex items-center gap-3.5 mb-5">
-                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden ring-2 ring-amber-400/40 shadow-lg shadow-amber-950/40 bg-stone-950 shrink-0">
+                        <div className="flex items-center gap-3 mb-3.5 pr-6">
+                            <div className="relative w-11 h-11 rounded-xl overflow-hidden ring-1 ring-amber-400/50 shadow-md bg-stone-950 shrink-0">
                                 <Image
-                                    src="/farm/farm_icon_512.png"
+                                    src="/farm/farm_icon_192.png"
                                     alt="EasyM Farm"
                                     fill
-                                    className="object-contain p-1"
+                                    className="object-contain p-0.5"
                                     unoptimized
                                 />
                             </div>
-                            <div>
-                                <h3 className="font-bold text-base sm:text-lg text-amber-200 flex items-center gap-1.5">
+                            <div className="min-w-0">
+                                <h3 className="font-bold text-sm text-amber-200 flex items-center gap-1.5 truncate">
                                     <span>EasyM Farm</span>
                                     {portNumber && (
-                                        <span className="text-xs font-mono text-amber-400/80 font-normal">
+                                        <span className="text-[10px] font-mono text-amber-400/80">
                                             #{portNumber}
                                         </span>
                                     )}
                                 </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    สร้างทางลัดเข้าดูฟาร์มแบบเต็มจอ (เหมือนแอปจริง)
+                                <p className="text-[10px] text-muted-foreground truncate">
+                                    สร้างทางลัดดูฟาร์มเต็มหน้าจอ
                                 </p>
                             </div>
                         </div>
 
                         {/* In-App Browser Warning (LINE, TikTok, Facebook) */}
                         {isInApp && (
-                            <div className="mb-4 p-3 rounded-xl bg-orange-950/40 border border-orange-500/30 text-xs text-orange-200 flex items-start gap-2.5">
-                                <Smartphone className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                            <div className="mb-2.5 p-2 rounded-lg bg-orange-950/40 border border-orange-500/30 text-[10px] text-orange-200 flex items-start gap-2">
+                                <Smartphone className="w-3.5 h-3.5 text-orange-400 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-semibold text-orange-300">เปิดอยู่ในแอปภายนอก (เช่น LINE / TikTok)</p>
-                                    <p className="text-[11px] text-orange-200/80 mt-0.5">
-                                        กรุณาแตะปุ่มจุดสามจุด <span className="font-mono font-bold">[⋯]</span> แล้วเลือก <span className="font-bold underline">"เปิดด้วยเบราว์เซอร์เริ่มต้น" (Open in Safari/Chrome)</span> ก่อน จึงจะสามารถเพิ่มลงหน้าจอโฮมได้ครับ
+                                    <p className="font-semibold text-orange-300">เปิดอยู่ในแอป (LINE/TikTok)</p>
+                                    <p className="text-[9.5px] text-orange-200/80">
+                                        แตะ [⋯] แล้วเลือก "เปิดด้วยเบราว์เซอร์เริ่มต้น" ก่อนครับ
                                     </p>
                                 </div>
                             </div>
@@ -209,69 +206,56 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
                         {/* Step by Step Instructions */}
                         {isIOS ? (
                             /* iOS (iPhone / Safari) Guide */
-                            <div className="space-y-3 mb-6 text-xs text-stone-200">
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
-                                    <div className="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold shrink-0">
+                            <div className="space-y-2 mb-3.5 text-[11px] text-stone-200">
+                                <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                         1
                                     </div>
-                                    <div className="flex-1">
-                                        <p>แตะปุ่มแชร์ที่แถบล่างของ Safari</p>
-                                        <div className="flex items-center gap-1.5 text-sky-300 font-semibold mt-0.5">
-                                            <Share2 className="w-3.5 h-3.5" />
-                                            <span>ปุ่มแชร์รูปสี่เหลี่ยมลูกศรชี้ขึ้น</span>
-                                        </div>
+                                    <div className="flex-1 flex items-center justify-between">
+                                        <span>แตะปุ่มแชร์ที่แถบล่าง Safari</span>
+                                        <Share2 className="w-3.5 h-3.5 text-sky-400 shrink-0 ml-1" />
                                     </div>
                                 </div>
 
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
-                                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                                <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                         2
                                     </div>
-                                    <div className="flex-1">
-                                        <p>เลื่อนลงมาและแตะเมนู</p>
-                                        <div className="flex items-center gap-1.5 text-amber-300 font-semibold mt-0.5">
-                                            <PlusSquare className="w-3.5 h-3.5" />
-                                            <span>"เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen)</span>
-                                        </div>
+                                    <div className="flex-1 flex items-center justify-between">
+                                        <span>เลือก <strong className="text-amber-300">"เพิ่มไปยังหน้าจอโฮม"</strong></span>
+                                        <PlusSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-1" />
                                     </div>
                                 </div>
 
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
-                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                                <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                         3
                                     </div>
                                     <div className="flex-1">
-                                        <p>แตะปุ่ม <strong className="text-emerald-400 font-bold">"เพิ่ม" (Add)</strong> ที่มุมบนขวา</p>
-                                        <span className="text-[11px] text-muted-foreground">ไอคอนเกาะฟาร์มจะไปปรากฏบนหน้าจอ iPhone ทันที</span>
+                                        <span>แตะ <strong className="text-emerald-400 font-bold">"เพิ่ม" (Add)</strong> มุมบนขวา</span>
                                     </div>
                                 </div>
                             </div>
                         ) : (
                             /* Android (Chrome) / Others Guide */
-                            <div className="space-y-3 mb-6 text-xs text-stone-200">
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
-                                    <div className="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold shrink-0">
+                            <div className="space-y-2 mb-3.5 text-[11px] text-stone-200">
+                                <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                         1
                                     </div>
-                                    <div className="flex-1">
-                                        <p>แตะจุด 3 จุดที่มุมบนขวาของ Chrome</p>
-                                        <div className="flex items-center gap-1.5 text-sky-300 font-semibold mt-0.5">
-                                            <MoreVertical className="w-3.5 h-3.5" />
-                                            <span>เมนูการตั้งค่าเบราว์เซอร์</span>
-                                        </div>
+                                    <div className="flex-1 flex items-center justify-between">
+                                        <span>แตะจุด 3 จุด [⋮] มุมบนขวา</span>
+                                        <MoreVertical className="w-3.5 h-3.5 text-sky-400 shrink-0 ml-1" />
                                     </div>
                                 </div>
 
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
-                                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                                <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                         2
                                     </div>
-                                    <div className="flex-1">
-                                        <p>เลือกเมนู</p>
-                                        <div className="flex items-center gap-1.5 text-amber-300 font-semibold mt-0.5">
-                                            <Download className="w-3.5 h-3.5" />
-                                            <span>"ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"</span>
-                                        </div>
+                                    <div className="flex-1 flex items-center justify-between">
+                                        <span>เลือก <strong className="text-amber-300">"เพิ่มลงในหน้าจอหลัก"</strong></span>
+                                        <Download className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-1" />
                                     </div>
                                 </div>
                             </div>
@@ -281,9 +265,9 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
-                            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-stone-950 font-bold text-sm tracking-wide shadow-lg shadow-amber-500/20 active:scale-98 transition-all flex items-center justify-center gap-2"
+                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-stone-950 font-bold text-xs tracking-wide shadow-md shadow-amber-500/20 active:scale-98 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                            <Check className="w-4 h-4" />
+                            <Check className="w-3.5 h-3.5" />
                             <span>เข้าใจแล้ว (ปิดหน้าต่าง)</span>
                         </button>
                     </div>
