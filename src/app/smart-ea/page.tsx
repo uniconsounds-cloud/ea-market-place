@@ -319,6 +319,15 @@ function SmartEACockpitContent() {
         Number(lastCommand.command_seq) > Number(eaState.last_ack_seq || 0)
     );
 
+    // Active control state: reflects user's queued command immediately, then synced MT5 state
+    const effectiveStopMode = isPendingAck && lastCommand?.stop_mode
+        ? String(lastCommand.stop_mode)
+        : (eaState?.active_config?.stop_mode || eaState?.trade_status || 'RUN');
+
+    const isRunning = effectiveStopMode === 'RUN' && (eaState?.trade_status === 'RUNNING' || !eaState?.trade_status);
+    const isPauseNextActive = effectiveStopMode === 'PAUSE_NEXT' || eaState?.trade_status === 'PAUSED_NEXT';
+    const isFreezeStopActive = effectiveStopMode === 'FREEZE_STOP' || eaState?.trade_status === 'FREEZE_STOP';
+
     const cur = eaState?.currency || 'USD';
     const liveCyclePnl = (eaState?.cycle_pnl || 0) + pnlJitter;
     const liveEquity = (eaState?.equity || 0) + pnlJitter;
@@ -709,96 +718,190 @@ function SmartEACockpitContent() {
 
                     {/* Control & Settings Split */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-                        {/* Left: 2-Way Execution Controls */}
-                        <Card className="lg:col-span-5 border-cyan-500/25 bg-[#070b16]/95 text-slate-100">
-                            <CardHeader className="p-2.5 sm:p-3 pb-2">
-                                <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
-                                    <Activity className="w-4 h-4 text-cyan-400" /> FLIGHT CONTROL // MODE
-                                </CardTitle>
+                        {/* Left: Flight Control & Tactical Modes */}
+                        <Card className="lg:col-span-5 border-cyan-500/25 bg-[#070b16]/95 text-slate-100 shadow-md">
+                            <CardHeader className="p-2.5 sm:p-3 pb-2 space-y-1.5 border-b border-cyan-500/15">
+                                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                                    <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
+                                        <Activity className="w-4 h-4 text-cyan-400" /> FLIGHT CONTROL
+                                    </CardTitle>
+
+                                    {/* 🎯 Mode & CFG Status Rail in Header */}
+                                    <div className="flex items-center gap-1.5 font-mono text-[10.5px]">
+                                        {/* CFG Indicator */}
+                                        <div className="rounded px-2 py-0.5 bg-black/60 border border-slate-800 flex items-center gap-1">
+                                            <span className="text-slate-400">CFG:</span>
+                                            {isPendingAck ? (
+                                                <span className="text-amber-400 font-bold flex items-center gap-1 animate-pulse">
+                                                    <RefreshCw className="w-2.5 h-2.5 animate-spin" /> SYNCING
+                                                </span>
+                                            ) : eaState?.config_status === 'WEB_LOADED' ? (
+                                                <span className="text-cyan-400 font-bold flex items-center gap-0.5">
+                                                    <CheckCircle2 className="w-2.5 h-2.5" /> WEB
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300 font-bold">MT5</span>
+                                            )}
+                                        </div>
+
+                                        {/* MODE Indicator */}
+                                        <div className="rounded px-2 py-0.5 bg-black/60 border border-slate-800 flex items-center gap-1">
+                                            <span className="text-slate-400">MODE:</span>
+                                            <span
+                                                className={`font-bold ${
+                                                    isRunning
+                                                        ? 'text-emerald-400'
+                                                        : isPauseNextActive
+                                                        ? 'text-amber-400'
+                                                        : 'text-rose-400'
+                                                }`}
+                                            >
+                                                {isRunning
+                                                    ? 'RUN'
+                                                    : isPauseNextActive
+                                                    ? 'PAUSE_NEXT'
+                                                    : isFreezeStopActive
+                                                    ? 'FREEZE_STOP'
+                                                    : eaState?.trade_status || 'WAIT'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             </CardHeader>
-                            <CardContent className="p-2.5 sm:p-3 pt-0 space-y-2 font-mono">
+                            <CardContent className="p-2.5 sm:p-3 pt-2.5 space-y-2 font-mono">
+                                {/* 1. ปุ่มเริ่มรันอีเอใหม่ (สีเขียว) - ซ่อนไปเมื่ออีเอกำลังรันอยู่ (isRunning), แสดงขึ้นมาเมื่อสั่งหยุดออกไม้ใหม่/หยุดรัน */}
+                                {!isRunning && (
+                                    <Button
+                                        className="w-full justify-between bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 animate-in fade-in duration-200"
+                                        disabled={sending}
+                                        onClick={() =>
+                                            sendCommand(
+                                                { stop_mode: 'RUN', close_all: false },
+                                                'สั่งเริ่มรันอีเอใหม่ (RUN) ไปยัง MT5 แล้ว'
+                                            )
+                                        }
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <PlayCircle className="w-4 h-4 text-emerald-200" />
+                                            <span>เริ่มรันอีเอใหม่ (ENGAGE // RUN)</span>
+                                        </span>
+                                        <span className="text-[10px] bg-emerald-700/80 px-2 py-0.5 rounded font-mono">START</span>
+                                    </Button>
+                                )}
+
+                                {/* 2. ปุ่มหยุดหลังจบรอบนี้ (Pause Next Cycle) - กดอีกทีเพื่อยกเลิกได้ */}
                                 <Button
-                                    className="w-full justify-between bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs"
+                                    variant="outline"
+                                    className={`w-full justify-between text-xs transition-colors ${
+                                        isPauseNextActive
+                                            ? 'border-amber-500 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                                            : 'border-amber-500/40 text-amber-400 hover:bg-amber-500/10'
+                                    }`}
                                     disabled={sending}
-                                    onClick={() =>
-                                        sendCommand(
-                                            { stop_mode: 'RUN', close_all: false },
-                                            'สั่งเริ่มเทรด (RUN) ไปยัง EA แล้ว'
-                                        )
-                                    }
+                                    onClick={() => {
+                                        if (isPauseNextActive) {
+                                            sendCommand(
+                                                { stop_mode: 'RUN', close_all: false },
+                                                'ยกเลิกการหยุดหลังจบรอบแล้ว กลับสู่โหมดรันต่อ (RUN)'
+                                            );
+                                        } else {
+                                            sendCommand(
+                                                { stop_mode: 'PAUSE_NEXT', close_all: false },
+                                                'สั่งหยุดหลังจบรอบปัจจุบัน (Pause Next Cycle) แล้ว'
+                                            );
+                                        }
+                                    }}
                                 >
                                     <span className="flex items-center gap-2">
-                                        <PlayCircle className="w-4 h-4" /> ENGAGE // RUN
+                                        <PauseCircle className="w-4 h-4 text-amber-400" />
+                                        <span>
+                                            {isPauseNextActive
+                                                ? 'หยุดหลังจบรอบนี้ (กดเพื่อยกเลิก)'
+                                                : 'หยุดหลังจบรอบนี้ (Pause Next Cycle)'}
+                                        </span>
                                     </span>
-                                    <span className="text-[10px] opacity-80">START</span>
+                                    {isPauseNextActive && (
+                                        <Badge className="bg-amber-500 text-slate-950 font-mono text-[9px] px-1.5 py-0 h-4">
+                                            รอจบรอบ
+                                        </Badge>
+                                    )}
                                 </Button>
 
+                                {/* 3. ปุ่มลบ Pending หยุดออกไม้ใหม่ - กดอีกทีเพื่อยกเลิกได้ */}
                                 <Button
                                     variant="outline"
-                                    className="w-full justify-start gap-2 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                                    className={`w-full justify-between text-xs transition-colors ${
+                                        isFreezeStopActive
+                                            ? 'border-rose-500 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
+                                            : 'border-rose-500/40 text-rose-400 hover:bg-rose-500/10'
+                                    }`}
                                     disabled={sending}
-                                    onClick={() =>
-                                        sendCommand(
-                                            { stop_mode: 'PAUSE_NEXT', close_all: false },
-                                            'สั่งหยุดหลังจบรอบปัจจุบัน (Pause Next Cycle) แล้ว'
-                                        )
-                                    }
+                                    onClick={() => {
+                                        if (isFreezeStopActive) {
+                                            sendCommand(
+                                                { stop_mode: 'RUN', close_all: false },
+                                                'ยกเลิกคำสั่งหยุดแล้ว กลับสู่โหมดรันต่อ (RUN)'
+                                            );
+                                        } else {
+                                            sendCommand(
+                                                { stop_mode: 'FREEZE_STOP', close_all: false },
+                                                'สั่งลบ Pending และหยุดออกไม้ใหม่ทันทีแล้ว'
+                                            );
+                                        }
+                                    }}
                                 >
-                                    <PauseCircle className="w-4 h-4" />
-                                    หยุดหลังจบรอบนี้ (Pause Next Cycle)
+                                    <span className="flex items-center gap-2">
+                                        <XCircle className="w-4 h-4 text-rose-400" />
+                                        <span>
+                                            {isFreezeStopActive
+                                                ? 'ลบ Pending หยุดออกไม้ใหม่ (กดเพื่อยกเลิก)'
+                                                : 'ลบ Pending หยุดออกไม้ใหม่'}
+                                        </span>
+                                    </span>
+                                    {isFreezeStopActive && (
+                                        <Badge className="bg-rose-500 text-white font-mono text-[9px] px-1.5 py-0 h-4">
+                                            หยุดออกไม้
+                                        </Badge>
+                                    )}
                                 </Button>
 
-                                <Button
-                                    variant="outline"
-                                    className="w-full justify-start gap-2 border-rose-500/40 text-rose-500 hover:bg-rose-500/10"
-                                    disabled={sending}
-                                    onClick={() =>
-                                        sendCommand(
-                                            { stop_mode: 'FREEZE_STOP', close_all: false },
-                                            'สั่งหยุดกางไม้และลบ Pending ทันทีแล้ว'
-                                        )
-                                    }
-                                >
-                                    <XCircle className="w-4 h-4" />
-                                    หยุดกางไม้ & ลบ Pending ทันที (Freeze Stop)
-                                </Button>
-
-                                <div className="pt-3 border-t">
+                                {/* 4. ปุ่มปิดรวบออเดอร์ทั้งหมดทันที - เมื่องดออกไม้ใหม่ */}
+                                <div className="pt-2 border-t border-slate-800/80">
                                     {!confirmCloseAll ? (
                                         <Button
                                             variant="destructive"
-                                            className="w-full justify-start gap-2"
+                                            className="w-full justify-start gap-2 text-xs"
                                             disabled={sending}
                                             onClick={() => setConfirmCloseAll(true)}
                                         >
                                             <ShieldAlert className="w-4 h-4" />
-                                            ปิดรวบออเดอร์ทั้งหมดทันที (Close All Now)
+                                            <span>ปิดรวบออเดอร์ทั้งหมดทันที (งดออกไม้ใหม่)</span>
                                         </Button>
                                     ) : (
-                                        <div className="p-3 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
+                                        <div className="p-2.5 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
                                             <p className="text-xs font-medium text-destructive">
-                                                ยืนยันปิดรวบทุกไม้และลบ Pending ทั้งหมดทันที?
+                                                ยืนยันปิดรวบทุกไม้ ลบ Pending และงดออกไม้ใหม่ทันที?
                                             </p>
                                             <div className="flex gap-2">
                                                 <Button
                                                     size="sm"
                                                     variant="destructive"
-                                                    className="flex-1"
+                                                    className="flex-1 text-xs"
                                                     disabled={sending}
                                                     onClick={() => {
                                                         setConfirmCloseAll(false);
                                                         sendCommand(
-                                                            { stop_mode: 'PAUSE_NEXT', close_all: true },
-                                                            'ส่งคำสั่ง Close All Now ไปยัง EA แล้ว!'
+                                                            { stop_mode: 'FREEZE_STOP', close_all: true },
+                                                            'ส่งคำสั่ง Close All Now ปิดรวบทุกไม้และงดออกไม้ใหม่แล้ว!'
                                                         );
                                                     }}
                                                 >
-                                                    ยืนยันปิดทันที
+                                                    ยืนยันปิดรวบ & หยุด
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="flex-1"
+                                                    className="flex-1 text-xs"
                                                     onClick={() => setConfirmCloseAll(false)}
                                                 >
                                                     ยกเลิก
