@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-export type RoundHistoryTuple = [number, number, number]; // [closeTimeUnix, tradesCount, netProfit]
+export type RoundHistoryTuple = [number, number, number, number?]; // [closeTimeUnix, tradesCount, netProfit, durationSec]
 
 interface RoundHistoryBarProps {
     rounds?: RoundHistoryTuple[] | null;
@@ -14,6 +14,22 @@ interface ParsedRound {
     time: number;
     trades: number;
     pnl: number;
+    durationSec: number;
+}
+
+function formatDuration(sec: number): string {
+    if (!sec || sec <= 0) return '<1m';
+    const s = Math.round(sec);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const remS = s % 60;
+    if (m < 60) return remS > 0 ? `${m}m ${remS}s` : `${m}m`;
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    if (h < 24) return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+    const d = Math.floor(h / 24);
+    const remH = h % 24;
+    return remH > 0 ? `${d}d ${remH}h` : `${d}d`;
 }
 
 function formatTimeShort(unixSec: number): string {
@@ -43,6 +59,7 @@ export default function RoundHistoryBar({ rounds, currency = 'USD' }: RoundHisto
             time: Number(r[0]) || 0,
             trades: Math.max(0, Math.round(Number(r[1]) || 0)),
             pnl: Number(r[2]) || 0,
+            durationSec: Math.max(0, Math.round(Number(r[3]) || 0)),
         }));
     }, [rounds]);
 
@@ -58,17 +75,24 @@ export default function RoundHistoryBar({ rounds, currency = 'USD' }: RoundHisto
     const stats = useMemo(() => {
         let totalPnl = 0;
         let totalTrades = 0;
+        let totalDur = 0;
+        let durCount = 0;
         let maxAbsPnl = 1;
         let hasNegative = false;
 
         for (const it of items) {
             totalPnl += it.pnl;
             totalTrades += it.trades;
+            if (it.durationSec > 0) {
+                totalDur += it.durationSec;
+                durCount++;
+            }
             if (Math.abs(it.pnl) > maxAbsPnl) maxAbsPnl = Math.abs(it.pnl);
             if (it.pnl < 0) hasNegative = true;
         }
 
-        return { totalPnl, totalTrades, maxAbsPnl, hasNegative };
+        const avgDurSec = durCount > 0 ? Math.round(totalDur / durCount) : 0;
+        return { totalPnl, totalTrades, avgDurSec, maxAbsPnl, hasNegative };
     }, [items]);
 
     const activeItem = useMemo(() => {
@@ -96,6 +120,11 @@ export default function RoundHistoryBar({ rounds, currency = 'USD' }: RoundHisto
 
                 {/* Summary Badges */}
                 <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                    {stats.avgDurSec > 0 && (
+                        <span className="rounded border border-slate-700/80 bg-slate-900/80 px-1.5 py-0.5 text-amber-300/90">
+                            AVG {formatDuration(stats.avgDurSec)}
+                        </span>
+                    )}
                     <span className="rounded border border-slate-700/80 bg-slate-900/80 px-1.5 py-0.5 text-slate-300">
                         {stats.totalTrades} ไม้
                     </span>
@@ -128,6 +157,9 @@ export default function RoundHistoryBar({ rounds, currency = 'USD' }: RoundHisto
                                 <span className="text-slate-300">{formatTimeShort(activeItem.time)}</span>
                             </div>
                             <div className="flex items-center gap-2.5">
+                                {activeItem.durationSec > 0 && (
+                                    <span className="text-amber-300/90">⏱ {formatDuration(activeItem.durationSec)}</span>
+                                )}
                                 <span className="text-sky-300">{activeItem.trades} ไม้</span>
                                 <span
                                     className={`font-bold ${
@@ -163,7 +195,7 @@ export default function RoundHistoryBar({ rounds, currency = 'USD' }: RoundHisto
                                         type="button"
                                         onClick={() => setSelectedIdx(item.idx)}
                                         onMouseEnter={() => setSelectedIdx(item.idx)}
-                                        title={`รอบที่ -${item.idx - 1} | ${formatTimeShort(item.time)} | ${item.trades} ไม้ | ${
+                                        title={`รอบที่ -${item.idx - 1} | ${formatTimeShort(item.time)} | ⏱ ${formatDuration(item.durationSec)} | ${item.trades} ไม้ | ${
                                             isPos ? '+' : ''
                                         }${item.pnl.toFixed(2)} ${currency}`}
                                         className={`group flex flex-col items-center justify-end w-[22px] sm:w-[24px] pt-1 pb-0.5 rounded transition-all focus:outline-none ${

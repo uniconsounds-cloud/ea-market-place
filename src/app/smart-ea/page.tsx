@@ -320,7 +320,7 @@ function SmartEACockpitContent() {
     const [isOnline, setIsOnline] = useState(false);
     const [eaState, setEaState] = useState<EAState | null>(null);
     const [lastCommand, setLastCommand] = useState<any>(null);
-    const [latestVersion, setLatestVersion] = useState<string>('1.10');
+    const [latestVersion, setLatestVersion] = useState<string>('1.11');
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
     const [pnlJitter, setPnlJitter] = useState(0);
