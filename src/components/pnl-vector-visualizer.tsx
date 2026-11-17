@@ -79,9 +79,14 @@ export function PnlVectorVisualizer({
             ...orders.map((o) => Math.abs(o.u ?? 0))
         );
 
+        const buyLot = buyOrders.reduce((acc, o) => acc + (o.l || 0), 0);
+        const sellLot = sellOrders.reduce((acc, o) => acc + (o.l || 0), 0);
+
         return {
             buyOrders,
             sellOrders,
+            buyLot,
+            sellLot,
             buySum,
             sellSum,
             netSum,
@@ -92,7 +97,7 @@ export function PnlVectorVisualizer({
 
     if (!chart) return null;
 
-    const { buyOrders, sellOrders, buySum, sellSum, netSum, maxMag, maxOrderMag } = data;
+    const { buyOrders, sellOrders, buyLot, sellLot, buySum, sellSum, netSum, maxMag, maxOrderMag } = data;
 
     // SVG Model A: Tightly-spaced 3 center summary bars + Price-ordered Buy/Sell stacks + Floating BID line
     const W = 440;
@@ -154,16 +159,111 @@ export function PnlVectorVisualizer({
 
     const bidY = computeBidY();
 
-    // SVG Model B: Dual-Arc Radar + Balance Needle (280 x 185)
-    const RW = 280;
-    const RCX = RW / 2;
-    const RCY = 148;
-    const RAD = 104;
-    const netRatio = Math.max(-1, Math.min(1, netSum / maxMag));
-    const needleDeg = netRatio * 78;
-    const buyArcRatio = Math.min(1, Math.abs(buySum) / maxMag);
-    const sellArcRatio = Math.min(1, Math.abs(sellSum) / maxMag);
-    const quarterArcLen = (Math.PI * RAD) / 2;
+    // Reusable Sci-Fi Semi-Circular Balance Gauge for Model B (Triple Array)
+    const renderSemiGauge = (
+        title: string,
+        buyVal: number,
+        sellVal: number,
+        buyLabel: string,
+        sellLabel: string,
+        centerLabel: string,
+        centerColor: string,
+        useAbsoluteWeight = true
+    ) => {
+        const GW = 136;
+        const GCX = GW / 2;
+        const GCY = 74;
+        const GRAD = 50;
+        const quarterLen = (Math.PI * GRAD) / 2;
+
+        const wBuy = useAbsoluteWeight ? Math.abs(buyVal) : Math.max(0, buyVal);
+        const wSell = useAbsoluteWeight ? Math.abs(sellVal) : Math.max(0, sellVal);
+        const totalW = wBuy + wSell;
+
+        // Needle tilts LEFT (-72 deg) when Buy dominates, RIGHT (+72 deg) when Sell dominates, 0 deg when balanced
+        const balanceRatio = totalW > 0 ? (wSell - wBuy) / totalW : 0;
+        const deg = balanceRatio * 74;
+        const buyArc = totalW > 0 ? wBuy / totalW : 0;
+        const sellArc = totalW > 0 ? wSell / totalW : 0;
+
+        return (
+            <div className="rounded-lg border border-cyan-500/20 bg-slate-950/75 p-2 flex flex-col items-center">
+                <div className="text-[9px] font-mono font-bold tracking-widest text-cyan-300/90 uppercase mb-0.5">
+                    {title}
+                </div>
+                <svg viewBox={`0 0 ${GW} 104`} className="w-full h-auto font-mono select-none">
+                    {/* Outer Track */}
+                    <path
+                        d={`M ${GCX - GRAD} ${GCY} A ${GRAD} ${GRAD} 0 0 1 ${GCX + GRAD} ${GCY}`}
+                        fill="none"
+                        stroke="#1e293b"
+                        strokeWidth="6.5"
+                        strokeLinecap="round"
+                    />
+                    {/* Inner Dotted Radar Ring */}
+                    <path
+                        d={`M ${GCX - 35} ${GCY} A 35 35 0 0 1 ${GCX + 35} ${GCY}`}
+                        fill="none"
+                        stroke="#0f172a"
+                        strokeWidth="1"
+                        strokeDasharray="2 2.5"
+                    />
+                    {/* Left Arc: BUY Weight (Cyan) */}
+                    <path
+                        d={`M ${GCX - GRAD} ${GCY} A ${GRAD} ${GRAD} 0 0 1 ${GCX} ${GCY - GRAD}`}
+                        fill="none"
+                        stroke="#22d3ee"
+                        strokeWidth="6.5"
+                        strokeDasharray={`${buyArc * quarterLen} ${quarterLen * 2}`}
+                        strokeLinecap="round"
+                        opacity="0.92"
+                    />
+                    {/* Right Arc: SELL Weight (Orange) */}
+                    <path
+                        d={`M ${GCX + GRAD} ${GCY} A ${GRAD} ${GRAD} 0 0 0 ${GCX} ${GCY - GRAD}`}
+                        fill="none"
+                        stroke="#fb923c"
+                        strokeWidth="6.5"
+                        strokeDasharray={`${sellArc * quarterLen} ${quarterLen * 2}`}
+                        strokeLinecap="round"
+                        opacity="0.92"
+                    />
+                    {/* Top Center Tick */}
+                    <line x1={GCX} y1={GCY - GRAD - 5} x2={GCX} y2={GCY - GRAD + 5} stroke="#475569" strokeWidth="1.2" />
+
+                    {/* Rotating Balance Needle */}
+                    <g transform={`rotate(${deg} ${GCX} ${GCY})`}>
+                        <line
+                            x1={GCX}
+                            y1={GCY}
+                            x2={GCX}
+                            y2={GCY - GRAD + 9}
+                            stroke={centerColor}
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                        />
+                        <circle cx={GCX} cy={GCY - GRAD + 9} r="2.6" fill={centerColor} />
+                    </g>
+                    <circle cx={GCX} cy={GCY} r="4.5" fill="#070b16" stroke="#38bdf8" strokeWidth="1.5" />
+
+                    {/* Buy (Left) & Sell (Right) Values */}
+                    <text x={4} y={14} fontSize="8" fontWeight="bold" fill="#22d3ee">
+                        B {buyLabel}
+                    </text>
+                    <text x={GW - 4} y={14} textAnchor="end" fontSize="8" fontWeight="bold" fill="#fb923c">
+                        S {sellLabel}
+                    </text>
+
+                    {/* Center Summary Readout */}
+                    <text x={GCX} y={GCY + 18} textAnchor="middle" fontSize="9.5" fontWeight="bold" fill={centerColor}>
+                        {centerLabel}
+                    </text>
+                </svg>
+            </div>
+        );
+    };
+
+    const netLot = buyLot - sellLot;
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -367,105 +467,51 @@ export function PnlVectorVisualizer({
             </div>
 
             {/* ===================================================== */}
-            {/* MODEL B: Dual-Arc Radar + Central Balance Needle       */}
+            {/* MODEL B: 3 Sci-Fi Semi-Circular Balance Dials (L -> R) */}
             {/* ===================================================== */}
             <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3.5 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2.5">
                     <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
                         <Radar className="w-4 h-4 text-cyan-400" />
-                        MODEL B // RADAR NEEDLE
+                        MODEL B // TRIPLE BALANCE RADAR
                     </span>
                     <Badge className="bg-slate-900 text-slate-300 border-slate-700 font-mono text-[10px]">
-                        {currency}
+                        B vs S ({currency})
                     </Badge>
                 </div>
 
-                <svg viewBox={`0 0 ${RW} 185`} className="w-full h-auto font-mono select-none">
-                    {/* Radar Concentric Rings */}
-                    <path
-                        d={`M ${RCX - RAD} ${RCY} A ${RAD} ${RAD} 0 0 1 ${RCX + RAD} ${RCY}`}
-                        fill="none"
-                        stroke="#1e293b"
-                        strokeWidth="10"
-                        strokeLinecap="round"
-                    />
-                    <path
-                        d={`M ${RCX - 72} ${RCY} A 72 72 0 0 1 ${RCX + 72} ${RCY}`}
-                        fill="none"
-                        stroke="#0f172a"
-                        strokeWidth="1"
-                        strokeDasharray="3 3"
-                    />
-
-                    {/* Left Quadrant Arc: BUY */}
-                    <path
-                        d={`M ${RCX - RAD} ${RCY} A ${RAD} ${RAD} 0 0 1 ${RCX} ${RCY - RAD}`}
-                        fill="none"
-                        stroke={buySum >= 0 ? '#22d3ee' : '#f43f5e'}
-                        strokeWidth="10"
-                        strokeDasharray={`${buyArcRatio * quarterArcLen} ${quarterArcLen * 2}`}
-                        strokeLinecap="round"
-                        opacity="0.9"
-                    />
-                    {/* Right Quadrant Arc: SELL */}
-                    <path
-                        d={`M ${RCX + RAD} ${RCY} A ${RAD} ${RAD} 0 0 0 ${RCX} ${RCY - RAD}`}
-                        fill="none"
-                        stroke={sellSum >= 0 ? '#fb923c' : '#f43f5e'}
-                        strokeWidth="10"
-                        strokeDasharray={`${sellArcRatio * quarterArcLen} ${quarterArcLen * 2}`}
-                        strokeLinecap="round"
-                        opacity="0.9"
-                    />
-
-                    {/* Labels for Left (BUY) & Right (SELL) */}
-                    <text x={24} y={32} fontSize="10" fontWeight="bold" fill="#22d3ee">
-                        BUY
-                    </text>
-                    <text x={24} y={45} fontSize="11" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
-                        {buySum >= 0 ? `+${buySum.toFixed(2)}` : buySum.toFixed(2)}
-                    </text>
-
-                    <text x={RW - 24} y={32} textAnchor="end" fontSize="10" fontWeight="bold" fill="#fb923c">
-                        SELL
-                    </text>
-                    <text x={RW - 24} y={45} textAnchor="end" fontSize="11" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
-                        {sellSum >= 0 ? `+${sellSum.toFixed(2)}` : sellSum.toFixed(2)}
-                    </text>
-
-                    {/* Center Zero Tick */}
-                    <line x1={RCX} y1={RCY - RAD - 9} x2={RCX} y2={RCY - RAD + 9} stroke="#64748b" strokeWidth="1.5" />
-
-                    {/* Rotating Net Balance Needle */}
-                    <g transform={`rotate(${needleDeg} ${RCX} ${RCY})`}>
-                        <line
-                            x1={RCX}
-                            y1={RCY}
-                            x2={RCX}
-                            y2={RCY - RAD + 16}
-                            stroke={netSum >= 0 ? '#10b981' : '#f43f5e'}
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                        />
-                        <circle cx={RCX} cy={RCY - RAD + 16} r="4" fill={netSum >= 0 ? '#34d399' : '#fb7185'} />
-                    </g>
-                    <circle cx={RCX} cy={RCY} r="7" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
-
-                    {/* Digital NET Readout */}
-                    <text x={RCX} y={RCY + 20} textAnchor="middle" fontSize="9" fill="#94a3b8">
-                        NET SUM
-                    </text>
-                    <text
-                        x={RCX}
-                        y={RCY + 34}
-                        textAnchor="middle"
-                        fontSize="13"
-                        fontWeight="bold"
-                        fill={netSum >= 0 ? '#34d399' : '#fb7185'}
-                    >
-                        {netSum >= 0 ? `+${netSum.toFixed(2)}` : netSum.toFixed(2)} {currency}
-                    </text>
-                </svg>
+                <div className="grid grid-cols-3 gap-2">
+                    {renderSemiGauge(
+                        'ORDERS',
+                        buyOrders.length,
+                        sellOrders.length,
+                        `${buyOrders.length}`,
+                        `${sellOrders.length}`,
+                        `${buyOrders.length}:${sellOrders.length}`,
+                        '#38bdf8',
+                        false
+                    )}
+                    {renderSemiGauge(
+                        'DD / PNL',
+                        buySum,
+                        sellSum,
+                        buySum >= 0 ? `+${buySum.toFixed(0)}` : buySum.toFixed(0),
+                        sellSum >= 0 ? `+${sellSum.toFixed(0)}` : sellSum.toFixed(0),
+                        netSum >= 0 ? `+${netSum.toFixed(1)}` : netSum.toFixed(1),
+                        netSum >= 0 ? '#34d399' : '#fb7185',
+                        true
+                    )}
+                    {renderSemiGauge(
+                        'LOTS',
+                        buyLot,
+                        sellLot,
+                        buyLot.toFixed(2),
+                        sellLot.toFixed(2),
+                        `${netLot >= 0 ? '+' : ''}${netLot.toFixed(2)}L`,
+                        Math.abs(netLot) < 0.001 ? '#facc15' : netLot > 0 ? '#22d3ee' : '#fb923c',
+                        false
+                    )}
+                </div>
             </div>
         </div>
     );
