@@ -77,11 +77,15 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
         try {
             // Clear legacy 7-day localStorage key if present
             localStorage.removeItem('dismiss_farm_pwa_install');
+            if (cleanPort) {
+                localStorage.removeItem(`dismiss_farm_pwa_install_${cleanPort}`);
+            }
 
             const searchParams = new URLSearchParams(window.location.search);
             const forceShow = searchParams.has('install') || searchParams.has('pwa');
 
-            const isSessionDismissed = sessionStorage.getItem('dismiss_farm_pwa_install');
+            const storageKey = `dismiss_farm_pwa_install_${cleanPort || 'default'}`;
+            const isSessionDismissed = sessionStorage.getItem(storageKey);
             if (!forceShow && isSessionDismissed) {
                 setIsDismissed(true);
             } else {
@@ -117,7 +121,8 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
         e?.stopPropagation();
         setIsDismissed(true);
         try {
-            sessionStorage.setItem('dismiss_farm_pwa_install', 'true');
+            const storageKey = `dismiss_farm_pwa_install_${cleanPort || 'default'}`;
+            sessionStorage.setItem(storageKey, 'true');
         } catch {}
     };
 
