@@ -34,6 +34,12 @@ interface SmartVortexChartProps {
     targetProfit: number;
     frozenSide?: string;
     isOnline?: boolean;
+    openBuy?: number;
+    openSell?: number;
+    pendBuy?: number;
+    pendSell?: number;
+    cap?: number;
+    liveCyclePnl?: number;
     chart: SmartChartData | null | undefined;
 }
 
@@ -44,6 +50,12 @@ export function SmartVortexChart({
     targetProfit,
     frozenSide,
     isOnline = false,
+    openBuy = 0,
+    openSell = 0,
+    pendBuy = 0,
+    pendSell = 0,
+    cap = 7,
+    liveCyclePnl = 0,
     chart,
 }: SmartVortexChartProps) {
     const [showOrders, setShowOrders] = useState(true);
@@ -450,19 +462,29 @@ export function SmartVortexChart({
                     </div>
                 </div>
 
-                {/* OHLC Bar Info inside Header */}
-                <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-mono text-slate-400">
-                    <span>{formatTime(hoveredBar[0])}</span>
-                    <span>O:<strong className="text-slate-200">{hoveredBar[1].toFixed(digits)}</strong></span>
-                    <span>H:<strong className="text-emerald-400">{hoveredBar[2].toFixed(digits)}</strong></span>
-                    <span>L:<strong className="text-rose-400">{hoveredBar[3].toFixed(digits)}</strong></span>
-                    <span>C:<strong className="text-slate-200">{hoveredBar[4].toFixed(digits)}</strong></span>
-                    <span className="ml-auto flex items-center gap-1.5 text-cyan-300 font-bold">
-                        {isOnline && (
-                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                {/* Single-line Radar & Floating PnL Strip (never wraps on mobile) */}
+                <div className="flex items-center justify-between gap-2 text-[11px] font-mono whitespace-nowrap overflow-hidden">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <span className="text-cyan-400 font-bold">
+                            B:{openBuy}/{cap}
+                        </span>
+                        <span className="text-orange-400 font-bold">
+                            S:{openSell}/{cap}
+                        </span>
+                        <span className="text-slate-400">
+                            P:{pendBuy}/{pendSell}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 tabular-nums font-bold">
+                        {isOnline && (openBuy + openSell) > 0 && (
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         )}
-                        {liveBid.toFixed(digits)}
-                    </span>
+                        <span className="text-slate-400 text-[10px]">PNL</span>
+                        <span className={liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            {liveCyclePnl >= 0 ? '+' : ''}
+                            {liveCyclePnl.toFixed(2)} {currency}
+                        </span>
+                    </div>
                 </div>
             </CardHeader>
 

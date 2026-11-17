@@ -608,6 +608,12 @@ function SmartEACockpitContent() {
                         targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
                         frozenSide={eaState?.frozen_side}
                         isOnline={isOnline && !isWaitingFreshData}
+                        openBuy={eaState?.open_buy ?? 0}
+                        openSell={eaState?.open_sell ?? 0}
+                        pendBuy={eaState?.pending_buy ?? 0}
+                        pendSell={eaState?.pending_sell ?? 0}
+                        cap={activeCap}
+                        liveCyclePnl={liveCyclePnl}
                         chart={eaState?.chart}
                     />
 
