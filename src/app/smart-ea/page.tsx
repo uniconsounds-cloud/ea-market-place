@@ -333,13 +333,22 @@ function SmartEACockpitContent() {
     };
     const needsUpdate = Boolean(eaState?.ea_version && compareVersions(latestVersion, eaState.ea_version) > 0);
 
-    // Prime-style Header calculations
+    // Prime-style Header calculations (75% Balance Anchor + 05:00 BKK Market Timeline)
     const balanceVal = eaState?.balance || 0;
-    const eqPct = balanceVal > 0 ? Math.max(0, Math.min(100, (liveEquity / balanceVal) * 100)) : 100;
+    const safeBalance = Math.max(1, balanceVal);
     const pnlPct = balanceVal > 0 ? (liveCyclePnl / balanceVal) * 100 : 0;
-    const tpRatio = activeTp > 0 ? Math.max(0, Math.min(1, liveCyclePnl / activeTp)) : (liveCyclePnl >= activeTp ? 1 : 0);
-    const totalSegments = 24;
-    const filledSegments = Math.round(tpRatio * totalSegments);
+
+    // 1-Day Trading Timeline (05:00 AM Bangkok -> 05:00 AM next day): shrinks from left to right
+    const bkkStr = clockNow.toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+    const [bkkH, bkkM] = bkkStr.split(':').map((v) => parseInt(v, 10) || 0);
+    const minsSince0500 = ((bkkH * 60 + bkkM) - 300 + 1440) % 1440;
+    const marketElapsedPct = (minsSince0500 / 1440) * 100;
+    const remainingMarketPct = Math.max(0, 100 - marketElapsedPct);
 
     const secAngle = clockNow.getSeconds() * 6;
     const minAngle = clockNow.getMinutes() * 6 + clockNow.getSeconds() * 0.1;
@@ -411,36 +420,68 @@ function SmartEACockpitContent() {
                                     </div>
                                 </div>
 
-                                {/* Equity vs Balance Bar */}
-                                <div className="h-2.5 w-full rounded-full bg-slate-900 border border-cyan-500/25 overflow-hidden flex">
-                                    <div
-                                        className="h-full bg-gradient-to-r from-cyan-500 to-sky-400 transition-all duration-500"
-                                        style={{ width: `${Math.min(100, eqPct)}%` }}
-                                    />
-                                    {liveCyclePnl < 0 && balanceVal > 0 && (
-                                        <div
-                                            className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-500"
-                                            style={{ width: `${Math.min(100 - Math.min(100, eqPct), Math.abs(pnlPct))}%` }}
-                                        />
+                                {/* THE UNIFIED BAR: Balance as Anchor (75% mark) matching Prime FarmHUD */}
+                                <div className="relative h-2.5 sm:h-3.5 w-full bg-black/50 rounded-full border border-cyan-500/25 p-0.5 overflow-hidden shadow-inner">
+                                    {/* Target Point: Balance Marker (WHITE at 75%) */}
+                                    <div className="absolute left-[75%] top-0 bottom-0 w-[1px] bg-white/60 z-20" />
+
+                                    {liveCyclePnl < 0 ? (
+                                        <>
+                                            <div
+                                                className="h-full bg-gradient-to-r from-[#0284c7] to-[#0ea5e9] rounded-l-full transition-all duration-1000"
+                                                style={{ width: `${Math.max(0, 75 + (liveCyclePnl / safeBalance) * 75)}%` }}
+                                            />
+                                            <div
+                                                className="absolute bottom-0.5 h-1 sm:h-1.5 bg-gradient-to-r from-red-600/60 to-red-400 transition-all duration-1000"
+                                                style={{
+                                                    left: `${Math.max(0, 75 + (liveCyclePnl / safeBalance) * 75)}%`,
+                                                    width: `${Math.min(75, Math.abs((liveCyclePnl / safeBalance) * 75))}%`,
+                                                }}
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div
+                                                className="h-full bg-gradient-to-r from-[#0284c7] to-[#38bdf8] rounded-l-full transition-all duration-1000"
+                                                style={{ width: '75%' }}
+                                            />
+                                            <div
+                                                className="absolute bottom-0.5 h-1 sm:h-1.5 bg-gradient-to-r from-[#4de180] to-green-300 shadow-[0_0_8px_rgba(77,225,128,0.3)] transition-all duration-1000"
+                                                style={{
+                                                    left: '75%',
+                                                    width: `${Math.min(25, (liveCyclePnl / safeBalance) * 75)}%`,
+                                                }}
+                                            />
+                                        </>
                                     )}
+
+                                    {/* Glowing tip at current Equity */}
+                                    <div
+                                        className={`absolute top-0 bottom-0 w-1 blur-[2px] z-30 transition-all duration-1000 ${liveCyclePnl >= 0 ? 'bg-[#38bdf8]' : 'bg-red-400'}`}
+                                        style={{
+                                            left: `${Math.max(0, Math.min(100, 75 + (liveCyclePnl / safeBalance) * 75))}%`,
+                                            opacity: 0.6,
+                                        }}
+                                    />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Segmented Target Progress Bar */}
-                        <div className="grid grid-cols-24 gap-1 pt-0.5">
-                            {Array.from({ length: totalSegments }).map((_, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`h-2 rounded-[2px] transition-colors duration-300 ${
-                                        idx < filledSegments
-                                            ? liveCyclePnl >= 0
-                                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]'
-                                                : 'bg-rose-500'
-                                            : 'bg-slate-800/90'
-                                    }`}
-                                />
-                            ))}
+                        {/* 1-Day Trading Timeline Bar: left=open (05:00 BKK), right=close, bar shrinks from left to right */}
+                        <div className="relative w-full bg-black/40 border-y border-cyan-500/20 py-1 sm:py-1.5 rounded-md">
+                            <div className="px-2 relative">
+                                <div className="h-1.5 sm:h-2 w-full bg-white/5 rounded-full relative overflow-hidden">
+                                    <div
+                                        className="absolute top-0 right-0 h-full bg-gradient-to-r from-cyan-300/30 via-cyan-400/60 to-cyan-500/90 transition-all duration-1000 rounded-full"
+                                        style={{ width: `${remainingMarketPct}%` }}
+                                    />
+                                </div>
+                                <div className="absolute inset-0 px-2 flex justify-between items-center pointer-events-none">
+                                    {Array.from({ length: 25 }).map((_, i) => (
+                                        <div key={`h_${i}`} className={`h-2 sm:h-3 w-[1px] ${i % 6 === 0 ? 'bg-white/40' : 'bg-white/10'}`} />
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
