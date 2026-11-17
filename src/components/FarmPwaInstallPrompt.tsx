@@ -29,16 +29,17 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
         setIsStandalone(checkStandalone);
         if (checkStandalone) return;
 
-        // 2. Check dismissal cooldown (dismissed within last 7 days)
+        // 2. Check dismissal (session-only so user can test and re-open anytime)
         try {
-            const dismissedAt = localStorage.getItem('dismiss_farm_pwa_install');
-            if (dismissedAt) {
-                const diffDays = (Date.now() - Number(dismissedAt)) / (1000 * 60 * 60 * 24);
-                if (diffDays < 7) {
-                    setIsDismissed(true);
-                } else {
-                    setIsDismissed(false);
-                }
+            // Clear legacy 7-day localStorage key if present
+            localStorage.removeItem('dismiss_farm_pwa_install');
+
+            const searchParams = new URLSearchParams(window.location.search);
+            const forceShow = searchParams.has('install') || searchParams.has('pwa');
+
+            const isSessionDismissed = sessionStorage.getItem('dismiss_farm_pwa_install');
+            if (!forceShow && isSessionDismissed) {
+                setIsDismissed(true);
             } else {
                 setIsDismissed(false);
             }
@@ -72,7 +73,7 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
         e?.stopPropagation();
         setIsDismissed(true);
         try {
-            localStorage.setItem('dismiss_farm_pwa_install', String(Date.now()));
+            sessionStorage.setItem('dismiss_farm_pwa_install', 'true');
         } catch {}
     };
 
