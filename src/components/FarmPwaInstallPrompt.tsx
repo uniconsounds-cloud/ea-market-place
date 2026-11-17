@@ -102,15 +102,15 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
 
     return (
         <>
-            {/* 🌟 Option 2: Floating Pill Button on Mobile / Tablet */}
-            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 select-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* 🌟 Floating Pill Button: Positioned at top between Port HUD and Farm Canvas */}
+            <div className="fixed top-[188px] sm:top-[146px] left-1/2 -translate-x-1/2 z-40 select-none animate-in fade-in slide-in-from-top-4 duration-500 max-w-[92vw]">
                 <div 
                     onClick={handleInstallClick}
-                    className="flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-stone-900/90 hover:bg-stone-850 active:scale-95 transition-all duration-200 border border-amber-500/40 shadow-xl shadow-black/60 backdrop-blur-md cursor-pointer group"
+                    className="flex items-center gap-2.5 px-3.5 py-1.5 sm:py-2 rounded-full bg-stone-950/90 hover:bg-stone-900 active:scale-95 transition-all duration-200 border border-amber-500/50 shadow-[0_4px_20px_rgba(0,0,0,0.85)] shadow-amber-950/30 backdrop-blur-md cursor-pointer group"
                     title="สร้างทางลัดแอปฟาร์มลงหน้าจอมือถือ"
                 >
                     {/* 3D Floating Island Icon */}
-                    <div className="relative w-6 h-6 shrink-0 rounded-md overflow-hidden ring-1 ring-amber-400/40 shadow-sm bg-stone-950 flex items-center justify-center">
+                    <div className="relative w-6 h-6 shrink-0 rounded-md overflow-hidden ring-1 ring-amber-400/50 shadow-sm bg-stone-900 flex items-center justify-center">
                         <Image 
                             src="/farm/farm_icon_192.png" 
                             alt="EasyM Farm Icon" 
