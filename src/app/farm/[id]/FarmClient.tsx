@@ -8,6 +8,7 @@ import SpaceshipDashboard from '@/components/spaceship-dashboard';
 import AdminFarmDiagnosticOverlay from '@/components/AdminFarmDiagnosticOverlay';
 import OwnerDevFarmController from '@/components/OwnerDevFarmController';
 import TodayHarvestModal from '@/components/TodayHarvestModal';
+import FarmPwaInstallPrompt from '@/components/FarmPwaInstallPrompt';
 import { toast } from 'sonner';
 import { 
     Shield, Layers, Zap, Crosshair, X, 
@@ -7261,6 +7262,9 @@ export default function FarmClient({
                     history={history}
                 />
             )}
+
+            {/* 📲 PWA Floating Pill Install Prompt on Mobile (Option 2) */}
+            <FarmPwaInstallPrompt portNumber={String(portNumber)} />
         </div>
     );
 }

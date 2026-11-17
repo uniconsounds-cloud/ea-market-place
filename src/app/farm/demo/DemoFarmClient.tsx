@@ -6,6 +6,7 @@ import FarmHud, { FarmMobileStatsOverlay } from '@/components/farm-hud';
 import Image from 'next/image';
 import Link from 'next/link';
 import SpaceshipDashboard from '@/components/spaceship-dashboard';
+import FarmPwaInstallPrompt from '@/components/FarmPwaInstallPrompt';
 import { Trophy, X, Filter, BarChart3, TrendingUp, ShieldCheck, Clock, Users, ArrowUpRight, Award, Zap, ChevronRight, CheckCircle2, DollarSign, Sparkles, Rocket, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -2572,6 +2573,9 @@ export default function DemoFarmClient({
                     </button>
                 </div>
             )}
+
+            {/* 📲 PWA Floating Pill Install Prompt on Mobile (Option 2) */}
+            <FarmPwaInstallPrompt portNumber="Demo" />
         </div>
     );
 }
