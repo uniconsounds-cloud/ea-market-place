@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
 import { BasketRiskAnalyzer } from '@/components/basket-risk-analyzer';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import {
     Activity,
@@ -86,6 +87,7 @@ function SmartEACockpitContent() {
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
     const [pnlJitter, setPnlJitter] = useState(0);
     const [sessionOpenedAt, setSessionOpenedAt] = useState<number>(() => Date.now());
+    const [clockNow, setClockNow] = useState<Date>(() => new Date());
 
     // Form fields
     const [firstDistance, setFirstDistance] = useState('100');
@@ -101,13 +103,49 @@ function SmartEACockpitContent() {
     const [formInitialized, setFormInitialized] = useState(false);
 
     useEffect(() => {
-        if (!initialPortParam) {
-            const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_ea_port') : '';
-            if (saved) {
-                setPortInput(saved);
-                setActivePort(saved);
+        const t = setInterval(() => setClockNow(new Date()), 1000);
+        return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        if (initialPortParam) {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('smart_ea_port', initialPortParam);
             }
+            return;
         }
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_ea_port') : '';
+        if (saved) {
+            setPortInput(saved);
+            setActivePort(saved);
+            return;
+        }
+        // Auto-detect active Smart EA port from logged-in user's licenses
+        (async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                const { data: licenses } = await supabase
+                    .from('licenses')
+                    .select('account_number, products(product_key, name, strategy)')
+                    .eq('user_id', user.id)
+                    .eq('is_active', true);
+                const smartLic = (licenses || []).find((l: any) => {
+                    const key = (l.products?.product_key || '').toUpperCase();
+                    const name = (l.products?.name || '').toLowerCase();
+                    return key.startsWith('SMART-') || name.includes('smart vortex') || l.products?.strategy === 'Smart EA';
+                });
+                if (smartLic?.account_number) {
+                    setPortInput(smartLic.account_number);
+                    setActivePort(smartLic.account_number);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('smart_ea_port', smartLic.account_number);
+                    }
+                }
+            } catch {
+                // Ignore auto-detect error
+            }
+        })();
     }, [initialPortParam]);
 
     const fetchTelemetry = useCallback(async (portToFetch: string) => {
@@ -282,87 +320,172 @@ function SmartEACockpitContent() {
     const liveEquity = (eaState?.equity || 0) + pnlJitter;
     const activeTp = eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20);
     const activeCap = eaState?.active_config?.max_both_sides_cap ?? (parseInt(maxBothSidesCap, 10) || 7);
-    const eqRatio = eaState && eaState.balance > 0 ? Math.max(0, Math.min(130, (liveEquity / eaState.balance) * 100)) : 100;
-    const tpProgress = activeTp > 0 ? Math.max(0, Math.min(100, (liveCyclePnl / activeTp) * 100)) : (liveCyclePnl >= activeTp ? 100 : 0);
+
+    // Semantic numeric version comparison: > 0 means latest > current
+    const compareVersions = (a: string, b: string) => {
+        const pa = a.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+        const pb = b.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const diff = (pa[i] || 0) - (pb[i] || 0);
+            if (diff !== 0) return diff;
+        }
+        return 0;
+    };
+    const needsUpdate = Boolean(eaState?.ea_version && compareVersions(latestVersion, eaState.ea_version) > 0);
+
+    // Prime-style Header calculations
+    const balanceVal = eaState?.balance || 0;
+    const eqPct = balanceVal > 0 ? Math.max(0, Math.min(100, (liveEquity / balanceVal) * 100)) : 100;
+    const pnlPct = balanceVal > 0 ? (liveCyclePnl / balanceVal) * 100 : 0;
+    const tpRatio = activeTp > 0 ? Math.max(0, Math.min(1, liveCyclePnl / activeTp)) : (liveCyclePnl >= activeTp ? 1 : 0);
+    const totalSegments = 24;
+    const filledSegments = Math.round(tpRatio * totalSegments);
+
+    const secAngle = clockNow.getSeconds() * 6;
+    const minAngle = clockNow.getMinutes() * 6 + clockNow.getSeconds() * 0.1;
+    const hrAngle = (clockNow.getHours() % 12) * 30 + clockNow.getMinutes() * 0.5;
 
     return (
         <div className="min-h-screen bg-[#040711] text-slate-100">
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-5xl space-y-4">
-            {/* Starship Bridge Header & Port Selector */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl border border-cyan-500/30 bg-[#070b16]/95 p-3.5 sm:p-4 shadow-[0_0_24px_rgba(6,182,212,0.08)]">
-                <div className="flex items-center justify-between md:justify-start gap-2.5">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                            <h1 className="text-lg sm:text-xl font-mono font-bold tracking-widest uppercase text-cyan-300">
-                                VORTEX // BRIDGE
-                            </h1>
-                            <Badge className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-mono text-[10px]">
-                                SMART EA
-                            </Badge>
-                        </div>
-                        <p className="text-[11px] font-mono text-slate-400 mt-0.5 hidden sm:block">
-                            2-WAY TELEMETRY & TACTICAL GRID COMMAND
-                        </p>
-                    </div>
-                </div>
-
-                <form onSubmit={handleConnectPort} className="flex items-center gap-2 w-full md:w-auto">
-                    <Input
-                        placeholder="PORT # (e.g. 58013626)"
-                        value={portInput}
-                        onChange={(e) => setPortInput(e.target.value)}
-                        className="w-full md:w-48 font-mono text-xs bg-slate-950/90 border-cyan-500/30 text-cyan-100"
-                    />
-                    <Button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs shrink-0"
-                    >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'LINK'}
-                    </Button>
-                </form>
-            </div>
-
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-5 max-w-5xl space-y-4">
             {!activePort ? (
-                <Card className="border-dashed">
-                    <CardContent className="py-16 text-center space-y-3">
-                        <Activity className="w-10 h-10 mx-auto text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">กรุณาระบุเลขพอร์ต MT5 ที่ต้องการควบคุม</h3>
-                        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                            ติดตั้ง EA Smart Vortex บน MT5 ของคุณ และเพิ่ม URL https://eaeze.com ใน MT5 WebRequest จากนั้นกรอกเลขพอร์ตด้านบนเพื่อเริ่มใช้งาน
-                        </p>
+                <Card className="border-cyan-500/30 bg-[#070b16]/95 text-slate-100">
+                    <CardContent className="py-12 text-center space-y-4">
+                        <Activity className="w-10 h-10 mx-auto text-cyan-400" />
+                        <h3 className="text-base font-mono font-bold text-cyan-300">CONNECT SMART VORTEX PORT</h3>
+                        <form onSubmit={handleConnectPort} className="flex items-center justify-center gap-2 max-w-sm mx-auto">
+                            <Input
+                                placeholder="PORT # (e.g. 58018897)"
+                                value={portInput}
+                                onChange={(e) => setPortInput(e.target.value)}
+                                className="font-mono text-xs bg-slate-950/90 border-cyan-500/30 text-cyan-100"
+                            />
+                            <Button type="submit" disabled={loading} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs">
+                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'LINK'}
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
             ) : (
                 <>
-                    {/* Version Update Alert Banner */}
-                    {eaState?.ea_version && eaState.ea_version !== latestVersion && (
-                        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <Badge className="bg-amber-500 text-slate-950 font-semibold">
-                                        มีอัปเดตเวอร์ชันใหม่ v{latestVersion}
-                                    </Badge>
-                                    <span className="text-xs text-muted-foreground font-mono">
-                                        พอร์ตของคุณกำลังรัน v{eaState.ea_version}
+                    {/* Prime-Inspired Sci-Fi Header (Adapted to Smart EA Cyan/Obsidian Theme) */}
+                    <div className={`rounded-xl border border-cyan-500/30 bg-gradient-to-r from-[#070d1c] via-[#061224] to-[#070d1c] p-3.5 sm:p-4 shadow-[0_0_28px_rgba(6,182,212,0.1)] space-y-3 transition-all duration-500 ${isWaitingFreshData ? 'opacity-60 grayscale animate-pulse' : ''}`}>
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            {/* Analog Live Clock */}
+                            <svg viewBox="0 0 60 60" className="w-12 h-12 sm:w-14 sm:h-14 shrink-0">
+                                <circle cx="30" cy="30" r="27" fill="#050811" stroke="#22d3ee" strokeWidth="1.5" opacity="0.85" />
+                                <circle cx="30" cy="30" r="23" fill="none" stroke="#1e293b" strokeWidth="1" />
+                                <text x="30" y="13" textAnchor="middle" fontSize="6.5" fill="#22d3ee" fontFamily="monospace">12</text>
+                                <text x="30" y="52" textAnchor="middle" fontSize="6.5" fill="#22d3ee" fontFamily="monospace">6</text>
+                                <line x1="30" y1="30" x2="30" y2="16" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" transform={`rotate(${hrAngle} 30 30)`} />
+                                <line x1="30" y1="30" x2="30" y2="11" stroke="#94a3b8" strokeWidth="1.4" strokeLinecap="round" transform={`rotate(${minAngle} 30 30)`} />
+                                <line x1="30" y1="30" x2="30" y2="9" stroke="#f43f5e" strokeWidth="0.9" strokeLinecap="round" transform={`rotate(${secAngle} 30 30)`} />
+                                <circle cx="30" cy="30" r="2.2" fill="#22d3ee" />
+                            </svg>
+
+                            {/* Left & Right Telemetry */}
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex items-start justify-between gap-2 font-mono">
+                                    <div className="min-w-0">
+                                        <div className="text-xs sm:text-sm font-bold tracking-wider text-cyan-300 truncate">
+                                            {eaState?.symbol || 'XAUUSD'} | {activePort} | {cur}
+                                        </div>
+                                        <div className="text-xs sm:text-sm text-slate-400">
+                                            EQUITY{' '}
+                                            <strong className="text-sky-400 tabular-nums">
+                                                {eaState ? liveEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---'}
+                                            </strong>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                        <div className="text-[11px] sm:text-xs text-slate-400 tabular-nums">
+                                            BALANCE{' '}
+                                            <strong className="text-slate-100">
+                                                {eaState ? balanceVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---'}
+                                            </strong>
+                                        </div>
+                                        <div className={`text-xs sm:text-sm font-bold tabular-nums ${liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {eaState ? `${liveCyclePnl >= 0 ? '+' : ''}${liveCyclePnl.toFixed(2)} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)` : '---'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Equity vs Balance Bar */}
+                                <div className="h-2.5 w-full rounded-full bg-slate-900 border border-cyan-500/25 overflow-hidden flex">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-cyan-500 to-sky-400 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, eqPct)}%` }}
+                                    />
+                                    {liveCyclePnl < 0 && balanceVal > 0 && (
+                                        <div
+                                            className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-500"
+                                            style={{ width: `${Math.min(100 - Math.min(100, eqPct), Math.abs(pnlPct))}%` }}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Segmented Target Progress Bar */}
+                        <div className="grid grid-cols-24 gap-1 pt-0.5">
+                            {Array.from({ length: totalSegments }).map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`h-2 rounded-[2px] transition-colors duration-300 ${
+                                        idx < filledSegments
+                                            ? liveCyclePnl >= 0
+                                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]'
+                                                : 'bg-rose-500'
+                                            : 'bg-slate-800/90'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Responsive Version Status Bar (Single-line compact on mobile, full on desktop) */}
+                    {eaState?.ea_version && (
+                        needsUpdate ? (
+                            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 flex items-center justify-between gap-2 font-mono">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 text-[11px] sm:text-xs whitespace-nowrap overflow-hidden">
+                                        <Badge className="bg-amber-500 text-slate-950 font-bold text-[10px] shrink-0">
+                                            UPDATE v{latestVersion}
+                                        </Badge>
+                                        <span className="text-amber-200 truncate">
+                                            <span className="sm:hidden">ใช้ v{eaState.ea_version} • กดอัปเดต</span>
+                                            <span className="hidden sm:inline">พอร์ตกำลังรัน v{eaState.ea_version} (สามารถลงทับไฟล์ .ex5 เดิมได้ทันทีโดยไม่เสียรอบ)</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                {downloadUrl && (
+                                    <a
+                                        href={downloadUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="px-2.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold shrink-0"
+                                    >
+                                        <span className="sm:hidden">โหลด</span>
+                                        <span className="hidden sm:inline">ดาวน์โหลด v{latestVersion}</span>
+                                    </a>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 flex items-center justify-between gap-2 font-mono text-[11px] sm:text-xs whitespace-nowrap overflow-hidden">
+                                <div className="flex items-center gap-2 min-w-0 truncate">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                    <span className="text-emerald-300 font-bold">Smart Vortex v{eaState.ea_version}</span>
+                                    <span className="text-slate-400 truncate">
+                                        <span className="sm:hidden">• เวอร์ชันล่าสุดแล้ว</span>
+                                        <span className="hidden sm:inline">• เป็นเวอร์ชันล่าสุดแล้ว (Up to date)</span>
                                     </span>
                                 </div>
-                                <p className="text-xs text-amber-200/90">
-                                    สามารถดาวน์โหลดไฟล์ .ex5 เวอร์ชันใหม่ไปวางทับบนกราฟเดิมได้เลยโดยไม่ต้องลบออเดอร์เก่า ระบบจะกู้รอบเทรดเดิมต่อทันที
-                                </p>
+                                <span className="text-[10px] text-slate-500 shrink-0">
+                                    SYNC {(eaState as any)?.sync_interval_sec || 15}s
+                                </span>
                             </div>
-                            {downloadUrl && (
-                                <a
-                                    href={downloadUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-semibold shrink-0 text-center"
-                                >
-                                    ดาวน์โหลด v{latestVersion}
-                                </a>
-                            )}
-                        </div>
+                        )
                     )}
 
                     {/* One-Side Cap Freeze Banner + Quick TP Rescue */}
@@ -485,117 +608,6 @@ function SmartEACockpitContent() {
                             >
                                 {eaState?.trade_status || 'WAIT'}
                             </span>
-                        </div>
-                    </div>
-
-                    {/* Sci-Fi HUD Gauges & Dual-Side Radar Cluster */}
-                    <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono transition-all duration-500 ${isWaitingFreshData ? 'opacity-55 grayscale animate-pulse' : ''}`}>
-                        {/* Gauge 1: Balance & Equity Arc */}
-                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex items-center gap-3">
-                            <svg viewBox="0 0 44 44" className="w-12 h-12 shrink-0 -rotate-90">
-                                <circle cx="22" cy="22" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
-                                <circle
-                                    cx="22"
-                                    cy="22"
-                                    r="18"
-                                    fill="none"
-                                    stroke={eqRatio >= 100 ? '#10b981' : '#38bdf8'}
-                                    strokeWidth="4"
-                                    strokeDasharray={`${(Math.min(100, eqRatio) / 100) * 113.1} 113.1`}
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                            <div className="min-w-0">
-                                <div className="text-[10px] text-slate-400">BAL // EQ ({cur})</div>
-                                <div className="text-sm font-bold text-slate-100 truncate tabular-nums">
-                                    {eaState ? eaState.balance.toFixed(2) : '---'}
-                                </div>
-                                <div className="text-[11px] text-cyan-300 truncate tabular-nums">
-                                    EQ {eaState ? liveEquity.toFixed(2) : '---'}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Gauge 2: Cycle Net & Target Progress Arc */}
-                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex items-center gap-3">
-                            <svg viewBox="0 0 44 44" className="w-12 h-12 shrink-0 -rotate-90">
-                                <circle cx="22" cy="22" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
-                                <circle
-                                    cx="22"
-                                    cy="22"
-                                    r="18"
-                                    fill="none"
-                                    stroke={liveCyclePnl >= 0 ? '#22c55e' : '#f43f5e'}
-                                    strokeWidth="4"
-                                    strokeDasharray={`${(tpProgress / 100) * 113.1} 113.1`}
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                            <div className="min-w-0">
-                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                    CYCLE NET
-                                    {isOnline && (eaState?.open_pos || 0) > 0 && (
-                                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    )}
-                                </div>
-                                <div
-                                    className={`text-sm font-bold truncate tabular-nums ${
-                                        liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                                    }`}
-                                >
-                                    {eaState ? `${liveCyclePnl >= 0 ? '+' : ''}${liveCyclePnl.toFixed(2)}` : '---'}
-                                </div>
-                                <div className="text-[11px] text-slate-400 truncate tabular-nums">
-                                    TP {activeTp} {cur}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Gauge 3: Dual-Side Cap Radar */}
-                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex flex-col justify-between">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                <span>RADAR B // S</span>
-                                <span className="text-cyan-400">CAP {activeCap}</span>
-                            </div>
-                            <div className="space-y-1.5 my-1">
-                                <div className="flex items-center gap-2 text-[11px]">
-                                    <span className="w-4 text-cyan-400 font-bold">B</span>
-                                    <div className="flex-1 h-1.5 rounded-full bg-slate-900 overflow-hidden">
-                                        <div
-                                            className="h-full bg-cyan-400 transition-all"
-                                            style={{ width: `${Math.min(100, ((eaState?.open_buy || 0) / Math.max(1, activeCap)) * 100)}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-slate-200 tabular-nums">{eaState?.open_buy ?? 0}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[11px]">
-                                    <span className="w-4 text-orange-400 font-bold">S</span>
-                                    <div className="flex-1 h-1.5 rounded-full bg-slate-900 overflow-hidden">
-                                        <div
-                                            className="h-full bg-orange-400 transition-all"
-                                            style={{ width: `${Math.min(100, ((eaState?.open_sell || 0) / Math.max(1, activeCap)) * 100)}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-slate-200 tabular-nums">{eaState?.open_sell ?? 0}</span>
-                                </div>
-                            </div>
-                            <div className="text-[10px] text-slate-400 truncate">
-                                PEND B:{eaState?.pending_buy ?? 0} S:{eaState?.pending_sell ?? 0}
-                            </div>
-                        </div>
-
-                        {/* Gauge 4: Anchor & Telemetry Sync */}
-                        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3 flex flex-col justify-between">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                <span>{eaState?.symbol || 'XAUUSD'}</span>
-                                <span className="text-emerald-400">v{eaState?.ea_version || '1.10'}</span>
-                            </div>
-                            <div className="text-sm font-bold text-amber-400 truncate tabular-nums">
-                                {eaState?.anchor ? eaState.anchor.toFixed(2) : 'WAIT'}
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                                ANCHOR // SYNC {(eaState as any)?.sync_interval_sec || 15}s
-                            </div>
                         </div>
                     </div>
 
