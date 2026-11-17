@@ -13,9 +13,12 @@ export const metadata: Metadata = {
     },
     icons: {
         icon: [
+            { url: '/farm/farm_icon_32.png', sizes: '32x32', type: 'image/png' },
+            { url: '/farm/farm_icon_48.png', sizes: '48x48', type: 'image/png' },
             { url: '/farm/farm_icon_192.png', sizes: '192x192', type: 'image/png' },
             { url: '/farm/farm_icon_512.png', sizes: '512x512', type: 'image/png' },
         ],
+        shortcut: '/farm/farm_icon_48.png',
         apple: [
             { url: '/farm/farm_apple_touch_icon.png', sizes: '180x180', type: 'image/png' },
         ],

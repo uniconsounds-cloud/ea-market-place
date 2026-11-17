@@ -824,6 +824,44 @@ export default function FarmClient({
         return () => document.removeEventListener('click', handleOutsideGuideClick, true);
     }, [isFarmGuideActive]);
 
+    // 🌾 Dynamic Farm Favicon & Apple-Touch-Icon sync (Ensures Chrome/Safari tabs & PWA icon use Farm logo specifically on farm pages)
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const iconRels = ['icon', 'shortcut icon'];
+        iconRels.forEach((rel) => {
+            let link = document.querySelector(`link[rel='${rel}']`) as HTMLLinkElement | null;
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = rel;
+                document.head.appendChild(link);
+            }
+            link.type = 'image/png';
+            link.href = '/farm/farm_icon_48.png';
+        });
+
+        let appleLink = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement | null;
+        if (!appleLink) {
+            appleLink = document.createElement('link');
+            appleLink.rel = 'apple-touch-icon';
+            document.head.appendChild(appleLink);
+        }
+        appleLink.href = '/farm/farm_apple_touch_icon.png';
+
+        return () => {
+            iconRels.forEach((rel) => {
+                const link = document.querySelector(`link[rel='${rel}']`) as HTMLLinkElement | null;
+                if (link) {
+                    link.href = '/favicon.ico';
+                }
+            });
+            const apple = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement | null;
+            if (apple) {
+                apple.href = '/apple-icon.png';
+            }
+        };
+    }, []);
+
     const fullEaName = useMemo(() => {
         if (cleanSysCode) return cleanSysCode;
         if (licenseInfo?.productName) return licenseInfo.productName;
