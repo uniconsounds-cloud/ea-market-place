@@ -208,9 +208,9 @@ export function PnlVectorVisualizer({
                         strokeWidth="1"
                         strokeDasharray="2 2.5"
                     />
-                    {/* Left Arc: BUY Weight (Cyan) */}
+                    {/* Left Arc: BUY Weight (sweeps from TOP CENTER outward to LEFT) */}
                     <path
-                        d={`M ${GCX - GRAD} ${GCY} A ${GRAD} ${GRAD} 0 0 1 ${GCX} ${GCY - GRAD}`}
+                        d={`M ${GCX} ${GCY - GRAD} A ${GRAD} ${GRAD} 0 0 0 ${GCX - GRAD} ${GCY}`}
                         fill="none"
                         stroke="#22d3ee"
                         strokeWidth="6.5"
@@ -218,9 +218,9 @@ export function PnlVectorVisualizer({
                         strokeLinecap="round"
                         opacity="0.92"
                     />
-                    {/* Right Arc: SELL Weight (Orange) */}
+                    {/* Right Arc: SELL Weight (sweeps from TOP CENTER outward to RIGHT) */}
                     <path
-                        d={`M ${GCX + GRAD} ${GCY} A ${GRAD} ${GRAD} 0 0 0 ${GCX} ${GCY - GRAD}`}
+                        d={`M ${GCX} ${GCY - GRAD} A ${GRAD} ${GRAD} 0 0 1 ${GCX + GRAD} ${GCY}`}
                         fill="none"
                         stroke="#fb923c"
                         strokeWidth="6.5"
