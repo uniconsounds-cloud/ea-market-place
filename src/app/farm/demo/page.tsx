@@ -2,6 +2,26 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import DemoFarmClient from './DemoFarmClient';
 import { redirect } from 'next/navigation';
 import { parsePoolConfig, getSyntheticLiveTrackerData } from '@/lib/liveTrackerSynthetic';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: 'FarmDemo',
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: 'black-translucent',
+        title: 'FarmDemo',
+    },
+    icons: {
+        icon: [
+            { url: '/farm/farm_icon_192.png', sizes: '192x192', type: 'image/png' },
+            { url: '/farm/farm_icon_512.png', sizes: '512x512', type: 'image/png' },
+        ],
+        apple: [
+            { url: '/farm/farm_apple_touch_icon.png', sizes: '180x180', type: 'image/png' },
+        ],
+    },
+    manifest: '/api/farm-manifest?port=Demo',
+};
 
 export default async function DemoFarmPage(props: {
     searchParams?: Promise<{ preview?: string; embed?: string }> | { preview?: string; embed?: string };

@@ -17,8 +17,52 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
     const [isIOS, setIsIOS] = useState(false);
     const [isInApp, setIsInApp] = useState(false);
 
+    // Compute dynamic App Name: e.g. Farm3088, Farm2434, FarmDemo
+    const cleanPort = String(portNumber || '').trim();
+    const isDemo = !cleanPort || cleanPort.toLowerCase() === 'demo';
+    const last4 = !isDemo ? (cleanPort.length > 4 ? cleanPort.slice(-4) : cleanPort) : 'Demo';
+    const appName = `Farm${last4}`;
+
     useEffect(() => {
         setMounted(true);
+
+        // Update document title, apple-mobile-web-app-title and manifest link dynamically
+        if (typeof document !== 'undefined') {
+            document.title = appName;
+
+            let metaApple = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+            if (!metaApple) {
+                metaApple = document.createElement('meta');
+                metaApple.setAttribute('name', 'apple-mobile-web-app-title');
+                document.head.appendChild(metaApple);
+            }
+            metaApple.setAttribute('content', appName);
+
+            let metaApp = document.querySelector('meta[name="application-name"]');
+            if (!metaApp) {
+                metaApp = document.createElement('meta');
+                metaApp.setAttribute('name', 'application-name');
+                document.head.appendChild(metaApp);
+            }
+            metaApp.setAttribute('content', appName);
+
+            let linkApple = document.querySelector('link[rel="apple-touch-icon"]');
+            if (!linkApple) {
+                linkApple = document.createElement('link');
+                linkApple.setAttribute('rel', 'apple-touch-icon');
+                document.head.appendChild(linkApple);
+            }
+            linkApple.setAttribute('href', '/farm/farm_apple_touch_icon.png');
+
+            let linkManifest = document.querySelector('link[rel="manifest"]');
+            const manifestUrl = `/api/farm-manifest?port=${cleanPort || 'demo'}`;
+            if (!linkManifest) {
+                linkManifest = document.createElement('link');
+                linkManifest.setAttribute('rel', 'manifest');
+                document.head.appendChild(linkManifest);
+            }
+            linkManifest.setAttribute('href', manifestUrl);
+        }
 
         // 1. Check if running in standalone mode (already installed PWA)
         const checkStandalone = 
@@ -67,7 +111,7 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
-    }, []);
+    }, [appName, cleanPort]);
 
     const handleDismiss = (e?: React.MouseEvent) => {
         e?.stopPropagation();
@@ -169,23 +213,25 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
                             <div className="relative w-11 h-11 rounded-xl overflow-hidden ring-1 ring-amber-400/50 shadow-md bg-stone-950 shrink-0">
                                 <Image
                                     src="/farm/farm_icon_192.png"
-                                    alt="EasyM Farm"
+                                    alt={appName}
                                     fill
                                     className="object-contain p-0.5"
                                     unoptimized
                                 />
                             </div>
                             <div className="min-w-0">
-                                <h3 className="font-bold text-sm text-amber-200 flex items-center gap-1.5 truncate">
-                                    <span>EasyM Farm</span>
-                                    {portNumber && (
-                                        <span className="text-[10px] font-mono text-amber-400/80">
-                                            #{portNumber}
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h3 className="font-extrabold text-sm sm:text-base text-amber-200">
+                                        {appName}
+                                    </h3>
+                                    {!isDemo && (
+                                        <span className="text-[10px] font-mono text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-1 rounded">
+                                            #{cleanPort}
                                         </span>
                                     )}
-                                </h3>
+                                </div>
                                 <p className="text-[10px] text-muted-foreground truncate">
-                                    สร้างทางลัดดูฟาร์มเต็มหน้าจอ
+                                    สร้างทางลัดเข้าฟาร์มบนหน้าจอมือถือ
                                 </p>
                             </div>
                         </div>
@@ -233,6 +279,7 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
                                     </div>
                                     <div className="flex-1">
                                         <span>แตะ <strong className="text-emerald-400 font-bold">"เพิ่ม" (Add)</strong> มุมบนขวา</span>
+                                        <span className="block text-[9.5px] text-amber-300/80 font-mono mt-0.5">ชื่อแอป: {appName}</span>
                                     </div>
                                 </div>
                             </div>
@@ -253,9 +300,12 @@ export default function FarmPwaInstallPrompt({ portNumber }: FarmPwaInstallPromp
                                     <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                         2
                                     </div>
-                                    <div className="flex-1 flex items-center justify-between">
-                                        <span>เลือก <strong className="text-amber-300">"เพิ่มลงในหน้าจอหลัก"</strong></span>
-                                        <Download className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-1" />
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <span>เลือก <strong className="text-amber-300">"เพิ่มลงในหน้าจอหลัก"</strong></span>
+                                            <Download className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-1" />
+                                        </div>
+                                        <span className="block text-[9.5px] text-amber-300/80 font-mono mt-0.5">ชื่อแอป: {appName}</span>
                                     </div>
                                 </div>
                             </div>

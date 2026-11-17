@@ -1,6 +1,37 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import FarmClient from './FarmClient';
 import { notFound, redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> | { id: string } }): Promise<Metadata> {
+    const unwrappedParams = await params;
+    let portNumber = unwrappedParams.id;
+    if (portNumber === '3088') portNumber = '97053088';
+    if (portNumber === '2434') portNumber = '21692434';
+    const cleanPort = String(portNumber || '').trim();
+    const isDemo = cleanPort.toLowerCase() === 'demo';
+    const last4 = !isDemo ? (cleanPort.length > 4 ? cleanPort.slice(-4) : cleanPort) : 'Demo';
+    const appName = `Farm${last4}`;
+
+    return {
+        title: appName,
+        appleWebApp: {
+            capable: true,
+            statusBarStyle: 'black-translucent',
+            title: appName,
+        },
+        icons: {
+            icon: [
+                { url: '/farm/farm_icon_192.png', sizes: '192x192', type: 'image/png' },
+                { url: '/farm/farm_icon_512.png', sizes: '512x512', type: 'image/png' },
+            ],
+            apple: [
+                { url: '/farm/farm_apple_touch_icon.png', sizes: '180x180', type: 'image/png' },
+            ],
+        },
+        manifest: `/api/farm-manifest?port=${portNumber}`,
+    };
+}
 
 export default async function FarmPage({ params }: { params: { id: string } }) {
     const supabase = await createSupabaseServerClient();
