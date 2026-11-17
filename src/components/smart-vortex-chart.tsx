@@ -464,13 +464,8 @@ export function SmartVortexChart({
                     <div className="flex flex-wrap items-center gap-2">
                         <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
                             <CandlestickChart className="w-4 h-4 text-cyan-400" />
-                            SCANNER // {symbol} M1
+                            {symbol} M1
                         </CardTitle>
-                        {(chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN') && (
-                            <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-mono text-[10px]">
-                                TP {chart.est_tp_price.toFixed(digits)}
-                            </Badge>
-                        )}
                         {chart.freeze_price > 0 && frozenSide && frozenSide !== 'NONE' && (
                             <Badge className="bg-rose-500/15 text-rose-400 border-rose-500/30 font-mono text-[10px]">
                                 FRZ {frozenSide} {chart.freeze_price.toFixed(digits)}

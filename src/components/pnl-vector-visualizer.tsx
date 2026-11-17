@@ -12,6 +12,7 @@ interface PnlVectorVisualizerProps {
     pnlJitter: number;
     isOnline?: boolean;
     chart: SmartChartData | null | undefined;
+    mode?: 'all' | 'modelA' | 'modelB';
 }
 
 export function PnlVectorVisualizer({
@@ -21,6 +22,7 @@ export function PnlVectorVisualizer({
     pnlJitter,
     isOnline = false,
     chart,
+    mode = 'all',
 }: PnlVectorVisualizerProps) {
     const [bidOffset, setBidOffset] = useState(0);
     const digits = chart?.digits ?? 2;
@@ -265,13 +267,9 @@ export function PnlVectorVisualizer({
 
     const netLot = buyLot - sellLot;
 
-    return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            {/* ===================================================== */}
-            {/* MODEL A: Unified Stack + Floating Live BID Price Line  */}
-            {/* ===================================================== */}
-            <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3.5 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
-                <div className="flex items-center justify-between mb-2">
+    const renderModelA = () => (
+        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-2.5 sm:p-3 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
+            <div className="flex items-center justify-between mb-2">
                     <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
                         <GitCommitHorizontal className="w-4 h-4 text-cyan-400" />
                         MODEL A // UNIFIED PNL STACK
@@ -464,55 +462,68 @@ export function PnlVectorVisualizer({
                         {oppositeSign ? 'CENTER NET = DIFF SPAN' : 'CENTER NET = COMBINED SPAN'}
                     </text>
                 </svg>
+        </div>
+    );
+
+    const renderModelB = () => (
+        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-2.5 sm:p-3 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
+            <div className="flex items-center justify-between mb-2">
+                <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
+                    <Radar className="w-3.5 h-3.5 text-cyan-400" />
+                    MODEL B // TRIPLE BALANCE RADAR
+                </span>
+                <Badge className="bg-slate-900 text-slate-300 border-slate-700 font-mono text-[10px] py-0">
+                    B vs S ({currency})
+                </Badge>
             </div>
 
-            {/* ===================================================== */}
-            {/* MODEL B: 3 Sci-Fi Semi-Circular Balance Dials (L -> R) */}
-            {/* ===================================================== */}
-            <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-3.5 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
-                <div className="flex items-center justify-between mb-2.5">
-                    <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
-                        <Radar className="w-4 h-4 text-cyan-400" />
-                        MODEL B // TRIPLE BALANCE RADAR
-                    </span>
-                    <Badge className="bg-slate-900 text-slate-300 border-slate-700 font-mono text-[10px]">
-                        B vs S ({currency})
-                    </Badge>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                    {renderSemiGauge(
-                        'ORDERS',
-                        buyOrders.length,
-                        sellOrders.length,
-                        `${buyOrders.length}`,
-                        `${sellOrders.length}`,
-                        `${buyOrders.length}:${sellOrders.length}`,
-                        '#38bdf8',
-                        false
-                    )}
-                    {renderSemiGauge(
-                        'DD / PNL',
-                        buySum,
-                        sellSum,
-                        buySum >= 0 ? `+${buySum.toFixed(0)}` : buySum.toFixed(0),
-                        sellSum >= 0 ? `+${sellSum.toFixed(0)}` : sellSum.toFixed(0),
-                        netSum >= 0 ? `+${netSum.toFixed(1)}` : netSum.toFixed(1),
-                        netSum >= 0 ? '#34d399' : '#fb7185',
-                        true
-                    )}
-                    {renderSemiGauge(
-                        'LOTS',
-                        buyLot,
-                        sellLot,
-                        buyLot.toFixed(2),
-                        sellLot.toFixed(2),
-                        `${netLot >= 0 ? '+' : ''}${netLot.toFixed(2)}L`,
-                        Math.abs(netLot) < 0.001 ? '#facc15' : netLot > 0 ? '#22d3ee' : '#fb923c',
-                        false
-                    )}
-                </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                {renderSemiGauge(
+                    'ORDERS',
+                    buyOrders.length,
+                    sellOrders.length,
+                    `${buyOrders.length}`,
+                    `${sellOrders.length}`,
+                    `${buyOrders.length}:${sellOrders.length}`,
+                    '#38bdf8',
+                    false
+                )}
+                {renderSemiGauge(
+                    'DD / PNL',
+                    buySum,
+                    sellSum,
+                    buySum >= 0 ? `+${buySum.toFixed(0)}` : buySum.toFixed(0),
+                    sellSum >= 0 ? `+${sellSum.toFixed(0)}` : sellSum.toFixed(0),
+                    netSum >= 0 ? `+${netSum.toFixed(1)}` : netSum.toFixed(1),
+                    netSum >= 0 ? '#34d399' : '#fb7185',
+                    true
+                )}
+                {renderSemiGauge(
+                    'LOTS',
+                    buyLot,
+                    sellLot,
+                    buyLot.toFixed(2),
+                    sellLot.toFixed(2),
+                    `${netLot >= 0 ? '+' : ''}${netLot.toFixed(2)}L`,
+                    Math.abs(netLot) < 0.001 ? '#facc15' : netLot > 0 ? '#22d3ee' : '#fb923c',
+                    false
+                )}
             </div>
+        </div>
+    );
+
+    if (mode === 'modelB') {
+        return renderModelB();
+    }
+
+    if (mode === 'modelA') {
+        return renderModelA();
+    }
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 items-start">
+            {renderModelA()}
+            {renderModelB()}
         </div>
     );
 }

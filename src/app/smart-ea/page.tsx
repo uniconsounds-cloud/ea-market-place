@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
-import { BasketRiskAnalyzer } from '@/components/basket-risk-analyzer';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -592,6 +591,17 @@ function SmartEACockpitContent() {
                         </div>
                     </div>
 
+                    {/* Model B: Triple Balance Radar (Orders / DD-PnL / Lots) - Moved directly after Clock Frame */}
+                    <PnlVectorVisualizer
+                        mode="modelB"
+                        currency={cur}
+                        cyclePnl={eaState?.cycle_pnl || 0}
+                        targetProfit={activeTp}
+                        pnlJitter={pnlJitter}
+                        isOnline={isOnline && !isWaitingFreshData}
+                        chart={eaState?.chart}
+                    />
+
                     {/* One-Side Cap Freeze Banner + Quick TP Rescue (Emergency Protection) */}
                     {(eaState?.trade_status === 'FROZEN_BUY' || eaState?.trade_status === 'FROZEN_SELL' || eaState?.trade_status === 'FROZEN_7X7' || eaState?.protection_frozen) && (
                         <div className="rounded-xl border border-rose-500/50 bg-rose-500/10 p-2.5 sm:p-3 space-y-2">
@@ -685,26 +695,9 @@ function SmartEACockpitContent() {
                         chart={eaState?.chart}
                     />
 
-                    {/* Basket Risk & Recovery Analyzer */}
-                    <BasketRiskAnalyzer
-                        currency={cur}
-                        cyclePnl={eaState?.cycle_pnl || 0}
-                        targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
-                        openPos={eaState?.open_pos || 0}
-                        frozenSide={eaState?.frozen_side}
-                        sending={sending}
-                        chart={eaState?.chart}
-                        onQuickSetTp={(newTp) => {
-                            setTargetProfit(String(newTp));
-                            sendCommand(
-                                { target_profit: newTp, close_all: false },
-                                `ตั้งเป้า Target Profit = ${newTp} ${cur} เรียบร้อย`
-                            );
-                        }}
-                    />
-
-                    {/* Dual Comparison: Model A (Vector Axis) & Model B (Radar Needle) */}
+                    {/* Model A: Unified PnL Stack Vector Axis */}
                     <PnlVectorVisualizer
+                        mode="modelA"
                         currency={cur}
                         cyclePnl={eaState?.cycle_pnl || 0}
                         targetProfit={activeTp}
