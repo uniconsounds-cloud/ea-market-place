@@ -103,10 +103,10 @@ export function PnlVectorVisualizer({
     const buyStackCount = buyOrders.length;
     const sellStackCount = sellOrders.length;
     const TOP_PAD = 28;
-    const Y_BUY = TOP_PAD + buyStackCount * ROW_STEP + (buyStackCount > 0 ? 12 : 6);
-    const Y_NET = Y_BUY + 20;  // Tightly packed summary lines (20px apart)
-    const Y_SELL = Y_NET + 20;
-    const SELL_STACK_START = Y_SELL + 18;
+    const Y_BUY = TOP_PAD + buyStackCount * ROW_STEP + (buyStackCount > 0 ? 16 : 10);
+    const Y_NET = Y_BUY + 11;   // Ultra-tight 11px spacing -> unified center core block
+    const Y_SELL = Y_NET + 11;
+    const SELL_STACK_START = Y_SELL + 22;
     const H_MODEL_A = SELL_STACK_START + sellStackCount * ROW_STEP + 20;
 
     const clampRatio = (v: number, scale: number) => Math.max(-1, Math.min(1, v / scale));
@@ -222,65 +222,77 @@ export function PnlVectorVisualizer({
                         );
                     })}
 
+                    {/* Unified Center Core Block Frame (BUY ∑ + NET + SELL ∑) */}
+                    <rect
+                        x={2}
+                        y={Y_BUY - 9}
+                        width={W - 4}
+                        height={Y_SELL - Y_BUY + 18}
+                        rx={6}
+                        fill="rgba(15, 23, 42, 0.72)"
+                        stroke="rgba(34, 211, 238, 0.28)"
+                        strokeWidth="1"
+                    />
+
                     {/* Connector Guides from BUY Tip & SELL Tip into Center NET Line */}
-                    <line x1={buyX} y1={Y_BUY + 4} x2={buyX} y2={Y_NET} stroke="#22d3ee" strokeWidth="1.1" strokeDasharray="2 2" opacity="0.7" />
-                    <line x1={sellX} y1={Y_SELL - 4} x2={sellX} y2={Y_NET} stroke="#fb923c" strokeWidth="1.1" strokeDasharray="2 2" opacity="0.7" />
+                    <line x1={buyX} y1={Y_BUY + 3} x2={buyX} y2={Y_NET} stroke="#22d3ee" strokeWidth="1" strokeDasharray="2 1.5" opacity="0.75" />
+                    <line x1={sellX} y1={Y_SELL - 3} x2={sellX} y2={Y_NET} stroke="#fb923c" strokeWidth="1" strokeDasharray="2 1.5" opacity="0.75" />
 
                     {/* BUY TOTAL (- Left | + Right) */}
-                    <line x1={CX - HALF_SPAN} y1={Y_BUY} x2={CX + HALF_SPAN} y2={Y_BUY} stroke="#1e293b" strokeWidth="7" strokeLinecap="round" />
+                    <line x1={CX - HALF_SPAN} y1={Y_BUY} x2={CX + HALF_SPAN} y2={Y_BUY} stroke="#1e293b" strokeWidth="5.5" strokeLinecap="round" />
                     <line
                         x1={CX}
                         y1={Y_BUY}
                         x2={buyX}
                         y2={Y_BUY}
                         stroke={buySum >= 0 ? '#22d3ee' : '#f43f5e'}
-                        strokeWidth="7"
+                        strokeWidth="5.5"
                         strokeLinecap="round"
                     />
-                    <circle cx={buyX} cy={Y_BUY} r="4.5" fill={buySum >= 0 ? '#22d3ee' : '#f43f5e'} stroke="#050811" strokeWidth="1.2" />
-                    <text x={6} y={Y_BUY + 3} fontSize="9" fontWeight="bold" fill="#22d3ee">
+                    <circle cx={buyX} cy={Y_BUY} r="3.5" fill={buySum >= 0 ? '#22d3ee' : '#f43f5e'} stroke="#050811" strokeWidth="1" />
+                    <text x={8} y={Y_BUY + 2.8} fontSize="8" fontWeight="bold" fill="#22d3ee">
                         BUY ∑
                     </text>
-                    <text x={W - 6} y={Y_BUY + 3} textAnchor="end" fontSize="9" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
+                    <text x={W - 8} y={Y_BUY + 2.8} textAnchor="end" fontSize="8" fontWeight="bold" fill={buySum >= 0 ? '#34d399' : '#fb7185'}>
                         {buySum >= 0 ? `+${buySum.toFixed(2)}` : buySum.toFixed(2)}
                     </text>
 
-                    {/* NET TOTAL IN THE MIDDLE (Tight 20px spacing) */}
-                    <line x1={CX - HALF_SPAN} y1={Y_NET} x2={CX + HALF_SPAN} y2={Y_NET} stroke="#1e293b" strokeWidth="8.5" strokeLinecap="round" />
+                    {/* NET TOTAL IN THE MIDDLE (Ultra-tight 11px spacing) */}
+                    <line x1={CX - HALF_SPAN} y1={Y_NET} x2={CX + HALF_SPAN} y2={Y_NET} stroke="#1e293b" strokeWidth="6.5" strokeLinecap="round" />
                     <line
                         x1={netStartX}
                         y1={Y_NET}
                         x2={netEndX}
                         y2={Y_NET}
                         stroke={netSum >= 0 ? '#10b981' : '#f43f5e'}
-                        strokeWidth="8.5"
+                        strokeWidth="6.5"
                         strokeLinecap="round"
                     />
-                    <circle cx={netStartX} cy={Y_NET} r="4" fill="#e2e8f0" stroke="#050811" strokeWidth="1.2" />
-                    <circle cx={netEndX} cy={Y_NET} r="5.5" fill={netSum >= 0 ? '#10b981' : '#f43f5e'} stroke="#ffffff" strokeWidth="1.4" />
-                    <text x={6} y={Y_NET + 3} fontSize="9.5" fontWeight="bold" fill="#f8fafc">
+                    <circle cx={netStartX} cy={Y_NET} r="3.2" fill="#e2e8f0" stroke="#050811" strokeWidth="1" />
+                    <circle cx={netEndX} cy={Y_NET} r="4.5" fill={netSum >= 0 ? '#10b981' : '#f43f5e'} stroke="#ffffff" strokeWidth="1.2" />
+                    <text x={8} y={Y_NET + 2.8} fontSize="8.5" fontWeight="bold" fill="#f8fafc">
                         NET
                     </text>
-                    <text x={W - 6} y={Y_NET + 3.5} textAnchor="end" fontSize="10" fontWeight="bold" fill={netSum >= 0 ? '#34d399' : '#fb7185'}>
+                    <text x={W - 8} y={Y_NET + 2.8} textAnchor="end" fontSize="8.5" fontWeight="bold" fill={netSum >= 0 ? '#34d399' : '#fb7185'}>
                         {netSum >= 0 ? `+${netSum.toFixed(2)}` : netSum.toFixed(2)}
                     </text>
 
                     {/* SELL TOTAL (+ Left | - Right, mirrored) */}
-                    <line x1={CX - HALF_SPAN} y1={Y_SELL} x2={CX + HALF_SPAN} y2={Y_SELL} stroke="#1e293b" strokeWidth="7" strokeLinecap="round" />
+                    <line x1={CX - HALF_SPAN} y1={Y_SELL} x2={CX + HALF_SPAN} y2={Y_SELL} stroke="#1e293b" strokeWidth="5.5" strokeLinecap="round" />
                     <line
                         x1={CX}
                         y1={Y_SELL}
                         x2={sellX}
                         y2={Y_SELL}
                         stroke={sellSum >= 0 ? '#10b981' : '#fb923c'}
-                        strokeWidth="7"
+                        strokeWidth="5.5"
                         strokeLinecap="round"
                     />
-                    <circle cx={sellX} cy={Y_SELL} r="4.5" fill={sellSum >= 0 ? '#10b981' : '#fb923c'} stroke="#050811" strokeWidth="1.2" />
-                    <text x={6} y={Y_SELL + 3} fontSize="9" fontWeight="bold" fill="#fb923c">
+                    <circle cx={sellX} cy={Y_SELL} r="3.5" fill={sellSum >= 0 ? '#10b981' : '#fb923c'} stroke="#050811" strokeWidth="1" />
+                    <text x={8} y={Y_SELL + 2.8} fontSize="8" fontWeight="bold" fill="#fb923c">
                         SELL ∑
                     </text>
-                    <text x={W - 6} y={Y_SELL + 3} textAnchor="end" fontSize="9" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
+                    <text x={W - 8} y={Y_SELL + 2.8} textAnchor="end" fontSize="8" fontWeight="bold" fill={sellSum >= 0 ? '#34d399' : '#fb7185'}>
                         {sellSum >= 0 ? `+${sellSum.toFixed(2)}` : sellSum.toFixed(2)}
                     </text>
 
