@@ -46,6 +46,7 @@ interface ActiveConfig {
     initial_lot: number;
     lot_increment: number;
     target_profit: number;
+    freeze_stop_loss?: number;
     enable_cap_freeze?: boolean;
     max_both_sides_cap?: number;
     freeze_flip_max_extra?: number;
@@ -320,7 +321,7 @@ function SmartEACockpitContent() {
     const [isOnline, setIsOnline] = useState(false);
     const [eaState, setEaState] = useState<EAState | null>(null);
     const [lastCommand, setLastCommand] = useState<any>(null);
-    const [latestVersion, setLatestVersion] = useState<string>('1.11');
+    const [latestVersion, setLatestVersion] = useState<string>('1.12');
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
     const [pnlJitter, setPnlJitter] = useState(0);
@@ -334,6 +335,7 @@ function SmartEACockpitContent() {
     const [initialLot, setInitialLot] = useState('0.01');
     const [lotIncrement, setLotIncrement] = useState('0.01');
     const [targetProfit, setTargetProfit] = useState('20');
+    const [freezeStopLoss, setFreezeStopLoss] = useState('0');
     const [enableCapFreeze, setEnableCapFreeze] = useState(true);
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [freezeFlipMaxExtra, setFreezeFlipMaxExtra] = useState('3');
@@ -418,6 +420,7 @@ function SmartEACockpitContent() {
                         if (src.initial_lot !== undefined) setInitialLot(String(src.initial_lot));
                         if (src.lot_increment !== undefined) setLotIncrement(String(src.lot_increment));
                         if (src.target_profit !== undefined) setTargetProfit(String(src.target_profit));
+                        if (src.freeze_stop_loss !== undefined) setFreezeStopLoss(String(src.freeze_stop_loss));
                         if (src.enable_cap_freeze !== undefined) setEnableCapFreeze(Boolean(src.enable_cap_freeze));
                         if (src.max_both_sides_cap !== undefined) setMaxBothSidesCap(String(src.max_both_sides_cap));
                         if (src.freeze_flip_max_extra !== undefined) setFreezeFlipMaxExtra(String(src.freeze_flip_max_extra));
@@ -525,6 +528,8 @@ function SmartEACockpitContent() {
         const lot = parseFloat(initialLot);
         const inc = parseFloat(lotIncrement);
         const tp = parseFloat(targetProfit);
+        const rawFsl = parseFloat(freezeStopLoss);
+        const fsl = isNaN(rawFsl) ? 0 : (rawFsl > 0 ? -rawFsl : rawFsl);
         const cap = parseInt(maxBothSidesCap, 10);
         const fmax = parseInt(freezeFlipMaxExtra, 10);
 
@@ -543,6 +548,7 @@ function SmartEACockpitContent() {
                 initial_lot: lot,
                 lot_increment: inc,
                 target_profit: tp,
+                freeze_stop_loss: fsl,
                 enable_cap_freeze: enableCapFreeze,
                 max_both_sides_cap: cap,
                 freeze_flip_max_extra: fmax,
@@ -934,22 +940,30 @@ function SmartEACockpitContent() {
                                 ทั้งสองฝั่งเปิดครบเกณฑ์แล้ว EA ลบ Pending ฝั่งตรงข้ามออก ส่วนฝั่งที่นับครบยังออกไม้ต่อได้เพื่อลุ้นปิดรวบ หรือปรับ <strong>Target Profit</strong> ด้านล่าง
                             </p>
                             <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-[11px] text-muted-foreground mr-1">ตั้งเป้าปิดรวบด่วน:</span>
+                                <span className="text-[11px] text-muted-foreground mr-1">Freeze SL (คง TP={activeTp}):</span>
                                 {[
-                                    { label: 'TP = 0 (เท่าทุน)', val: 0 },
-                                    { label: `TP = -100 ${cur}`, val: -100 },
+                                    { label: 'SL = ปิด (0)', val: 0 },
+                                    ...(balanceVal > 0 ? [
+                                        { label: `SL -3% (-${Math.round(balanceVal * 0.03)})`, val: -Math.round(balanceVal * 0.03) },
+                                        { label: `SL -6% (-${Math.round(balanceVal * 0.06)})`, val: -Math.round(balanceVal * 0.06) },
+                                    ] : [
+                                        { label: `SL -200 ${cur}`, val: -200 },
+                                        { label: `SL -500 ${cur}`, val: -500 },
+                                    ]),
                                 ].map((preset) => (
                                     <Button
-                                        key={preset.val}
+                                        key={`fsl-${preset.val}`}
                                         size="sm"
                                         variant="outline"
                                         disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-rose-500/40 hover:bg-rose-500/20"
+                                        className="h-6 text-[11px] px-2 border-amber-500/40 text-amber-200 hover:bg-amber-500/20"
                                         onClick={() => {
-                                            setTargetProfit(String(preset.val));
+                                            setFreezeStopLoss(String(preset.val));
                                             sendCommand(
-                                                { target_profit: preset.val, close_all: false },
-                                                `ตั้งเป้า Target Profit = ${preset.val} ${cur} แล้ว EA จะรวบปิดอัตโนมัติเมื่อถึงเป้า`
+                                                { freeze_stop_loss: preset.val, close_all: false },
+                                                preset.val === 0
+                                                    ? 'ปิด Freeze SL แล้ว (ใช้เฉพาะ TP ปกติ)'
+                                                    : `ตั้ง Freeze SL = ${preset.val} ${cur} แล้ว (TP=${activeTp} ยังทำงานตามปกติ)`
                                             );
                                         }}
                                     >
@@ -964,7 +978,7 @@ function SmartEACockpitContent() {
                                     onClick={openCustomTpModal}
                                 >
                                     <Sliders className="w-3 h-3 text-cyan-400" />
-                                    กำหนดเอง...
+                                    ตั้ง TP เอง...
                                 </Button>
                             </div>
                         </div>
@@ -1463,6 +1477,31 @@ function SmartEACockpitContent() {
                                                 />
                                                 <p className="text-[10px] text-muted-foreground hidden sm:block">
                                                     ใส่ 0 (เท่าทุน) หรือค่าติดลบ (เช่น -50) เพื่อรวบปิดจำกัดขาดทุนอัตโนมัติ
+                                                </p>
+                                            </div>
+
+                                            {/* 4b. Freeze Mode Stop Loss (SL) */}
+                                            <div className="space-y-1">
+                                                <Label className="text-[11px] text-amber-300/90 font-mono truncate block">
+                                                    <span className="sm:hidden">Freeze SL (0=ปิด)</span>
+                                                    <span className="hidden sm:inline">SL โหมด Freeze ({cur})</span>
+                                                </Label>
+                                                <Input
+                                                    readOnly
+                                                    value={Number(freezeStopLoss) < 0 ? freezeStopLoss : '0 (OFF)'}
+                                                    onClick={() => openParamModal({
+                                                        title: `FREEZE STOP LOSS (${cur})`,
+                                                        unit: cur,
+                                                        currentVal: Math.min(0, parseFloat(freezeStopLoss) || 0),
+                                                        step: 50,
+                                                        presetValues: [0, -50, -100, -200, -300, -500, -1000, -2000, -3000, -5000, -10000],
+                                                        quickSteps: [-500, -100, -10, 10, 100, 500],
+                                                        onApply: (v) => setFreezeStopLoss(String(v > 0 ? -v : v)),
+                                                    })}
+                                                    className="font-mono bg-slate-950/80 border-amber-500/30 text-amber-200 h-8 sm:h-9 cursor-pointer hover:border-amber-400/60 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                />
+                                                <p className="text-[10px] text-muted-foreground hidden sm:block">
+                                                    ทำงานคู่กับ TP เฉพาะตอน Freeze (0 = ปิด, ค่าติดลบ = ยอมตัดขาดทุน)
                                                 </p>
                                             </div>
 
