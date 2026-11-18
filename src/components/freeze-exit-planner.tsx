@@ -63,6 +63,8 @@ export default function FreezeExitPlanner({
     const [draftSl, setDraftSl] = useState<number>(currentSl);
     const [activeMode, setActiveMode] = useState<'TP' | 'SL'>('SL');
     const [rangePts, setRangePts] = useState<number>(2000);
+    const [showBuyOrders, setShowBuyOrders] = useState<boolean>(true);
+    const [showSellOrders, setShowSellOrders] = useState<boolean>(true);
 
     useEffect(() => {
         if (open) {
@@ -222,6 +224,14 @@ export default function FreezeExitPlanner({
             }
         }
 
+        const buyOrderPts: number[] = [];
+        const sellOrderPts: number[] = [];
+        for (const o of openOrders) {
+            const dPts = Math.round((o.p - basePrice) / pointSize);
+            if (o.t === 'B') buyOrderPts.push(dPts);
+            else if (o.t === 'S') sellOrderPts.push(dPts);
+        }
+
         return {
             points,
             basePrice,
@@ -231,6 +241,8 @@ export default function FreezeExitPlanner({
             valPerPricePerLot,
             maxDdPt,
             bePoint,
+            buyOrderPts,
+            sellOrderPts,
             minPnl: Math.min(minPnl, -100, draftSl < 0 ? draftSl * 1.1 : 0),
             maxPnl: Math.max(maxPnl, 100, draftTp > 0 ? draftTp * 1.2 : 100),
         };
@@ -257,6 +269,34 @@ export default function FreezeExitPlanner({
     const zeroX = xForPnl(0);
     const nowY = yForPts(0);
     const nowX = xForPnl(cyclePnl);
+
+    // X-axis PnL Scale ticks
+    const xTicks = useMemo(() => {
+        const span = sim.maxPnl - sim.minPnl;
+        const rawStep = span / 4;
+        const mag = Math.pow(10, Math.floor(Math.log10(Math.max(1, rawStep))));
+        const norm = rawStep / mag;
+        const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+        const step = Math.max(50, niceNorm * mag);
+
+        const ticks: number[] = [];
+        const start = Math.ceil(sim.minPnl / step) * step;
+        for (let v = start; v <= sim.maxPnl; v += step) {
+            const rounded = Math.round(v);
+            if (Math.abs(rounded) >= step * 0.45) {
+                ticks.push(rounded);
+            }
+        }
+        return ticks;
+    }, [sim.minPnl, sim.maxPnl]);
+
+    const formatCompactPnl = (v: number) => {
+        if (Math.abs(v) >= 1000) {
+            const k = v / 1000;
+            return `${v > 0 ? '+' : ''}${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+        }
+        return `${v > 0 ? '+' : ''}${v}`;
+    };
 
     const pathD = sim.points
         .map((pt, idx) => `${idx === 0 ? 'M' : 'L'} ${xForPnl(pt.pnl).toFixed(1)} ${yForPts(pt.deltaPts).toFixed(1)}`)
@@ -339,9 +379,9 @@ export default function FreezeExitPlanner({
                         </div>
                     </div>
                     <div>
-                        <div className="text-slate-400">NET LOT</div>
+                        <div className="text-slate-400">ไม้ B:{openBuy} / S:{openSell}</div>
                         <div className="font-bold text-sky-300">
-                            {sim.netLot >= 0 ? `B +${sim.netLot.toFixed(2)}` : `S ${sim.netLot.toFixed(2)}`}
+                            {sim.netLot >= 0 ? `Net B +${sim.netLot.toFixed(2)}` : `Net S ${sim.netLot.toFixed(2)}`}
                         </div>
                     </div>
                     <div>
@@ -397,6 +437,31 @@ export default function FreezeExitPlanner({
                     </div>
                 </div>
 
+                {/* Order Line Checklist (Toggle Buy / Sell lines) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-1 font-mono text-[10px] sm:text-[11px]">
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none text-sky-300">
+                            <input
+                                type="checkbox"
+                                checked={showBuyOrders}
+                                onChange={(e) => setShowBuyOrders(e.target.checked)}
+                                className="accent-sky-400 w-3.5 h-3.5 rounded cursor-pointer"
+                            />
+                            <span>เส้น Buy ({openBuy})</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none text-orange-300">
+                            <input
+                                type="checkbox"
+                                checked={showSellOrders}
+                                onChange={(e) => setShowSellOrders(e.target.checked)}
+                                className="accent-orange-400 w-3.5 h-3.5 rounded cursor-pointer"
+                            />
+                            <span>เส้น Sell ({openSell})</span>
+                        </label>
+                    </div>
+                    <span className="text-[10px] text-slate-500">แกนนอน: {currency} | แกนตั้ง: จุด</span>
+                </div>
+
                 {/* Price-vs-PnL Simulator SVG */}
                 <div className="relative rounded-xl border border-cyan-500/25 bg-[#030710] p-1.5">
                     <svg
@@ -413,10 +478,24 @@ export default function FreezeExitPlanner({
                             fill="rgba(16, 185, 129, 0.06)"
                         />
 
+                        {/* X-axis PnL Scale Gridlines & Labels */}
+                        {xTicks.map((val) => {
+                            const tx = xForPnl(val);
+                            if (tx < PAD_L + 8 || tx > W - PAD_R - 8) return null;
+                            return (
+                                <g key={`xt-${val}`}>
+                                    <line x1={tx} y1={PAD_T} x2={tx} y2={H - PAD_B} stroke="#1e293b" strokeWidth="0.7" />
+                                    <text x={tx} y={H - 6} fill="#64748b" fontSize="8" textAnchor="middle" fontFamily="monospace">
+                                        {formatCompactPnl(val)}
+                                    </text>
+                                </g>
+                            );
+                        })}
+
                         {/* Zero PnL Vertical Line (TP = 0) */}
                         <line x1={zeroX} y1={PAD_T} x2={zeroX} y2={H - PAD_B} stroke="#38bdf8" strokeWidth="1" strokeDasharray="3 3" opacity="0.65" />
-                        <text x={zeroX} y={H - 6} fill="#38bdf8" fontSize="9" textAnchor="middle" fontFamily="monospace">
-                            0 (BE)
+                        <text x={zeroX} y={H - 6} fill="#38bdf8" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+                            0
                         </text>
 
                         {/* Y-axis Price & Distance Grid */}
@@ -428,6 +507,30 @@ export default function FreezeExitPlanner({
                                     <text x={PAD_L - 4} y={y + 3} fill={pts === 0 ? '#e2e8f0' : '#64748b'} fontSize="8.5" textAnchor="end" fontFamily="monospace">
                                         {pts === 0 ? 'NOW' : `${pts > 0 ? '+' : ''}${pts}`}
                                     </text>
+                                </g>
+                            );
+                        })}
+
+                        {/* Open Buy Order Lines (Checklist controlled) */}
+                        {showBuyOrders && sim.buyOrderPts.map((dPts, idx) => {
+                            if (dPts > rangePts || dPts < -rangePts) return null;
+                            const oy = yForPts(dPts);
+                            return (
+                                <g key={`b-${idx}`}>
+                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 10} y2={oy} stroke="#38bdf8" strokeWidth="1.5" opacity="0.85" />
+                                    <line x1={PAD_L + 10} y1={oy} x2={W - PAD_R} y2={oy} stroke="#38bdf8" strokeWidth="0.7" strokeDasharray="2 3" opacity="0.16" />
+                                </g>
+                            );
+                        })}
+
+                        {/* Open Sell Order Lines (Checklist controlled) */}
+                        {showSellOrders && sim.sellOrderPts.map((dPts, idx) => {
+                            if (dPts > rangePts || dPts < -rangePts) return null;
+                            const oy = yForPts(dPts);
+                            return (
+                                <g key={`s-${idx}`}>
+                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 10} y2={oy} stroke="#fb923c" strokeWidth="1.5" opacity="0.85" />
+                                    <line x1={PAD_L + 10} y1={oy} x2={W - PAD_R} y2={oy} stroke="#fb923c" strokeWidth="0.7" strokeDasharray="2 3" opacity="0.16" />
                                 </g>
                             );
                         })}
