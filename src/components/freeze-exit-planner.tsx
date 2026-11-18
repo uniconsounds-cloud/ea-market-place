@@ -467,6 +467,9 @@ export default function FreezeExitPlanner({
                             />
                             <span>เส้น Sell ({openSell})</span>
                         </label>
+                        {openBuy === 0 && openSell === 0 && (
+                            <span className="text-[10px] text-amber-300/80">(พอร์ตว่าง 0 ไม้)</span>
+                        )}
                     </div>
                     <span className="text-[10px] text-slate-500">แกนนอน: {currency} | แกนตั้ง: จุด</span>
                 </div>
@@ -520,28 +523,28 @@ export default function FreezeExitPlanner({
                             );
                         })}
 
-                        {/* Open Buy Order Lines (Checklist controlled, half thickness & opacity to center) */}
+                        {/* Open Buy Order Lines (Checklist controlled, subtle to center) */}
                         {showBuyOrders && sim.buyOrderPts.map((dPts, idx) => {
                             if (dPts > rangePts || dPts < -rangePts) return null;
                             const oy = yForPts(dPts);
                             const midX = PAD_L + plotW / 2;
                             return (
                                 <g key={`b-${idx}`}>
-                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#38bdf8" strokeWidth="0.75" opacity="0.42" />
-                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#38bdf8" strokeWidth="0.35" strokeDasharray="2 3" opacity="0.08" />
+                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#38bdf8" strokeWidth="0.9" opacity="0.55" />
+                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2 2" opacity="0.22" />
                                 </g>
                             );
                         })}
 
-                        {/* Open Sell Order Lines (Checklist controlled, half thickness & opacity to center) */}
+                        {/* Open Sell Order Lines (Checklist controlled, subtle to center) */}
                         {showSellOrders && sim.sellOrderPts.map((dPts, idx) => {
                             if (dPts > rangePts || dPts < -rangePts) return null;
                             const oy = yForPts(dPts);
                             const midX = PAD_L + plotW / 2;
                             return (
                                 <g key={`s-${idx}`}>
-                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#fb923c" strokeWidth="0.75" opacity="0.42" />
-                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#fb923c" strokeWidth="0.35" strokeDasharray="2 3" opacity="0.08" />
+                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#fb923c" strokeWidth="0.9" opacity="0.55" />
+                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#fb923c" strokeWidth="0.5" strokeDasharray="2 2" opacity="0.22" />
                                 </g>
                             );
                         })}
