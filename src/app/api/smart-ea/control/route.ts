@@ -62,7 +62,7 @@ export async function GET(req: Request) {
             success: true,
             port_number: port,
             is_online: isOnline,
-            latest_version: productRow?.version || '1.12',
+            latest_version: productRow?.version || '1.13',
             download_url: productRow?.file_url || null,
             state,
             command,
