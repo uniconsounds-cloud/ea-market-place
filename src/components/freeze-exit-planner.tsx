@@ -361,9 +361,18 @@ export default function FreezeExitPlanner({
                             <Sparkles className="w-4 h-4 text-cyan-400" />
                             FREEZE EXIT PLANNER
                         </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
-                            {symbol} | {frozenSide !== 'NONE' ? `FROZEN ${frozenSide}` : 'LIVE SIM'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
+                                {symbol} | {frozenSide !== 'NONE' ? `FROZEN ${frozenSide}` : 'LIVE SIM'}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => onOpenChange(false)}
+                                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-[11px] font-mono transition"
+                            >
+                                ✕ ปิด
+                            </button>
+                        </div>
                     </DialogTitle>
                     <DialogDescription className="text-[11px] text-slate-400">
                         จำลองเส้นทางกำไร-ขาดทุนจริงตามระยะราคา (±{rangePts} จุด) แตะบนกราฟหรือกดเลือกจุดแนะนำได้เลย
@@ -511,26 +520,28 @@ export default function FreezeExitPlanner({
                             );
                         })}
 
-                        {/* Open Buy Order Lines (Checklist controlled) */}
+                        {/* Open Buy Order Lines (Checklist controlled, half thickness & opacity to center) */}
                         {showBuyOrders && sim.buyOrderPts.map((dPts, idx) => {
                             if (dPts > rangePts || dPts < -rangePts) return null;
                             const oy = yForPts(dPts);
+                            const midX = PAD_L + plotW / 2;
                             return (
                                 <g key={`b-${idx}`}>
-                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 10} y2={oy} stroke="#38bdf8" strokeWidth="1.5" opacity="0.85" />
-                                    <line x1={PAD_L + 10} y1={oy} x2={W - PAD_R} y2={oy} stroke="#38bdf8" strokeWidth="0.7" strokeDasharray="2 3" opacity="0.16" />
+                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#38bdf8" strokeWidth="0.75" opacity="0.42" />
+                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#38bdf8" strokeWidth="0.35" strokeDasharray="2 3" opacity="0.08" />
                                 </g>
                             );
                         })}
 
-                        {/* Open Sell Order Lines (Checklist controlled) */}
+                        {/* Open Sell Order Lines (Checklist controlled, half thickness & opacity to center) */}
                         {showSellOrders && sim.sellOrderPts.map((dPts, idx) => {
                             if (dPts > rangePts || dPts < -rangePts) return null;
                             const oy = yForPts(dPts);
+                            const midX = PAD_L + plotW / 2;
                             return (
                                 <g key={`s-${idx}`}>
-                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 10} y2={oy} stroke="#fb923c" strokeWidth="1.5" opacity="0.85" />
-                                    <line x1={PAD_L + 10} y1={oy} x2={W - PAD_R} y2={oy} stroke="#fb923c" strokeWidth="0.7" strokeDasharray="2 3" opacity="0.16" />
+                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#fb923c" strokeWidth="0.75" opacity="0.42" />
+                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#fb923c" strokeWidth="0.35" strokeDasharray="2 3" opacity="0.08" />
                                 </g>
                             );
                         })}
@@ -704,19 +715,30 @@ export default function FreezeExitPlanner({
                 </div>
 
                 <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-1">
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                            setDraftTp(currentTp);
-                            setDraftSl(currentSl);
-                        }}
-                        className="text-slate-400 hover:text-slate-200 text-xs"
-                    >
-                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                        รีเซ็ต
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onOpenChange(false)}
+                            className="border-slate-700 text-slate-300 hover:bg-slate-800 text-xs px-3"
+                        >
+                            ปิด
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setDraftTp(currentTp);
+                                setDraftSl(currentSl);
+                            }}
+                            className="text-slate-400 hover:text-slate-200 text-xs"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                            รีเซ็ต
+                        </Button>
+                    </div>
                     <Button
                         type="button"
                         size="sm"
