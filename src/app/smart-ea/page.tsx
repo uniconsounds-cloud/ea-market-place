@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
 import RoundHistoryBar, { RoundHistoryTuple } from '@/components/round-history-bar';
 import FreezeExitPlanner from '@/components/freeze-exit-planner';
+import SmartTacticalOverview from '@/components/smart-tactical-overview';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -949,6 +950,26 @@ function SmartEACockpitContent() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Unified 5-Part Tactical Overview Card */}
+                    <SmartTacticalOverview
+                        port={activePort}
+                        symbol={eaState?.symbol || 'XAUUSD'}
+                        currency={cur}
+                        openBuy={eaState?.open_buy ?? 0}
+                        openSell={eaState?.open_sell ?? 0}
+                        cap={activeCap}
+                        frozenSide={eaState?.frozen_side}
+                        protectionFrozen={Boolean(eaState?.protection_frozen || eaState?.trade_status?.startsWith('FROZEN_'))}
+                        liveCyclePnl={liveCyclePnl}
+                        targetProfit={activeTp}
+                        freezeStopLoss={activeFreezeSl}
+                        spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}
+                        initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
+                        lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
+                        chart={eaState?.chart}
+                        roundHistory={eaState?.round_history}
+                    />
 
                     {/* Model B: Triple Balance Radar (Orders / DD-PnL / Lots) - Moved directly after Clock Frame */}
                     <PnlVectorVisualizer
