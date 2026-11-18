@@ -163,35 +163,42 @@ export default function SmartTacticalOverview({
     }, [chart?.orders, openBuy, openSell, initialLot, lotIncrement, roundHistory, isBuyFrozen, isSellFrozen, spacingPoints, liveCyclePnl, targetProfit]);
 
     // =========================================================================
-    // SECTION 1: Interlocked Freeze VU Meter (Buy bottom-up, Sell top-down, Buy#1 == Sell#Cap)
-    // Include y = safeCap + 1 (for Sell number directly above Sell#1) and y = 0 (for Buy number directly below Buy#1)
+    // SECTION 1 & SECTION 2: Shared VU Geometry (using Section 2 as master template)
+    // Both Section 1 and Section 2 use the exact same row count, gap, and bar width
+    // so all 4 VU columns have identical tick thickness, width, and vertical spacing.
     // =========================================================================
     const sec1MinY = Math.min(0, safeCap + 1 - Math.max(safeCap, openSell));
     const sec1MaxY = Math.max(safeCap + 1, openBuy);
-    const sec1Rows: number[] = [];
-    for (let y = sec1MaxY; y >= sec1MinY; y--) {
-        sec1Rows.push(y);
-    }
-    // Exact vertical center of the Freeze zone (y = 1 .. safeCap) as a percentage of sec1Rows
-    const freezeCenterY = (safeCap + 1) / 2;
-    const freezeCenterPct = ((sec1MaxY - freezeCenterY + 0.5) / Math.max(1, sec1Rows.length)) * 100;
+    const rawSec1Count = sec1MaxY - sec1MinY + 1;
 
-    // =========================================================================
-    // SECTION 2: Parallel Bottom-Up VU Meter + Lock + TP Triangle + TP=0 Line
-    // Include +1 slot above openBuy/openSell so the count label sits directly on top of the highest lit bar
-    // =========================================================================
     const sec2MaxLevel = Math.max(
         safeCap + 2,
         openBuy + 1,
         openSell + 1,
         metrics.tpTradeLevel ?? 0,
         metrics.beTradeLevel ?? 0,
-        10
+        10,
+        rawSec1Count
     );
     const sec2Levels: number[] = [];
     for (let lv = sec2MaxLevel; lv >= 1; lv--) {
         sec2Levels.push(lv);
     }
+
+    // Pad Section 1 rows symmetrically so total row count === sec2Levels.length
+    const extraSec1Rows = Math.max(0, sec2Levels.length - rawSec1Count);
+    const padTopSec1 = Math.floor(extraSec1Rows / 2);
+    const padBotSec1 = extraSec1Rows - padTopSec1;
+    const sec1PaddedMaxY = sec1MaxY + padTopSec1;
+    const sec1PaddedMinY = sec1MinY - padBotSec1;
+    const sec1Rows: number[] = [];
+    for (let y = sec1PaddedMaxY; y >= sec1PaddedMinY; y--) {
+        sec1Rows.push(y);
+    }
+
+    // Exact vertical center of the Freeze zone (y = 1 .. safeCap) as a percentage of sec1Rows
+    const freezeCenterY = (safeCap + 1) / 2;
+    const freezeCenterPct = ((sec1PaddedMaxY - freezeCenterY + 0.5) / Math.max(1, sec1Rows.length)) * 100;
 
     // =========================================================================
     // SECTION 3: Mini Price Sparkline (Full candle history window, 50% width)
@@ -245,13 +252,10 @@ export default function SmartTacticalOverview({
             <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-stretch h-[168px] sm:h-[184px]">
                 {/* =========================================================
                     SECTION 1 (1/6 width): Interlocked Freeze VU
-                    - 1..Cap same color; >Cap distinct color
-                    - Buy count attached directly below Buy's 1st bar (y = 0)
-                    - Sell count attached directly above Sell's topmost bar (y = safeCap + 1)
-                    - Freeze Cap circle positioned at exact vertical center of the 1..Cap Freeze zone
+                    - Uses exact same padding (p-1.5 / px-1), gap-[1px], and row count as Section 2
                    ========================================================= */}
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
-                    <div className="flex-1 flex flex-col justify-between gap-[1.5px] px-0.5 relative min-h-0">
+                    <div className="flex-1 flex flex-col justify-between gap-[1px] px-1 relative min-h-0">
                         {sec1Rows.map((y) => {
                             const buyIdx = y; // 1..N bottom-up
                             const sellIdx = safeCap + 1 - y; // 1..N top-down
