@@ -523,29 +523,23 @@ export default function FreezeExitPlanner({
                             );
                         })}
 
-                        {/* Open Buy Order Lines (Checklist controlled, subtle to center) */}
+                        {/* Open Buy Order Lines (Checklist controlled, extending to chart center) */}
                         {showBuyOrders && sim.buyOrderPts.map((dPts, idx) => {
                             if (dPts > rangePts || dPts < -rangePts) return null;
                             const oy = yForPts(dPts);
-                            const midX = PAD_L + plotW / 2;
+                            const midX = Math.max(W / 2, PAD_L + plotW * 0.55);
                             return (
-                                <g key={`b-${idx}`}>
-                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#38bdf8" strokeWidth="0.9" opacity="0.55" />
-                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2 2" opacity="0.22" />
-                                </g>
+                                <line key={`b-${idx}`} x1={PAD_L} y1={oy} x2={midX} y2={oy} stroke="#38bdf8" strokeWidth="0.6" strokeDasharray="3 2" opacity="0.42" />
                             );
                         })}
 
-                        {/* Open Sell Order Lines (Checklist controlled, subtle to center) */}
+                        {/* Open Sell Order Lines (Checklist controlled, extending to chart center) */}
                         {showSellOrders && sim.sellOrderPts.map((dPts, idx) => {
                             if (dPts > rangePts || dPts < -rangePts) return null;
                             const oy = yForPts(dPts);
-                            const midX = PAD_L + plotW / 2;
+                            const midX = Math.max(W / 2, PAD_L + plotW * 0.55);
                             return (
-                                <g key={`s-${idx}`}>
-                                    <line x1={PAD_L} y1={oy} x2={PAD_L + 8} y2={oy} stroke="#fb923c" strokeWidth="0.9" opacity="0.55" />
-                                    <line x1={PAD_L + 8} y1={oy} x2={midX} y2={oy} stroke="#fb923c" strokeWidth="0.5" strokeDasharray="2 2" opacity="0.22" />
-                                </g>
+                                <line key={`s-${idx}`} x1={PAD_L} y1={oy} x2={midX} y2={oy} stroke="#fb923c" strokeWidth="0.6" strokeDasharray="3 2" opacity="0.42" />
                             );
                         })}
 
