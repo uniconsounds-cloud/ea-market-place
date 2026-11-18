@@ -554,38 +554,38 @@ export default function FreezeExitPlanner({
 
                         {/* Selected SL Horizontal Line */}
                         {draftSl < 0 && slMatch && (
-                            <g>
+                            <g className={willTriggerSlNow || willTriggerSlOnFreeze ? 'animate-pulse' : ''}>
                                 <line
                                     x1={PAD_L}
                                     y1={yForPts(slMatch.deltaPts)}
                                     x2={W - PAD_R}
                                     y2={yForPts(slMatch.deltaPts)}
-                                    stroke="#f59e0b"
-                                    strokeWidth="1.5"
+                                    stroke={willTriggerSlNow ? '#f43f5e' : '#f59e0b'}
+                                    strokeWidth={willTriggerSlNow ? '2.2' : '1.5'}
                                     strokeDasharray="4 2"
                                 />
-                                <circle cx={xForPnl(slMatch.pnl)} cy={yForPts(slMatch.deltaPts)} r="4" fill="#f59e0b" />
-                                <text x={PAD_L + 4} y={yForPts(slMatch.deltaPts) - 4} fill="#fbbf24" fontSize="8.5" fontWeight="bold" fontFamily="monospace">
-                                    SL {draftSl} ({slMatch.deltaPts > 0 ? `+${slMatch.deltaPts}` : slMatch.deltaPts}pt)
+                                <circle cx={xForPnl(slMatch.pnl)} cy={yForPts(slMatch.deltaPts)} r={willTriggerSlNow ? '5' : '4'} fill={willTriggerSlNow ? '#f43f5e' : '#f59e0b'} />
+                                <text x={PAD_L + 4} y={yForPts(slMatch.deltaPts) - 4} fill={willTriggerSlNow ? '#fda4af' : '#fbbf24'} fontSize="8.5" fontWeight="bold" fontFamily="monospace">
+                                    SL {draftSl} ({slMatch.deltaPts > 0 ? `+${slMatch.deltaPts}` : slMatch.deltaPts}pt){willTriggerSlNow ? ' ⚡ปิดทันที' : ''}
                                 </text>
                             </g>
                         )}
 
                         {/* Selected TP Horizontal Line */}
                         {tpMatch && (
-                            <g>
+                            <g className={willTriggerTpNow ? 'animate-pulse' : ''}>
                                 <line
                                     x1={PAD_L}
                                     y1={yForPts(tpMatch.deltaPts)}
                                     x2={W - PAD_R}
                                     y2={yForPts(tpMatch.deltaPts)}
-                                    stroke="#10b981"
-                                    strokeWidth="1.5"
+                                    stroke={willTriggerTpNow ? '#f43f5e' : '#10b981'}
+                                    strokeWidth={willTriggerTpNow ? '2.2' : '1.5'}
                                     strokeDasharray="4 2"
                                 />
-                                <circle cx={xForPnl(tpMatch.pnl)} cy={yForPts(tpMatch.deltaPts)} r="4" fill="#10b981" />
-                                <text x={W - PAD_R - 4} y={yForPts(tpMatch.deltaPts) - 4} fill="#34d399" fontSize="8.5" fontWeight="bold" textAnchor="end" fontFamily="monospace">
-                                    TP {draftTp >= 0 ? `+${draftTp}` : draftTp} ({tpMatch.deltaPts > 0 ? `+${tpMatch.deltaPts}` : tpMatch.deltaPts}pt)
+                                <circle cx={xForPnl(tpMatch.pnl)} cy={yForPts(tpMatch.deltaPts)} r={willTriggerTpNow ? '5' : '4'} fill={willTriggerTpNow ? '#f43f5e' : '#10b981'} />
+                                <text x={W - PAD_R - 4} y={yForPts(tpMatch.deltaPts) - 4} fill={willTriggerTpNow ? '#fda4af' : '#34d399'} fontSize="8.5" fontWeight="bold" textAnchor="end" fontFamily="monospace">
+                                    TP {draftTp >= 0 ? `+${draftTp}` : draftTp} ({tpMatch.deltaPts > 0 ? `+${tpMatch.deltaPts}` : tpMatch.deltaPts}pt){willTriggerTpNow ? ' ⚡ปิดทันที' : ''}
                                 </text>
                             </g>
                         )}
@@ -612,11 +612,29 @@ export default function FreezeExitPlanner({
                 </div>
 
                 {/* SL Controls */}
-                <div className="rounded-xl border border-amber-500/25 bg-amber-950/15 p-2.5 space-y-2">
+                <div
+                    className={`rounded-xl border p-2.5 space-y-2 transition-colors ${
+                        willTriggerSlNow
+                            ? 'border-rose-500/80 bg-rose-950/35 animate-pulse shadow-[0_0_16px_rgba(244,63,94,0.3)]'
+                            : willTriggerSlOnFreeze
+                            ? 'border-amber-400/70 bg-amber-950/30 animate-pulse'
+                            : 'border-amber-500/25 bg-amber-950/15'
+                    }`}
+                >
                     <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="flex items-center gap-1 font-bold text-amber-300">
+                        <span className={`flex items-center gap-1 font-bold ${willTriggerSlNow ? 'text-rose-300' : 'text-amber-300'}`}>
                             <ShieldAlert className="w-3.5 h-3.5" />
                             FREEZE SL: {draftSl < 0 ? `${draftSl} ${currency}` : 'ปิด (0)'}
+                            {willTriggerSlNow && (
+                                <span className="ml-1 rounded bg-rose-500/30 border border-rose-400/60 px-1.5 py-0.2 text-[9px] text-rose-200">
+                                    ⚡ ปิดทันที
+                                </span>
+                            )}
+                            {willTriggerSlOnFreeze && (
+                                <span className="ml-1 rounded bg-amber-500/25 border border-amber-400/60 px-1.5 py-0.2 text-[9px] text-amber-200">
+                                    ⚠️ รอตัดเมื่อ Freeze
+                                </span>
+                            )}
                         </span>
                         <span className="text-[10px] text-amber-200/80">
                             {draftSl < 0 && slMatch
@@ -665,11 +683,22 @@ export default function FreezeExitPlanner({
                 </div>
 
                 {/* TP Controls */}
-                <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/15 p-2.5 space-y-2">
+                <div
+                    className={`rounded-xl border p-2.5 space-y-2 transition-colors ${
+                        willTriggerTpNow
+                            ? 'border-rose-500/80 bg-rose-950/35 animate-pulse shadow-[0_0_16px_rgba(244,63,94,0.3)]'
+                            : 'border-emerald-500/25 bg-emerald-950/15'
+                    }`}
+                >
                     <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="flex items-center gap-1 font-bold text-emerald-300">
+                        <span className={`flex items-center gap-1 font-bold ${willTriggerTpNow ? 'text-rose-300' : 'text-emerald-300'}`}>
                             <Target className="w-3.5 h-3.5" />
                             TARGET TP: {draftTp >= 0 ? `+${draftTp}` : draftTp} {currency}
+                            {willTriggerTpNow && (
+                                <span className="ml-1 rounded bg-rose-500/30 border border-rose-400/60 px-1.5 py-0.2 text-[9px] text-rose-200">
+                                    ⚡ ปิดทันที
+                                </span>
+                            )}
                         </span>
                         <span className="text-[10px] text-emerald-200/80">
                             {tpMatch
