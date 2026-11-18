@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
 import RoundHistoryBar, { RoundHistoryTuple } from '@/components/round-history-bar';
+import FreezeExitPlanner from '@/components/freeze-exit-planner';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -601,6 +602,7 @@ function SmartEACockpitContent() {
     const pnlPct = balanceVal > 0 ? (liveCyclePnl / balanceVal) * 100 : 0;
 
     // Custom Target Profit Modal State & Calculations
+    const [plannerOpen, setPlannerOpen] = useState(false);
     const [customTpModalOpen, setCustomTpModalOpen] = useState(false);
     const [customTpVal, setCustomTpVal] = useState<number>(-100);
 
@@ -935,6 +937,15 @@ function SmartEACockpitContent() {
                                         {eaState?.trade_status === 'RUNNING' ? 'RUN' : eaState?.trade_status || 'WAIT'}
                                     </span>
                                 </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setPlannerOpen(true)}
+                                    className="rounded px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/50 text-cyan-200 flex items-center gap-1 text-[10px] sm:text-[11px] font-mono font-bold transition active:scale-95"
+                                >
+                                    <Target className="w-3 h-3 text-cyan-300" />
+                                    <span>Exit Planner</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1092,6 +1103,34 @@ function SmartEACockpitContent() {
                             </div>
                         </div>
                     )}
+
+                    {/* Freeze Exit Planner Simulator Modal */}
+                    <FreezeExitPlanner
+                        open={plannerOpen}
+                        onOpenChange={setPlannerOpen}
+                        symbol={eaState?.symbol || 'XAUUSD'}
+                        currency={cur}
+                        balance={balanceVal}
+                        cyclePnl={liveCyclePnl}
+                        openBuy={eaState?.open_buy ?? 0}
+                        openSell={eaState?.open_sell ?? 0}
+                        frozenSide={eaState?.frozen_side}
+                        spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}
+                        initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
+                        lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
+                        currentTp={activeTp}
+                        currentSl={activeFreezeSl}
+                        chart={eaState?.chart}
+                        sending={sending}
+                        onApply={(newTp, newSl) => {
+                            setTargetProfit(String(newTp));
+                            setFreezeStopLoss(String(newSl));
+                            sendCommand(
+                                { target_profit: newTp, freeze_stop_loss: newSl, close_all: false },
+                                `อัปเดตแผนปิดรอบแล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'}`
+                            );
+                        }}
+                    />
 
                     {/* Custom Target Profit Dialog with Interactive Scroll Wheel */}
                     <Dialog open={customTpModalOpen} onOpenChange={setCustomTpModalOpen}>
