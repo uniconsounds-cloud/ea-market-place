@@ -580,6 +580,7 @@ function SmartEACockpitContent() {
     const liveCyclePnl = (eaState?.cycle_pnl || 0) + pnlJitter;
     const liveEquity = (eaState?.equity || 0) + pnlJitter;
     const activeTp = eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20);
+    const activeFreezeSl = eaState?.active_config?.freeze_stop_loss ?? (parseFloat(freezeStopLoss) || 0);
     const activeCap = eaState?.active_config?.max_both_sides_cap ?? (parseInt(maxBothSidesCap, 10) || 7);
 
     // Semantic numeric version comparison: > 0 means latest > current
@@ -606,6 +607,44 @@ function SmartEACockpitContent() {
     const minusOnePct = balanceVal > 0 ? -Math.max(1, Math.round(balanceVal * 0.01)) : -100;
     const minusTwoPct = balanceVal > 0 ? -Math.max(2, Math.round(balanceVal * 0.02)) : -200;
     const currentDd = Math.round(liveCyclePnl < 0 ? liveCyclePnl : (eaState?.cycle_pnl || 0));
+
+    // Freeze Banner Quick Presets:
+    // SL 1: DD from real net lot if price moves 500 points further against basket
+    const sl500Val = useMemo(() => {
+        const c = eaState?.chart;
+        let dd500 = 0;
+        if (c && c.est_tp_price > 0 && c.bid > 0) {
+            const digits = c.digits ?? 2;
+            const pointSize = Math.pow(10, -digits);
+            const refPrice = c.tp_dir === 'DOWN' ? (c.ask || c.bid) : c.bid;
+            const deltaPrice = Math.abs(c.est_tp_price - refPrice);
+            const needed = Math.abs(activeTp - (eaState?.cycle_pnl || 0));
+            if (deltaPrice > pointSize * 0.5 && needed > 0) {
+                dd500 = (needed / deltaPrice) * pointSize * 500;
+            }
+        }
+        if (dd500 <= 0 && c?.orders?.length) {
+            let buyLot = 0;
+            let sellLot = 0;
+            for (const o of c.orders) {
+                if (o.t === 'B') buyLot += o.l;
+                else if (o.t === 'S') sellLot += o.l;
+            }
+            const netLot = Math.abs(buyLot - sellLot);
+            dd500 = netLot * 500;
+        }
+        if (dd500 <= 0) {
+            const netTrades = Math.max(1, Math.abs((eaState?.open_buy || 0) - (eaState?.open_sell || 0)));
+            dd500 = netTrades * 0.01 * 500;
+        }
+        return Math.min(-1, Math.round(liveCyclePnl - dd500));
+    }, [eaState, activeTp, liveCyclePnl]);
+
+    // SL 2: -3% of Balance
+    const slMinus3PctVal = balanceVal > 0 ? -Math.max(1, Math.round(balanceVal * 0.03)) : -300;
+
+    // TP 1: Halfway between current DD and TP = 0
+    const tpHalfDdVal = liveCyclePnl < 0 ? Math.round(liveCyclePnl / 2) : 0;
 
     const openCustomTpModal = useCallback(() => {
         const bal = eaState?.balance || 0;
@@ -939,47 +978,117 @@ function SmartEACockpitContent() {
                             <p className="text-[11px] text-rose-200/90 leading-relaxed">
                                 ทั้งสองฝั่งเปิดครบเกณฑ์แล้ว EA ลบ Pending ฝั่งตรงข้ามออก ส่วนฝั่งที่นับครบยังออกไม้ต่อได้เพื่อลุ้นปิดรวบ หรือปรับ <strong>Target Profit</strong> ด้านล่าง
                             </p>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-[11px] text-muted-foreground mr-1">Freeze SL (คง TP={activeTp}):</span>
-                                {[
-                                    { label: 'SL = ปิด (0)', val: 0 },
-                                    ...(balanceVal > 0 ? [
-                                        { label: `SL -3% (-${Math.round(balanceVal * 0.03)})`, val: -Math.round(balanceVal * 0.03) },
-                                        { label: `SL -6% (-${Math.round(balanceVal * 0.06)})`, val: -Math.round(balanceVal * 0.06) },
-                                    ] : [
-                                        { label: `SL -200 ${cur}`, val: -200 },
-                                        { label: `SL -500 ${cur}`, val: -500 },
-                                    ]),
-                                ].map((preset) => (
+                            <div className="space-y-2 pt-0.5">
+                                {/* Row 1: Freeze SL */}
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[11px] font-mono font-bold text-amber-300 mr-1">
+                                        SL (ปัจจุบัน: {activeFreezeSl < 0 ? `${activeFreezeSl} ${cur}` : 'ปิด'}) :
+                                    </span>
                                     <Button
-                                        key={`fsl-${preset.val}`}
                                         size="sm"
                                         variant="outline"
                                         disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-amber-500/40 text-amber-200 hover:bg-amber-500/20"
+                                        className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
                                         onClick={() => {
-                                            setFreezeStopLoss(String(preset.val));
+                                            setFreezeStopLoss(String(sl500Val));
                                             sendCommand(
-                                                { freeze_stop_loss: preset.val, close_all: false },
-                                                preset.val === 0
-                                                    ? 'ปิด Freeze SL แล้ว (ใช้เฉพาะ TP ปกติ)'
-                                                    : `ตั้ง Freeze SL = ${preset.val} ${cur} แล้ว (TP=${activeTp} ยังทำงานตามปกติ)`
+                                                { freeze_stop_loss: sl500Val, close_all: false },
+                                                `ตั้ง Freeze SL = ${sl500Val} ${cur} (-500 จุดจากปัจจุบัน, TP=${activeTp} ยังทำงานปกติ)`
                                             );
                                         }}
                                     >
-                                        {preset.label}
+                                        SL -500 จุด ({sl500Val})
                                     </Button>
-                                ))}
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={sending}
-                                    className="h-6 text-[11px] px-2 border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/20 flex items-center gap-1"
-                                    onClick={openCustomTpModal}
-                                >
-                                    <Sliders className="w-3 h-3 text-cyan-400" />
-                                    ตั้ง TP เอง...
-                                </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={sending}
+                                        className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
+                                        onClick={() => {
+                                            setFreezeStopLoss(String(slMinus3PctVal));
+                                            sendCommand(
+                                                { freeze_stop_loss: slMinus3PctVal, close_all: false },
+                                                `ตั้ง Freeze SL = ${slMinus3PctVal} ${cur} (-3% พอร์ต, TP=${activeTp} ยังทำงานปกติ)`
+                                            );
+                                        }}
+                                    >
+                                        SL -3% ({slMinus3PctVal})
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={sending}
+                                        className="h-6 text-[11px] px-2 border-amber-400/60 text-amber-100 hover:bg-amber-500/25 flex items-center gap-1"
+                                        onClick={() => openParamModal({
+                                            title: `FREEZE STOP LOSS (${cur})`,
+                                            unit: cur,
+                                            currentVal: Math.min(0, activeFreezeSl),
+                                            step: 50,
+                                            presetValues: [0, sl500Val, slMinus3PctVal, -100, -200, -500, -1000, -2000, -3000, -5000],
+                                            quickSteps: [-500, -100, -10, 10, 100, 500],
+                                            onApply: (v) => {
+                                                const val = v > 0 ? -v : v;
+                                                setFreezeStopLoss(String(val));
+                                                sendCommand(
+                                                    { freeze_stop_loss: val, close_all: false },
+                                                    val === 0
+                                                        ? 'ปิด Freeze SL แล้ว (ใช้เฉพาะ TP ปกติ)'
+                                                        : `ตั้ง Freeze SL = ${val} ${cur} แล้ว (TP=${activeTp} ยังทำงานปกติ)`
+                                                );
+                                            },
+                                        })}
+                                    >
+                                        <Sliders className="w-3 h-3 text-amber-300" />
+                                        ตั้ง SL เอง...
+                                    </Button>
+                                </div>
+
+                                {/* Row 2: Target Profit (TP) */}
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[11px] font-mono font-bold text-cyan-300 mr-1">
+                                        TP (ปัจจุบัน: {activeTp > 0 ? `+${activeTp}` : activeTp} {cur}) :
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={sending}
+                                        className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
+                                        onClick={() => {
+                                            setTargetProfit(String(tpHalfDdVal));
+                                            sendCommand(
+                                                { target_profit: tpHalfDdVal, close_all: false },
+                                                `ตั้ง Target TP = ${tpHalfDdVal} ${cur} (ครึ่งนึงของ DD ปัจจุบัน)`
+                                            );
+                                        }}
+                                    >
+                                        DD 50% ({tpHalfDdVal})
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={sending}
+                                        className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
+                                        onClick={() => {
+                                            setTargetProfit('0');
+                                            sendCommand(
+                                                { target_profit: 0, close_all: false },
+                                                `ตั้ง Target TP = 0 ${cur} (เท่าทุน) แล้ว`
+                                            );
+                                        }}
+                                    >
+                                        TP = 0 (เท่าทุน)
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={sending}
+                                        className="h-6 text-[11px] px-2 border-cyan-400/60 text-cyan-100 hover:bg-cyan-500/25 flex items-center gap-1"
+                                        onClick={openCustomTpModal}
+                                    >
+                                        <Sliders className="w-3 h-3 text-cyan-300" />
+                                        ตั้ง TP เอง...
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     )}
