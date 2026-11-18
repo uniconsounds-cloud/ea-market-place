@@ -352,6 +352,12 @@ export default function FreezeExitPlanner({
     const tpMin = Math.min(-100, Math.round(sim.minPnl));
     const tpMax = Math.max(100, Math.round(sim.maxPnl));
 
+    const hasOpenTrades = openBuy + openSell > 0;
+    const willTriggerTpNow = hasOpenTrades && cyclePnl >= draftTp;
+    const willTriggerSlNow = hasOpenTrades && frozenSide !== 'NONE' && draftSl < 0 && cyclePnl <= draftSl;
+    const willTriggerSlOnFreeze = hasOpenTrades && frozenSide === 'NONE' && draftSl < 0 && cyclePnl <= draftSl;
+    const willTriggerImmediately = willTriggerTpNow || willTriggerSlNow;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="bg-[#060b16] border border-cyan-500/35 text-slate-100 max-w-lg w-[96vw] p-3.5 sm:p-5 rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.2)] max-h-[92vh] overflow-y-auto">
@@ -711,6 +717,52 @@ export default function FreezeExitPlanner({
                     </div>
                 </div>
 
+                {/* Instant Close Warning Banner (Blinking alert when TP or Freeze SL will fire immediately) */}
+                {(willTriggerImmediately || willTriggerSlOnFreeze) && (
+                    <div
+                        className={`rounded-xl border px-3 py-2 font-mono text-[11px] flex items-start gap-2 ${
+                            willTriggerImmediately
+                                ? 'border-rose-500/80 bg-rose-950/60 text-rose-200 animate-pulse shadow-[0_0_20px_rgba(244,63,94,0.35)]'
+                                : 'border-amber-500/60 bg-amber-950/40 text-amber-200'
+                        }`}
+                    >
+                        <span className="relative flex h-2.5 w-2.5 mt-1 shrink-0">
+                            <span
+                                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                                    willTriggerImmediately ? 'bg-rose-400' : 'bg-amber-400'
+                                }`}
+                            />
+                            <span
+                                className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                                    willTriggerImmediately ? 'bg-rose-500' : 'bg-amber-500'
+                                }`}
+                            />
+                        </span>
+                        <div className="space-y-0.5 leading-snug">
+                            <div className="font-bold">
+                                {willTriggerImmediately
+                                    ? 'แจ้งเตือน: คำสั่งนี้จะทำงานปิดรวบทันที!'
+                                    : 'ข้อควรรู้: ค่า SL สูงกว่ายอดติดลบปัจจุบัน'}
+                            </div>
+                            {willTriggerTpNow && (
+                                <div>
+                                    • กำไร/ขาดทุนปัจจุบัน ({cyclePnl.toFixed(2)} {currency}) ≥ <strong>TP ({draftTp})</strong> → ทันทีที่ส่งคำสั่ง EA จะรวบปิดทั้งหมดทันที
+                                </div>
+                            )}
+                            {willTriggerSlNow && (
+                                <div>
+                                    • กำไร/ขาดทุนปัจจุบัน ({cyclePnl.toFixed(2)} {currency}) ≤ <strong>Freeze SL ({draftSl})</strong> → ทันทีที่ส่งคำสั่ง EA จะตัดขาดทุนทันที
+                                </div>
+                            )}
+                            {willTriggerSlOnFreeze && !willTriggerTpNow && (
+                                <div>
+                                    • ยอดปัจจุบัน ({cyclePnl.toFixed(2)} {currency}) ≤ SL ({draftSl}) แล้ว หากพอร์ตเข้าโหมด Freeze แล้วยังลบระดับนี้จะตัดขาดทุนทันที
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-1">
                     <div className="flex items-center gap-1.5">
                         <Button
@@ -744,10 +796,14 @@ export default function FreezeExitPlanner({
                             onApply(draftTp, draftSl);
                             onOpenChange(false);
                         }}
-                        className="bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold hover:opacity-95 text-xs px-4"
+                        className={`font-bold hover:opacity-95 text-xs px-4 ${
+                            willTriggerImmediately
+                                ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white animate-pulse shadow-[0_0_16px_rgba(244,63,94,0.45)]'
+                                : 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950'
+                        }`}
                     >
                         <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-                        ยืนยันส่ง TP & SL นี้ให้ EA
+                        {willTriggerImmediately ? 'ยืนยัน (EA จะปิดรวบทันที!)' : 'ยืนยันส่ง TP & SL นี้ให้ EA'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
