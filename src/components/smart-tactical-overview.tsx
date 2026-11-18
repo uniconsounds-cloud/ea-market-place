@@ -164,22 +164,26 @@ export default function SmartTacticalOverview({
 
     // =========================================================================
     // SECTION 1: Interlocked Freeze VU Meter (Buy bottom-up, Sell top-down, Buy#1 == Sell#Cap)
+    // Include y = safeCap + 1 (for Sell number directly above Sell#1) and y = 0 (for Buy number directly below Buy#1)
     // =========================================================================
-    const sec1MinY = Math.min(1, safeCap + 1 - Math.max(safeCap, openSell));
-    const sec1MaxY = Math.max(safeCap, openBuy);
+    const sec1MinY = Math.min(0, safeCap + 1 - Math.max(safeCap, openSell));
+    const sec1MaxY = Math.max(safeCap + 1, openBuy);
     const sec1Rows: number[] = [];
     for (let y = sec1MaxY; y >= sec1MinY; y--) {
         sec1Rows.push(y);
     }
+    // Exact vertical center of the Freeze zone (y = 1 .. safeCap) as a percentage of sec1Rows
+    const freezeCenterY = (safeCap + 1) / 2;
+    const freezeCenterPct = ((sec1MaxY - freezeCenterY + 0.5) / Math.max(1, sec1Rows.length)) * 100;
 
     // =========================================================================
     // SECTION 2: Parallel Bottom-Up VU Meter + Lock + TP Triangle + TP=0 Line
-    // Always extend up to tpTradeLevel / beTradeLevel / openBuy / openSell so the arrow points at the exact bar!
+    // Include +1 slot above openBuy/openSell so the count label sits directly on top of the highest lit bar
     // =========================================================================
     const sec2MaxLevel = Math.max(
         safeCap + 2,
-        openBuy,
-        openSell,
+        openBuy + 1,
+        openSell + 1,
         metrics.tpTradeLevel ?? 0,
         metrics.beTradeLevel ?? 0,
         10
@@ -242,102 +246,99 @@ export default function SmartTacticalOverview({
                 {/* =========================================================
                     SECTION 1 (1/6 width): Interlocked Freeze VU
                     - 1..Cap same color; >Cap distinct color
-                    - Sell count on top of Sell column, Buy count on bottom of Buy column (numbers only, large)
-                    - Freeze Cap number in a circle overlaid at exact center between both bars
+                    - Buy count attached directly below Buy's 1st bar (y = 0)
+                    - Sell count attached directly above Sell's topmost bar (y = safeCap + 1)
+                    - Freeze Cap circle positioned at exact vertical center of the 1..Cap Freeze zone
                    ========================================================= */}
-                <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1 sm:p-1.5 relative overflow-hidden">
-                    {/* Top row: empty left (Buy), large Sell count on right */}
-                    <div className="grid grid-cols-2 gap-1 items-center">
-                        <div />
-                        <div className="text-center font-mono text-base sm:text-xl font-extrabold text-orange-400 leading-none tabular-nums">
-                            {openSell}
-                        </div>
-                    </div>
-
-                    {/* VU Columns + Center Freeze Circle Overlay */}
-                    <div className="my-0.5 flex-1 flex flex-col justify-between gap-[1.5px] px-0.5 relative min-h-0">
+                <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
+                    <div className="flex-1 flex flex-col justify-between gap-[1.5px] px-0.5 relative min-h-0">
                         {sec1Rows.map((y) => {
                             const buyIdx = y; // 1..N bottom-up
                             const sellIdx = safeCap + 1 - y; // 1..N top-down
-                            const hasBuySlot = buyIdx >= 1;
-                            const hasSellSlot = sellIdx >= 1;
-                            const buyLit = hasBuySlot && openBuy >= buyIdx;
-                            const sellLit = hasSellSlot && openSell >= sellIdx;
+                            const hasBuySlot = buyIdx >= 1 && buyIdx <= Math.max(safeCap, openBuy);
+                            const hasSellSlot = sellIdx >= 1 && sellIdx <= Math.max(safeCap, openSell);
+                            const buyLit = buyIdx >= 1 && openBuy >= buyIdx;
+                            const sellLit = sellIdx >= 1 && openSell >= sellIdx;
                             const isFreezeZone = y >= 1 && y <= safeCap;
+                            const isBuyLabelRow = y === 0;
+                            const isSellLabelRow = y === safeCap + 1;
 
                             return (
-                                <div key={`s1-${y}`} className="grid grid-cols-2 gap-1.5 items-center flex-1 min-h-[1.5px]">
-                                    {/* Left: Buy segment (1..Cap = sky-400, >Cap = emerald-300) */}
-                                    <div
-                                        className={`h-full max-h-[5px] rounded-[1px] transition-all ${
-                                            !hasBuySlot
-                                                ? 'bg-transparent'
-                                                : buyLit
-                                                ? buyIdx <= safeCap
-                                                    ? 'bg-sky-400 shadow-[0_0_4px_rgba(56,189,248,0.45)]'
-                                                    : 'bg-emerald-300 shadow-[0_0_5px_#6ee7b7]'
-                                                : isFreezeZone
-                                                ? 'bg-sky-950/60'
-                                                : 'bg-slate-900/40'
-                                        }`}
-                                    />
-                                    {/* Right: Sell segment (1..Cap = orange-400, >Cap = rose-400) */}
-                                    <div
-                                        className={`h-full max-h-[5px] rounded-[1px] transition-all ${
-                                            !hasSellSlot
-                                                ? 'bg-transparent'
-                                                : sellLit
-                                                ? sellIdx <= safeCap
-                                                    ? 'bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.45)]'
-                                                    : 'bg-rose-400 shadow-[0_0_5px_#fb7185]'
-                                                : isFreezeZone
-                                                ? 'bg-orange-950/60'
-                                                : 'bg-slate-900/40'
-                                        }`}
-                                    />
+                                <div key={`s1-${y}`} className="grid grid-cols-2 gap-1.5 items-center flex-1 min-h-[1.5px] relative">
+                                    {/* Left: Buy segment OR Buy count directly below bar #1 */}
+                                    <div className="relative h-full flex items-center justify-center">
+                                        {isBuyLabelRow ? (
+                                            <span className="absolute top-0 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums">
+                                                {openBuy}
+                                            </span>
+                                        ) : (
+                                            <div
+                                                className={`w-full h-full max-h-[5px] rounded-[1px] transition-all ${
+                                                    !hasBuySlot
+                                                        ? 'bg-transparent'
+                                                        : buyLit
+                                                        ? buyIdx <= safeCap
+                                                            ? 'bg-sky-400 shadow-[0_0_4px_rgba(56,189,248,0.45)]'
+                                                            : 'bg-emerald-300 shadow-[0_0_5px_#6ee7b7]'
+                                                        : isFreezeZone
+                                                        ? 'bg-sky-950/60'
+                                                        : 'bg-transparent'
+                                                }`}
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Right: Sell segment OR Sell count directly above bar #1 */}
+                                    <div className="relative h-full flex items-center justify-center">
+                                        {isSellLabelRow ? (
+                                            <span className="absolute bottom-0 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums">
+                                                {openSell}
+                                            </span>
+                                        ) : (
+                                            <div
+                                                className={`w-full h-full max-h-[5px] rounded-[1px] transition-all ${
+                                                    !hasSellSlot
+                                                        ? 'bg-transparent'
+                                                        : sellLit
+                                                        ? sellIdx <= safeCap
+                                                            ? 'bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.45)]'
+                                                            : 'bg-rose-400 shadow-[0_0_5px_#fb7185]'
+                                                        : isFreezeZone
+                                                        ? 'bg-orange-950/60'
+                                                        : 'bg-transparent'
+                                                }`}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
 
-                        {/* Center Freeze Number inside Circle Overlay */}
-                        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full border border-cyan-400/70 bg-[#050b14]/95 shadow-[0_0_10px_rgba(34,211,238,0.45)]">
-                            <span className="font-mono text-sm sm:text-lg font-extrabold text-cyan-200 leading-none tabular-nums">
+                        {/* Center Freeze Number inside Circle Overlay — centered on the 1..Cap Freeze zone */}
+                        <div
+                            style={{ top: `${freezeCenterPct}%` }}
+                            className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full border border-cyan-400/75 bg-[#050b14]/95 shadow-[0_0_8px_rgba(34,211,238,0.45)]"
+                        >
+                            <span className="font-mono text-[10px] sm:text-xs font-extrabold text-cyan-200 leading-none tabular-nums">
                                 {safeCap}
                             </span>
                         </div>
-                    </div>
-
-                    {/* Bottom row: large Buy count on left, empty right */}
-                    <div className="grid grid-cols-2 gap-1 items-center">
-                        <div className="text-center font-mono text-base sm:text-xl font-extrabold text-sky-400 leading-none tabular-nums">
-                            {openBuy}
-                        </div>
-                        <div />
                     </div>
                 </div>
 
                 {/* =========================================================
                     SECTION 2 (1/6 width): Parallel Bottom-Up VU
-                    - Large counts on top of both columns
-                    - Bars extend all the way to tpTradeLevel with triangle pointing directly at that bar
-                    - Circular Lock badge with frozen trade count overlaid at bottom of frozen column
+                    - Count sits directly on top of the highest lit bar of each side
+                    - TP triangle + TP level number shown right at the TP bar (no bottom footer)
+                    - Circular Lock icon (no number) centered at bottom of the frozen side's bar
                    ========================================================= */}
-                <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1 sm:p-1.5 relative overflow-hidden">
-                    {/* Top Counts */}
-                    <div className="grid grid-cols-2 gap-1 items-center text-center font-mono">
-                        <span className="text-base sm:text-xl font-extrabold text-sky-400 leading-none tabular-nums">
-                            {openBuy}
-                        </span>
-                        <span className="text-base sm:text-xl font-extrabold text-orange-400 leading-none tabular-nums">
-                            {openSell}
-                        </span>
-                    </div>
-
-                    {/* Parallel VU Bars extending up to sec2MaxLevel */}
-                    <div className="my-0.5 flex-1 flex flex-col justify-between gap-[1px] px-1.5 relative min-h-0">
+                <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
+                    <div className="flex-1 flex flex-col justify-between gap-[1px] px-1 relative min-h-0">
                         {sec2Levels.map((lv) => {
                             const buyLit = openBuy >= lv;
                             const sellLit = openSell >= lv;
+                            const isBuyTopLabel = lv === openBuy + 1;
+                            const isSellTopLabel = lv === openSell + 1;
                             const isTpRow = metrics.tpTradeLevel === lv;
                             const isBeRow = metrics.beTradeLevel === lv;
 
@@ -351,72 +352,89 @@ export default function SmartTacticalOverview({
                                         />
                                     )}
 
-                                    {/* Small Triangle Pointer (no tail) pointing at the exact TP bar */}
+                                    {/* Small Triangle Pointer + TP bar number right at the TP row */}
                                     {isTpRow && (
-                                        <svg
-                                            viewBox="0 0 6 6"
-                                            className={`w-2 h-2 text-emerald-400 absolute top-1/2 -translate-y-1/2 z-20 drop-shadow-[0_0_3px_#10b981] ${
-                                                metrics.activeSide === 'BUY' ? '-left-2' : '-right-2'
+                                        <div
+                                            className={`pointer-events-none absolute top-1/2 -translate-y-1/2 z-30 flex items-center gap-[1px] ${
+                                                metrics.activeSide === 'BUY' ? '-left-1' : '-right-1 flex-row-reverse'
                                             }`}
                                         >
-                                            {metrics.activeSide === 'BUY' ? (
-                                                <polygon points="0,0 6,3 0,6" fill="currentColor" />
-                                            ) : (
-                                                <polygon points="6,0 0,3 6,6" fill="currentColor" />
-                                            )}
-                                        </svg>
+                                            <svg
+                                                viewBox="0 0 6 6"
+                                                className="w-1.5 h-1.5 text-emerald-400 drop-shadow-[0_0_3px_#10b981] shrink-0"
+                                            >
+                                                {metrics.activeSide === 'BUY' ? (
+                                                    <polygon points="0,0 6,3 0,6" fill="currentColor" />
+                                                ) : (
+                                                    <polygon points="6,0 0,3 6,6" fill="currentColor" />
+                                                )}
+                                            </svg>
+                                            <span className="font-mono text-[8px] sm:text-[9px] font-extrabold text-emerald-300 leading-none bg-[#030710]/85 px-0.5 rounded">
+                                                {lv}
+                                            </span>
+                                        </div>
                                     )}
 
-                                    {/* Buy Segment */}
-                                    <div
-                                        className={`h-full max-h-[5px] rounded-[1px] ${
-                                            buyLit
-                                                ? isBuyFrozen
-                                                    ? 'bg-rose-500/80'
-                                                    : 'bg-sky-400'
-                                                : isTpRow && metrics.activeSide === 'BUY'
-                                                ? 'bg-emerald-500/35'
-                                                : 'bg-slate-900/75'
-                                        }`}
-                                    />
-                                    {/* Sell Segment */}
-                                    <div
-                                        className={`h-full max-h-[5px] rounded-[1px] ${
-                                            sellLit
-                                                ? isSellFrozen
-                                                    ? 'bg-rose-500/80'
-                                                    : 'bg-orange-400'
-                                                : isTpRow && metrics.activeSide === 'SELL'
-                                                ? 'bg-emerald-500/35'
-                                                : 'bg-slate-900/75'
-                                        }`}
-                                    />
+                                    {/* Buy Segment or Buy Top Number */}
+                                    <div className="relative h-full flex items-center justify-center">
+                                        {isBuyTopLabel && (
+                                            <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums bg-[#030710]/80 px-0.5 rounded">
+                                                {openBuy}
+                                            </span>
+                                        )}
+                                        <div
+                                            className={`w-full h-full max-h-[5px] rounded-[1px] ${
+                                                buyLit
+                                                    ? isBuyFrozen
+                                                        ? 'bg-rose-500/80'
+                                                        : 'bg-sky-400'
+                                                    : isTpRow && metrics.activeSide === 'BUY'
+                                                    ? 'bg-emerald-500/40'
+                                                    : 'bg-slate-900/75'
+                                            }`}
+                                        />
+                                    </div>
+
+                                    {/* Sell Segment or Sell Top Number */}
+                                    <div className="relative h-full flex items-center justify-center">
+                                        {isSellTopLabel && (
+                                            <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums bg-[#030710]/80 px-0.5 rounded">
+                                                {openSell}
+                                            </span>
+                                        )}
+                                        <div
+                                            className={`w-full h-full max-h-[5px] rounded-[1px] ${
+                                                sellLit
+                                                    ? isSellFrozen
+                                                        ? 'bg-rose-500/80'
+                                                        : 'bg-orange-400'
+                                                    : isTpRow && metrics.activeSide === 'SELL'
+                                                    ? 'bg-emerald-500/40'
+                                                    : 'bg-slate-900/75'
+                                            }`}
+                                        />
+                                    </div>
                                 </div>
                             );
                         })}
 
-                        {/* Circular Lock with Number overlaid at bottom of the frozen bar */}
-                        {isBuyFrozen && (
-                            <div className="pointer-events-none absolute bottom-0.5 left-1/4 -translate-x-1/2 z-20 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full border border-rose-400/80 bg-[#080d1a]/95 shadow-[0_0_8px_rgba(244,63,94,0.5)]">
-                                <Lock className="w-3.5 h-3.5 text-rose-400/45 absolute" />
-                                <span className="relative z-10 font-mono text-[10px] sm:text-xs font-extrabold text-rose-200 leading-none">
-                                    {openBuy}
-                                </span>
+                        {/* Circular Lock icon (no number) centered horizontally at bottom of frozen column */}
+                        <div className="pointer-events-none absolute inset-x-1 bottom-0.5 grid grid-cols-2 gap-1.5 z-20">
+                            <div className="flex justify-center">
+                                {isBuyFrozen && (
+                                    <div className="flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full border border-rose-400/80 bg-[#080d1a]/95 shadow-[0_0_8px_rgba(244,63,94,0.5)]">
+                                        <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-300" />
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        {isSellFrozen && (
-                            <div className="pointer-events-none absolute bottom-0.5 left-3/4 -translate-x-1/2 z-20 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full border border-rose-400/80 bg-[#080d1a]/95 shadow-[0_0_8px_rgba(244,63,94,0.5)]">
-                                <Lock className="w-3.5 h-3.5 text-rose-400/45 absolute" />
-                                <span className="relative z-10 font-mono text-[10px] sm:text-xs font-extrabold text-rose-200 leading-none">
-                                    {openSell}
-                                </span>
+                            <div className="flex justify-center">
+                                {isSellFrozen && (
+                                    <div className="flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full border border-rose-400/80 bg-[#080d1a]/95 shadow-[0_0_8px_rgba(244,63,94,0.5)]">
+                                        <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-300" />
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center justify-between font-mono text-[8px] text-slate-400 leading-none">
-                        <span className="text-emerald-400">▲{metrics.tpTradeLevel ?? '-'}</span>
-                        <span className="text-sky-300/70">BE:{metrics.beTradeLevel ?? '-'}</span>
+                        </div>
                     </div>
                 </div>
 
