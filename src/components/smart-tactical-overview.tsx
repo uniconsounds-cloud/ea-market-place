@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, RefreshCw } from 'lucide-react';
 import type { SmartChartData } from '@/components/smart-vortex-chart';
 import type { RoundHistoryTuple } from '@/components/round-history-bar';
 
@@ -22,7 +22,11 @@ interface SmartTacticalOverviewProps {
     lotIncrement: number;
     chart?: SmartChartData | null;
     roundHistory?: RoundHistoryTuple[] | null;
+    isWaitingFreshData?: boolean;
+    lastPing?: string;
 }
+
+const FIXED_VU_SLOTS = 30;
 
 export default function SmartTacticalOverview({
     port,
@@ -41,49 +45,150 @@ export default function SmartTacticalOverview({
     lotIncrement,
     chart,
     roundHistory,
+    isWaitingFreshData = false,
+    lastPing,
 }: SmartTacticalOverviewProps) {
-    const safeCap = Math.max(1, cap || 7);
+    const safeCap = Math.max(1, Math.min(20, cap || 7));
     const isBuyFrozen = protectionFrozen && frozenSide === 'BUY';
     const isSellFrozen = protectionFrozen && frozenSide === 'SELL';
     const digits = chart?.digits ?? 2;
     const pointSize = Math.pow(10, -digits);
 
-    // Track highest/extreme PnL of the day in localStorage
-    const [peakPnlToday, setPeakPnlToday] = useState<number>(liveCyclePnl);
+    // =========================================================================
+    // ROUND PEAK PnL TRACKER (Per-Round Peak: persists while round is open,
+    // even if user closes the web page, and resets only when the round ends)
+    // =========================================================================
+    const currentRoundKey = useMemo(() => {
+        const latestClosedTime =
+            Array.isArray(roundHistory) && roundHistory.length > 0
+                ? Math.max(...roundHistory.map((r) => (Array.isArray(r) ? Number(r[0]) || 0 : 0)))
+                : 0;
+        const roundStarted = Number(chart?.round_started || 0);
+        // Keyed by latest closed round timestamp (invariant throughout the active cycle)
+        // If round_started is available and > latestClosedTime, include it for extra precision
+        if (openBuy + openSell === 0) {
+            return `idle_${latestClosedTime}`;
+        }
+        return `active_${latestClosedTime}_${roundStarted > latestClosedTime ? roundStarted : 0}`;
+    }, [roundHistory, chart?.round_started, openBuy, openSell]);
 
-    const bkkDayKey = useMemo(() => {
-        const now = new Date();
-        // Trading day starts at 05:00 Bangkok (UTC+7 => 22:00 UTC previous day)
-        const shifted = new Date(now.getTime() + (7 - 5) * 3600 * 1000);
-        return shifted.toISOString().slice(0, 10);
-    }, []);
+    // Reconstruct any intra-round peak excursion from candle highs/lows & open orders
+    // in case price spiked while user had the web browser closed
+    const candleEstimatedPeak = useMemo(() => {
+        if (openBuy + openSell === 0) return 0;
+        const orders = (chart?.orders || []).filter((o) => o.t === 'B' || o.t === 'S');
+        const candles = chart?.candles || [];
+        const bid = chart?.bid || 0;
+        if (orders.length === 0 || candles.length === 0 || bid <= 0) return liveCyclePnl;
+
+        // Calibrate point value from current orders if possible
+        let calcDiffPointsX001 = 0;
+        let sumOrderU = 0;
+        for (const o of orders) {
+            const diffPts = ((o.t === 'B' ? bid - o.p : o.p - bid) / pointSize) * (o.l / 0.01);
+            calcDiffPointsX001 += diffPts;
+            sumOrderU += o.u ?? 0;
+        }
+        const valPerPtPer001 =
+            Math.abs(calcDiffPointsX001) > 10 && Math.abs(sumOrderU) > 0.1
+                ? Math.max(0.001, Math.min(1, Math.abs(sumOrderU / calcDiffPointsX001)))
+                : 0.01;
+
+        const latestClosedTime =
+            Array.isArray(roundHistory) && roundHistory.length > 0
+                ? Math.max(...roundHistory.map((r) => (Array.isArray(r) ? Number(r[0]) || 0 : 0)))
+                : 0;
+        const roundStartUnix = Math.max(
+            latestClosedTime,
+            Number(chart?.round_started || 0) > 0
+                ? Number(chart?.round_started)
+                : Math.min(...orders.map((o) => o.tm || Infinity))
+        );
+
+        let extremePnl = liveCyclePnl;
+        for (const c of candles) {
+            const cTime = Number(c[0]) || 0;
+            if (roundStartUnix > 0 && cTime + 900 < roundStartUnix) continue;
+            const activeAtCandle = orders.filter((o) => !o.tm || o.tm <= cTime + 900);
+            if (activeAtCandle.length === 0) continue;
+
+            for (const testPrice of [c[2], c[3]]) {
+                let pnlAtPrice = 0;
+                for (const o of activeAtCandle) {
+                    const pts = (o.t === 'B' ? testPrice - o.p : o.p - testPrice) / pointSize;
+                    pnlAtPrice += pts * (o.l / 0.01) * valPerPtPer001;
+                }
+                if (Math.abs(pnlAtPrice) > Math.abs(extremePnl)) {
+                    extremePnl = pnlAtPrice;
+                }
+            }
+        }
+        return extremePnl;
+    }, [openBuy, openSell, chart, roundHistory, liveCyclePnl, pointSize]);
+
+    const [peakPnlRound, setPeakPnlRound] = useState<number>(liveCyclePnl);
 
     useEffect(() => {
         if (!port) return;
-        const storageKey = `sv_peak_pnl_${port}_${bkkDayKey}`;
+        const storageKey = `sv_round_peak_v2_${port}`;
+        if (openBuy + openSell === 0) {
+            setPeakPnlRound(0);
+            try {
+                localStorage.setItem(
+                    storageKey,
+                    JSON.stringify({ roundKey: currentRoundKey, peakPnl: 0, updatedAt: Date.now() })
+                );
+            } catch {
+                // ignore storage error
+            }
+            return;
+        }
+
         try {
             const raw = localStorage.getItem(storageKey);
-            const prev = raw !== null ? parseFloat(raw) : NaN;
-            const nextPeak = isNaN(prev)
-                ? liveCyclePnl
-                : liveCyclePnl < 0
-                ? Math.min(prev, liveCyclePnl)
-                : Math.max(prev, liveCyclePnl);
-            setPeakPnlToday(nextPeak);
-            localStorage.setItem(storageKey, String(nextPeak));
-        } catch {
-            setPeakPnlToday(liveCyclePnl);
-        }
-    }, [port, bkkDayKey, liveCyclePnl]);
+            let savedPeak = NaN;
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.roundKey === currentRoundKey && typeof parsed.peakPnl === 'number') {
+                    savedPeak = parsed.peakPnl;
+                }
+            }
 
-    // Compute Total Lots, Today's Profit, and Trade Level where TP=0 and TP=targetProfit occur
+            // Pick the largest magnitude excursion among savedPeak, liveCyclePnl, and candleEstimatedPeak
+            let nextPeak = liveCyclePnl;
+            if (!isNaN(savedPeak) && Math.abs(savedPeak) > Math.abs(nextPeak)) {
+                nextPeak = savedPeak;
+            }
+            if (Math.abs(candleEstimatedPeak) > Math.abs(nextPeak)) {
+                nextPeak = candleEstimatedPeak;
+            }
+
+            setPeakPnlRound(nextPeak);
+            localStorage.setItem(
+                storageKey,
+                JSON.stringify({ roundKey: currentRoundKey, peakPnl: nextPeak, updatedAt: Date.now() })
+            );
+        } catch {
+            setPeakPnlRound(liveCyclePnl);
+        }
+    }, [port, currentRoundKey, openBuy, openSell, liveCyclePnl, candleEstimatedPeak]);
+
+    // Compute Total Lots, Buy/Sell Lots, Buy/Sell PnL, Today's Profit, and Trade Level where TP=0 and TP=targetProfit occur
     const metrics = useMemo(() => {
-        const orders = chart?.orders || [];
+        const orders = (chart?.orders || []).filter((o) => o.t === 'B' || o.t === 'S');
         let buyLot = 0;
         let sellLot = 0;
+        let sumBuyOrderPnl = 0;
+        let sumSellOrderPnl = 0;
+
         for (const o of orders) {
-            if (o.t === 'B') buyLot += o.l;
-            else if (o.t === 'S') sellLot += o.l;
+            if (o.t === 'B') {
+                buyLot += o.l;
+                sumBuyOrderPnl += o.u ?? 0;
+            } else if (o.t === 'S') {
+                sellLot += o.l;
+                sumSellOrderPnl += o.u ?? 0;
+            }
         }
         if (buyLot === 0 && openBuy > 0) {
             buyLot = openBuy * initialLot + ((openBuy * (openBuy - 1)) / 2) * lotIncrement;
@@ -93,6 +198,11 @@ export default function SmartTacticalOverview({
         }
         const totalLot = buyLot + sellLot;
         const totalTrades = openBuy + openSell;
+
+        const hasExactSidePnl =
+            typeof chart?.buy_pnl === 'number' && typeof chart?.sell_pnl === 'number';
+        const buyPnl = hasExactSidePnl ? (chart?.buy_pnl ?? 0) : sumBuyOrderPnl;
+        const sellPnl = hasExactSidePnl ? (chart?.sell_pnl ?? 0) : sumSellOrderPnl;
 
         // Today's closed profit (since 05:00 AM Bangkok time)
         const now = new Date();
@@ -131,7 +241,7 @@ export default function SmartTacticalOverview({
             let curActiveLot = activeSide === 'BUY' ? buyLot : sellLot;
             const curOppLot = activeSide === 'BUY' ? sellLot : buyLot;
 
-            for (let m = Math.max(1, activeCount); m <= 45; m++) {
+            for (let m = Math.max(1, activeCount); m <= 99; m++) {
                 if (m > activeCount) {
                     const newLot = initialLot + (m - 1) * lotIncrement;
                     const netLotBeforeStep = curActiveLot - curOppLot;
@@ -154,58 +264,64 @@ export default function SmartTacticalOverview({
             buyLot,
             sellLot,
             totalLot,
+            buyPnl,
+            sellPnl,
             totalTrades,
             todayProfit,
             activeSide,
             beTradeLevel,
             tpTradeLevel,
         };
-    }, [chart?.orders, openBuy, openSell, initialLot, lotIncrement, roundHistory, isBuyFrozen, isSellFrozen, spacingPoints, liveCyclePnl, targetProfit]);
+    }, [chart, openBuy, openSell, initialLot, lotIncrement, roundHistory, isBuyFrozen, isSellFrozen, spacingPoints, liveCyclePnl, targetProfit]);
 
     // =========================================================================
-    // SECTION 1 & SECTION 2: Shared VU Geometry (using Section 2 as master template)
-    // Both Section 1 and Section 2 use the exact same row count, gap, and bar width
-    // so all 4 VU columns have identical tick thickness, width, and vertical spacing.
+    // SECTION 1 & SECTION 2: Fixed 30-Slot VU Geometry
+    // Both Section 1 and Section 2 render strictly 30 fixed slots (FIXED_VU_SLOTS = 30)
+    // so all 4 VU columns have identical bar height, gap, and 30 visible slots.
     // =========================================================================
-    const sec1MinY = Math.min(0, safeCap + 1 - Math.max(safeCap, openSell));
-    const sec1MaxY = Math.max(safeCap + 1, openBuy);
-    const rawSec1Count = sec1MaxY - sec1MinY + 1;
+    const sec2Levels = useMemo(() => {
+        const arr: number[] = [];
+        for (let lv = FIXED_VU_SLOTS; lv >= 1; lv--) {
+            arr.push(lv);
+        }
+        return arr;
+    }, []);
 
-    const sec2MaxLevel = Math.max(
-        safeCap + 2,
-        openBuy + 1,
-        openSell + 1,
-        metrics.tpTradeLevel ?? 0,
-        metrics.beTradeLevel ?? 0,
-        10,
-        rawSec1Count
-    );
-    const sec2Levels: number[] = [];
-    for (let lv = sec2MaxLevel; lv >= 1; lv--) {
-        sec2Levels.push(lv);
-    }
+    // Section 1: 30 fixed rows centered around the Freeze zone (y = 1 .. safeCap)
+    // Buy slots run bottom-up (buyIdx = y >= 1); Sell slots run top-down (sellIdx = safeCap + 1 - y >= 1)
+    const { sec1Rows, sec1TopY, sec1BotY, freezeCenterPct } = useMemo(() => {
+        const remaining = Math.max(0, FIXED_VU_SLOTS - safeCap);
+        const topExtra = Math.floor(remaining / 2);
+        const botExtra = remaining - topExtra;
+        const topY = safeCap + topExtra; // e.g. for cap=7 -> 7 + 11 = 18
+        const botY = 1 - botExtra; // e.g. for cap=7 -> 1 - 12 = -11 (18 - (-11) + 1 = 30 rows)
+        const rows: number[] = [];
+        for (let y = topY; y >= botY; y--) {
+            rows.push(y);
+        }
+        const fCenterY = (safeCap + 1) / 2;
+        const fCenterPct = ((topY - fCenterY + 0.5) / FIXED_VU_SLOTS) * 100;
+        return {
+            sec1Rows: rows,
+            sec1TopY: topY,
+            sec1BotY: botY,
+            freezeCenterPct: fCenterPct,
+        };
+    }, [safeCap]);
 
-    // Pad Section 1 rows symmetrically so total row count === sec2Levels.length
-    const extraSec1Rows = Math.max(0, sec2Levels.length - rawSec1Count);
-    const padTopSec1 = Math.floor(extraSec1Rows / 2);
-    const padBotSec1 = extraSec1Rows - padTopSec1;
-    const sec1PaddedMaxY = sec1MaxY + padTopSec1;
-    const sec1PaddedMinY = sec1MinY - padBotSec1;
-    const sec1Rows: number[] = [];
-    for (let y = sec1PaddedMaxY; y >= sec1PaddedMinY; y--) {
-        sec1Rows.push(y);
-    }
-
-    // Exact vertical center of the Freeze zone (y = 1 .. safeCap) as a percentage of sec1Rows
-    const freezeCenterY = (safeCap + 1) / 2;
-    const freezeCenterPct = ((sec1PaddedMaxY - freezeCenterY + 0.5) / Math.max(1, sec1Rows.length)) * 100;
+    // Clamped display slots for Section 2 (1..30)
+    const clampedTpSlot =
+        metrics.tpTradeLevel !== null ? Math.min(FIXED_VU_SLOTS, Math.max(1, metrics.tpTradeLevel)) : null;
+    const clampedBeSlot =
+        metrics.beTradeLevel !== null ? Math.min(FIXED_VU_SLOTS, Math.max(1, metrics.beTradeLevel)) : null;
+    const sec2BuyLabelSlot = openBuy <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, openBuy + 1);
+    const sec2SellLabelSlot = openSell <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, openSell + 1);
 
     // =========================================================================
     // SECTION 3: Mini Price Sparkline (Full candle history window, 50% width)
     // =========================================================================
     const spark = useMemo(() => {
         const candles = chart?.candles || [];
-        // Use ALL candles fetched for the candlestick chart so the line chart mirrors the full time window
         const closes = candles.map((c) => c[4]);
         const highs = candles.map((c) => c[2]);
         const lows = candles.map((c) => c[3]);
@@ -234,45 +350,81 @@ export default function SmartTacticalOverview({
     }, [chart, pointSize, freezeStopLoss, targetProfit, liveCyclePnl]);
 
     // =========================================================================
-    // SECTION 4: Vertical PnL Bar + Peak Excursion Marker
+    // SECTION 4: Vertical PnL Bar + Per-Round Peak Excursion Marker
     // =========================================================================
     const pnlScaleMax = useMemo(() => {
         return Math.max(
             50,
             Math.abs(liveCyclePnl) * 1.25,
-            Math.abs(peakPnlToday) * 1.2,
+            Math.abs(peakPnlRound) * 1.2,
             Math.abs(targetProfit) * 1.5,
             freezeStopLoss < 0 ? Math.abs(freezeStopLoss) * 1.15 : 50
         );
-    }, [liveCyclePnl, peakPnlToday, targetProfit, freezeStopLoss]);
+    }, [liveCyclePnl, peakPnlRound, targetProfit, freezeStopLoss]);
+
+    // How long ago the displayed snapshot was recorded
+    const snapshotAgeLabel = useMemo(() => {
+        if (!lastPing) return null;
+        const diffSec = Math.max(0, Math.floor((Date.now() - new Date(lastPing).getTime()) / 1000));
+        if (diffSec < 60) return `${diffSec} วินาทีก่อน`;
+        const mins = Math.floor(diffSec / 60);
+        if (mins < 60) return `${mins} นาทีก่อน`;
+        const hrs = Math.floor(mins / 60);
+        return `${hrs} ชม. ${mins % 60} นาทีก่อน`;
+    }, [lastPing]);
 
     return (
-        <div className="rounded-xl border border-cyan-500/30 bg-[#050b14]/95 p-2 sm:p-3 shadow-[0_0_28px_rgba(6,182,212,0.1)] backdrop-blur-md space-y-2">
+        <div
+            className={`rounded-xl border border-cyan-500/30 bg-[#050b14]/95 p-2 sm:p-3 shadow-[0_0_28px_rgba(6,182,212,0.1)] backdrop-blur-md space-y-2 transition-all duration-500 ${
+                isWaitingFreshData ? 'opacity-70 grayscale animate-pulse' : ''
+            }`}
+        >
+            {/* Waiting for Sync Banner when displaying cached / 10-min pre-recorded snapshot */}
+            {isWaitingFreshData && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-mono text-[10px] sm:text-[11px] text-amber-300">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <RefreshCw className="w-3 h-3 animate-spin text-amber-400 shrink-0" />
+                        <span className="font-bold truncate">
+                            รอ Sync ข้อมูลรอบใหม่จาก MT5...
+                        </span>
+                    </div>
+                    {snapshotAgeLabel && (
+                        <span className="text-[9px] sm:text-[10px] text-amber-200/80 shrink-0">
+                            ข้อมูลล่าสุด: {snapshotAgeLabel}
+                        </span>
+                    )}
+                </div>
+            )}
+
             {/* Upper 4-Section Visual Deck: 6-col grid -> Sec 1 (1), Sec 2 (1), Sec 3 (3 = 50%), Sec 4 (1) */}
-            <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-stretch h-[168px] sm:h-[184px]">
+            <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-stretch h-[176px] sm:h-[192px]">
                 {/* =========================================================
-                    SECTION 1 (1/6 width): Interlocked Freeze VU
-                    - Uses exact same padding (p-1.5 / px-1), gap-[1px], and row count as Section 2
+                    SECTION 1 (1/6 width): Interlocked Freeze VU (30 Fixed Slots)
                    ========================================================= */}
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
                     <div className="flex-1 flex flex-col justify-between gap-[1px] px-1 relative min-h-0">
                         {sec1Rows.map((y) => {
-                            const buyIdx = y; // 1..N bottom-up
-                            const sellIdx = safeCap + 1 - y; // 1..N top-down
-                            const hasBuySlot = buyIdx >= 1 && buyIdx <= Math.max(safeCap, openBuy);
-                            const hasSellSlot = sellIdx >= 1 && sellIdx <= Math.max(safeCap, openSell);
-                            const buyLit = buyIdx >= 1 && openBuy >= buyIdx;
-                            const sellLit = sellIdx >= 1 && openSell >= sellIdx;
+                            const buyIdx = y; // 1..topY bottom-up
+                            const sellIdx = safeCap + 1 - y; // 1..maxSell top-down
+                            const maxBuySlots = sec1TopY;
+                            const maxSellSlots = safeCap + 1 - sec1BotY;
+                            const clampedOpenBuy = Math.min(maxBuySlots, openBuy);
+                            const clampedOpenSell = Math.min(maxSellSlots, openSell);
+
+                            const hasBuySlot = buyIdx >= 1;
+                            const hasSellSlot = sellIdx >= 1;
+                            const buyLit = hasBuySlot && clampedOpenBuy >= buyIdx;
+                            const sellLit = hasSellSlot && clampedOpenSell >= sellIdx;
                             const isFreezeZone = y >= 1 && y <= safeCap;
                             const isBuyLabelRow = y === 0;
                             const isSellLabelRow = y === safeCap + 1;
 
                             return (
                                 <div key={`s1-${y}`} className="grid grid-cols-2 gap-1.5 items-center flex-1 min-h-[1.5px] relative">
-                                    {/* Left: Buy segment OR Buy count directly below bar #1 */}
+                                    {/* Left: Buy segment (30-slot grid) OR Buy count directly below bar #1 */}
                                     <div className="relative h-full flex items-center justify-center">
                                         {isBuyLabelRow ? (
-                                            <span className="absolute top-0 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums">
+                                            <span className="absolute top-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums">
                                                 {openBuy}
                                             </span>
                                         ) : (
@@ -285,17 +437,17 @@ export default function SmartTacticalOverview({
                                                             ? 'bg-sky-400 shadow-[0_0_4px_rgba(56,189,248,0.45)]'
                                                             : 'bg-emerald-300 shadow-[0_0_5px_#6ee7b7]'
                                                         : isFreezeZone
-                                                        ? 'bg-sky-950/60'
-                                                        : 'bg-transparent'
+                                                        ? 'bg-sky-950/65'
+                                                        : 'bg-slate-800/55'
                                                 }`}
                                             />
                                         )}
                                     </div>
 
-                                    {/* Right: Sell segment OR Sell count directly above bar #1 */}
+                                    {/* Right: Sell segment (30-slot grid) OR Sell count directly above bar #1 */}
                                     <div className="relative h-full flex items-center justify-center">
                                         {isSellLabelRow ? (
-                                            <span className="absolute bottom-0 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums">
+                                            <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums">
                                                 {openSell}
                                             </span>
                                         ) : (
@@ -308,8 +460,8 @@ export default function SmartTacticalOverview({
                                                             ? 'bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.45)]'
                                                             : 'bg-rose-400 shadow-[0_0_5px_#fb7185]'
                                                         : isFreezeZone
-                                                        ? 'bg-orange-950/60'
-                                                        : 'bg-transparent'
+                                                        ? 'bg-orange-950/65'
+                                                        : 'bg-slate-800/55'
                                                 }`}
                                             />
                                         )}
@@ -331,33 +483,33 @@ export default function SmartTacticalOverview({
                 </div>
 
                 {/* =========================================================
-                    SECTION 2 (1/6 width): Parallel Bottom-Up VU
-                    - Count sits directly on top of the highest lit bar of each side
-                    - TP triangle + TP level number shown right at the TP bar (no bottom footer)
-                    - Circular Lock icon (no number) centered at bottom of the frozen side's bar
+                    SECTION 2 (1/6 width): Parallel Bottom-Up VU (30 Fixed Slots)
+                    - Always 30 fixed slots (1..30 from bottom to top)
+                    - Lit from 1..openBuy and 1..openSell, empty slots above
+                    - If TP > 30, points at slot 30 and shows the true TP number
                    ========================================================= */}
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
                     <div className="flex-1 flex flex-col justify-between gap-[1px] px-1 relative min-h-0">
                         {sec2Levels.map((lv) => {
                             const buyLit = openBuy >= lv;
                             const sellLit = openSell >= lv;
-                            const isBuyTopLabel = lv === openBuy + 1;
-                            const isSellTopLabel = lv === openSell + 1;
-                            const isTpRow = metrics.tpTradeLevel === lv;
-                            const isBeRow = metrics.beTradeLevel === lv;
+                            const isBuyTopLabel = lv === sec2BuyLabelSlot;
+                            const isSellTopLabel = lv === sec2SellLabelSlot;
+                            const isTpRow = clampedTpSlot === lv;
+                            const isBeRow = clampedBeSlot === lv;
 
                             return (
                                 <div key={`s2-${lv}`} className="relative grid grid-cols-2 gap-1.5 items-center flex-1 min-h-[1.5px]">
                                     {/* Thin faint TP=0 (BE) horizontal line */}
                                     {isBeRow && (
                                         <div
-                                            title={`TP=0 ที่ไม้ ${lv}`}
+                                            title={`TP=0 ที่ไม้ ${metrics.beTradeLevel}`}
                                             className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-sky-200/50 pointer-events-none z-10"
                                         />
                                     )}
 
-                                    {/* Small Triangle Pointer + TP bar number right at the TP row */}
-                                    {isTpRow && (
+                                    {/* Small Triangle Pointer + true TP bar number right at the TP row (clamped at 30 if >30) */}
+                                    {isTpRow && metrics.tpTradeLevel !== null && (
                                         <div
                                             className={`pointer-events-none absolute top-1/2 -translate-y-1/2 z-30 flex items-center gap-[1px] ${
                                                 metrics.activeSide === 'BUY' ? '-left-1' : '-right-1 flex-row-reverse'
@@ -373,13 +525,13 @@ export default function SmartTacticalOverview({
                                                     <polygon points="6,0 0,3 6,6" fill="currentColor" />
                                                 )}
                                             </svg>
-                                            <span className="font-mono text-[8px] sm:text-[9px] font-extrabold text-emerald-300 leading-none bg-[#030710]/85 px-0.5 rounded">
-                                                {lv}
+                                            <span className="font-mono text-[8px] sm:text-[9px] font-extrabold text-emerald-300 leading-none bg-[#030710]/90 px-0.5 rounded">
+                                                {metrics.tpTradeLevel}
                                             </span>
                                         </div>
                                     )}
 
-                                    {/* Buy Segment or Buy Top Number */}
+                                    {/* Buy Segment (1..30) or Buy Top Number */}
                                     <div className="relative h-full flex items-center justify-center">
                                         {isBuyTopLabel && (
                                             <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums bg-[#030710]/80 px-0.5 rounded">
@@ -393,13 +545,13 @@ export default function SmartTacticalOverview({
                                                         ? 'bg-rose-500/80'
                                                         : 'bg-sky-400'
                                                     : isTpRow && metrics.activeSide === 'BUY'
-                                                    ? 'bg-emerald-500/40'
-                                                    : 'bg-slate-900/75'
+                                                    ? 'bg-emerald-500/45'
+                                                    : 'bg-slate-800/55'
                                             }`}
                                         />
                                     </div>
 
-                                    {/* Sell Segment or Sell Top Number */}
+                                    {/* Sell Segment (1..30) or Sell Top Number */}
                                     <div className="relative h-full flex items-center justify-center">
                                         {isSellTopLabel && (
                                             <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums bg-[#030710]/80 px-0.5 rounded">
@@ -413,8 +565,8 @@ export default function SmartTacticalOverview({
                                                         ? 'bg-rose-500/80'
                                                         : 'bg-orange-400'
                                                     : isTpRow && metrics.activeSide === 'SELL'
-                                                    ? 'bg-emerald-500/40'
-                                                    : 'bg-slate-900/75'
+                                                    ? 'bg-emerald-500/45'
+                                                    : 'bg-slate-800/55'
                                             }`}
                                         />
                                     </div>
@@ -564,7 +716,7 @@ export default function SmartTacticalOverview({
                 </div>
 
                 {/* =========================================================
-                    SECTION 4 (1/6 width): Vertical PnL Bar + Big Number + Peak Tick
+                    SECTION 4 (1/6 width): Vertical PnL Bar + Big Number + Per-Round Peak Tick
                    ========================================================= */}
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1 sm:p-1.5">
                     <div className="text-center">
@@ -579,12 +731,12 @@ export default function SmartTacticalOverview({
                         </div>
                     </div>
 
-                    {/* Vertical Bar + Peak Tick */}
+                    {/* Vertical Bar + Per-Round Peak Tick */}
                     <div className="my-0.5 flex-1 flex items-center justify-center gap-1 min-h-0">
                         <div className="relative h-full w-3.5 sm:w-4 rounded bg-slate-900 border border-slate-800 overflow-hidden flex flex-col justify-end">
                             {(() => {
                                 const curRatio = Math.min(100, Math.round((Math.abs(liveCyclePnl) / pnlScaleMax) * 100));
-                                const peakRatio = Math.min(97, Math.max(4, Math.round((Math.abs(peakPnlToday) / pnlScaleMax) * 100)));
+                                const peakRatio = Math.min(97, Math.max(4, Math.round((Math.abs(peakPnlRound) / pnlScaleMax) * 100)));
 
                                 return (
                                     <>
@@ -598,6 +750,7 @@ export default function SmartTacticalOverview({
                                         />
                                         <div
                                             style={{ bottom: `${peakRatio}%` }}
+                                            title={`Peak ของรอบนี้: ${peakPnlRound >= 0 ? '+' : ''}${peakPnlRound.toFixed(1)} ${currency}`}
                                             className="absolute inset-x-0 h-[2px] bg-amber-300 shadow-[0_0_4px_#fcd34d] z-10"
                                         />
                                     </>
@@ -607,10 +760,12 @@ export default function SmartTacticalOverview({
 
                         <div className="flex flex-col justify-between h-full font-mono text-[7.5px] sm:text-[8.5px] text-left leading-none py-0.5">
                             <div>
-                                <div className="text-amber-300/90 font-bold">PK</div>
+                                <div className="text-amber-300/90 font-bold" title="Peak สูงสุดของรอบปัจจุบัน">
+                                    PK
+                                </div>
                                 <div className="text-amber-200 tabular-nums">
-                                    {peakPnlToday >= 0 ? '+' : ''}
-                                    {peakPnlToday.toFixed(0)}
+                                    {peakPnlRound >= 0 ? '+' : ''}
+                                    {peakPnlRound.toFixed(0)}
                                 </div>
                             </div>
                             <div className="text-slate-500">0</div>
@@ -624,11 +779,16 @@ export default function SmartTacticalOverview({
             </div>
 
             {/* =========================================================
-                SECTION 5: 5 Key Metrics Bottom Strip (Numbers doubled in size, labels unchanged)
+                SECTION 5: 5 Key Metrics Bottom Strip
+                1. กำไรวันนี้
+                2. ตั้ง TP / SL (รวมในช่องเดียวกัน ขนาดตัวเลขลดลงครึ่งนึง)
+                3. ไม้ออกรวม
+                4. ลอตรวม (ขนาดตัวเลขลดลงครึ่งนึง + เส้นแนวนอนซ้อนกันสองเส้น Buy/Sell)
+                5. PnL Buy / Sell (เส้นแนวนอนสองเส้น บน=Buy ล่าง=Sell บวก/ลบซ้ายขวาต่อเนื่องบนเส้นเดียวกัน จัดวางกลางช่อง พร้อมตัวเลขกำกับ)
                ========================================================= */}
-            <div className="grid grid-cols-5 gap-1 sm:gap-2 rounded-lg border border-cyan-500/20 bg-slate-900/80 px-1.5 py-2 sm:px-2.5 sm:py-2.5 font-mono text-center">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 rounded-lg border border-cyan-500/20 bg-slate-900/80 px-1.5 py-1.5 sm:px-2.5 sm:py-2 font-mono text-center items-center">
                 {/* 1. Today's Profit */}
-                <div className="flex flex-col justify-center gap-0.5">
+                <div className="flex flex-col justify-center gap-0.5 min-w-0">
                     <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">กำไรวันนี้</span>
                     <span
                         className={`text-base sm:text-2xl font-extrabold leading-none tabular-nums truncate ${
@@ -640,40 +800,156 @@ export default function SmartTacticalOverview({
                     </span>
                 </div>
 
-                {/* 2. Target Profit */}
-                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800">
-                    <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ตั้ง TP</span>
-                    <span className="text-base sm:text-2xl font-extrabold text-cyan-300 leading-none tabular-nums truncate">
-                        {targetProfit >= 0 ? `+${targetProfit}` : targetProfit}
-                    </span>
+                {/* 2. Combined TP & SL (Half-size numbers) */}
+                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
+                    <span className="text-[8px] sm:text-[10px] text-slate-400 truncate leading-none">ตั้ง TP / SL</span>
+                    <div className="flex flex-col items-center justify-center gap-0.5 pt-0.5">
+                        <div className="flex items-center justify-center gap-1 leading-none">
+                            <span className="text-[7.5px] sm:text-[9px] text-slate-400">TP</span>
+                            <span className="text-[9px] sm:text-xs font-extrabold text-cyan-300 leading-none tabular-nums truncate">
+                                {targetProfit >= 0 ? `+${targetProfit}` : targetProfit}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-center gap-1 leading-none">
+                            <span className="text-[7.5px] sm:text-[9px] text-slate-400">SL</span>
+                            <span
+                                className={`text-[9px] sm:text-xs font-extrabold leading-none tabular-nums truncate ${
+                                    freezeStopLoss < 0 ? 'text-amber-300' : 'text-slate-500'
+                                }`}
+                            >
+                                {freezeStopLoss < 0 ? freezeStopLoss : '-'}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* 3. Total Open Trades */}
-                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800">
+                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
                     <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ไม้ออกรวม</span>
                     <span className="text-base sm:text-2xl font-extrabold text-white leading-none tabular-nums">
                         {metrics.totalTrades}
                     </span>
                 </div>
 
-                {/* 4. Total Lots */}
-                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800">
-                    <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ลอตรวม</span>
-                    <span className="text-base sm:text-2xl font-extrabold text-sky-300 leading-none tabular-nums">
-                        {metrics.totalLot.toFixed(2)}
-                    </span>
+                {/* 4. Total Lots (Half-size total number + 2 stacked horizontal bars for Buy & Sell Lots) */}
+                <div className="flex flex-col justify-center gap-1 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
+                    <div className="flex items-center justify-center gap-1 leading-none">
+                        <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ลอต</span>
+                        <span className="text-[9px] sm:text-xs font-extrabold text-sky-300 leading-none tabular-nums">
+                            {metrics.totalLot.toFixed(2)}
+                        </span>
+                    </div>
+                    {(() => {
+                        const maxSideLot = Math.max(0.01, metrics.buyLot, metrics.sellLot);
+                        const buyLotPct = Math.min(100, Math.round((metrics.buyLot / maxSideLot) * 100));
+                        const sellLotPct = Math.min(100, Math.round((metrics.sellLot / maxSideLot) * 100));
+                        return (
+                            <div className="flex flex-col justify-center gap-0.5 w-full px-0.5">
+                                {/* Top Horizontal Line: Buy Lot */}
+                                <div className="flex items-center gap-1 w-full">
+                                    <div className="flex-1 h-1.5 rounded-full bg-slate-950 border border-slate-800/90 overflow-hidden">
+                                        <div
+                                            style={{ width: `${buyLotPct}%` }}
+                                            className="h-full bg-sky-400 shadow-[0_0_4px_rgba(56,189,248,0.45)] rounded-full transition-all"
+                                        />
+                                    </div>
+                                    <span className="text-[7.5px] sm:text-[9px] font-bold text-sky-300 leading-none tabular-nums shrink-0">
+                                        {metrics.buyLot.toFixed(2)}
+                                    </span>
+                                </div>
+                                {/* Bottom Horizontal Line: Sell Lot */}
+                                <div className="flex items-center gap-1 w-full">
+                                    <div className="flex-1 h-1.5 rounded-full bg-slate-950 border border-slate-800/90 overflow-hidden">
+                                        <div
+                                            style={{ width: `${sellLotPct}%` }}
+                                            className="h-full bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.45)] rounded-full transition-all"
+                                        />
+                                    </div>
+                                    <span className="text-[7.5px] sm:text-[9px] font-bold text-orange-300 leading-none tabular-nums shrink-0">
+                                        {metrics.sellLot.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
-                {/* 5. Freeze SL */}
-                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800">
-                    <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ตั้ง SL</span>
-                    <span
-                        className={`text-base sm:text-2xl font-extrabold leading-none tabular-nums truncate ${
-                            freezeStopLoss < 0 ? 'text-amber-300' : 'text-slate-500'
-                        }`}
-                    >
-                        {freezeStopLoss < 0 ? freezeStopLoss : '-'}
-                    </span>
+                {/* 5. Rightmost Box: 2 Horizontal PnL Lines (Top = Buy, Bottom = Sell, Continuous Left(-) / Right(+) on same line, centered with labels) */}
+                <div className="flex flex-col justify-center gap-1 border-l border-slate-800 pl-1 sm:pl-2 min-w-0 h-full">
+                    {(() => {
+                        const bPnl = metrics.buyPnl;
+                        const sPnl = metrics.sellPnl;
+                        const maxAbsSidePnl = Math.max(10, Math.abs(bPnl), Math.abs(sPnl));
+                        const bHalfPct = Math.min(50, Math.round((Math.abs(bPnl) / maxAbsSidePnl) * 50));
+                        const sHalfPct = Math.min(50, Math.round((Math.abs(sPnl) / maxAbsSidePnl) * 50));
+
+                        const fmtPnl = (v: number) => {
+                            const sign = v > 0 ? '+' : '';
+                            return `${sign}${Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)}`;
+                        };
+
+                        return (
+                            <div className="flex flex-col justify-center gap-1 w-full px-0.5 my-auto">
+                                {/* Top Line: Buy PnL (Left = -, Right = + continuous on same line) */}
+                                <div className="flex flex-col gap-[2px] w-full">
+                                    <div className="flex items-center justify-between text-[7.5px] sm:text-[9px] leading-none px-0.5">
+                                        <span className="font-bold text-sky-400">B</span>
+                                        <span
+                                            className={`font-extrabold tabular-nums truncate ${
+                                                bPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                            }`}
+                                        >
+                                            {fmtPnl(bPnl)}
+                                        </span>
+                                    </div>
+                                    <div className="relative h-1.5 w-full rounded-full bg-slate-950 border border-slate-800/90 overflow-hidden">
+                                        {/* Center 0 Axis */}
+                                        <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-slate-500/80 z-10" />
+                                        {bPnl < 0 ? (
+                                            <div
+                                                style={{ width: `${bHalfPct}%`, right: '50%' }}
+                                                className="absolute top-0 bottom-0 bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.5)] rounded-l-full transition-all"
+                                            />
+                                        ) : bPnl > 0 ? (
+                                            <div
+                                                style={{ width: `${bHalfPct}%`, left: '50%' }}
+                                                className="absolute top-0 bottom-0 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)] rounded-r-full transition-all"
+                                            />
+                                        ) : null}
+                                    </div>
+                                </div>
+
+                                {/* Bottom Line: Sell PnL (Left = -, Right = + continuous on same line) */}
+                                <div className="flex flex-col gap-[2px] w-full">
+                                    <div className="flex items-center justify-between text-[7.5px] sm:text-[9px] leading-none px-0.5">
+                                        <span className="font-bold text-orange-400">S</span>
+                                        <span
+                                            className={`font-extrabold tabular-nums truncate ${
+                                                sPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                            }`}
+                                        >
+                                            {fmtPnl(sPnl)}
+                                        </span>
+                                    </div>
+                                    <div className="relative h-1.5 w-full rounded-full bg-slate-950 border border-slate-800/90 overflow-hidden">
+                                        {/* Center 0 Axis */}
+                                        <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-slate-500/80 z-10" />
+                                        {sPnl < 0 ? (
+                                            <div
+                                                style={{ width: `${sHalfPct}%`, right: '50%' }}
+                                                className="absolute top-0 bottom-0 bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.5)] rounded-l-full transition-all"
+                                            />
+                                        ) : sPnl > 0 ? (
+                                            <div
+                                                style={{ width: `${sHalfPct}%`, left: '50%' }}
+                                                className="absolute top-0 bottom-0 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)] rounded-r-full transition-all"
+                                            />
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
         </div>

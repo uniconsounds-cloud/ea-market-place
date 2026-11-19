@@ -405,7 +405,21 @@ function SmartEACockpitContent() {
             const data = await res.json();
             if (data.success) {
                 setIsOnline(Boolean(data.is_online));
-                setEaState(data.state || null);
+                if (data.state) {
+                    setEaState(data.state);
+                    try {
+                        localStorage.setItem(
+                            `sv_last_telemetry_${portToFetch}`,
+                            JSON.stringify({
+                                state: data.state,
+                                command: data.command || null,
+                                savedAt: Date.now(),
+                            })
+                        );
+                    } catch {
+                        // ignore storage quota errors
+                    }
+                }
                 setLastCommand(data.command || null);
                 if (data.latest_version) setLatestVersion(String(data.latest_version));
                 if (data.download_url) setDownloadUrl(String(data.download_url));
@@ -436,13 +450,25 @@ function SmartEACockpitContent() {
         }
     }, [formInitialized]);
 
+    // Immediately hydrate cached snapshot on first visit while waiting for next sync round
     useEffect(() => {
         if (!activePort) return;
         setSessionOpenedAt(Date.now());
+        try {
+            const cachedRaw = localStorage.getItem(`sv_last_telemetry_${activePort}`);
+            if (cachedRaw) {
+                const cached = JSON.parse(cachedRaw);
+                if (cached?.state) {
+                    setEaState((prev) => prev || cached.state);
+                }
+                if (cached?.command) {
+                    setLastCommand((prev: any) => prev || cached.command);
+                }
+            }
+        } catch {
+            // ignore parse error
+        }
         fetchTelemetry(activePort);
-        // Prime-standard 15s polling when cockpit is open (also keeps viewer-ping alive for 15s EA sync)
-        const timer = setInterval(() => fetchTelemetry(activePort), 15000);
-        return () => clearInterval(timer);
     }, [activePort, fetchTelemetry]);
 
     const isWaitingFreshData = Boolean(
@@ -451,10 +477,18 @@ function SmartEACockpitContent() {
         (
             !isOnline ||
             !eaState.chart ||
-            (((eaState as any)?.sync_interval_sec ?? 15) > 30 &&
-                new Date(eaState.last_ping).getTime() < sessionOpenedAt)
+            !eaState.last_ping ||
+            new Date(eaState.last_ping).getTime() < sessionOpenedAt - 20000
         )
     );
+
+    useEffect(() => {
+        if (!activePort) return;
+        // Poll faster (5s) while waiting for initial fresh sync after opening page, then 15s live mode
+        const pollMs = isWaitingFreshData ? 5000 : 15000;
+        const timer = setInterval(() => fetchTelemetry(activePort), pollMs);
+        return () => clearInterval(timer);
+    }, [activePort, isWaitingFreshData, fetchTelemetry]);
 
     // Reset live profit jitter on each real MT5 snapshot & pulse gently when positions are open
     useEffect(() => {
@@ -897,8 +931,8 @@ function SmartEACockpitContent() {
                                 <div className="rounded px-2 py-0.5 bg-black/40 border border-slate-800 flex items-center gap-1 text-[10px] sm:text-[11px]">
                                     <span className="text-slate-400">LINK:</span>
                                     {isWaitingFreshData ? (
-                                        <span className="text-amber-400 flex items-center gap-1 font-bold animate-pulse">
-                                            <RefreshCw className="w-2.5 h-2.5 animate-spin" /> WAIT
+                                        <span className="text-amber-400 flex items-center gap-1 font-bold animate-pulse" title="กำลังแสดงข้อมูลล่าสุดที่บันทึกไว้ และรอ Sync ข้อมูลรอบใหม่จาก MT5">
+                                            <RefreshCw className="w-2.5 h-2.5 animate-spin" /> รอ SYNC
                                         </span>
                                     ) : isOnline ? (
                                         <span className="text-emerald-400 flex items-center gap-1 font-bold">
@@ -969,6 +1003,8 @@ function SmartEACockpitContent() {
                         lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
                         chart={eaState?.chart}
                         roundHistory={eaState?.round_history}
+                        isWaitingFreshData={isWaitingFreshData}
+                        lastPing={eaState?.last_ping}
                     />
 
                     {/* Model B: Triple Balance Radar (Orders / DD-PnL / Lots) - Moved directly after Clock Frame */}
