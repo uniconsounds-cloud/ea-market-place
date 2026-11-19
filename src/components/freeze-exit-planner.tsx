@@ -16,6 +16,7 @@ import type { SmartChartData } from '@/components/smart-vortex-chart';
 interface FreezeExitPlannerProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    inline?: boolean;
     symbol: string;
     currency: string;
     balance: number;
@@ -43,6 +44,7 @@ interface SimPoint {
 export default function FreezeExitPlanner({
     open,
     onOpenChange,
+    inline = false,
     symbol,
     currency,
     balance,
@@ -358,32 +360,33 @@ export default function FreezeExitPlanner({
     const willTriggerSlOnFreeze = hasOpenTrades && frozenSide === 'NONE' && draftSl < 0 && cyclePnl <= draftSl;
     const willTriggerImmediately = willTriggerTpNow || willTriggerSlNow;
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#060b16] border border-cyan-500/35 text-slate-100 max-w-lg w-[96vw] p-3.5 sm:p-5 rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.2)] max-h-[92vh] overflow-y-auto">
-                <DialogHeader className="space-y-1 text-left">
-                    <DialogTitle className="flex items-center justify-between gap-2 text-sm sm:text-base font-mono text-cyan-300">
-                        <span className="flex items-center gap-1.5">
-                            <Sparkles className="w-4 h-4 text-cyan-400" />
-                            FREEZE EXIT PLANNER
+    if (inline && !open) return null;
+
+    const plannerBody = (
+        <div className="space-y-3 text-left">
+            <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2 text-sm sm:text-base font-mono font-bold text-cyan-300">
+                    <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-cyan-400" />
+                        EXIT PLANNER
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
+                            {symbol} | {frozenSide !== 'NONE' ? `FROZEN ${frozenSide}` : 'LIVE SIM'}
                         </span>
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
-                                {symbol} | {frozenSide !== 'NONE' ? `FROZEN ${frozenSide}` : 'LIVE SIM'}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => onOpenChange(false)}
-                                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-[11px] font-mono transition"
-                            >
-                                ✕ ปิด
-                            </button>
-                        </div>
-                    </DialogTitle>
-                    <DialogDescription className="text-[11px] text-slate-400">
-                        จำลองเส้นทางกำไร-ขาดทุนจริงตามระยะราคา (±{rangePts} จุด) แตะบนกราฟหรือกดเลือกจุดแนะนำได้เลย
-                    </DialogDescription>
-                </DialogHeader>
+                        <button
+                            type="button"
+                            onClick={() => onOpenChange(false)}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-[11px] font-mono transition"
+                        >
+                            ✕ ซ่อน
+                        </button>
+                    </div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                    จำลองเส้นทางกำไร-ขาดทุนจริงตามระยะราคา (±{rangePts} จุด) แตะบนกราฟหรือกดเลือกจุดแนะนำได้เลย
+                </p>
+            </div>
 
                 {/* Live Snapshot Strip */}
                 <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-800 bg-slate-900/70 p-2 font-mono text-[10px] sm:text-[11px]">
@@ -792,7 +795,7 @@ export default function FreezeExitPlanner({
                     </div>
                 )}
 
-                <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-1">
+                <div className="flex flex-row items-center justify-between gap-2 pt-1">
                     <div className="flex items-center gap-1.5">
                         <Button
                             type="button"
@@ -801,7 +804,7 @@ export default function FreezeExitPlanner({
                             onClick={() => onOpenChange(false)}
                             className="border-slate-700 text-slate-300 hover:bg-slate-800 text-xs px-3"
                         >
-                            ปิด
+                            ซ่อน
                         </Button>
                         <Button
                             type="button"
@@ -834,7 +837,22 @@ export default function FreezeExitPlanner({
                         <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
                         {willTriggerImmediately ? 'ยืนยัน (EA จะปิดรวบทันที!)' : 'ยืนยันส่ง TP & SL นี้ให้ EA'}
                     </Button>
-                </DialogFooter>
+                </div>
+        </div>
+    );
+
+    if (inline) {
+        return (
+            <div className="border-t border-cyan-500/20 bg-[#060b16]/95 p-3 sm:p-4 text-slate-100 animate-in fade-in-50 duration-200">
+                {plannerBody}
+            </div>
+        );
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="bg-[#060b16] border border-cyan-500/35 text-slate-100 max-w-lg w-[96vw] p-3.5 sm:p-5 rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.2)] max-h-[92vh] overflow-y-auto">
+                {plannerBody}
             </DialogContent>
         </Dialog>
     );

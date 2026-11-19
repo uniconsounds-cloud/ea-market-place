@@ -351,7 +351,7 @@ function SmartEACockpitContent() {
 
     useEffect(() => {
         if (typeof document !== 'undefined') {
-            document.title = activePort ? `Smart EA #${activePort}` : 'Smart EA Cockpit';
+            document.title = activePort ? `Monitor & Control #${activePort}` : 'Monitor & Control';
         }
     }, [activePort]);
 
@@ -636,8 +636,11 @@ function SmartEACockpitContent() {
     const safeBalance = Math.max(1, balanceVal);
     const pnlPct = balanceVal > 0 ? (liveCyclePnl / balanceVal) * 100 : 0;
 
-    // Custom Target Profit Modal State & Calculations
-    const [plannerOpen, setPlannerOpen] = useState(false);
+    // Active Collapsible Drawer under Card 1: 'control' | 'setting' | 'planner' | null
+    const [activeDrawer, setActiveDrawer] = useState<'control' | 'setting' | 'planner' | null>(null);
+    const toggleDrawer = useCallback((drawer: 'control' | 'setting' | 'planner') => {
+        setActiveDrawer((prev) => (prev === drawer ? null : drawer));
+    }, []);
     const [customTpModalOpen, setCustomTpModalOpen] = useState(false);
     const [customTpVal, setCustomTpVal] = useState<number>(-100);
 
@@ -759,7 +762,7 @@ function SmartEACockpitContent() {
                 <div className="flex items-center gap-2">
                     <span className="text-[10px] sm:text-[11px] font-mono font-semibold tracking-wider text-cyan-400/90 bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                        SMART EA COCKPIT
+                        Monitor &amp; Control
                     </span>
                 </div>
             </div>
@@ -891,17 +894,17 @@ function SmartEACockpitContent() {
                             </div>
                         </div>
 
-                        {/* 3. INTEGRATED SUB-BAR: EA VERSION & TACTICAL STATUS RAIL (INSIDE SAME FRAME) */}
-                        <div className="pt-1.5 border-t border-cyan-500/20 flex flex-wrap items-center justify-between gap-1.5 font-mono text-[11px] sm:text-xs">
-                            {/* Version Info */}
-                            <div className="flex items-center gap-1.5 min-w-0">
+                        {/* 3. INTEGRATED SUB-BAR: ROW 1 = EA NAME ONLY, ROW 2 = FULL-WIDTH LINK / CFG / MODE */}
+                        <div className="pt-1.5 border-t border-cyan-500/20 space-y-1.5 font-mono text-[11px] sm:text-xs">
+                            {/* Row 1: EA Name & Version Only */}
+                            <div className="flex items-center justify-between gap-1.5 min-w-0">
                                 {needsUpdate ? (
                                     <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-amber-200">
                                         <Badge className="bg-amber-500 text-slate-950 font-bold text-[9px] px-1 py-0 h-3.5">
                                             UPDATE v{latestVersion}
                                         </Badge>
                                         <span className="text-[10px] sm:text-[11px] truncate">
-                                            รัน v{eaState?.ea_version || '1.0'}
+                                            Smart Vortex v{eaState?.ea_version || '1.0'}
                                         </span>
                                         {downloadUrl && (
                                             <a
@@ -918,71 +921,590 @@ function SmartEACockpitContent() {
                                     <div className="flex items-center gap-1.5 text-emerald-300">
                                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                                         <span className="font-bold">Smart Vortex v{eaState?.ea_version || latestVersion}</span>
-                                        <span className="text-[10px] text-slate-400 hidden sm:inline">(ล่าสุด)</span>
+                                        <span className="text-[10px] text-slate-400">(เวอร์ชันล่าสุด)</span>
                                     </div>
                                 )}
-                                <span className="text-[10px] text-slate-500 hidden md:inline">
-                                    • SYNC {(eaState as any)?.sync_interval_sec || 15}s
+                                <span className="text-[10px] text-slate-500">
+                                    SYNC {(eaState as any)?.sync_interval_sec || 15}s
                                 </span>
                             </div>
 
-                            {/* Status Indicators (LINK, CFG, MODE) */}
-                            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                                <div className="rounded px-2 py-0.5 bg-black/40 border border-slate-800 flex items-center gap-1 text-[10px] sm:text-[11px]">
-                                    <span className="text-slate-400">LINK:</span>
+                            {/* Row 2: 3 Full-Width Status Signals (LINK, CFG, MODE) with clear descriptions */}
+                            <div className="grid grid-cols-3 gap-1.5 w-full">
+                                {/* LINK */}
+                                <div className="rounded-lg px-2 py-1 bg-black/45 border border-slate-800 flex items-center justify-between gap-1 text-[10px] sm:text-[11px] min-w-0">
+                                    <span className="text-slate-400 shrink-0">LINK:</span>
                                     {isWaitingFreshData ? (
-                                        <span className="text-amber-400 flex items-center gap-1 font-bold animate-pulse" title="กำลังแสดงข้อมูลล่าสุดที่บันทึกไว้ และรอ Sync ข้อมูลรอบใหม่จาก MT5">
-                                            <RefreshCw className="w-2.5 h-2.5 animate-spin" /> รอ SYNC
+                                        <span className="text-amber-400 flex items-center gap-1 font-bold animate-pulse truncate" title="แสดงข้อมูลล่าสุดที่บันทึกไว้ และรอ Sync ข้อมูลรอบใหม่จาก MT5">
+                                            <RefreshCw className="w-2.5 h-2.5 animate-spin shrink-0" />
+                                            <span className="truncate">รอซิงค์ใหม่</span>
                                         </span>
                                     ) : isOnline ? (
-                                        <span className="text-emerald-400 flex items-center gap-1 font-bold">
-                                            <Wifi className="w-2.5 h-2.5" /> ON
+                                        <span className="text-emerald-400 flex items-center gap-1 font-bold truncate">
+                                            <Wifi className="w-2.5 h-2.5 shrink-0" />
+                                            <span className="truncate">เชื่อมต่อปกติ</span>
                                         </span>
                                     ) : (
-                                        <span className="text-rose-400 flex items-center gap-1 font-bold">
-                                            <WifiOff className="w-2.5 h-2.5" /> OFF
+                                        <span className="text-rose-400 flex items-center gap-1 font-bold truncate">
+                                            <WifiOff className="w-2.5 h-2.5 shrink-0" />
+                                            <span className="truncate">ขาดการเชื่อมต่อ</span>
                                         </span>
                                     )}
                                 </div>
 
-                                <div className="rounded px-2 py-0.5 bg-black/40 border border-slate-800 flex items-center gap-1 text-[10px] sm:text-[11px]">
-                                    <span className="text-slate-400">CFG:</span>
+                                {/* CFG */}
+                                <div className="rounded-lg px-2 py-1 bg-black/45 border border-slate-800 flex items-center justify-between gap-1 text-[10px] sm:text-[11px] min-w-0">
+                                    <span className="text-slate-400 shrink-0">CFG:</span>
                                     {isPendingAck ? (
-                                        <span className="text-amber-400 font-bold flex items-center gap-0.5">
-                                            <RefreshCw className="w-2.5 h-2.5 animate-spin" /> SYNC
+                                        <span className="text-amber-400 font-bold flex items-center gap-1 truncate">
+                                            <RefreshCw className="w-2.5 h-2.5 animate-spin shrink-0" />
+                                            <span className="truncate">กำลังส่งค่า</span>
                                         </span>
                                     ) : eaState?.config_status === 'WEB_LOADED' ? (
-                                        <span className="text-cyan-400 font-bold">WEB</span>
+                                        <span className="text-cyan-400 font-bold truncate">ใช้ค่าจากเว็บ</span>
                                     ) : (
-                                        <span className="text-slate-300 font-bold">MT5</span>
+                                        <span className="text-slate-300 font-bold truncate">ใช้ค่าใน MT5</span>
                                     )}
                                 </div>
 
-                                <div className="rounded px-2 py-0.5 bg-black/40 border border-slate-800 flex items-center gap-1 text-[10px] sm:text-[11px]">
-                                    <span className="text-slate-400">MODE:</span>
+                                {/* MODE */}
+                                <div className="rounded-lg px-2 py-1 bg-black/45 border border-slate-800 flex items-center justify-between gap-1 text-[10px] sm:text-[11px] min-w-0">
+                                    <span className="text-slate-400 shrink-0">MODE:</span>
                                     <span
-                                        className={`font-bold ${
-                                            eaState?.trade_status === 'RUNNING'
+                                        className={`font-bold truncate ${
+                                            isRunning
                                                 ? 'text-emerald-400'
-                                                : eaState?.trade_status === 'PAUSED_NEXT'
+                                                : isPauseNextActive
                                                 ? 'text-amber-400'
                                                 : 'text-rose-400'
                                         }`}
                                     >
-                                        {eaState?.trade_status === 'RUNNING' ? 'RUN' : eaState?.trade_status || 'WAIT'}
+                                        {eaState?.trade_status === 'FROZEN_BUY'
+                                            ? 'ล็อกฝั่ง BUY'
+                                            : eaState?.trade_status === 'FROZEN_SELL'
+                                            ? 'ล็อกฝั่ง SELL'
+                                            : isRunning
+                                            ? 'ทำงานปกติ'
+                                            : isPauseNextActive
+                                            ? 'รอหยุดจบรอบ'
+                                            : isFreezeStopActive
+                                            ? 'หยุดออกไม้ใหม่'
+                                            : eaState?.trade_status || 'รอสถานะ'}
                                     </span>
                                 </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setPlannerOpen(true)}
-                                    className="rounded px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/50 text-cyan-200 flex items-center gap-1 text-[10px] sm:text-[11px] font-mono font-bold transition active:scale-95"
-                                >
-                                    <Target className="w-3 h-3 text-cyan-300" />
-                                    <span>Exit Planner</span>
-                                </button>
                             </div>
                         </div>
+                    </div>
+
+                    {/* 🎛️ New 3-Button Collapsible Action Bar under Card 1: Control | Setting | Exit Planner */}
+                    <div className="rounded-xl border border-cyan-500/30 bg-[#070b16]/95 overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.08)]">
+                        <div className="grid grid-cols-3 gap-1.5 p-1.5 sm:p-2 bg-[#050914]">
+                            {/* Button 1: Control */}
+                            <button
+                                type="button"
+                                onClick={() => toggleDrawer('control')}
+                                className={cn(
+                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all active:scale-95 border',
+                                    activeDrawer === 'control'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                                )}
+                            >
+                                <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span className="truncate">Control</span>
+                                <ChevronDown
+                                    className={cn(
+                                        'w-3.5 h-3.5 text-cyan-400/80 transition-transform duration-200 shrink-0',
+                                        activeDrawer === 'control' && 'rotate-180'
+                                    )}
+                                />
+                            </button>
+
+                            {/* Button 2: Setting */}
+                            <button
+                                type="button"
+                                onClick={() => toggleDrawer('setting')}
+                                className={cn(
+                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all active:scale-95 border',
+                                    activeDrawer === 'setting'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                                )}
+                            >
+                                <Sliders className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span className="truncate">Setting</span>
+                                <ChevronDown
+                                    className={cn(
+                                        'w-3.5 h-3.5 text-cyan-400/80 transition-transform duration-200 shrink-0',
+                                        activeDrawer === 'setting' && 'rotate-180'
+                                    )}
+                                />
+                            </button>
+
+                            {/* Button 3: Exit Planner */}
+                            <button
+                                type="button"
+                                onClick={() => toggleDrawer('planner')}
+                                className={cn(
+                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all active:scale-95 border',
+                                    activeDrawer === 'planner'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                                )}
+                            >
+                                <Target className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span className="truncate">Exit Planner</span>
+                                <ChevronDown
+                                    className={cn(
+                                        'w-3.5 h-3.5 text-cyan-400/80 transition-transform duration-200 shrink-0',
+                                        activeDrawer === 'planner' && 'rotate-180'
+                                    )}
+                                />
+                            </button>
+                        </div>
+
+                        {/* Collapsible Panel 1: Control (Flight Control) */}
+                        {activeDrawer === 'control' && (
+                            <div className="p-2.5 sm:p-3 border-t border-cyan-500/20 space-y-2 font-mono animate-in fade-in-50 duration-200">
+                                {!isRunning && (
+                                    <Button
+                                        className="w-full justify-between bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 animate-in fade-in duration-200"
+                                        disabled={sending}
+                                        onClick={() =>
+                                            sendCommand(
+                                                { stop_mode: 'RUN', close_all: false },
+                                                'สั่งเริ่มรันอีเอใหม่ (RUN) ไปยัง MT5 แล้ว'
+                                            )
+                                        }
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <PlayCircle className="w-4 h-4 text-emerald-200" />
+                                            <span>เริ่มรันอีเอใหม่ (ENGAGE // RUN)</span>
+                                        </span>
+                                        <span className="text-[10px] bg-emerald-700/80 px-2 py-0.5 rounded font-mono">START</span>
+                                    </Button>
+                                )}
+
+                                <Button
+                                    variant="outline"
+                                    className={`w-full justify-between text-xs transition-colors ${
+                                        isPauseNextActive
+                                            ? 'border-amber-500 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                                            : 'border-amber-500/40 text-amber-400 hover:bg-amber-500/10'
+                                    }`}
+                                    disabled={sending}
+                                    onClick={() => {
+                                        if (isPauseNextActive) {
+                                            sendCommand(
+                                                { stop_mode: 'RUN', close_all: false },
+                                                'ยกเลิกการหยุดหลังจบรอบแล้ว กลับสู่โหมดรันต่อ (RUN)'
+                                            );
+                                        } else {
+                                            sendCommand(
+                                                { stop_mode: 'PAUSE_NEXT', close_all: false },
+                                                'สั่งหยุดหลังจบรอบปัจจุบัน (Pause Next Cycle) แล้ว'
+                                            );
+                                        }
+                                    }}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <PauseCircle className="w-4 h-4 text-amber-400" />
+                                        <span>
+                                            {isPauseNextActive
+                                                ? 'หยุดหลังจบรอบนี้ (กดเพื่อยกเลิก)'
+                                                : 'หยุดหลังจบรอบนี้ (Pause Next Cycle)'}
+                                        </span>
+                                    </span>
+                                    {isPauseNextActive && (
+                                        <Badge className="bg-amber-500 text-slate-950 font-mono text-[9px] px-1.5 py-0 h-4">
+                                            รอจบรอบ
+                                        </Badge>
+                                    )}
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className={`w-full justify-between text-xs transition-colors ${
+                                        isFreezeStopActive
+                                            ? 'border-rose-500 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
+                                            : 'border-rose-500/40 text-rose-400 hover:bg-rose-500/10'
+                                    }`}
+                                    disabled={sending}
+                                    onClick={() => {
+                                        if (isFreezeStopActive) {
+                                            sendCommand(
+                                                { stop_mode: 'RUN', close_all: false },
+                                                'ยกเลิกคำสั่งหยุดแล้ว กลับสู่โหมดรันต่อ (RUN)'
+                                            );
+                                        } else {
+                                            sendCommand(
+                                                { stop_mode: 'FREEZE_STOP', close_all: false },
+                                                'สั่งลบ Pending และหยุดออกไม้ใหม่ทันทีแล้ว'
+                                            );
+                                        }
+                                    }}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <XCircle className="w-4 h-4 text-rose-400" />
+                                        <span>
+                                            {isFreezeStopActive
+                                                ? 'ลบ Pending หยุดออกไม้ใหม่ (กดเพื่อยกเลิก)'
+                                                : 'ลบ Pending หยุดออกไม้ใหม่'}
+                                        </span>
+                                    </span>
+                                    {isFreezeStopActive && (
+                                        <Badge className="bg-rose-500 text-white font-mono text-[9px] px-1.5 py-0 h-4">
+                                            หยุดออกไม้
+                                        </Badge>
+                                    )}
+                                </Button>
+
+                                <div className="pt-2 border-t border-slate-800/80">
+                                    {!confirmCloseAll ? (
+                                        <Button
+                                            variant="destructive"
+                                            className="w-full justify-start gap-2 text-xs"
+                                            disabled={sending}
+                                            onClick={() => setConfirmCloseAll(true)}
+                                        >
+                                            <ShieldAlert className="w-4 h-4" />
+                                            <span>ปิดรวบออเดอร์ทั้งหมดทันที (งดออกไม้ใหม่)</span>
+                                        </Button>
+                                    ) : (
+                                        <div className="p-2.5 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
+                                            <p className="text-xs font-medium text-destructive">
+                                                ยืนยันปิดรวบทุกไม้ ลบ Pending และงดออกไม้ใหม่ทันที?
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="flex-1 text-xs"
+                                                    disabled={sending}
+                                                    onClick={() => {
+                                                        setConfirmCloseAll(false);
+                                                        sendCommand(
+                                                            { stop_mode: 'FREEZE_STOP', close_all: true },
+                                                            'ส่งคำสั่ง Close All Now ปิดรวบทุกไม้และงดออกไม้ใหม่แล้ว!'
+                                                        );
+                                                    }}
+                                                >
+                                                    ยืนยันปิดรวบ & หยุด
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="flex-1 text-xs"
+                                                    onClick={() => setConfirmCloseAll(false)}
+                                                >
+                                                    ยกเลิก
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Collapsible Panel 2: Setting (Params Setting) */}
+                        {activeDrawer === 'setting' && (
+                            <div className="p-2.5 sm:p-3 border-t border-cyan-500/20 animate-in fade-in-50 duration-200">
+                                <form onSubmit={handleUpdateSettings} className="space-y-2.5 sm:space-y-3 font-mono">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {/* 1. First Dist */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">First Dist</span>
+                                                <span className="hidden sm:inline">FIRST DIST (PT)</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={firstDistance}
+                                                onClick={() => openParamModal({
+                                                    title: 'FIRST DIST (ระยะแรก)',
+                                                    unit: 'PT',
+                                                    currentVal: parseFloat(firstDistance) || 100,
+                                                    step: 10,
+                                                    presetValues: [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500],
+                                                    quickSteps: [-50, -10, 10, 50],
+                                                    onApply: (v) => setFirstDistance(String(Math.max(10, Math.round(v)))),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 2. Spacing */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">Spacing</span>
+                                                <span className="hidden sm:inline">SPACING (PT)</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={spacing}
+                                                onClick={() => openParamModal({
+                                                    title: 'SPACING (ระยะห่าง)',
+                                                    unit: 'PT',
+                                                    currentVal: parseFloat(spacing) || 60,
+                                                    step: 10,
+                                                    presetValues: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500],
+                                                    quickSteps: [-50, -10, 10, 50],
+                                                    onApply: (v) => setSpacing(String(Math.max(5, Math.round(v)))),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 3. Pending Per Side */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">Pending/ฝั่ง</span>
+                                                <span className="hidden sm:inline">จำนวน Pending ต่อฝั่ง (Pending/Side)</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={pendingPerSide}
+                                                onClick={() => openParamModal({
+                                                    title: 'PENDING ต่อฝั่ง',
+                                                    unit: 'ไม้',
+                                                    currentVal: parseInt(pendingPerSide, 10) || 10,
+                                                    step: 1,
+                                                    presetValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 30],
+                                                    quickSteps: [-5, -1, 1, 5],
+                                                    onApply: (v) => setPendingPerSide(String(Math.max(1, Math.round(v)))),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 4. Target Profit */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">เป้าปิดรวบ (TP)</span>
+                                                <span className="hidden sm:inline">เป้ากำไรปิดรวบ (Target Profit {cur})</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={targetProfit}
+                                                onClick={() => openParamModal({
+                                                    title: `TARGET PROFIT (${cur})`,
+                                                    unit: cur,
+                                                    currentVal: parseFloat(targetProfit) || 10,
+                                                    step: 5,
+                                                    presetValues: [100, 50, 40, 30, 25, 20, 15, 10, 5, 0, -5, -10, -15, -20, -25, -30, -40, -50, -60, -70, -80, -90, -100, -150, -200],
+                                                    quickSteps: [-50, -10, -1, 1, 10, 50],
+                                                    onApply: (v) => setTargetProfit(String(v)),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 4b. Freeze Mode Stop Loss (SL) */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-amber-300/90 font-mono truncate block">
+                                                <span className="sm:hidden">Freeze SL (0=ปิด)</span>
+                                                <span className="hidden sm:inline">SL โหมด Freeze ({cur})</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={Number(freezeStopLoss) < 0 ? freezeStopLoss : '0 (OFF)'}
+                                                onClick={() => openParamModal({
+                                                    title: `FREEZE STOP LOSS (${cur})`,
+                                                    unit: cur,
+                                                    currentVal: Math.min(0, parseFloat(freezeStopLoss) || 0),
+                                                    step: 50,
+                                                    presetValues: [0, -50, -100, -200, -300, -500, -1000, -2000, -3000, -5000, -10000],
+                                                    quickSteps: [-500, -100, -10, 10, 100, 500],
+                                                    onApply: (v) => setFreezeStopLoss(String(v > 0 ? -v : v)),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-amber-500/30 text-amber-200 h-8 sm:h-9 cursor-pointer hover:border-amber-400/60 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 5. Initial Lot */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">Lot เริ่มต้น</span>
+                                                <span className="hidden sm:inline">ล็อตเริ่มต้น (Initial Lot)</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={initialLot}
+                                                onClick={() => openParamModal({
+                                                    title: 'LOT เริ่มต้น (INITIAL LOT)',
+                                                    unit: 'Lot',
+                                                    currentVal: parseFloat(initialLot) || 0.01,
+                                                    step: 0.01,
+                                                    isDecimal: true,
+                                                    presetValues: [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.12, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 1.00],
+                                                    quickSteps: [-0.05, -0.01, 0.01, 0.05],
+                                                    onApply: (v) => setInitialLot(String(Math.max(0.01, Math.round(v * 100) / 100))),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 6. Lot Increment */}
+                                        <div className="space-y-1">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">Lot เพิ่ม/ชั้น</span>
+                                                <span className="hidden sm:inline">ล็อตเพิ่มต่อชั้น (Lot Increment)</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={lotIncrement}
+                                                onClick={() => openParamModal({
+                                                    title: 'LOT เพิ่มต่อชั้น (INCREMENT)',
+                                                    unit: 'Lot',
+                                                    currentVal: parseFloat(lotIncrement) || 0.01,
+                                                    step: 0.01,
+                                                    isDecimal: true,
+                                                    presetValues: [0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50],
+                                                    quickSteps: [-0.05, -0.01, 0.01, 0.05],
+                                                    onApply: (v) => setLotIncrement(String(Math.max(0, Math.round(v * 100) / 100))),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 7. One-Side Freeze Setting Box */}
+                                        <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-xs sm:text-sm font-semibold text-rose-300 truncate block">
+                                                        <span className="sm:hidden">One-Side Freeze (Cap)</span>
+                                                        <span className="hidden sm:inline">ระบบป้องกัน One-Side Freeze (ล็อกฝั่งตรงข้ามเมื่อครบทั้ง 2 ฝั่ง)</span>
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableCapFreeze ? 'default' : 'outline'}
+                                                    onClick={() => setEnableCapFreeze((v) => !v)}
+                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{enableCapFreeze ? 'ON' : 'OFF'}</span>
+                                                    <span className="hidden sm:inline">{enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                </Button>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">ไม้เริ่ม Freeze</span>
+                                                        <span className="hidden sm:inline">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableCapFreeze}
+                                                        value={maxBothSidesCap}
+                                                        onClick={() => enableCapFreeze && openParamModal({
+                                                            title: 'ไม้เริ่ม FREEZE (CAP)',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(maxBothSidesCap, 10) || 7,
+                                                            step: 1,
+                                                            presetValues: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+                                                            quickSteps: [-5, -1, 1, 5],
+                                                            onApply: (v) => setMaxBothSidesCap(String(Math.max(1, Math.round(v)))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">สลับสิทธิ์ถ้าไม่เพิ่ม</span>
+                                                        <span className="hidden sm:inline">สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง (ไม้, 0 = ไม่สลับ)</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableCapFreeze}
+                                                        value={freezeFlipMaxExtra}
+                                                        onClick={() => enableCapFreeze && openParamModal({
+                                                            title: 'สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(freezeFlipMaxExtra, 10) || 3,
+                                                            step: 1,
+                                                            presetValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
+                                                            quickSteps: [-5, -1, 1, 5],
+                                                            onApply: (v) => setFreezeFlipMaxExtra(String(Math.max(0, Math.round(v)))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-1 pt-1">
+                                                <span className="text-[11px] text-muted-foreground truncate">
+                                                    <span className="sm:hidden">สลับสิทธิ์เมื่อราคาตีกลับ</span>
+                                                    <span className="hidden sm:inline">รูปแบบการสลับสิทธิ์เมื่อราคาตีกลับ</span>
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={!enableCapFreeze}
+                                                    onClick={() => setFreezeFlipContinuous((v) => !v)}
+                                                    className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{freezeFlipContinuous ? 'ต่อเนื่อง' : 'ครั้งเดียว'}</span>
+                                                    <span className="hidden sm:inline">{freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}</span>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {eaState?.active_config && (
+                                        <div className="p-2 sm:p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-400 whitespace-nowrap overflow-x-auto">
+                                            EA Active: Dist={eaState.active_config.first_distance}pt | Spacing={eaState.active_config.spacing}pt | Pend={eaState.active_config.pending_per_side} | Lot={eaState.active_config.initial_lot}+{eaState.active_config.lot_increment} | TP={eaState.active_config.target_profit}
+                                        </div>
+                                    )}
+
+                                    <Button
+                                        type="submit"
+                                        className="w-full gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs h-9 shadow-md"
+                                        disabled={sending}
+                                    >
+                                        {sending ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Send className="w-4 h-4" />
+                                        )}
+                                        <span className="sm:hidden">UPLOAD &amp; SYNC</span>
+                                        <span className="hidden sm:inline">UPLOAD &amp; SYNC PARAMS</span>
+                                    </Button>
+                                </form>
+                            </div>
+                        )}
+
+                        {/* Collapsible Panel 3: Exit Planner */}
+                        <FreezeExitPlanner
+                            inline
+                            open={activeDrawer === 'planner'}
+                            onOpenChange={(open) => setActiveDrawer(open ? 'planner' : null)}
+                            symbol={eaState?.symbol || 'XAUUSD'}
+                            currency={cur}
+                            balance={balanceVal}
+                            cyclePnl={liveCyclePnl}
+                            openBuy={eaState?.open_buy ?? 0}
+                            openSell={eaState?.open_sell ?? 0}
+                            frozenSide={eaState?.frozen_side}
+                            spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}
+                            initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
+                            lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
+                            currentTp={activeTp}
+                            currentSl={activeFreezeSl}
+                            chart={eaState?.chart}
+                            sending={sending}
+                            onApply={(newTp, newSl) => {
+                                setTargetProfit(String(newTp));
+                                setFreezeStopLoss(String(newSl));
+                                sendCommand(
+                                    { target_profit: newTp, freeze_stop_loss: newSl, close_all: false },
+                                    `อัปเดตแผนปิดรอบแล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'}`
+                                );
+                            }}
+                        />
                     </div>
 
                     {/* Unified 5-Part Tactical Overview Card */}
@@ -1005,17 +1527,6 @@ function SmartEACockpitContent() {
                         roundHistory={eaState?.round_history}
                         isWaitingFreshData={isWaitingFreshData}
                         lastPing={eaState?.last_ping}
-                    />
-
-                    {/* Model B: Triple Balance Radar (Orders / DD-PnL / Lots) - Moved directly after Clock Frame */}
-                    <PnlVectorVisualizer
-                        mode="modelB"
-                        currency={cur}
-                        cyclePnl={eaState?.cycle_pnl || 0}
-                        targetProfit={activeTp}
-                        pnlJitter={pnlJitter}
-                        isOnline={isOnline && !isWaitingFreshData}
-                        chart={eaState?.chart}
                     />
 
                     {/* One-Side Cap Freeze Banner + Quick TP Rescue (Emergency Protection) */}
@@ -1161,34 +1672,6 @@ function SmartEACockpitContent() {
                         </div>
                     )}
 
-                    {/* Freeze Exit Planner Simulator Modal */}
-                    <FreezeExitPlanner
-                        open={plannerOpen}
-                        onOpenChange={setPlannerOpen}
-                        symbol={eaState?.symbol || 'XAUUSD'}
-                        currency={cur}
-                        balance={balanceVal}
-                        cyclePnl={liveCyclePnl}
-                        openBuy={eaState?.open_buy ?? 0}
-                        openSell={eaState?.open_sell ?? 0}
-                        frozenSide={eaState?.frozen_side}
-                        spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}
-                        initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
-                        lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
-                        currentTp={activeTp}
-                        currentSl={activeFreezeSl}
-                        chart={eaState?.chart}
-                        sending={sending}
-                        onApply={(newTp, newSl) => {
-                            setTargetProfit(String(newTp));
-                            setFreezeStopLoss(String(newSl));
-                            sendCommand(
-                                { target_profit: newTp, freeze_stop_loss: newSl, close_all: false },
-                                `อัปเดตแผนปิดรอบแล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'}`
-                            );
-                        }}
-                    />
-
                     {/* Custom Target Profit Dialog with Interactive Scroll Wheel */}
                     <Dialog open={customTpModalOpen} onOpenChange={setCustomTpModalOpen}>
                         <DialogContent className="bg-[#0b0f19] border border-cyan-500/30 text-slate-100 max-w-sm sm:max-w-md p-5 rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.15)]">
@@ -1323,552 +1806,42 @@ function SmartEACockpitContent() {
                         </div>
                     )}
 
-                    {/* Live M1 Candlestick Chart with TP & Freeze Overlays */}
+                    {/* Live M1 Candlestick Chart + Model A + Cycle History at the very bottom */}
                     <div className={`space-y-1.5 sm:space-y-2 transition-all duration-500 ${isWaitingFreshData ? 'opacity-55 grayscale animate-pulse' : ''}`}>
-                    <RoundHistoryBar
-                        rounds={eaState?.round_history}
-                        currency={cur}
-                    />
-                    <SmartVortexChart
-                        symbol={eaState?.symbol || 'XAUUSD'}
-                        currency={cur}
-                        anchor={eaState?.anchor || 0}
-                        targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
-                        frozenSide={eaState?.frozen_side}
-                        isOnline={isOnline && !isWaitingFreshData}
-                        openBuy={eaState?.open_buy ?? 0}
-                        openSell={eaState?.open_sell ?? 0}
-                        pendBuy={eaState?.pending_buy ?? 0}
-                        pendSell={eaState?.pending_sell ?? 0}
-                        cap={activeCap}
-                        liveCyclePnl={liveCyclePnl}
-                        balance={balanceVal}
-                        cyclePnl={eaState?.cycle_pnl || 0}
-                        chart={eaState?.chart}
-                    />
+                        <SmartVortexChart
+                            symbol={eaState?.symbol || 'XAUUSD'}
+                            currency={cur}
+                            anchor={eaState?.anchor || 0}
+                            targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
+                            frozenSide={eaState?.frozen_side}
+                            isOnline={isOnline && !isWaitingFreshData}
+                            openBuy={eaState?.open_buy ?? 0}
+                            openSell={eaState?.open_sell ?? 0}
+                            pendBuy={eaState?.pending_buy ?? 0}
+                            pendSell={eaState?.pending_sell ?? 0}
+                            cap={activeCap}
+                            liveCyclePnl={liveCyclePnl}
+                            balance={balanceVal}
+                            cyclePnl={eaState?.cycle_pnl || 0}
+                            chart={eaState?.chart}
+                        />
 
-                    {/* Model A: Unified PnL Stack Vector Axis */}
-                    <PnlVectorVisualizer
-                        mode="modelA"
-                        currency={cur}
-                        cyclePnl={eaState?.cycle_pnl || 0}
-                        targetProfit={activeTp}
-                        pnlJitter={pnlJitter}
-                        isOnline={isOnline && !isWaitingFreshData}
-                        chart={eaState?.chart}
-                    />
-                    </div>
+                        {/* Model A: Unified PnL Stack Vector Axis */}
+                        <PnlVectorVisualizer
+                            mode="modelA"
+                            currency={cur}
+                            cyclePnl={eaState?.cycle_pnl || 0}
+                            targetProfit={activeTp}
+                            pnlJitter={pnlJitter}
+                            isOnline={isOnline && !isWaitingFreshData}
+                            chart={eaState?.chart}
+                        />
 
-                    {/* Control & Settings Split */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-                        {/* Left: Flight Control & Tactical Modes */}
-                        <Card className="lg:col-span-5 border-cyan-500/25 bg-[#070b16]/95 text-slate-100 shadow-md">
-                            <CardHeader className="p-2.5 sm:p-3 pb-2 space-y-1.5 border-b border-cyan-500/15">
-                                <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                                    <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300">
-                                        <Activity className="w-4 h-4 text-cyan-400" /> FLIGHT CONTROL
-                                    </CardTitle>
-
-                                    {/* 🎯 Mode & CFG Status Rail in Header */}
-                                    <div className="flex items-center gap-1.5 font-mono text-[10.5px]">
-                                        {/* CFG Indicator */}
-                                        <div className="rounded px-2 py-0.5 bg-black/60 border border-slate-800 flex items-center gap-1">
-                                            <span className="text-slate-400">CFG:</span>
-                                            {isPendingAck ? (
-                                                <span className="text-amber-400 font-bold flex items-center gap-1 animate-pulse">
-                                                    <RefreshCw className="w-2.5 h-2.5 animate-spin" /> SYNCING
-                                                </span>
-                                            ) : eaState?.config_status === 'WEB_LOADED' ? (
-                                                <span className="text-cyan-400 font-bold flex items-center gap-0.5">
-                                                    <CheckCircle2 className="w-2.5 h-2.5" /> WEB
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-300 font-bold">MT5</span>
-                                            )}
-                                        </div>
-
-                                        {/* MODE Indicator */}
-                                        <div className="rounded px-2 py-0.5 bg-black/60 border border-slate-800 flex items-center gap-1">
-                                            <span className="text-slate-400">MODE:</span>
-                                            <span
-                                                className={`font-bold ${
-                                                    isRunning
-                                                        ? 'text-emerald-400'
-                                                        : isPauseNextActive
-                                                        ? 'text-amber-400'
-                                                        : 'text-rose-400'
-                                                }`}
-                                            >
-                                                {isRunning
-                                                    ? 'RUN'
-                                                    : isPauseNextActive
-                                                    ? 'PAUSE_NEXT'
-                                                    : isFreezeStopActive
-                                                    ? 'FREEZE_STOP'
-                                                    : eaState?.trade_status || 'WAIT'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-2.5 sm:p-3 pt-2.5 space-y-2 font-mono">
-                                {/* 1. ปุ่มเริ่มรันอีเอใหม่ (สีเขียว) - ซ่อนไปเมื่ออีเอกำลังรันอยู่ (isRunning), แสดงขึ้นมาเมื่อสั่งหยุดออกไม้ใหม่/หยุดรัน */}
-                                {!isRunning && (
-                                    <Button
-                                        className="w-full justify-between bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 animate-in fade-in duration-200"
-                                        disabled={sending}
-                                        onClick={() =>
-                                            sendCommand(
-                                                { stop_mode: 'RUN', close_all: false },
-                                                'สั่งเริ่มรันอีเอใหม่ (RUN) ไปยัง MT5 แล้ว'
-                                            )
-                                        }
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <PlayCircle className="w-4 h-4 text-emerald-200" />
-                                            <span>เริ่มรันอีเอใหม่ (ENGAGE // RUN)</span>
-                                        </span>
-                                        <span className="text-[10px] bg-emerald-700/80 px-2 py-0.5 rounded font-mono">START</span>
-                                    </Button>
-                                )}
-
-                                {/* 2. ปุ่มหยุดหลังจบรอบนี้ (Pause Next Cycle) - กดอีกทีเพื่อยกเลิกได้ */}
-                                <Button
-                                    variant="outline"
-                                    className={`w-full justify-between text-xs transition-colors ${
-                                        isPauseNextActive
-                                            ? 'border-amber-500 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
-                                            : 'border-amber-500/40 text-amber-400 hover:bg-amber-500/10'
-                                    }`}
-                                    disabled={sending}
-                                    onClick={() => {
-                                        if (isPauseNextActive) {
-                                            sendCommand(
-                                                { stop_mode: 'RUN', close_all: false },
-                                                'ยกเลิกการหยุดหลังจบรอบแล้ว กลับสู่โหมดรันต่อ (RUN)'
-                                            );
-                                        } else {
-                                            sendCommand(
-                                                { stop_mode: 'PAUSE_NEXT', close_all: false },
-                                                'สั่งหยุดหลังจบรอบปัจจุบัน (Pause Next Cycle) แล้ว'
-                                            );
-                                        }
-                                    }}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <PauseCircle className="w-4 h-4 text-amber-400" />
-                                        <span>
-                                            {isPauseNextActive
-                                                ? 'หยุดหลังจบรอบนี้ (กดเพื่อยกเลิก)'
-                                                : 'หยุดหลังจบรอบนี้ (Pause Next Cycle)'}
-                                        </span>
-                                    </span>
-                                    {isPauseNextActive && (
-                                        <Badge className="bg-amber-500 text-slate-950 font-mono text-[9px] px-1.5 py-0 h-4">
-                                            รอจบรอบ
-                                        </Badge>
-                                    )}
-                                </Button>
-
-                                {/* 3. ปุ่มลบ Pending หยุดออกไม้ใหม่ - กดอีกทีเพื่อยกเลิกได้ */}
-                                <Button
-                                    variant="outline"
-                                    className={`w-full justify-between text-xs transition-colors ${
-                                        isFreezeStopActive
-                                            ? 'border-rose-500 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-                                            : 'border-rose-500/40 text-rose-400 hover:bg-rose-500/10'
-                                    }`}
-                                    disabled={sending}
-                                    onClick={() => {
-                                        if (isFreezeStopActive) {
-                                            sendCommand(
-                                                { stop_mode: 'RUN', close_all: false },
-                                                'ยกเลิกคำสั่งหยุดแล้ว กลับสู่โหมดรันต่อ (RUN)'
-                                            );
-                                        } else {
-                                            sendCommand(
-                                                { stop_mode: 'FREEZE_STOP', close_all: false },
-                                                'สั่งลบ Pending และหยุดออกไม้ใหม่ทันทีแล้ว'
-                                            );
-                                        }
-                                    }}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <XCircle className="w-4 h-4 text-rose-400" />
-                                        <span>
-                                            {isFreezeStopActive
-                                                ? 'ลบ Pending หยุดออกไม้ใหม่ (กดเพื่อยกเลิก)'
-                                                : 'ลบ Pending หยุดออกไม้ใหม่'}
-                                        </span>
-                                    </span>
-                                    {isFreezeStopActive && (
-                                        <Badge className="bg-rose-500 text-white font-mono text-[9px] px-1.5 py-0 h-4">
-                                            หยุดออกไม้
-                                        </Badge>
-                                    )}
-                                </Button>
-
-                                {/* 4. ปุ่มปิดรวบออเดอร์ทั้งหมดทันที - เมื่องดออกไม้ใหม่ */}
-                                <div className="pt-2 border-t border-slate-800/80">
-                                    {!confirmCloseAll ? (
-                                        <Button
-                                            variant="destructive"
-                                            className="w-full justify-start gap-2 text-xs"
-                                            disabled={sending}
-                                            onClick={() => setConfirmCloseAll(true)}
-                                        >
-                                            <ShieldAlert className="w-4 h-4" />
-                                            <span>ปิดรวบออเดอร์ทั้งหมดทันที (งดออกไม้ใหม่)</span>
-                                        </Button>
-                                    ) : (
-                                        <div className="p-2.5 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
-                                            <p className="text-xs font-medium text-destructive">
-                                                ยืนยันปิดรวบทุกไม้ ลบ Pending และงดออกไม้ใหม่ทันที?
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    className="flex-1 text-xs"
-                                                    disabled={sending}
-                                                    onClick={() => {
-                                                        setConfirmCloseAll(false);
-                                                        sendCommand(
-                                                            { stop_mode: 'FREEZE_STOP', close_all: true },
-                                                            'ส่งคำสั่ง Close All Now ปิดรวบทุกไม้และงดออกไม้ใหม่แล้ว!'
-                                                        );
-                                                    }}
-                                                >
-                                                    ยืนยันปิดรวบ & หยุด
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="flex-1 text-xs"
-                                                    onClick={() => setConfirmCloseAll(false)}
-                                                >
-                                                    ยกเลิก
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Right: Live Settings Editor (Collapsible Accordion) */}
-                        <Card className="lg:col-span-7 border-cyan-500/25 bg-[#070b16]/95 text-slate-100 overflow-hidden shadow-md">
-                            {/* Collapsible Header Bar: PARAMS SETTING */}
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => setIsParamsOpen((prev) => !prev)}
-                                className="p-2.5 sm:p-3 flex items-center justify-between cursor-pointer select-none hover:bg-cyan-950/20 transition-colors"
-                            >
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <Sliders className="w-4 h-4 text-cyan-400 shrink-0" />
-                                    <span className="text-xs sm:text-sm font-mono tracking-widest uppercase text-cyan-300 font-bold truncate">
-                                        PARAMS SETTING
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    {!isParamsOpen && (
-                                        <span className="text-[10px] font-mono text-slate-400 hidden sm:inline-block">
-                                            D:{firstDistance} | S:{spacing} | TP:{targetProfit} | Lot:{initialLot}
-                                        </span>
-                                    )}
-                                    <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[10px] font-mono py-0 px-1.5">
-                                        {isParamsOpen ? 'ย่อแถบ' : 'แตะเพื่อตั้งค่า'}
-                                    </Badge>
-                                    <ChevronDown
-                                        className={cn(
-                                            "w-4 h-4 text-cyan-400 transition-transform duration-200",
-                                            isParamsOpen && "rotate-180"
-                                        )}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Collapsible Form Body */}
-                            {isParamsOpen && (
-                                <CardContent className="p-2.5 sm:p-3 pt-2.5 border-t border-cyan-500/15 animate-in fade-in-50 duration-200">
-                                    <form onSubmit={handleUpdateSettings} className="space-y-2.5 sm:space-y-3 font-mono">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {/* 1. First Dist */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
-                                                    <span className="sm:hidden">First Dist</span>
-                                                    <span className="hidden sm:inline">FIRST DIST (PT)</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={firstDistance}
-                                                    onClick={() => openParamModal({
-                                                        title: 'FIRST DIST (ระยะแรก)',
-                                                        unit: 'PT',
-                                                        currentVal: parseFloat(firstDistance) || 100,
-                                                        step: 10,
-                                                        presetValues: [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500],
-                                                        quickSteps: [-50, -10, 10, 50],
-                                                        onApply: (v) => setFirstDistance(String(Math.max(10, Math.round(v)))),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                            </div>
-
-                                            {/* 2. Spacing */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
-                                                    <span className="sm:hidden">Spacing</span>
-                                                    <span className="hidden sm:inline">SPACING (PT)</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={spacing}
-                                                    onClick={() => openParamModal({
-                                                        title: 'SPACING (ระยะห่าง)',
-                                                        unit: 'PT',
-                                                        currentVal: parseFloat(spacing) || 60,
-                                                        step: 10,
-                                                        presetValues: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500],
-                                                        quickSteps: [-50, -10, 10, 50],
-                                                        onApply: (v) => setSpacing(String(Math.max(5, Math.round(v)))),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                            </div>
-
-                                            {/* 3. Pending Per Side */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
-                                                    <span className="sm:hidden">Pending/ฝั่ง</span>
-                                                    <span className="hidden sm:inline">จำนวน Pending ต่อฝั่ง (Pending/Side)</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={pendingPerSide}
-                                                    onClick={() => openParamModal({
-                                                        title: 'PENDING ต่อฝั่ง',
-                                                        unit: 'ไม้',
-                                                        currentVal: parseInt(pendingPerSide, 10) || 10,
-                                                        step: 1,
-                                                        presetValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 30],
-                                                        quickSteps: [-5, -1, 1, 5],
-                                                        onApply: (v) => setPendingPerSide(String(Math.max(1, Math.round(v)))),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                            </div>
-
-                                            {/* 4. Target Profit */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
-                                                    <span className="sm:hidden">เป้าปิดรวบ (TP)</span>
-                                                    <span className="hidden sm:inline">เป้ากำไรปิดรวบ (Target Profit {cur})</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={targetProfit}
-                                                    onClick={() => openParamModal({
-                                                        title: `TARGET PROFIT (${cur})`,
-                                                        unit: cur,
-                                                        currentVal: parseFloat(targetProfit) || 10,
-                                                        step: 5,
-                                                        presetValues: [100, 50, 40, 30, 25, 20, 15, 10, 5, 0, -5, -10, -15, -20, -25, -30, -40, -50, -60, -70, -80, -90, -100, -150, -200],
-                                                        quickSteps: [-50, -10, -1, 1, 10, 50],
-                                                        onApply: (v) => setTargetProfit(String(v)),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                                <p className="text-[10px] text-muted-foreground hidden sm:block">
-                                                    ใส่ 0 (เท่าทุน) หรือค่าติดลบ (เช่น -50) เพื่อรวบปิดจำกัดขาดทุนอัตโนมัติ
-                                                </p>
-                                            </div>
-
-                                            {/* 4b. Freeze Mode Stop Loss (SL) */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-amber-300/90 font-mono truncate block">
-                                                    <span className="sm:hidden">Freeze SL (0=ปิด)</span>
-                                                    <span className="hidden sm:inline">SL โหมด Freeze ({cur})</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={Number(freezeStopLoss) < 0 ? freezeStopLoss : '0 (OFF)'}
-                                                    onClick={() => openParamModal({
-                                                        title: `FREEZE STOP LOSS (${cur})`,
-                                                        unit: cur,
-                                                        currentVal: Math.min(0, parseFloat(freezeStopLoss) || 0),
-                                                        step: 50,
-                                                        presetValues: [0, -50, -100, -200, -300, -500, -1000, -2000, -3000, -5000, -10000],
-                                                        quickSteps: [-500, -100, -10, 10, 100, 500],
-                                                        onApply: (v) => setFreezeStopLoss(String(v > 0 ? -v : v)),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-amber-500/30 text-amber-200 h-8 sm:h-9 cursor-pointer hover:border-amber-400/60 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                                <p className="text-[10px] text-muted-foreground hidden sm:block">
-                                                    ทำงานคู่กับ TP เฉพาะตอน Freeze (0 = ปิด, ค่าติดลบ = ยอมตัดขาดทุน)
-                                                </p>
-                                            </div>
-
-                                            {/* 5. Initial Lot */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
-                                                    <span className="sm:hidden">Lot เริ่มต้น</span>
-                                                    <span className="hidden sm:inline">ล็อตเริ่มต้น (Initial Lot)</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={initialLot}
-                                                    onClick={() => openParamModal({
-                                                        title: 'LOT เริ่มต้น (INITIAL LOT)',
-                                                        unit: 'Lot',
-                                                        currentVal: parseFloat(initialLot) || 0.01,
-                                                        step: 0.01,
-                                                        isDecimal: true,
-                                                        presetValues: [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.12, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 1.00],
-                                                        quickSteps: [-0.05, -0.01, 0.01, 0.05],
-                                                        onApply: (v) => setInitialLot(String(Math.max(0.01, Math.round(v * 100) / 100))),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                            </div>
-
-                                            {/* 6. Lot Increment */}
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] text-slate-400 font-mono truncate block">
-                                                    <span className="sm:hidden">Lot เพิ่ม/ชั้น</span>
-                                                    <span className="hidden sm:inline">ล็อตเพิ่มต่อชั้น (Lot Increment)</span>
-                                                </Label>
-                                                <Input
-                                                    readOnly
-                                                    value={lotIncrement}
-                                                    onClick={() => openParamModal({
-                                                        title: 'LOT เพิ่มต่อชั้น (INCREMENT)',
-                                                        unit: 'Lot',
-                                                        currentVal: parseFloat(lotIncrement) || 0.01,
-                                                        step: 0.01,
-                                                        isDecimal: true,
-                                                        presetValues: [0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50],
-                                                        quickSteps: [-0.05, -0.01, 0.01, 0.05],
-                                                        onApply: (v) => setLotIncrement(String(Math.max(0, Math.round(v * 100) / 100))),
-                                                    })}
-                                                    className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                />
-                                            </div>
-
-                                            {/* 7. One-Side Freeze Setting Box */}
-                                            <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
-                                                <div className="flex items-center justify-between gap-1.5">
-                                                    <div className="min-w-0">
-                                                        <span className="text-xs sm:text-sm font-semibold text-rose-300 truncate block">
-                                                            <span className="sm:hidden">One-Side Freeze (Cap)</span>
-                                                            <span className="hidden sm:inline">ระบบป้องกัน One-Side Freeze (ล็อกฝั่งตรงข้ามเมื่อครบทั้ง 2 ฝั่ง)</span>
-                                                        </span>
-                                                        <p className="text-[10px] text-muted-foreground hidden sm:block mt-0.5">
-                                                            เมื่อทั้งสองฝั่งเปิดถึง {maxBothSidesCap || 7} ไม้ ฝั่งที่เพิ่งครบยังออกต่อได้ ส่วนฝั่งตรงข้ามจะถูก Freeze ห้ามออกเพิ่ม
-                                                        </p>
-                                                    </div>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant={enableCapFreeze ? 'default' : 'outline'}
-                                                        onClick={() => setEnableCapFreeze((v) => !v)}
-                                                        className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
-                                                    >
-                                                        <span className="sm:hidden">{enableCapFreeze ? 'ON' : 'OFF'}</span>
-                                                        <span className="hidden sm:inline">{enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
-                                                    </Button>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-2 pt-1">
-                                                    <div>
-                                                        <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                            <span className="sm:hidden">ไม้เริ่ม Freeze</span>
-                                                            <span className="hidden sm:inline">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</span>
-                                                        </Label>
-                                                        <Input
-                                                            readOnly
-                                                            disabled={!enableCapFreeze}
-                                                            value={maxBothSidesCap}
-                                                            onClick={() => enableCapFreeze && openParamModal({
-                                                                title: 'ไม้เริ่ม FREEZE (CAP)',
-                                                                unit: 'ไม้',
-                                                                currentVal: parseInt(maxBothSidesCap, 10) || 7,
-                                                                step: 1,
-                                                                presetValues: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-                                                                quickSteps: [-5, -1, 1, 5],
-                                                                onApply: (v) => setMaxBothSidesCap(String(Math.max(1, Math.round(v)))),
-                                                            })}
-                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                            <span className="sm:hidden">สลับสิทธิ์ถ้าไม่เพิ่ม</span>
-                                                            <span className="hidden sm:inline">สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง (ไม้, 0 = ไม่สลับ)</span>
-                                                        </Label>
-                                                        <Input
-                                                            readOnly
-                                                            disabled={!enableCapFreeze}
-                                                            value={freezeFlipMaxExtra}
-                                                            onClick={() => enableCapFreeze && openParamModal({
-                                                                title: 'สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง',
-                                                                unit: 'ไม้',
-                                                                currentVal: parseInt(freezeFlipMaxExtra, 10) || 3,
-                                                                step: 1,
-                                                                presetValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
-                                                                quickSteps: [-5, -1, 1, 5],
-                                                                onApply: (v) => setFreezeFlipMaxExtra(String(Math.max(0, Math.round(v)))),
-                                                            })}
-                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between gap-1 pt-1">
-                                                    <span className="text-[11px] text-muted-foreground truncate">
-                                                        <span className="sm:hidden">สลับสิทธิ์เมื่อราคาตีกลับ</span>
-                                                        <span className="hidden sm:inline">รูปแบบการสลับสิทธิ์เมื่อราคาตีกลับ</span>
-                                                    </span>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={!enableCapFreeze}
-                                                        onClick={() => setFreezeFlipContinuous((v) => !v)}
-                                                        className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 shrink-0 font-mono"
-                                                    >
-                                                        <span className="sm:hidden">{freezeFlipContinuous ? 'ต่อเนื่อง' : 'ครั้งเดียว'}</span>
-                                                        <span className="hidden sm:inline">{freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}</span>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {eaState?.active_config && (
-                                            <div className="p-2 sm:p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-400 whitespace-nowrap overflow-x-auto">
-                                                EA Active: Dist={eaState.active_config.first_distance}pt | Spacing={eaState.active_config.spacing}pt | Pend={eaState.active_config.pending_per_side} | Lot={eaState.active_config.initial_lot}+{eaState.active_config.lot_increment} | TP={eaState.active_config.target_profit}
-                                            </div>
-                                        )}
-
-                                        <Button
-                                            type="submit"
-                                            className="w-full gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs h-9 shadow-md"
-                                            disabled={sending}
-                                        >
-                                            {sending ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : (
-                                                <Send className="w-4 h-4" />
-                                            )}
-                                            <span className="sm:hidden">UPLOAD & SYNC</span>
-                                            <span className="hidden sm:inline">UPLOAD & SYNC PARAMS</span>
-                                        </Button>
-                                    </form>
-                                </CardContent>
-                            )}
-                        </Card>
+                        {/* Cycle History Bar moved to the very bottom */}
+                        <RoundHistoryBar
+                            rounds={eaState?.round_history}
+                            currency={cur}
+                        />
                     </div>
 
                     {/* Quick Parameter Adjust Modal (Wheel Picker) */}

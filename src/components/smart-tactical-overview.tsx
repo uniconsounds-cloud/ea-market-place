@@ -800,26 +800,23 @@ export default function SmartTacticalOverview({
                     </span>
                 </div>
 
-                {/* 2. Combined TP & SL (Half-size numbers) */}
-                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
-                    <span className="text-[8px] sm:text-[10px] text-slate-400 truncate leading-none">ตั้ง TP / SL</span>
-                    <div className="flex flex-col items-center justify-center gap-0.5 pt-0.5">
-                        <div className="flex items-center justify-center gap-1 leading-none">
-                            <span className="text-[7.5px] sm:text-[9px] text-slate-400">TP</span>
-                            <span className="text-[9px] sm:text-xs font-extrabold text-cyan-300 leading-none tabular-nums truncate">
-                                {targetProfit >= 0 ? `+${targetProfit}` : targetProfit}
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-center gap-1 leading-none">
-                            <span className="text-[7.5px] sm:text-[9px] text-slate-400">SL</span>
-                            <span
-                                className={`text-[9px] sm:text-xs font-extrabold leading-none tabular-nums truncate ${
-                                    freezeStopLoss < 0 ? 'text-amber-300' : 'text-slate-500'
-                                }`}
-                            >
-                                {freezeStopLoss < 0 ? freezeStopLoss : '-'}
-                            </span>
-                        </div>
+                {/* 2. Combined TP & SL (2 lines only: TP +20 and SL -, maximized number size) */}
+                <div className="flex flex-col items-center justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
+                    <div className="flex items-baseline justify-center gap-1 leading-tight">
+                        <span className="text-[9px] sm:text-xs font-bold text-slate-400">TP</span>
+                        <span className="text-xs sm:text-base font-extrabold text-cyan-300 leading-tight tabular-nums truncate">
+                            {targetProfit >= 0 ? `+${targetProfit}` : targetProfit}
+                        </span>
+                    </div>
+                    <div className="flex items-baseline justify-center gap-1 leading-tight">
+                        <span className="text-[9px] sm:text-xs font-bold text-slate-400">SL</span>
+                        <span
+                            className={`text-xs sm:text-base font-extrabold leading-tight tabular-nums truncate ${
+                                freezeStopLoss < 0 ? 'text-amber-300' : 'text-slate-500'
+                            }`}
+                        >
+                            {freezeStopLoss < 0 ? freezeStopLoss : '-'}
+                        </span>
                     </div>
                 </div>
 
@@ -831,11 +828,11 @@ export default function SmartTacticalOverview({
                     </span>
                 </div>
 
-                {/* 4. Total Lots (Half-size total number + 2 stacked horizontal bars for Buy & Sell Lots) */}
-                <div className="flex flex-col justify-center gap-1 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
-                    <div className="flex items-center justify-center gap-1 leading-none">
+                {/* 4. Total Lots (Same number size as TP/SL + 2 stacked horizontal bars for Buy & Sell Lots) */}
+                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
+                    <div className="flex items-baseline justify-center gap-1 leading-tight">
                         <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ลอต</span>
-                        <span className="text-[9px] sm:text-xs font-extrabold text-sky-300 leading-none tabular-nums">
+                        <span className="text-xs sm:text-base font-extrabold text-sky-300 leading-tight tabular-nums">
                             {metrics.totalLot.toFixed(2)}
                         </span>
                     </div>
