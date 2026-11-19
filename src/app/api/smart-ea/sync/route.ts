@@ -9,6 +9,16 @@ function getSupabaseAdmin() {
     return createClient(url, key);
 }
 
+function getLatestClosedRoundTimeFromArr(roundHistory: any): number {
+    if (!Array.isArray(roundHistory) || roundHistory.length === 0) return 0;
+    let maxT = 0;
+    for (const r of roundHistory) {
+        const t = Array.isArray(r) ? Number(r[0]) || 0 : 0;
+        if (t > maxT) maxT = t;
+    }
+    return maxT;
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -53,6 +63,7 @@ export async function POST(req: Request) {
 
         // Prime-style Adaptive Sync: 15s when viewer is open, 180s (3 min) in Standby
         const adaptiveInterval = hasActiveViewer ? 15 : 180;
+        const resolvedRoundHistory = body.round_history ?? existingRoundHistory ?? null;
 
         const statePayload = {
             port_number: port,
@@ -82,7 +93,7 @@ export async function POST(req: Request) {
             last_ack_seq: Number(body.last_ack_seq || 0),
             active_config: body.active_config || {},
             chart: body.chart || null,
-            round_history: body.round_history ?? existingRoundHistory ?? null,
+            round_history: resolvedRoundHistory,
             last_ping: nowIso,
         };
 
@@ -108,6 +119,56 @@ export async function POST(req: Request) {
                 webConfig = JSON.parse(cmdRow.system_code);
             } catch {
                 webConfig = null;
+            }
+        }
+
+        // Offline-safe Auto-Reset: if an Exit Planner override was active and the round has closed,
+        // automatically revert sv_cmd_<port> back to base_target_profit & base_freeze_stop_loss
+        if (webConfig && webConfig.exit_override_active) {
+            const latestClosedTime = getLatestClosedRoundTimeFromArr(resolvedRoundHistory);
+            const overrideClosedTime = Number(webConfig.override_last_closed_time || 0);
+            const ackSeq = Number(statePayload.last_ack_seq || 0);
+            const cmdSeq = Number(webConfig.command_seq || 0);
+            const openPos = statePayload.open_pos;
+            const eaAlreadyReset =
+                ackSeq >= cmdSeq && statePayload.active_config?.exit_override_active === false;
+            const roundClosedAfterOverride =
+                (overrideClosedTime > 0 && latestClosedTime > overrideClosedTime) ||
+                (ackSeq >= cmdSeq && openPos === 0);
+
+            if (eaAlreadyReset || roundClosedAfterOverride) {
+                const restoredTp =
+                    Number(webConfig.base_target_profit) > 0
+                        ? Number(webConfig.base_target_profit)
+                        : Number(statePayload.active_config?.base_target_profit) > 0
+                        ? Number(statePayload.active_config.base_target_profit)
+                        : 20.0;
+                const restoredFsl =
+                    webConfig.base_freeze_stop_loss !== undefined
+                        ? Number(webConfig.base_freeze_stop_loss)
+                        : Number(statePayload.active_config?.base_freeze_stop_loss || 0.0);
+
+                webConfig = {
+                    ...webConfig,
+                    command_seq: cmdSeq + 1,
+                    target_profit: restoredTp,
+                    freeze_stop_loss: restoredFsl,
+                    base_target_profit: restoredTp,
+                    base_freeze_stop_loss: restoredFsl,
+                    exit_override_active: false,
+                    updated_at: nowIso,
+                };
+
+                await supabase
+                    .from('farm_port_status')
+                    .upsert(
+                        {
+                            port_number: `sv_cmd_${port}`,
+                            system_code: JSON.stringify(webConfig),
+                            updated_at: nowIso,
+                        },
+                        { onConflict: 'port_number' }
+                    );
             }
         }
 

@@ -323,7 +323,7 @@ function SmartEACockpitContent() {
     const [isOnline, setIsOnline] = useState(false);
     const [eaState, setEaState] = useState<EAState | null>(null);
     const [lastCommand, setLastCommand] = useState<any>(null);
-    const [latestVersion, setLatestVersion] = useState<string>('1.13');
+    const [latestVersion, setLatestVersion] = useState<string>('1.14');
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
     const [pnlJitter, setPnlJitter] = useState(0);
@@ -435,8 +435,10 @@ function SmartEACockpitContent() {
                         if (src.pending_per_side !== undefined) setPendingPerSide(String(src.pending_per_side));
                         if (src.initial_lot !== undefined) setInitialLot(String(src.initial_lot));
                         if (src.lot_increment !== undefined) setLotIncrement(String(src.lot_increment));
-                        if (src.target_profit !== undefined) setTargetProfit(String(src.target_profit));
-                        if (src.freeze_stop_loss !== undefined) setFreezeStopLoss(String(src.freeze_stop_loss));
+                        const baseTpVal = src.base_target_profit !== undefined ? src.base_target_profit : src.target_profit;
+                        const baseFslVal = src.base_freeze_stop_loss !== undefined ? src.base_freeze_stop_loss : src.freeze_stop_loss;
+                        if (baseTpVal !== undefined) setTargetProfit(String(baseTpVal));
+                        if (baseFslVal !== undefined) setFreezeStopLoss(String(baseFslVal));
                         if (src.enable_cap_freeze !== undefined) setEnableCapFreeze(Boolean(src.enable_cap_freeze));
                         if (src.max_both_sides_cap !== undefined) setMaxBothSidesCap(String(src.max_both_sides_cap));
                         if (src.freeze_flip_max_extra !== undefined) setFreezeFlipMaxExtra(String(src.freeze_flip_max_extra));
@@ -585,13 +587,16 @@ function SmartEACockpitContent() {
                 lot_increment: inc,
                 target_profit: tp,
                 freeze_stop_loss: fsl,
+                base_target_profit: tp,
+                base_freeze_stop_loss: fsl,
+                is_exit_override: false,
                 enable_cap_freeze: enableCapFreeze,
                 max_both_sides_cap: cap,
                 freeze_flip_max_extra: fmax,
                 freeze_flip_continuous: freezeFlipContinuous,
                 close_all: false,
             },
-            'ส่งค่าใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
+            'ส่งค่า Setting ใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
         );
     };
 
@@ -615,8 +620,12 @@ function SmartEACockpitContent() {
     const cur = eaState?.currency || 'USD';
     const liveCyclePnl = (eaState?.cycle_pnl || 0) + pnlJitter;
     const liveEquity = (eaState?.equity || 0) + pnlJitter;
-    const activeTp = eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20);
-    const activeFreezeSl = eaState?.active_config?.freeze_stop_loss ?? (parseFloat(freezeStopLoss) || 0);
+    const activeTp = isPendingAck && lastCommand?.target_profit !== undefined
+        ? Number(lastCommand.target_profit)
+        : (eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20));
+    const activeFreezeSl = isPendingAck && lastCommand?.freeze_stop_loss !== undefined
+        ? Number(lastCommand.freeze_stop_loss)
+        : (eaState?.active_config?.freeze_stop_loss ?? (parseFloat(freezeStopLoss) || 0));
     const activeCap = eaState?.active_config?.max_both_sides_cap ?? (parseInt(maxBothSidesCap, 10) || 7);
 
     // Semantic numeric version comparison: > 0 means latest > current
@@ -694,10 +703,9 @@ function SmartEACockpitContent() {
     }, [eaState?.balance]);
 
     const handleConfirmCustomTp = () => {
-        setTargetProfit(String(customTpVal));
         sendCommand(
-            { target_profit: customTpVal, close_all: false },
-            `ตั้งเป้า Target Profit = ${customTpVal} ${cur} แล้ว EA จะรวบปิดอัตโนมัติเมื่อถึงเป้า`
+            { target_profit: customTpVal, is_exit_override: true, close_all: false },
+            `ตั้งเป้า TP เฉพาะรอบนี้ = ${customTpVal} ${cur} แล้ว (เมื่อจบรอบนี้จะกลับไปใช้ค่า Setting TP = ${targetProfit} ${cur} อัตโนมัติ)`
         );
         setCustomTpModalOpen(false);
     };
@@ -1497,11 +1505,9 @@ function SmartEACockpitContent() {
                             chart={eaState?.chart}
                             sending={sending}
                             onApply={(newTp, newSl) => {
-                                setTargetProfit(String(newTp));
-                                setFreezeStopLoss(String(newSl));
                                 sendCommand(
-                                    { target_profit: newTp, freeze_stop_loss: newSl, close_all: false },
-                                    `อัปเดตแผนปิดรอบแล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'}`
+                                    { target_profit: newTp, freeze_stop_loss: newSl, is_exit_override: true, close_all: false },
+                                    `อัปเดตแผนปิดรอบนี้แล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'} (จบรอบนี้จะรีเซ็ตกลับเป็นค่า Setting TP = ${targetProfit} อัตโนมัติ)`
                                 );
                             }}
                         />
@@ -1569,10 +1575,9 @@ function SmartEACockpitContent() {
                                         disabled={sending}
                                         className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
                                         onClick={() => {
-                                            setFreezeStopLoss(String(sl500Val));
                                             sendCommand(
-                                                { freeze_stop_loss: sl500Val, close_all: false },
-                                                `ตั้ง Freeze SL = ${sl500Val} ${cur} (-500 จุดจากปัจจุบัน, TP=${activeTp} ยังทำงานปกติ)`
+                                                { freeze_stop_loss: sl500Val, is_exit_override: true, close_all: false },
+                                                `ตั้ง Freeze SL รอบนี้ = ${sl500Val} ${cur} (-500 จุดจากปัจจุบัน, จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
                                             );
                                         }}
                                     >
@@ -1584,10 +1589,9 @@ function SmartEACockpitContent() {
                                         disabled={sending}
                                         className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
                                         onClick={() => {
-                                            setFreezeStopLoss(String(slMinus3PctVal));
                                             sendCommand(
-                                                { freeze_stop_loss: slMinus3PctVal, close_all: false },
-                                                `ตั้ง Freeze SL = ${slMinus3PctVal} ${cur} (-3% พอร์ต, TP=${activeTp} ยังทำงานปกติ)`
+                                                { freeze_stop_loss: slMinus3PctVal, is_exit_override: true, close_all: false },
+                                                `ตั้ง Freeze SL รอบนี้ = ${slMinus3PctVal} ${cur} (-3% พอร์ต, จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
                                             );
                                         }}
                                     >
@@ -1599,7 +1603,7 @@ function SmartEACockpitContent() {
                                         disabled={sending}
                                         className="h-6 text-[11px] px-2 border-amber-400/60 text-amber-100 hover:bg-amber-500/25 flex items-center gap-1"
                                         onClick={() => openParamModal({
-                                            title: `FREEZE STOP LOSS (${cur})`,
+                                            title: `FREEZE STOP LOSS เฉพาะรอบนี้ (${cur})`,
                                             unit: cur,
                                             currentVal: Math.min(0, activeFreezeSl),
                                             step: 50,
@@ -1607,12 +1611,11 @@ function SmartEACockpitContent() {
                                             quickSteps: [-500, -100, -10, 10, 100, 500],
                                             onApply: (v) => {
                                                 const val = v > 0 ? -v : v;
-                                                setFreezeStopLoss(String(val));
                                                 sendCommand(
-                                                    { freeze_stop_loss: val, close_all: false },
+                                                    { freeze_stop_loss: val, is_exit_override: true, close_all: false },
                                                     val === 0
-                                                        ? 'ปิด Freeze SL แล้ว (ใช้เฉพาะ TP ปกติ)'
-                                                        : `ตั้ง Freeze SL = ${val} ${cur} แล้ว (TP=${activeTp} ยังทำงานปกติ)`
+                                                        ? 'ปิด Freeze SL รอบนี้แล้ว (ใช้เฉพาะ TP ปกติ)'
+                                                        : `ตั้ง Freeze SL รอบนี้ = ${val} ${cur} แล้ว (จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
                                                 );
                                             },
                                         })}
@@ -1633,10 +1636,9 @@ function SmartEACockpitContent() {
                                         disabled={sending}
                                         className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
                                         onClick={() => {
-                                            setTargetProfit(String(tpHalfDdVal));
                                             sendCommand(
-                                                { target_profit: tpHalfDdVal, close_all: false },
-                                                `ตั้ง Target TP = ${tpHalfDdVal} ${cur} (ครึ่งนึงของ DD ปัจจุบัน)`
+                                                { target_profit: tpHalfDdVal, is_exit_override: true, close_all: false },
+                                                `ตั้ง Target TP รอบนี้ = ${tpHalfDdVal} ${cur} (จบรอบจะกลับไปใช้ค่า Setting TP = ${targetProfit} อัตโนมัติ)`
                                             );
                                         }}
                                     >
@@ -1648,10 +1650,9 @@ function SmartEACockpitContent() {
                                         disabled={sending}
                                         className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
                                         onClick={() => {
-                                            setTargetProfit('0');
                                             sendCommand(
-                                                { target_profit: 0, close_all: false },
-                                                `ตั้ง Target TP = 0 ${cur} (เท่าทุน) แล้ว`
+                                                { target_profit: 0, is_exit_override: true, close_all: false },
+                                                `ตั้ง Target TP รอบนี้ = 0 ${cur} (เท่าทุน) แล้ว (จบรอบจะกลับไปใช้ค่า Setting TP = ${targetProfit} อัตโนมัติ)`
                                             );
                                         }}
                                     >

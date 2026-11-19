@@ -9,6 +9,16 @@ function getSupabaseAdmin() {
     return createClient(url, key);
 }
 
+function getLatestClosedRoundTime(state: any): number {
+    if (!Array.isArray(state?.round_history) || state.round_history.length === 0) return 0;
+    let maxT = 0;
+    for (const r of state.round_history) {
+        const t = Array.isArray(r) ? Number(r[0]) || 0 : 0;
+        if (t > maxT) maxT = t;
+    }
+    return maxT;
+}
+
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -18,7 +28,6 @@ export async function GET(req: Request) {
         }
 
         const supabase = getSupabaseAdmin();
-
         const nowIso = new Date().toISOString();
 
         const [{ data: stateRow }, { data: cmdRow }, { data: productRow }, { data: mainPortRow }] = await Promise.all([
@@ -52,6 +61,55 @@ export async function GET(req: Request) {
             try { command = JSON.parse(cmdRow.system_code); } catch { command = null; }
         }
 
+        // Auto-reset Exit Planner temporary TP/SL back to Setting defaults if the round has closed
+        if (command && command.exit_override_active && state) {
+            const latestClosedTime = getLatestClosedRoundTime(state);
+            const overrideClosedTime = Number(command.override_last_closed_time || 0);
+            const ackSeq = Number(state.last_ack_seq || 0);
+            const cmdSeq = Number(command.command_seq || 0);
+            const openPos = Number(state.open_pos ?? (Number(state.open_buy || 0) + Number(state.open_sell || 0)));
+            const eaAlreadyReset =
+                ackSeq >= cmdSeq && state.active_config?.exit_override_active === false;
+            const roundClosedAfterOverride =
+                (overrideClosedTime > 0 && latestClosedTime > overrideClosedTime) ||
+                (ackSeq >= cmdSeq && openPos === 0);
+
+            if (eaAlreadyReset || roundClosedAfterOverride) {
+                const restoredTp =
+                    Number(command.base_target_profit) > 0
+                        ? Number(command.base_target_profit)
+                        : Number(state.active_config?.base_target_profit) > 0
+                        ? Number(state.active_config.base_target_profit)
+                        : 20.0;
+                const restoredFsl =
+                    command.base_freeze_stop_loss !== undefined
+                        ? Number(command.base_freeze_stop_loss)
+                        : Number(state.active_config?.base_freeze_stop_loss || 0.0);
+
+                command = {
+                    ...command,
+                    command_seq: cmdSeq + 1,
+                    target_profit: restoredTp,
+                    freeze_stop_loss: restoredFsl,
+                    base_target_profit: restoredTp,
+                    base_freeze_stop_loss: restoredFsl,
+                    exit_override_active: false,
+                    updated_at: nowIso,
+                };
+
+                await supabase
+                    .from('farm_port_status')
+                    .upsert(
+                        {
+                            port_number: `sv_cmd_${port}`,
+                            system_code: JSON.stringify(command),
+                            updated_at: nowIso,
+                        },
+                        { onConflict: 'port_number' }
+                    );
+            }
+        }
+
         const expectedIntervalSec = Number(state?.sync_interval_sec || 20);
         const onlineThresholdMs = Math.max(45000, (expectedIntervalSec + 60) * 1000);
         const isOnline = state?.last_ping
@@ -62,7 +120,7 @@ export async function GET(req: Request) {
             success: true,
             port_number: port,
             is_online: isOnline,
-            latest_version: productRow?.version || '1.13',
+            latest_version: productRow?.version || '1.14',
             download_url: productRow?.file_url || null,
             state,
             command,
@@ -83,12 +141,24 @@ export async function POST(req: Request) {
 
         const supabase = getSupabaseAdmin();
 
-        // Fetch existing command to preserve fields & increment command_seq
-        const { data: existingRow } = await supabase
-            .from('farm_port_status')
-            .select('system_code')
-            .eq('port_number', `sv_cmd_${port}`)
-            .maybeSingle();
+        // Fetch existing command & state to preserve base settings & snapshot current round
+        const [{ data: existingRow }, { data: stateRow }] = await Promise.all([
+            supabase
+                .from('farm_port_status')
+                .select('system_code')
+                .eq('port_number', `sv_cmd_${port}`)
+                .maybeSingle(),
+            supabase
+                .from('farm_port_status')
+                .select('system_code')
+                .eq('port_number', `sv_state_${port}`)
+                .maybeSingle(),
+        ]);
+
+        let currentState: any = null;
+        if (stateRow?.system_code) {
+            try { currentState = JSON.parse(stateRow.system_code); } catch { currentState = null; }
+        }
 
         let prevCmd: any = {
             command_seq: 0,
@@ -99,6 +169,10 @@ export async function POST(req: Request) {
             lot_increment: 0.01,
             target_profit: 20.0,
             freeze_stop_loss: 0.0,
+            base_target_profit: 20.0,
+            base_freeze_stop_loss: 0.0,
+            exit_override_active: false,
+            override_last_closed_time: 0,
             enable_cap_freeze: true,
             max_both_sides_cap: 7,
             freeze_flip_max_extra: 3,
@@ -115,6 +189,48 @@ export async function POST(req: Request) {
             }
         }
 
+        const prevBaseTp =
+            Number(prevCmd.base_target_profit) > 0
+                ? Number(prevCmd.base_target_profit)
+                : Number(prevCmd.target_profit) > 0
+                ? Number(prevCmd.target_profit)
+                : Number(currentState?.active_config?.base_target_profit) > 0
+                ? Number(currentState.active_config.base_target_profit)
+                : Number(currentState?.active_config?.target_profit) > 0
+                ? Number(currentState.active_config.target_profit)
+                : 20.0;
+
+        const prevBaseFsl =
+            prevCmd.base_freeze_stop_loss !== undefined
+                ? Number(prevCmd.base_freeze_stop_loss)
+                : Number(currentState?.active_config?.base_freeze_stop_loss ?? 0.0);
+
+        const isExitOverride = Boolean(body.is_exit_override === true);
+        const isSettingSave =
+            !isExitOverride && (body.target_profit !== undefined || body.base_target_profit !== undefined);
+
+        const nextTp =
+            body.target_profit !== undefined ? Number(body.target_profit) : Number(prevCmd.target_profit);
+        const nextFsl =
+            body.freeze_stop_loss !== undefined
+                ? Number(body.freeze_stop_loss)
+                : Number(prevCmd.freeze_stop_loss ?? 0.0);
+
+        const nextBaseTp = isSettingSave
+            ? (body.base_target_profit !== undefined ? Number(body.base_target_profit) : nextTp)
+            : prevBaseTp;
+        const nextBaseFsl = isSettingSave
+            ? (body.base_freeze_stop_loss !== undefined ? Number(body.base_freeze_stop_loss) : nextFsl)
+            : prevBaseFsl;
+        const nextExitOverrideActive = isExitOverride
+            ? true
+            : isSettingSave
+            ? false
+            : Boolean(prevCmd.exit_override_active);
+        const nextOverrideClosedTime = isExitOverride
+            ? getLatestClosedRoundTime(currentState)
+            : Number(prevCmd.override_last_closed_time || 0);
+
         const nextSeq = Number(prevCmd.command_seq || 0) + 1;
         const updatedCmd = {
             command_seq: nextSeq,
@@ -123,8 +239,12 @@ export async function POST(req: Request) {
             pending_per_side: body.pending_per_side !== undefined ? Number(body.pending_per_side) : prevCmd.pending_per_side,
             initial_lot: body.initial_lot !== undefined ? Number(body.initial_lot) : prevCmd.initial_lot,
             lot_increment: body.lot_increment !== undefined ? Number(body.lot_increment) : prevCmd.lot_increment,
-            target_profit: body.target_profit !== undefined ? Number(body.target_profit) : prevCmd.target_profit,
-            freeze_stop_loss: body.freeze_stop_loss !== undefined ? Number(body.freeze_stop_loss) : (prevCmd.freeze_stop_loss ?? 0.0),
+            target_profit: nextTp,
+            freeze_stop_loss: nextFsl,
+            base_target_profit: nextBaseTp,
+            base_freeze_stop_loss: nextBaseFsl,
+            exit_override_active: nextExitOverrideActive,
+            override_last_closed_time: nextOverrideClosedTime,
             enable_cap_freeze: body.enable_cap_freeze !== undefined ? Boolean(body.enable_cap_freeze) : (prevCmd.enable_cap_freeze ?? true),
             max_both_sides_cap: body.max_both_sides_cap !== undefined ? Number(body.max_both_sides_cap) : (prevCmd.max_both_sides_cap ?? 7),
             freeze_flip_max_extra: body.freeze_flip_max_extra !== undefined ? Number(body.freeze_flip_max_extra) : (prevCmd.freeze_flip_max_extra ?? 3),
