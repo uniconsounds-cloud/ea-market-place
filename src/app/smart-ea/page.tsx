@@ -53,6 +53,9 @@ interface ActiveConfig {
     max_both_sides_cap?: number;
     freeze_flip_max_extra?: number;
     freeze_flip_continuous?: boolean;
+    enable_streak_unlock?: boolean;
+    streak_unlock_trades?: number;
+    streak_unlock_candles?: number;
     stop_mode: string;
 }
 
@@ -342,6 +345,9 @@ function SmartEACockpitContent() {
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [freezeFlipMaxExtra, setFreezeFlipMaxExtra] = useState('3');
     const [freezeFlipContinuous, setFreezeFlipContinuous] = useState(true);
+    const [enableStreakUnlock, setEnableStreakUnlock] = useState(true);
+    const [streakUnlockTrades, setStreakUnlockTrades] = useState('7');
+    const [streakUnlockCandles, setStreakUnlockCandles] = useState('7');
     const [formInitialized, setFormInitialized] = useState(false);
 
     useEffect(() => {
@@ -443,6 +449,9 @@ function SmartEACockpitContent() {
                         if (src.max_both_sides_cap !== undefined) setMaxBothSidesCap(String(src.max_both_sides_cap));
                         if (src.freeze_flip_max_extra !== undefined) setFreezeFlipMaxExtra(String(src.freeze_flip_max_extra));
                         if (src.freeze_flip_continuous !== undefined) setFreezeFlipContinuous(Boolean(src.freeze_flip_continuous));
+                        if (src.enable_streak_unlock !== undefined) setEnableStreakUnlock(Boolean(src.enable_streak_unlock));
+                        if (src.streak_unlock_trades !== undefined) setStreakUnlockTrades(String(src.streak_unlock_trades));
+                        if (src.streak_unlock_candles !== undefined) setStreakUnlockCandles(String(src.streak_unlock_candles));
                         setFormInitialized(true);
                     }
                 }
@@ -570,10 +579,14 @@ function SmartEACockpitContent() {
         const fsl = isNaN(rawFsl) ? 0 : (rawFsl > 0 ? -rawFsl : rawFsl);
         const cap = parseInt(maxBothSidesCap, 10);
         const fmax = parseInt(freezeFlipMaxExtra, 10);
+        const stkTrades = parseInt(streakUnlockTrades, 10);
+        const stkCandles = parseInt(streakUnlockCandles, 10);
 
         if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
             isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50 ||
-            isNaN(fmax) || fmax < 0 || fmax > 50) {
+            isNaN(fmax) || fmax < 0 || fmax > 50 ||
+            isNaN(stkTrades) || stkTrades < 1 || stkTrades > 50 ||
+            isNaN(stkCandles) || stkCandles < 1 || stkCandles > 100) {
             toast.error('กรุณาตรวจสอบค่าตัวเลขที่กรอกให้ถูกต้อง');
             return;
         }
@@ -594,6 +607,9 @@ function SmartEACockpitContent() {
                 max_both_sides_cap: cap,
                 freeze_flip_max_extra: fmax,
                 freeze_flip_continuous: freezeFlipContinuous,
+                enable_streak_unlock: enableStreakUnlock,
+                streak_unlock_trades: stkTrades,
+                streak_unlock_candles: stkCandles,
                 close_all: false,
             },
             'ส่งค่า Setting ใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
@@ -1458,6 +1474,74 @@ function SmartEACockpitContent() {
                                                     <span className="sm:hidden">{freezeFlipContinuous ? 'ต่อเนื่อง' : 'ครั้งเดียว'}</span>
                                                     <span className="hidden sm:inline">{freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}</span>
                                                 </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* 8. Streak Burst Unlock Setting Box */}
+                                        <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-xs sm:text-sm font-semibold text-amber-300 truncate block">
+                                                        <span className="sm:hidden">Streak Burst Unlock (M1)</span>
+                                                        <span className="hidden sm:inline">ปลดล็อกฝั่งตรงข้ามเมื่อออกไม้ต่อเนื่องเร็ว (Streak Unlock M1)</span>
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableStreakUnlock ? 'default' : 'outline'}
+                                                    onClick={() => setEnableStreakUnlock((v) => !v)}
+                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{enableStreakUnlock ? 'ON' : 'OFF'}</span>
+                                                    <span className="hidden sm:inline">{enableStreakUnlock ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                </Button>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">ไม้ต่อเนื่อง (&gt;=)</span>
+                                                        <span className="hidden sm:inline">จำนวนไม้ต่อเนื่องฝั่งเดียว (ไม้)</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableStreakUnlock}
+                                                        value={streakUnlockTrades}
+                                                        onClick={() => enableStreakUnlock && openParamModal({
+                                                            title: 'จำนวนไม้ต่อเนื่อง (STREAK)',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(streakUnlockTrades, 10) || 7,
+                                                            step: 1,
+                                                            presetValues: [3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20],
+                                                            quickSteps: [-5, -1, 1, 5],
+                                                            onApply: (v) => setStreakUnlockTrades(String(Math.max(1, Math.min(50, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">ภายในแท่ง M1 (&lt;=)</span>
+                                                        <span className="hidden sm:inline">ภายในจำนวนแท่งเทียน M1 (แท่ง)</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableStreakUnlock}
+                                                        value={streakUnlockCandles}
+                                                        onClick={() => enableStreakUnlock && openParamModal({
+                                                            title: 'ภายในแท่งเทียน M1',
+                                                            unit: 'แท่ง',
+                                                            currentVal: parseInt(streakUnlockCandles, 10) || 7,
+                                                            step: 1,
+                                                            presetValues: [3, 5, 7, 10, 12, 15, 20, 30, 45, 60],
+                                                            quickSteps: [-5, -1, 1, 5],
+                                                            onApply: (v) => setStreakUnlockCandles(String(Math.max(1, Math.min(100, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
