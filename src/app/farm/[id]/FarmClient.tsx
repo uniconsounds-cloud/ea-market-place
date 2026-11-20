@@ -2702,7 +2702,10 @@ export default function FarmClient({
         // If no quarantined pairs exist, return empty array (plot stays empty/natural soil)
         if (details.length === 0) return [];
 
-        return details.slice(0, 3).map((d, idx) => {
+        return [...details]
+            .sort((a, b) => (Number(b.ddPct) || 0) - (Number(a.ddPct) || 0))
+            .slice(0, 3)
+            .map((d, idx) => {
             const sym = (d.sym || 'EURJPY').toUpperCase();
             const pairInfo = (primeTelemetry?.pairData as any)?.[sym];
             const rescueFromPair = pairInfo ? (Number(pairInfo.rescue_orders) || 0) : 0;
@@ -2739,8 +2742,10 @@ export default function FarmClient({
     }, [primeTelemetry, isPrime, isFallback1Url, isPhase2Active]);
 
     const totalQuarantineDD = useMemo(() => {
-        return Number(quarantinePreviewList.reduce((acc, t) => acc + t.ddPct, 0).toFixed(2));
-    }, [quarantinePreviewList]);
+        const details = primeTelemetry?.quarantinedDetails || [];
+        if (details.length === 0) return 0;
+        return Number(details.reduce((acc, d) => acc + (Number(d.ddPct) || 0), 0).toFixed(2));
+    }, [primeTelemetry?.quarantinedDetails]);
 
     // ⚡ Bio-Shield: Recommended Buffer calculated from Quarantine Total DD (rounded up to nearest 10%, min 20%)
     const actualRecommendedBuffer = useMemo(() => {
@@ -2797,28 +2802,30 @@ export default function FarmClient({
         return Number((-extTrades.pnl / stats.balance * 100).toFixed(2));
     }, [extTrades.pnl, hasExternalTrades, stats.balance]);
 
-    // Active Farm DD (pure active EasyM pairs):
-    // Perfectly reconciled: totalPortDDPct = totalQuarantineDD + activeFarmDDPct + manualDDPct
-    const activeFarmDDPct = useMemo(() => {
-        if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
-        if (primeTelemetry?.modeDDPct !== undefined && primeTelemetry.modeDDPct > 0) {
-            return Number(primeTelemetry.modeDDPct.toFixed(2));
-        }
-        const computedActive = rawPortDD - totalQuarantineDD - manualDDPct;
-        return Number(Math.max(0, computedActive).toFixed(2));
-    }, [rawPortDD, totalQuarantineDD, manualDDPct, isPrime, isFallback1Url, primeTelemetry?.modeDDPct]);
-
     const totalPortDDPct = useMemo(() => {
         if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
         return Number(rawPortDD.toFixed(2));
     }, [rawPortDD, isPrime, isFallback1Url]);
 
-    // 🤖 Pure EasyM EA DD (ไม่รวมไม้เทรดมือนอกระบบ: EA DD = Active Farm DD + Quarantine Total DD)
+    // 🤖 Pure EasyM EA DD (ไม่รวมไม้เทรดมือนอกระบบ: EA DD = Total Port DD - Manual DD)
     const eaDDPct = useMemo(() => {
         if (!isPrime || isFallback1Url) return totalPortDDPct;
-        const pureEaDD = totalQuarantineDD + activeFarmDDPct;
+        const pureEaDD = totalPortDDPct - manualDDPct;
         return Number(Math.max(0, pureEaDD).toFixed(2));
-    }, [isPrime, isFallback1Url, totalPortDDPct, totalQuarantineDD, activeFarmDDPct]);
+    }, [isPrime, isFallback1Url, totalPortDDPct, manualDDPct]);
+
+    // Active Farm DD (pure active EasyM pairs):
+    // Reconciled: eaDDPct = totalQuarantineDD + activeFarmDDPct
+    const activeFarmDDPct = useMemo(() => {
+        if (!isPrime || isFallback1Url) return Number(rawPortDD.toFixed(2));
+        // Only use EA's modeDDPct when it actually excludes quarantined pairs (countQ <= max_quarantined)
+        const modeDd = primeTelemetry?.modeDDPct;
+        if (modeDd !== undefined && modeDd > 0 && (modeDd + totalQuarantineDD) <= (eaDDPct + 1.5)) {
+            return Number(modeDd.toFixed(2));
+        }
+        const computedActive = eaDDPct - totalQuarantineDD;
+        return Number(Math.max(0, computedActive).toFixed(2));
+    }, [rawPortDD, totalQuarantineDD, eaDDPct, isPrime, isFallback1Url, primeTelemetry?.modeDDPct]);
 
     const activeCount = useMemo(() => {
         return PRIME_20_PAIRS.filter(p => {
