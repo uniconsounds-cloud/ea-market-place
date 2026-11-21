@@ -86,6 +86,8 @@ export async function POST(req: Request) {
             freeze_flip_count: Number(body.freeze_flip_count || 0),
             freeze_base_count: Number(body.freeze_base_count || 0),
             streak_unlocked: Boolean(body.streak_unlocked),
+            hedge_active: Boolean(body.hedge_active),
+            hedge_side: body.hedge_side || 'NONE',
             sync_interval_sec: Number(body.sync_interval_sec || adaptiveInterval),
             conn_status: 'CONNECTED',
             config_status: body.config_status || 'MT5_DEFAULT',

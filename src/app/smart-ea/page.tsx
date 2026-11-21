@@ -56,6 +56,15 @@ interface ActiveConfig {
     enable_streak_unlock?: boolean;
     streak_unlock_trades?: number;
     streak_unlock_candles?: number;
+    enable_auto_hedge?: boolean;
+    hedge_dd_percent?: number;
+    enable_hedge_trailing?: boolean;
+    hedge_trail_start_pts?: number;
+    hedge_trail_step_pts?: number;
+    enable_hedge_partial?: boolean;
+    hedge_partial_pct?: number;
+    hedge_rebound_pts?: number;
+    enable_hedge_offset?: boolean;
     stop_mode: string;
 }
 
@@ -348,6 +357,15 @@ function SmartEACockpitContent() {
     const [enableStreakUnlock, setEnableStreakUnlock] = useState(true);
     const [streakUnlockTrades, setStreakUnlockTrades] = useState('7');
     const [streakUnlockCandles, setStreakUnlockCandles] = useState('7');
+    const [enableAutoHedge, setEnableAutoHedge] = useState(false);
+    const [hedgeDDPercent, setHedgeDDPercent] = useState('20');
+    const [enableHedgeTrailing, setEnableHedgeTrailing] = useState(true);
+    const [hedgeTrailStartPts, setHedgeTrailStartPts] = useState('300');
+    const [hedgeTrailStepPts, setHedgeTrailStepPts] = useState('150');
+    const [enableHedgePartial, setEnableHedgePartial] = useState(true);
+    const [hedgePartialPct, setHedgePartialPct] = useState('50');
+    const [hedgeReboundPts, setHedgeReboundPts] = useState('250');
+    const [enableHedgeOffset, setEnableHedgeOffset] = useState(true);
     const [formInitialized, setFormInitialized] = useState(false);
 
     useEffect(() => {
@@ -452,6 +470,15 @@ function SmartEACockpitContent() {
                         if (src.enable_streak_unlock !== undefined) setEnableStreakUnlock(Boolean(src.enable_streak_unlock));
                         if (src.streak_unlock_trades !== undefined) setStreakUnlockTrades(String(src.streak_unlock_trades));
                         if (src.streak_unlock_candles !== undefined) setStreakUnlockCandles(String(src.streak_unlock_candles));
+                        if (src.enable_auto_hedge !== undefined) setEnableAutoHedge(Boolean(src.enable_auto_hedge));
+                        if (src.hedge_dd_percent !== undefined) setHedgeDDPercent(String(src.hedge_dd_percent));
+                        if (src.enable_hedge_trailing !== undefined) setEnableHedgeTrailing(Boolean(src.enable_hedge_trailing));
+                        if (src.hedge_trail_start_pts !== undefined) setHedgeTrailStartPts(String(src.hedge_trail_start_pts));
+                        if (src.hedge_trail_step_pts !== undefined) setHedgeTrailStepPts(String(src.hedge_trail_step_pts));
+                        if (src.enable_hedge_partial !== undefined) setEnableHedgePartial(Boolean(src.enable_hedge_partial));
+                        if (src.hedge_partial_pct !== undefined) setHedgePartialPct(String(src.hedge_partial_pct));
+                        if (src.hedge_rebound_pts !== undefined) setHedgeReboundPts(String(src.hedge_rebound_pts));
+                        if (src.enable_hedge_offset !== undefined) setEnableHedgeOffset(Boolean(src.enable_hedge_offset));
                         setFormInitialized(true);
                     }
                 }
@@ -581,12 +608,21 @@ function SmartEACockpitContent() {
         const fmax = parseInt(freezeFlipMaxExtra, 10);
         const stkTrades = parseInt(streakUnlockTrades, 10);
         const stkCandles = parseInt(streakUnlockCandles, 10);
+        const hdgDd = parseFloat(hedgeDDPercent);
+        const hdgTStart = parseInt(hedgeTrailStartPts, 10);
+        const hdgTStep = parseInt(hedgeTrailStepPts, 10);
+        const hdgPartPct = parseFloat(hedgePartialPct);
+        const hdgReb = parseInt(hedgeReboundPts, 10);
 
         if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
             isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50 ||
             isNaN(fmax) || fmax < 0 || fmax > 50 ||
             isNaN(stkTrades) || stkTrades < 1 || stkTrades > 50 ||
-            isNaN(stkCandles) || stkCandles < 1 || stkCandles > 100) {
+            isNaN(stkCandles) || stkCandles < 1 || stkCandles > 100 ||
+            isNaN(hdgDd) || hdgDd < 1 || hdgDd > 95 ||
+            isNaN(hdgTStart) || hdgTStart < 10 || isNaN(hdgTStep) || hdgTStep < 10 ||
+            isNaN(hdgPartPct) || hdgPartPct < 10 || hdgPartPct > 100 ||
+            isNaN(hdgReb) || hdgReb < 10) {
             toast.error('กรุณาตรวจสอบค่าตัวเลขที่กรอกให้ถูกต้อง');
             return;
         }
@@ -610,6 +646,15 @@ function SmartEACockpitContent() {
                 enable_streak_unlock: enableStreakUnlock,
                 streak_unlock_trades: stkTrades,
                 streak_unlock_candles: stkCandles,
+                enable_auto_hedge: enableAutoHedge,
+                hedge_dd_percent: hdgDd,
+                enable_hedge_trailing: enableHedgeTrailing,
+                hedge_trail_start_pts: hdgTStart,
+                hedge_trail_step_pts: hdgTStep,
+                enable_hedge_partial: enableHedgePartial,
+                hedge_partial_pct: hdgPartPct,
+                hedge_rebound_pts: hdgReb,
+                enable_hedge_offset: enableHedgeOffset,
                 close_all: false,
             },
             'ส่งค่า Setting ใหม่ไปยัง EA แล้ว! ระบบกำลังลบ Pending เก่าและสร้างระยะใหม่...'
@@ -1541,6 +1586,178 @@ function SmartEACockpitContent() {
                                                         })}
                                                         className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
                                                     />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 9. Auto Hedge & 3-Mode Unhedge Protection Box */}
+                                        <div className="space-y-2.5 col-span-2 rounded-lg border border-emerald-500/30 bg-slate-950/50 p-2.5 sm:p-3">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-xs sm:text-sm font-semibold text-emerald-300 truncate block">
+                                                        <span className="sm:hidden">Auto Hedge &amp; Unhedge (DD%)</span>
+                                                        <span className="hidden sm:inline">ระบบ Auto Hedge &amp; ปลด Hedge 3 แนวทาง (% DD ของพอร์ต)</span>
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableAutoHedge ? 'default' : 'outline'}
+                                                    onClick={() => setEnableAutoHedge((v) => !v)}
+                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{enableAutoHedge ? 'ON' : 'OFF'}</span>
+                                                    <span className="hidden sm:inline">{enableAutoHedge ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                </Button>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">เข้า Hedge ที่ DD (%)</span>
+                                                        <span className="hidden sm:inline">เข้า Hedge เมื่อติดลบถึง (% ของ Balance)</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableAutoHedge}
+                                                        value={hedgeDDPercent}
+                                                        onClick={() => enableAutoHedge && openParamModal({
+                                                            title: 'เข้า HEDGE ที่ DD (%)',
+                                                            unit: '%',
+                                                            currentVal: parseFloat(hedgeDDPercent) || 20,
+                                                            step: 1,
+                                                            presetValues: [5, 10, 15, 20, 25, 30, 40, 50, 60, 70],
+                                                            quickSteps: [-5, -1, 1, 5],
+                                                            onApply: (v) => setHedgeDDPercent(String(Math.max(1, Math.min(95, Math.round(v * 10) / 10)))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-emerald-200 h-8 sm:h-9 cursor-pointer hover:border-emerald-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col justify-end">
+                                                    <div className="flex items-center justify-between gap-1 rounded border border-slate-800/80 bg-slate-900/40 px-2 h-8 sm:h-9">
+                                                        <span className="text-[10px] sm:text-[11px] text-slate-300 truncate">C: ตัดไม้ดอยทีละคู่</span>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant={enableHedgeOffset ? 'default' : 'outline'}
+                                                            disabled={!enableAutoHedge}
+                                                            onClick={() => setEnableHedgeOffset((v) => !v)}
+                                                            className="h-5 sm:h-6 px-1.5 text-[10px] font-mono shrink-0"
+                                                        >
+                                                            {enableHedgeOffset ? 'ON' : 'OFF'}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Mode A: Trailing Lock */}
+                                            <div className="rounded border border-slate-800/80 bg-slate-900/30 p-2 space-y-1.5">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-[11px] font-medium text-cyan-300 truncate">A: Trailing Lock บนกำไรไม้ Hedge</span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={enableHedgeTrailing ? 'default' : 'outline'}
+                                                        disabled={!enableAutoHedge}
+                                                        onClick={() => setEnableHedgeTrailing((v) => !v)}
+                                                        className="h-5 sm:h-6 px-2 text-[10px] font-mono shrink-0"
+                                                    >
+                                                        {enableHedgeTrailing ? 'ON' : 'OFF'}
+                                                    </Button>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <Label className="text-[10px] text-muted-foreground block mb-0.5">เริ่ม Trail (Points)</Label>
+                                                        <Input
+                                                            readOnly
+                                                            disabled={!enableAutoHedge || !enableHedgeTrailing}
+                                                            value={hedgeTrailStartPts}
+                                                            onClick={() => enableAutoHedge && enableHedgeTrailing && openParamModal({
+                                                                title: 'เริ่ม TRAILING HEDGE (POINTS)',
+                                                                unit: 'pt',
+                                                                currentVal: parseInt(hedgeTrailStartPts, 10) || 300,
+                                                                step: 50,
+                                                                presetValues: [100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000],
+                                                                quickSteps: [-100, -50, 50, 100],
+                                                                onApply: (v) => setHedgeTrailStartPts(String(Math.max(10, Math.round(v)))),
+                                                            })}
+                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-7 sm:h-8 cursor-pointer text-xs font-bold"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-[10px] text-muted-foreground block mb-0.5">ระยะ Trail Step (Points)</Label>
+                                                        <Input
+                                                            readOnly
+                                                            disabled={!enableAutoHedge || !enableHedgeTrailing}
+                                                            value={hedgeTrailStepPts}
+                                                            onClick={() => enableAutoHedge && enableHedgeTrailing && openParamModal({
+                                                                title: 'ระยะ TRAIL STEP (POINTS)',
+                                                                unit: 'pt',
+                                                                currentVal: parseInt(hedgeTrailStepPts, 10) || 150,
+                                                                step: 25,
+                                                                presetValues: [50, 100, 150, 200, 250, 300, 400, 500],
+                                                                quickSteps: [-50, -25, 25, 50],
+                                                                onApply: (v) => setHedgeTrailStepPts(String(Math.max(10, Math.round(v)))),
+                                                            })}
+                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-7 sm:h-8 cursor-pointer text-xs font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Mode B: Partial Unhedge + Re-Hedge Guard */}
+                                            <div className="rounded border border-slate-800/80 bg-slate-900/30 p-2 space-y-1.5">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-[11px] font-medium text-amber-300 truncate">B: ทยอยปลดเมื่อเด้ง + Re-Hedge Guard</span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={enableHedgePartial ? 'default' : 'outline'}
+                                                        disabled={!enableAutoHedge}
+                                                        onClick={() => setEnableHedgePartial((v) => !v)}
+                                                        className="h-5 sm:h-6 px-2 text-[10px] font-mono shrink-0"
+                                                    >
+                                                        {enableHedgePartial ? 'ON' : 'OFF'}
+                                                    </Button>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <Label className="text-[10px] text-muted-foreground block mb-0.5">สัดส่วนปลด (%)</Label>
+                                                        <Input
+                                                            readOnly
+                                                            disabled={!enableAutoHedge || !enableHedgePartial}
+                                                            value={hedgePartialPct}
+                                                            onClick={() => enableAutoHedge && enableHedgePartial && openParamModal({
+                                                                title: 'สัดส่วนปลด HEDGE (%)',
+                                                                unit: '%',
+                                                                currentVal: parseFloat(hedgePartialPct) || 50,
+                                                                step: 10,
+                                                                presetValues: [20, 25, 30, 40, 50, 60, 75, 100],
+                                                                quickSteps: [-25, -10, 10, 25],
+                                                                onApply: (v) => setHedgePartialPct(String(Math.max(10, Math.min(100, Math.round(v))))),
+                                                            })}
+                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-7 sm:h-8 cursor-pointer text-xs font-bold"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-[10px] text-muted-foreground block mb-0.5">ระยะเด้งยืนยัน (Points)</Label>
+                                                        <Input
+                                                            readOnly
+                                                            disabled={!enableAutoHedge || !enableHedgePartial}
+                                                            value={hedgeReboundPts}
+                                                            onClick={() => enableAutoHedge && enableHedgePartial && openParamModal({
+                                                                title: 'ระยะเด้งยืนยันปลด HEDGE (POINTS)',
+                                                                unit: 'pt',
+                                                                currentVal: parseInt(hedgeReboundPts, 10) || 250,
+                                                                step: 50,
+                                                                presetValues: [100, 150, 200, 250, 300, 400, 500, 750, 1000],
+                                                                quickSteps: [-100, -50, 50, 100],
+                                                                onApply: (v) => setHedgeReboundPts(String(Math.max(10, Math.round(v)))),
+                                                            })}
+                                                            className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-7 sm:h-8 cursor-pointer text-xs font-bold"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
