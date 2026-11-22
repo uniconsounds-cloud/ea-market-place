@@ -27,11 +27,14 @@ interface FreezeExitPlannerProps {
     spacingPoints: number;
     initialLot: number;
     lotIncrement: number;
+    stepLotRepeat?: number;
     currentTp: number;
     currentSl: number;
+    enableAutoHedge?: boolean;
+    currentHedgeDdPct?: number;
     chart?: SmartChartData | null;
     sending?: boolean;
-    onApply: (newTp: number, newSl: number) => void;
+    onApply: (newTp: number, newSl: number, newHedgeDdPct?: number) => void;
 }
 
 interface SimPoint {
@@ -55,14 +58,18 @@ export default function FreezeExitPlanner({
     spacingPoints,
     initialLot,
     lotIncrement,
+    stepLotRepeat = 2,
     currentTp,
     currentSl,
+    enableAutoHedge = false,
+    currentHedgeDdPct = 20,
     chart,
     sending = false,
     onApply,
 }: FreezeExitPlannerProps) {
     const [draftTp, setDraftTp] = useState<number>(currentTp);
     const [draftSl, setDraftSl] = useState<number>(currentSl);
+    const [draftHedgeDd, setDraftHedgeDd] = useState<number>(currentHedgeDdPct);
     const [activeMode, setActiveMode] = useState<'TP' | 'SL'>('SL');
     const [rangePts, setRangePts] = useState<number>(2000);
     const [showBuyOrders, setShowBuyOrders] = useState<boolean>(true);
@@ -72,8 +79,9 @@ export default function FreezeExitPlanner({
         if (open) {
             setDraftTp(currentTp);
             setDraftSl(currentSl);
+            setDraftHedgeDd(currentHedgeDdPct);
         }
-    }, [open, currentTp, currentSl]);
+    }, [open, currentTp, currentSl, currentHedgeDdPct]);
 
     const digits = chart?.digits ?? 2;
     const pointSize = Math.pow(10, -digits);
@@ -137,9 +145,10 @@ export default function FreezeExitPlanner({
             let idx = openBuy + futureBuys.length;
             const maxUp = basePrice + rangePts * pointSize;
             let p = lastBuyP + spacingPoints * pointSize;
+            const rep = Math.max(1, stepLotRepeat);
             while (p <= maxUp && futureBuys.length < 40) {
                 idx++;
-                futureBuys.push({ p, l: initialLot + (idx - 1) * lotIncrement });
+                futureBuys.push({ p, l: initialLot + Math.floor((idx - 1) / rep) * lotIncrement });
                 p += spacingPoints * pointSize;
             }
         }
@@ -155,9 +164,10 @@ export default function FreezeExitPlanner({
             let idx = openSell + futureSells.length;
             const minDown = basePrice - rangePts * pointSize;
             let p = lastSellP - spacingPoints * pointSize;
+            const rep = Math.max(1, stepLotRepeat);
             while (p >= minDown && futureSells.length < 40) {
                 idx++;
-                futureSells.push({ p, l: initialLot + (idx - 1) * lotIncrement });
+                futureSells.push({ p, l: initialLot + Math.floor((idx - 1) / rep) * lotIncrement });
                 p -= spacingPoints * pointSize;
             }
         }
@@ -320,6 +330,11 @@ export default function FreezeExitPlanner({
 
     const tpMatch = useMemo(() => findClosestPoint(draftTp), [sim.points, draftTp]);
     const slMatch = useMemo(() => (draftSl < 0 ? findClosestPoint(draftSl) : null), [sim.points, draftSl]);
+    const hedgeTargetMoney = balance > 0 ? -(balance * (draftHedgeDd / 100)) : 0;
+    const hedgeMatch = useMemo(
+        () => (enableAutoHedge && hedgeTargetMoney < 0 ? findClosestPoint(hedgeTargetMoney) : null),
+        [enableAutoHedge, hedgeTargetMoney, sim.points]
+    );
 
     // Smart recommended values
     const recSlBeyondMaxDd = Math.min(-1, Math.round(sim.maxDdPt.pnl * 1.15));
@@ -574,6 +589,25 @@ export default function FreezeExitPlanner({
                             </g>
                         )}
 
+                        {/* Selected Hedge Trigger Line */}
+                        {enableAutoHedge && hedgeMatch && (
+                            <g>
+                                <line
+                                    x1={PAD_L}
+                                    y1={yForPts(hedgeMatch.deltaPts)}
+                                    x2={W - PAD_R}
+                                    y2={yForPts(hedgeMatch.deltaPts)}
+                                    stroke="#a855f7"
+                                    strokeWidth="1.6"
+                                    strokeDasharray="5 3"
+                                />
+                                <circle cx={xForPnl(hedgeMatch.pnl)} cy={yForPts(hedgeMatch.deltaPts)} r="4" fill="#a855f7" />
+                                <text x={W - PAD_R - 4} y={yForPts(hedgeMatch.deltaPts) - 4} fill="#d8b4fe" fontSize="8.5" fontWeight="bold" textAnchor="end" fontFamily="monospace">
+                                    HEDGE -{draftHedgeDd}% ({hedgeMatch.deltaPts > 0 ? `+${hedgeMatch.deltaPts}` : hedgeMatch.deltaPts}pt)
+                                </text>
+                            </g>
+                        )}
+
                         {/* Selected TP Horizontal Line */}
                         {tpMatch && (
                             <g className={willTriggerTpNow ? 'animate-pulse' : ''}>
@@ -749,6 +783,47 @@ export default function FreezeExitPlanner({
                     </div>
                 </div>
 
+                {/* Auto Hedge DD% Controls (Visible when Auto Hedge is enabled) */}
+                {enableAutoHedge && (
+                    <div className="rounded-xl border border-purple-500/35 bg-purple-950/20 p-2.5 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className="flex items-center gap-1 font-bold text-purple-300">
+                                HEDGE TRIGGER: -{draftHedgeDd}% ({Math.round(hedgeTargetMoney)} {currency})
+                            </span>
+                            <span className="text-[10px] text-purple-200/85">
+                                {hedgeMatch
+                                    ? `~${hedgeMatch.price.toFixed(digits)} (${hedgeMatch.deltaPts > 0 ? `+${hedgeMatch.deltaPts}` : hedgeMatch.deltaPts} pt)`
+                                    : 'นอกช่วงกราฟจำลอง'}
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            min={5}
+                            max={60}
+                            step={0.5}
+                            value={draftHedgeDd}
+                            onChange={(e) => setDraftHedgeDd(Number(e.target.value))}
+                            className="w-full accent-purple-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                        />
+                        <div className="flex flex-wrap gap-1.5">
+                            {[15, 20, 25, 30, 35].map((pct) => (
+                                <Button
+                                    key={pct}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setDraftHedgeDd(pct)}
+                                    className={`h-6 text-[10px] px-2 border-purple-500/40 hover:bg-purple-500/20 ${
+                                        draftHedgeDd === pct ? 'bg-purple-500/30 text-white' : 'text-purple-200'
+                                    }`}
+                                >
+                                    -{pct}%
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Instant Close Warning Banner (Blinking alert when TP or Freeze SL will fire immediately) */}
                 {(willTriggerImmediately || willTriggerSlOnFreeze) && (
                     <div
@@ -825,7 +900,7 @@ export default function FreezeExitPlanner({
                         size="sm"
                         disabled={sending}
                         onClick={() => {
-                            onApply(draftTp, draftSl);
+                            onApply(draftTp, draftSl, enableAutoHedge ? draftHedgeDd : undefined);
                             onOpenChange(false);
                         }}
                         className={`font-bold hover:opacity-95 text-xs px-4 ${

@@ -21,6 +21,8 @@ export interface SmartChartData {
     buy_pnl?: number;
     sell_pnl?: number;
     est_tp_price: number;
+    est_sl_price?: number;
+    est_hedge_price?: number;
     tp_dir: 'UP' | 'DOWN' | 'HEDGED' | 'NONE' | string;
     freeze_price: number;
     candles: [number, number, number, number, number][]; // [time, open, high, low, close]
@@ -417,6 +419,8 @@ export function SmartVortexChart({
                     renderPriceLine(tpLevels.priceTp0, '#38bdf8', 'TP 0 (BE)', true, 1.2)}
                 {(chart.tp_dir === 'UP' || chart.tp_dir === 'DOWN') && chart.est_tp_price > 0 &&
                     renderPriceLine(chart.est_tp_price, '#22c55e', `TP (${targetProfit})`, false, 1.8)}
+                {chart.est_hedge_price && chart.est_hedge_price > 0 &&
+                    renderPriceLine(chart.est_hedge_price, '#a855f7', 'HEDGE LINE', false, 1.6)}
                 {renderPriceLine(liveBid, '#e2e8f0', 'BID', true, 1.0)}
 
                 {/* X-Axis Time Labels */}

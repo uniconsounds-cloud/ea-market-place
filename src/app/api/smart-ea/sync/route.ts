@@ -150,14 +150,20 @@ export async function POST(req: Request) {
                     webConfig.base_freeze_stop_loss !== undefined
                         ? Number(webConfig.base_freeze_stop_loss)
                         : Number(statePayload.active_config?.base_freeze_stop_loss || 0.0);
+                const restoredHdd =
+                    Number(webConfig.base_hedge_dd_percent) >= 1
+                        ? Number(webConfig.base_hedge_dd_percent)
+                        : Number(statePayload.active_config?.base_hedge_dd_percent || 20.0);
 
                 webConfig = {
                     ...webConfig,
                     command_seq: cmdSeq + 1,
                     target_profit: restoredTp,
                     freeze_stop_loss: restoredFsl,
+                    hedge_dd_percent: restoredHdd,
                     base_target_profit: restoredTp,
                     base_freeze_stop_loss: restoredFsl,
+                    base_hedge_dd_percent: restoredHdd,
                     exit_override_active: false,
                     updated_at: nowIso,
                 };

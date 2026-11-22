@@ -47,6 +47,7 @@ interface ActiveConfig {
     pending_per_side: number;
     initial_lot: number;
     lot_increment: number;
+    step_lot_repeat?: number;
     target_profit: number;
     freeze_stop_loss?: number;
     enable_cap_freeze?: boolean;
@@ -56,8 +57,12 @@ interface ActiveConfig {
     enable_streak_unlock?: boolean;
     streak_unlock_trades?: number;
     streak_unlock_candles?: number;
+    enable_single_side_freeze?: boolean;
+    single_side_freeze_trigger?: number;
+    max_orders_per_side?: number;
     enable_auto_hedge?: boolean;
     hedge_dd_percent?: number;
+    base_hedge_dd_percent?: number;
     enable_hedge_trailing?: boolean;
     hedge_trail_start_pts?: number;
     hedge_trail_step_pts?: number;
@@ -348,9 +353,13 @@ function SmartEACockpitContent() {
     const [pendingPerSide, setPendingPerSide] = useState('10');
     const [initialLot, setInitialLot] = useState('0.01');
     const [lotIncrement, setLotIncrement] = useState('0.01');
+    const [stepLotRepeat, setStepLotRepeat] = useState('2');
     const [targetProfit, setTargetProfit] = useState('20');
     const [freezeStopLoss, setFreezeStopLoss] = useState('0');
-    const [enableCapFreeze, setEnableCapFreeze] = useState(true);
+    const [enableSingleSideFreeze, setEnableSingleSideFreeze] = useState(true);
+    const [singleSideFreezeTrigger, setSingleSideFreezeTrigger] = useState('16');
+    const [maxOrdersPerSide, setMaxOrdersPerSide] = useState('24');
+    const [enableCapFreeze, setEnableCapFreeze] = useState(false);
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [freezeFlipMaxExtra, setFreezeFlipMaxExtra] = useState('3');
     const [freezeFlipContinuous, setFreezeFlipContinuous] = useState(true);
@@ -459,6 +468,10 @@ function SmartEACockpitContent() {
                         if (src.pending_per_side !== undefined) setPendingPerSide(String(src.pending_per_side));
                         if (src.initial_lot !== undefined) setInitialLot(String(src.initial_lot));
                         if (src.lot_increment !== undefined) setLotIncrement(String(src.lot_increment));
+                        if (src.step_lot_repeat !== undefined) setStepLotRepeat(String(src.step_lot_repeat));
+                        if (src.enable_single_side_freeze !== undefined) setEnableSingleSideFreeze(Boolean(src.enable_single_side_freeze));
+                        if (src.single_side_freeze_trigger !== undefined) setSingleSideFreezeTrigger(String(src.single_side_freeze_trigger));
+                        if (src.max_orders_per_side !== undefined) setMaxOrdersPerSide(String(src.max_orders_per_side));
                         const baseTpVal = src.base_target_profit !== undefined ? src.base_target_profit : src.target_profit;
                         const baseFslVal = src.base_freeze_stop_loss !== undefined ? src.base_freeze_stop_loss : src.freeze_stop_loss;
                         if (baseTpVal !== undefined) setTargetProfit(String(baseTpVal));
@@ -601,9 +614,12 @@ function SmartEACockpitContent() {
         const pend = parseInt(pendingPerSide, 10);
         const lot = parseFloat(initialLot);
         const inc = parseFloat(lotIncrement);
+        const slr = parseInt(stepLotRepeat, 10);
         const tp = parseFloat(targetProfit);
         const rawFsl = parseFloat(freezeStopLoss);
         const fsl = isNaN(rawFsl) ? 0 : (rawFsl > 0 ? -rawFsl : rawFsl);
+        const ssfTrig = parseInt(singleSideFreezeTrigger, 10);
+        const maxSide = parseInt(maxOrdersPerSide, 10);
         const cap = parseInt(maxBothSidesCap, 10);
         const fmax = parseInt(freezeFlipMaxExtra, 10);
         const stkTrades = parseInt(streakUnlockTrades, 10);
@@ -615,7 +631,10 @@ function SmartEACockpitContent() {
         const hdgReb = parseInt(hedgeReboundPts, 10);
 
         if (isNaN(fDist) || fDist < 10 || isNaN(spc) || spc < 10 || isNaN(pend) || pend < 1 ||
-            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50 ||
+            isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(slr) || slr < 1 || slr > 20 ||
+            isNaN(ssfTrig) || ssfTrig < 0 || ssfTrig > 100 ||
+            isNaN(maxSide) || maxSide < 0 || maxSide > 100 ||
+            isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50 ||
             isNaN(fmax) || fmax < 0 || fmax > 50 ||
             isNaN(stkTrades) || stkTrades < 1 || stkTrades > 50 ||
             isNaN(stkCandles) || stkCandles < 1 || stkCandles > 100 ||
@@ -634,11 +653,15 @@ function SmartEACockpitContent() {
                 pending_per_side: pend,
                 initial_lot: lot,
                 lot_increment: inc,
+                step_lot_repeat: slr,
                 target_profit: tp,
                 freeze_stop_loss: fsl,
                 base_target_profit: tp,
                 base_freeze_stop_loss: fsl,
                 is_exit_override: false,
+                enable_single_side_freeze: enableSingleSideFreeze,
+                single_side_freeze_trigger: ssfTrig,
+                max_orders_per_side: maxSide,
                 enable_cap_freeze: enableCapFreeze,
                 max_both_sides_cap: cap,
                 freeze_flip_max_extra: fmax,
@@ -648,6 +671,7 @@ function SmartEACockpitContent() {
                 streak_unlock_candles: stkCandles,
                 enable_auto_hedge: enableAutoHedge,
                 hedge_dd_percent: hdgDd,
+                base_hedge_dd_percent: hdgDd,
                 enable_hedge_trailing: enableHedgeTrailing,
                 hedge_trail_start_pts: hdgTStart,
                 hedge_trail_step_pts: hdgTStep,
@@ -687,6 +711,10 @@ function SmartEACockpitContent() {
     const activeFreezeSl = isPendingAck && lastCommand?.freeze_stop_loss !== undefined
         ? Number(lastCommand.freeze_stop_loss)
         : (eaState?.active_config?.freeze_stop_loss ?? (parseFloat(freezeStopLoss) || 0));
+    const activeHedgeDdPct = isPendingAck && lastCommand?.hedge_dd_percent !== undefined
+        ? Number(lastCommand.hedge_dd_percent)
+        : (eaState?.active_config?.hedge_dd_percent ?? (parseFloat(hedgeDDPercent) || 20));
+    const activeAutoHedgeEnabled = eaState?.active_config?.enable_auto_hedge ?? enableAutoHedge;
     const activeCap = eaState?.active_config?.max_both_sides_cap ?? (parseInt(maxBothSidesCap, 10) || 7);
 
     // Semantic numeric version comparison: > 0 means latest > current
@@ -1436,6 +1464,93 @@ function SmartEACockpitContent() {
                                             />
                                         </div>
 
+                                        {/* 6B. Step-Lot Repeat (v1.16) */}
+                                        <div className="space-y-1 col-span-2">
+                                            <Label className="text-[11px] text-slate-400 font-mono truncate block">
+                                                <span className="sm:hidden">Step-Lot (ไม้/ขั้น)</span>
+                                                <span className="hidden sm:inline">จำนวนไม้ต่อขั้น Lot (Step-Lot Repeat: 1 = ปกติ, 2 = ขั้นละ 2 ไม้)</span>
+                                            </Label>
+                                            <Input
+                                                readOnly
+                                                value={stepLotRepeat}
+                                                onClick={() => openParamModal({
+                                                    title: 'จำนวนไม้ต่อขั้น LOT (STEP-LOT)',
+                                                    unit: 'ไม้/ขั้น',
+                                                    currentVal: parseInt(stepLotRepeat, 10) || 2,
+                                                    step: 1,
+                                                    presetValues: [1, 2, 3, 4, 5],
+                                                    quickSteps: [-1, 1],
+                                                    onApply: (v) => setStepLotRepeat(String(Math.max(1, Math.min(20, Math.round(v))))),
+                                                })}
+                                                className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                            />
+                                        </div>
+
+                                        {/* 7A. Single-Side Freeze (16) & Hard Max Cap (24) */}
+                                        <div className="space-y-2 col-span-2 rounded-lg border border-sky-500/30 bg-slate-950/40 p-2.5 sm:p-3">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-xs sm:text-sm font-semibold text-sky-300 truncate block">
+                                                        <span className="sm:hidden">Single-Side Freeze &amp; Max Cap</span>
+                                                        <span className="hidden sm:inline">ระบบล็อกฝั่งตรงข้ามเมื่อฝั่งหนึ่งถึงลิมิต + เพดานไม้สูงสุด</span>
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableSingleSideFreeze ? 'default' : 'outline'}
+                                                    onClick={() => setEnableSingleSideFreeze((v) => !v)}
+                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{enableSingleSideFreeze ? 'ON' : 'OFF'}</span>
+                                                    <span className="hidden sm:inline">{enableSingleSideFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">ล็อกฝั่งตรงข้ามที่</span>
+                                                        <span className="hidden sm:inline">ฝั่งใดถึง (ไม้) ล็อกฝั่งตรงข้าม</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableSingleSideFreeze}
+                                                        value={singleSideFreezeTrigger}
+                                                        onClick={() => enableSingleSideFreeze && openParamModal({
+                                                            title: 'ล็อกฝั่งตรงข้ามเมื่อฝั่งใดถึง (ไม้)',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(singleSideFreezeTrigger, 10) || 16,
+                                                            step: 1,
+                                                            presetValues: [10, 12, 14, 15, 16, 18, 20, 24],
+                                                            quickSteps: [-2, -1, 1, 2],
+                                                            onApply: (v) => setSingleSideFreezeTrigger(String(Math.max(1, Math.min(100, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-sky-200 h-8 sm:h-9 cursor-pointer hover:border-sky-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
+                                                        <span className="sm:hidden">จำกัดสูงสุด/ฝั่ง</span>
+                                                        <span className="hidden sm:inline">เพดานสูงสุดต่อฝั่ง (0=ไม่จำกัด)</span>
+                                                    </Label>
+                                                    <Input
+                                                        readOnly
+                                                        value={maxOrdersPerSide}
+                                                        onClick={() => openParamModal({
+                                                            title: 'เพดานไม้สูงสุดต่อฝั่ง (MAX/SIDE)',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(maxOrdersPerSide, 10) || 24,
+                                                            step: 1,
+                                                            presetValues: [0, 15, 18, 20, 22, 24, 26, 28, 30],
+                                                            quickSteps: [-2, -1, 1, 2],
+                                                            onApply: (v) => setMaxOrdersPerSide(String(Math.max(0, Math.min(100, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-sky-200 h-8 sm:h-9 cursor-pointer hover:border-sky-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* 7. One-Side Freeze Setting Box */}
                                         <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
                                             <div className="flex items-center justify-between gap-1.5">
@@ -1801,14 +1916,26 @@ function SmartEACockpitContent() {
                             spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}
                             initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
                             lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
+                            stepLotRepeat={eaState?.active_config?.step_lot_repeat ?? (parseInt(stepLotRepeat, 10) || 2)}
                             currentTp={activeTp}
                             currentSl={activeFreezeSl}
+                            enableAutoHedge={activeAutoHedgeEnabled}
+                            currentHedgeDdPct={activeHedgeDdPct}
                             chart={eaState?.chart}
                             sending={sending}
-                            onApply={(newTp, newSl) => {
+                            onApply={(newTp, newSl, newHedgeDdPct) => {
+                                const payload: Record<string, any> = {
+                                    target_profit: newTp,
+                                    freeze_stop_loss: newSl,
+                                    is_exit_override: true,
+                                    close_all: false,
+                                };
+                                if (newHedgeDdPct !== undefined) {
+                                    payload.hedge_dd_percent = newHedgeDdPct;
+                                }
                                 sendCommand(
-                                    { target_profit: newTp, freeze_stop_loss: newSl, is_exit_override: true, close_all: false },
-                                    `อัปเดตแผนปิดรอบนี้แล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'} (จบรอบนี้จะรีเซ็ตกลับเป็นค่า Setting TP = ${targetProfit} อัตโนมัติ)`
+                                    payload,
+                                    `อัปเดตแผนปิดรอบนี้แล้ว: TP = ${newTp} ${cur} | Freeze SL = ${newSl < 0 ? `${newSl} ${cur}` : 'ปิด'}${newHedgeDdPct !== undefined ? ` | Hedge = -${newHedgeDdPct}%` : ''} (จบรอบนี้จะรีเซ็ตกลับเป็นค่า Setting อัตโนมัติ)`
                                 );
                             }}
                         />

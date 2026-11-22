@@ -85,14 +85,20 @@ export async function GET(req: Request) {
                     command.base_freeze_stop_loss !== undefined
                         ? Number(command.base_freeze_stop_loss)
                         : Number(state.active_config?.base_freeze_stop_loss || 0.0);
+                const restoredHdd =
+                    Number(command.base_hedge_dd_percent) >= 1
+                        ? Number(command.base_hedge_dd_percent)
+                        : Number(state.active_config?.base_hedge_dd_percent || 20.0);
 
                 command = {
                     ...command,
                     command_seq: cmdSeq + 1,
                     target_profit: restoredTp,
                     freeze_stop_loss: restoredFsl,
+                    hedge_dd_percent: restoredHdd,
                     base_target_profit: restoredTp,
                     base_freeze_stop_loss: restoredFsl,
+                    base_hedge_dd_percent: restoredHdd,
                     exit_override_active: false,
                     updated_at: nowIso,
                 };
@@ -167,13 +173,17 @@ export async function POST(req: Request) {
             pending_per_side: 10,
             initial_lot: 0.01,
             lot_increment: 0.01,
+            step_lot_repeat: 2,
             target_profit: 20.0,
             freeze_stop_loss: 0.0,
             base_target_profit: 20.0,
             base_freeze_stop_loss: 0.0,
             exit_override_active: false,
             override_last_closed_time: 0,
-            enable_cap_freeze: true,
+            enable_single_side_freeze: true,
+            single_side_freeze_trigger: 16,
+            max_orders_per_side: 24,
+            enable_cap_freeze: false,
             max_both_sides_cap: 7,
             freeze_flip_max_extra: 3,
             freeze_flip_continuous: true,
@@ -182,6 +192,7 @@ export async function POST(req: Request) {
             streak_unlock_candles: 7,
             enable_auto_hedge: false,
             hedge_dd_percent: 20.0,
+            base_hedge_dd_percent: 20.0,
             enable_hedge_trailing: true,
             hedge_trail_start_pts: 300,
             hedge_trail_step_pts: 150,
@@ -217,6 +228,11 @@ export async function POST(req: Request) {
                 ? Number(prevCmd.base_freeze_stop_loss)
                 : Number(currentState?.active_config?.base_freeze_stop_loss ?? 0.0);
 
+        const prevBaseHdd =
+            Number(prevCmd.base_hedge_dd_percent) >= 1
+                ? Number(prevCmd.base_hedge_dd_percent)
+                : Number(currentState?.active_config?.base_hedge_dd_percent ?? prevCmd.hedge_dd_percent ?? 20.0);
+
         const isExitOverride = Boolean(body.is_exit_override === true);
         const isSettingSave =
             !isExitOverride && (body.target_profit !== undefined || body.base_target_profit !== undefined);
@@ -227,6 +243,10 @@ export async function POST(req: Request) {
             body.freeze_stop_loss !== undefined
                 ? Number(body.freeze_stop_loss)
                 : Number(prevCmd.freeze_stop_loss ?? 0.0);
+        const nextHdd =
+            body.hedge_dd_percent !== undefined
+                ? Number(body.hedge_dd_percent)
+                : Number(prevCmd.hedge_dd_percent ?? 20.0);
 
         const nextBaseTp = isSettingSave
             ? (body.base_target_profit !== undefined ? Number(body.base_target_profit) : nextTp)
@@ -234,6 +254,9 @@ export async function POST(req: Request) {
         const nextBaseFsl = isSettingSave
             ? (body.base_freeze_stop_loss !== undefined ? Number(body.base_freeze_stop_loss) : nextFsl)
             : prevBaseFsl;
+        const nextBaseHdd = isSettingSave
+            ? (body.base_hedge_dd_percent !== undefined ? Number(body.base_hedge_dd_percent) : nextHdd)
+            : prevBaseHdd;
         const nextExitOverrideActive = isExitOverride
             ? true
             : isSettingSave
@@ -251,13 +274,17 @@ export async function POST(req: Request) {
             pending_per_side: body.pending_per_side !== undefined ? Number(body.pending_per_side) : prevCmd.pending_per_side,
             initial_lot: body.initial_lot !== undefined ? Number(body.initial_lot) : prevCmd.initial_lot,
             lot_increment: body.lot_increment !== undefined ? Number(body.lot_increment) : prevCmd.lot_increment,
+            step_lot_repeat: body.step_lot_repeat !== undefined ? Number(body.step_lot_repeat) : (prevCmd.step_lot_repeat ?? 2),
             target_profit: nextTp,
             freeze_stop_loss: nextFsl,
             base_target_profit: nextBaseTp,
             base_freeze_stop_loss: nextBaseFsl,
             exit_override_active: nextExitOverrideActive,
             override_last_closed_time: nextOverrideClosedTime,
-            enable_cap_freeze: body.enable_cap_freeze !== undefined ? Boolean(body.enable_cap_freeze) : (prevCmd.enable_cap_freeze ?? true),
+            enable_single_side_freeze: body.enable_single_side_freeze !== undefined ? Boolean(body.enable_single_side_freeze) : (prevCmd.enable_single_side_freeze ?? true),
+            single_side_freeze_trigger: body.single_side_freeze_trigger !== undefined ? Number(body.single_side_freeze_trigger) : (prevCmd.single_side_freeze_trigger ?? 16),
+            max_orders_per_side: body.max_orders_per_side !== undefined ? Number(body.max_orders_per_side) : (prevCmd.max_orders_per_side ?? 24),
+            enable_cap_freeze: body.enable_cap_freeze !== undefined ? Boolean(body.enable_cap_freeze) : (prevCmd.enable_cap_freeze ?? false),
             max_both_sides_cap: body.max_both_sides_cap !== undefined ? Number(body.max_both_sides_cap) : (prevCmd.max_both_sides_cap ?? 7),
             freeze_flip_max_extra: body.freeze_flip_max_extra !== undefined ? Number(body.freeze_flip_max_extra) : (prevCmd.freeze_flip_max_extra ?? 3),
             freeze_flip_continuous: body.freeze_flip_continuous !== undefined ? Boolean(body.freeze_flip_continuous) : (prevCmd.freeze_flip_continuous ?? true),
@@ -265,7 +292,8 @@ export async function POST(req: Request) {
             streak_unlock_trades: body.streak_unlock_trades !== undefined ? Number(body.streak_unlock_trades) : (prevCmd.streak_unlock_trades ?? 7),
             streak_unlock_candles: body.streak_unlock_candles !== undefined ? Number(body.streak_unlock_candles) : (prevCmd.streak_unlock_candles ?? 7),
             enable_auto_hedge: body.enable_auto_hedge !== undefined ? Boolean(body.enable_auto_hedge) : (prevCmd.enable_auto_hedge ?? false),
-            hedge_dd_percent: body.hedge_dd_percent !== undefined ? Number(body.hedge_dd_percent) : (prevCmd.hedge_dd_percent ?? 20.0),
+            hedge_dd_percent: nextHdd,
+            base_hedge_dd_percent: nextBaseHdd,
             enable_hedge_trailing: body.enable_hedge_trailing !== undefined ? Boolean(body.enable_hedge_trailing) : (prevCmd.enable_hedge_trailing ?? true),
             hedge_trail_start_pts: body.hedge_trail_start_pts !== undefined ? Number(body.hedge_trail_start_pts) : (prevCmd.hedge_trail_start_pts ?? 300),
             hedge_trail_step_pts: body.hedge_trail_step_pts !== undefined ? Number(body.hedge_trail_step_pts) : (prevCmd.hedge_trail_step_pts ?? 150),
