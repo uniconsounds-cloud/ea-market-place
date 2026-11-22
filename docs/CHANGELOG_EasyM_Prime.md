@@ -19,7 +19,27 @@
 
 ## 📋 ประวัติการแก้ไขราย Build (Build History)
 
-### 🔹 [B261027.1] — EasyM Prime v2.10 (Multi-Zone Safety & Carousel Alert Ticker) (Current Production)
+### 🔹 [B261122.1] — EasyM Prime v2.10 (Strict 40% Auto-Hedge Guard, Live :HDG Sync & UF/UC Fix) (Current Production)
+- **ไฟล์ซอร์สโค้ด**: `EasyM_Prime_v210_B261122_1.mq5` / `EasyM_Prime_v210_B261122_1.ex5`
+- **วันที่ปล่อย**: 2026-11-22
+- **ปัญหาที่พบจากหน้างาน (พอร์ต `97053088`)**:
+  - เมื่อ DD รวมพอร์ตแตะ 82.0% (`InpPortfolioDD_Zone4_Hedge`) ระบบ Zone 4 ที่เดิมอยู่ในลูป `for` ได้ไล่เปิดไม้ `:HDG` ให้ครบทุกคู่เงินพร้อมกันใน 2 วินาที (รวมถึง `USDCHF` 2.46% และ `USDCAD` 1.67% ที่ยังไม่ถึงเกณฑ์ 40%)
+  - เมื่อปิดไม้ `:HDG` ด้วยมือบน MT5 สถานะ `g_isHedged[]` ในหน่วยความจำยังไม่ปลดจนกว่าจะรีสตาร์ท EA
+  - บนแถบ `QT:` ของ MT5 ชื่อย่อของ `USDCHF` และ `USDCAD` ซ้ำกันเป็น `UC` ทั้งคู่
+  - บนหน้าเว็บฟาร์ม (`FarmClient.tsx`, แก้ไขใน Commit `ad60e8d`) ลูกแก้ว `EA` นำ `mode_dd` ช่วง Systemic Crisis มาบวกซ้ำกับ `QUAR` จนเกิน 100% (`-130.2%`) และ `totalQuarantineDD` ตัดคำนวณแค่ 3 คู่แรก
+- **รายละเอียดการปรับปรุง**:
+  1. **Strict 40% Single-Pair Auto-Hedge Guard**:
+     - เพิ่มพารามิเตอร์ `InpEnableZone4PortHedge = false` (ค่าเริ่มต้นเป็นปิด) และย้าย Logic การ Hedge ออกจากลูป `for` เพื่อไม่ให้ยิงซ้ำทุกคู่พร้อมกัน
+     - ทั้ง Block 3 และ Zone 4 (กรณีเปิดใช้) บังคับตรวจสอบเงื่อนไข `g_symLossPct[j] >= InpHedgeTriggerPct` (40.0%) และ `InpMaxHedgedSymbols` เสมอ
+  2. **Live `:HDG` Position State Sync**:
+     - เพิ่มการซิงค์ `g_isHedged[]` กับออเดอร์ `:HDG` จริง (`magic + 1000`) ในพอร์ต MT5 ทุกรอบการทำงาน ตรวจจับได้ทันทีทั้งกรณีปิด `:HDG` ด้วยมือและการเปิดใหม่หลังรีสตาร์ท EA
+  3. **Symbol Abbreviation Disambiguation (`ShortSymbol`)**:
+     - แยกชื่อย่อ **`USDCHF` = `UF`** และ **`USDCAD` = `UC`** ชัดเจนบนแถบ `QT:` และ Telemetry
+  4. **Web Farm DD Orb Reconciliation (`FarmClient.tsx` — Commit `ad60e8d`)**:
+     - ให้ `totalQuarantineDD` รวม DD ทุกคู่ที่ถูกขัง/Hedge ครบทั้งหมด และเรียง 3 คู่ DD สูงสุดแสดงบนแปลงขัง
+     - คำนวณ `eaDDPct = totalPortDDPct - manualDDPct` และแยก `activeFarmDDPct` ไม่ให้บวกซ้ำกับ `mode_dd` ช่วง Systemic Crisis
+
+### 🔹 [B261027.1] — EasyM Prime v2.10 (Multi-Zone Safety & Carousel Alert Ticker)
 - **ไฟล์ซอร์สโค้ด**: `EasyM_Prime_v210_B261027_1.mq5` / `EasyM_Prime_v210_B261027_1.ex5`
 - **วันที่ปล่อย**: 2026-10-27
 - **รายละเอียดการปรับปรุง**:
