@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { SmartVortexChart, SmartChartData } from '@/components/smart-vortex-chart';
+import { FreezeRiskRadarCard } from '@/components/smart-ea/FreezeRiskRadarCard';
+import { FreezeWhatIfSimulator } from '@/components/smart-ea/FreezeWhatIfSimulator';
 import RoundHistoryBar, { RoundHistoryTuple } from '@/components/round-history-bar';
 import FreezeExitPlanner from '@/components/freeze-exit-planner';
 import SmartTacticalOverview from '@/components/smart-tactical-overview';
@@ -1779,6 +1781,18 @@ function SmartEACockpitContent() {
                                         </div>
                                     </div>
 
+                                    {/* Modular What-If Simulator (easy to move/remove) */}
+                                    <FreezeWhatIfSimulator
+                                        currency={cur}
+                                        balance={balanceVal}
+                                        firstDistance={parseInt(firstDistance, 10) || 100}
+                                        spacing={parseInt(spacing, 10) || 100}
+                                        initialLot={parseFloat(initialLot) || 0.01}
+                                        lotIncrement={parseFloat(lotIncrement) || 0.01}
+                                        stepLotRepeat={parseInt(stepLotRepeat, 10) || 2}
+                                        hedgeDDPercent={parseFloat(hedgeDDPercent) || 20}
+                                    />
+
                                     {eaState?.active_config && (
                                         <div className="p-2 sm:p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-400 whitespace-nowrap overflow-x-auto">
                                             EA Active: Dist={eaState.active_config.first_distance}pt | Spacing={eaState.active_config.spacing}pt | Pend={eaState.active_config.pending_per_side} | Lot={eaState.active_config.initial_lot}+{eaState.active_config.lot_increment} | TP={eaState.active_config.target_profit}
@@ -2165,6 +2179,28 @@ function SmartEACockpitContent() {
                             pnlJitter={pnlJitter}
                             isOnline={isOnline && !isWaitingFreshData}
                             chart={eaState?.chart}
+                        />
+
+                        {/* Modular Freeze DD Risk Radar (easy to move/remove) */}
+                        <FreezeRiskRadarCard
+                            symbol={eaState?.symbol || 'XAUUSD'}
+                            currency={cur}
+                            balance={balanceVal}
+                            cyclePnl={liveCyclePnl}
+                            openBuy={eaState?.open_buy ?? 0}
+                            openSell={eaState?.open_sell ?? 0}
+                            frozenSide={eaState?.frozen_side}
+                            armedLockTrigger={eaState?.active_config?.armed_lock_trigger ?? (parseInt(armedLockTrigger, 10) || 7)}
+                            lockOppositeAt={eaState?.active_config?.lock_opposite_at ?? (parseInt(lockOppositeAt, 10) || 10)}
+                            targetProfit={activeTp}
+                            freezeStopLoss={eaState?.active_config?.freeze_stop_loss ?? (parseFloat(freezeStopLoss) || 0)}
+                            hedgeDDPercent={eaState?.active_config?.hedge_dd_percent ?? (parseFloat(hedgeDDPercent) || 20)}
+                            enableAutoHedge={eaState?.active_config?.enable_auto_hedge ?? enableAutoHedge}
+                            initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
+                            lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
+                            stepLotRepeat={eaState?.active_config?.step_lot_repeat ?? (parseInt(stepLotRepeat, 10) || 2)}
+                            chart={eaState?.chart}
+                            isOnline={isOnline && !isWaitingFreshData}
                         />
 
                         {/* Cycle History Bar moved to the very bottom */}
