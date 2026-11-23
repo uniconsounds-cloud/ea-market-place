@@ -366,20 +366,20 @@ function SmartEACockpitContent() {
     const [freezeStopLoss, setFreezeStopLoss] = useState('0');
     const [enableSingleSideFreeze, setEnableSingleSideFreeze] = useState(false);
     const [singleSideFreezeTrigger, setSingleSideFreezeTrigger] = useState('16');
-    const [maxOrdersPerSide, setMaxOrdersPerSide] = useState('24');
+    const [maxOrdersPerSide, setMaxOrdersPerSide] = useState('0');
     const [enableArmedLock, setEnableArmedLock] = useState(true);
     const [armedLockTrigger, setArmedLockTrigger] = useState('7');
     const [lockOppositeAt, setLockOppositeAt] = useState('10');
-    const [enableDualEngine, setEnableDualEngine] = useState(true);
+    const [enableDualEngine, setEnableDualEngine] = useState(false);
     const [parkBreakoutPts, setParkBreakoutPts] = useState('500');
     const [parkDDPercent, setParkDDPercent] = useState('12');
-    const [enableInstantPairCut, setEnableInstantPairCut] = useState(true);
-    const [enableHarvestOffset, setEnableHarvestOffset] = useState(true);
+    const [enableInstantPairCut, setEnableInstantPairCut] = useState(false);
+    const [enableHarvestOffset, setEnableHarvestOffset] = useState(false);
     const [enableCapFreeze, setEnableCapFreeze] = useState(false);
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [freezeFlipMaxExtra, setFreezeFlipMaxExtra] = useState('3');
     const [freezeFlipContinuous, setFreezeFlipContinuous] = useState(true);
-    const [enableStreakUnlock, setEnableStreakUnlock] = useState(true);
+    const [enableStreakUnlock, setEnableStreakUnlock] = useState(false);
     const [streakUnlockTrades, setStreakUnlockTrades] = useState('7');
     const [streakUnlockCandles, setStreakUnlockCandles] = useState('7');
     const [enableAutoHedge, setEnableAutoHedge] = useState(false);
@@ -691,22 +691,22 @@ function SmartEACockpitContent() {
                 base_target_profit: tp,
                 base_freeze_stop_loss: fsl,
                 is_exit_override: false,
-                enable_single_side_freeze: enableSingleSideFreeze,
+                enable_single_side_freeze: false,
                 single_side_freeze_trigger: ssfTrig,
                 max_orders_per_side: maxSide,
                 enable_armed_lock: enableArmedLock,
                 armed_lock_trigger: armTrig,
                 lock_opposite_at: lckAt,
-                enable_dual_engine: enableDualEngine,
+                enable_dual_engine: false,
                 park_breakout_pts: prkBo,
                 park_dd_percent: prkDd,
-                enable_instant_pair_cut: enableInstantPairCut,
-                enable_harvest_offset: enableHarvestOffset,
-                enable_cap_freeze: enableCapFreeze,
+                enable_instant_pair_cut: false,
+                enable_harvest_offset: false,
+                enable_cap_freeze: false,
                 max_both_sides_cap: cap,
                 freeze_flip_max_extra: fmax,
                 freeze_flip_continuous: freezeFlipContinuous,
-                enable_streak_unlock: enableStreakUnlock,
+                enable_streak_unlock: false,
                 streak_unlock_trades: stkTrades,
                 streak_unlock_candles: stkCandles,
                 enable_auto_hedge: enableAutoHedge,
@@ -1546,7 +1546,7 @@ function SmartEACockpitContent() {
                                                     <span className="hidden sm:inline">{enableArmedLock ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
                                                 </Button>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                                                 <div>
                                                     <Label className="text-[11px] text-muted-foreground truncate block mb-1">เตรียมล็อกเมื่อครบ (ไม้/ฝั่ง)</Label>
                                                     <Input
@@ -1583,142 +1583,9 @@ function SmartEACockpitContent() {
                                                         className="font-mono bg-slate-950/80 border-slate-800 text-indigo-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
                                                     />
                                                 </div>
-                                            </div>
-                                        </div>
-
-                                        {/* 7A1. Dual-Engine Park & Instant Harvest-Offset (Max 2 Engines) */}
-                                        <div className="space-y-2 col-span-2 rounded-lg border border-teal-500/35 bg-slate-950/45 p-2.5 sm:p-3">
-                                            <div className="flex items-center justify-between gap-1.5">
-                                                <div className="min-w-0">
-                                                    <span className="text-xs sm:text-sm font-semibold text-teal-300 truncate block">
-                                                        <span className="sm:hidden">Dual-Engine Park &amp; Harvest</span>
-                                                        <span className="hidden sm:inline">ระบบ 2 เครื่องยนต์: Park ชุดแรก + ตัดหนี้ทันที (สูงสุด 2 ชุด)</span>
-                                                    </span>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={enableDualEngine ? 'default' : 'outline'}
-                                                    onClick={() => setEnableDualEngine((v) => !v)}
-                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
-                                                >
-                                                    <span className="sm:hidden">{enableDualEngine ? 'ON' : 'OFF'}</span>
-                                                    <span className="hidden sm:inline">{enableDualEngine ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
-                                                </Button>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">Breakout เลยไม้ตรงข้าม (pt)</Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableDualEngine}
-                                                        value={parkBreakoutPts}
-                                                        onClick={() => enableDualEngine && openParamModal({
-                                                            title: 'BREAKOUT PARK BUFFER (POINTS)',
-                                                            unit: 'pt',
-                                                            currentVal: parseInt(parkBreakoutPts, 10) || 500,
-                                                            step: 50,
-                                                            presetValues: [0, 200, 300, 350, 500, 750, 1000],
-                                                            quickSteps: [-100, -50, 50, 100],
-                                                            onApply: (v) => setParkBreakoutPts(String(Math.max(0, Math.min(20000, Math.round(v))))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-teal-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">Safety DD% Cap (%)</Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableDualEngine}
-                                                        value={parkDDPercent}
-                                                        onClick={() => enableDualEngine && openParamModal({
-                                                            title: 'SAFETY PARK DD (%)',
-                                                            unit: '%',
-                                                            currentVal: parseFloat(parkDDPercent) || 12,
-                                                            step: 1,
-                                                            presetValues: [5, 8, 10, 12, 15, 20, 25],
-                                                            quickSteps: [-5, -1, 1, 5],
-                                                            onApply: (v) => setParkDDPercent(String(Math.max(1, Math.min(95, Math.round(v * 10) / 10)))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-teal-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2 pt-0.5">
-                                                <div className="flex items-center justify-between gap-1 rounded border border-slate-800/80 bg-slate-900/40 px-2 h-7 sm:h-8">
-                                                    <span className="text-[10px] sm:text-[11px] text-slate-300 truncate">ตัดคู่ Balance ทันที</span>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant={enableInstantPairCut ? 'default' : 'outline'}
-                                                        disabled={!enableDualEngine}
-                                                        onClick={() => setEnableInstantPairCut((v) => !v)}
-                                                        className="h-5 px-1.5 text-[10px] font-mono shrink-0"
-                                                    >
-                                                        {enableInstantPairCut ? 'ON' : 'OFF'}
-                                                    </Button>
-                                                </div>
-                                                <div className="flex items-center justify-between gap-1 rounded border border-slate-800/80 bg-slate-900/40 px-2 h-7 sm:h-8">
-                                                    <span className="text-[10px] sm:text-[11px] text-slate-300 truncate">เอากำไรชุด 2 ไถ่ถอน</span>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant={enableHarvestOffset ? 'default' : 'outline'}
-                                                        disabled={!enableDualEngine}
-                                                        onClick={() => setEnableHarvestOffset((v) => !v)}
-                                                        className="h-5 px-1.5 text-[10px] font-mono shrink-0"
-                                                    >
-                                                        {enableHarvestOffset ? 'ON' : 'OFF'}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* 7A. Single-Side Freeze (16) & Hard Max Cap (24) */}
-                                        <div className="space-y-2 col-span-2 rounded-lg border border-sky-500/30 bg-slate-950/40 p-2.5 sm:p-3">
-                                            <div className="flex items-center justify-between gap-1.5">
-                                                <div className="min-w-0">
-                                                    <span className="text-xs sm:text-sm font-semibold text-sky-300 truncate block">
-                                                        <span className="sm:hidden">Single-Side Freeze &amp; Max Cap</span>
-                                                        <span className="hidden sm:inline">ระบบล็อกฝั่งตรงข้ามเมื่อฝั่งหนึ่งถึงลิมิต + เพดานไม้สูงสุด</span>
-                                                    </span>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={enableSingleSideFreeze ? 'default' : 'outline'}
-                                                    onClick={() => setEnableSingleSideFreeze((v) => !v)}
-                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
-                                                >
-                                                    <span className="sm:hidden">{enableSingleSideFreeze ? 'ON' : 'OFF'}</span>
-                                                    <span className="hidden sm:inline">{enableSingleSideFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
-                                                </Button>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2 pt-1">
                                                 <div>
                                                     <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                        <span className="sm:hidden">ล็อกฝั่งตรงข้ามที่</span>
-                                                        <span className="hidden sm:inline">ฝั่งใดถึง (ไม้) ล็อกฝั่งตรงข้าม</span>
-                                                    </Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableSingleSideFreeze}
-                                                        value={singleSideFreezeTrigger}
-                                                        onClick={() => enableSingleSideFreeze && openParamModal({
-                                                            title: 'ล็อกฝั่งตรงข้ามเมื่อฝั่งใดถึง (ไม้)',
-                                                            unit: 'ไม้',
-                                                            currentVal: parseInt(singleSideFreezeTrigger, 10) || 16,
-                                                            step: 1,
-                                                            presetValues: [10, 12, 14, 15, 16, 18, 20, 24],
-                                                            quickSteps: [-2, -1, 1, 2],
-                                                            onApply: (v) => setSingleSideFreezeTrigger(String(Math.max(1, Math.min(100, Math.round(v))))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-sky-200 h-8 sm:h-9 cursor-pointer hover:border-sky-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                        <span className="sm:hidden">จำกัดสูงสุด/ฝั่ง</span>
+                                                        <span className="sm:hidden">จำกัดสูงสุด/ฝั่ง (0=ไม่จำกัด)</span>
                                                         <span className="hidden sm:inline">เพดานสูงสุดต่อฝั่ง (0=ไม่จำกัด)</span>
                                                     </Label>
                                                     <Input
@@ -1727,167 +1594,13 @@ function SmartEACockpitContent() {
                                                         onClick={() => openParamModal({
                                                             title: 'เพดานไม้สูงสุดต่อฝั่ง (MAX/SIDE)',
                                                             unit: 'ไม้',
-                                                            currentVal: parseInt(maxOrdersPerSide, 10) || 24,
+                                                            currentVal: parseInt(maxOrdersPerSide, 10) || 0,
                                                             step: 1,
                                                             presetValues: [0, 15, 18, 20, 22, 24, 26, 28, 30],
                                                             quickSteps: [-2, -1, 1, 2],
                                                             onApply: (v) => setMaxOrdersPerSide(String(Math.max(0, Math.min(100, Math.round(v))))),
                                                         })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-sky-200 h-8 sm:h-9 cursor-pointer hover:border-sky-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* 7. One-Side Freeze Setting Box */}
-                                        <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
-                                            <div className="flex items-center justify-between gap-1.5">
-                                                <div className="min-w-0">
-                                                    <span className="text-xs sm:text-sm font-semibold text-rose-300 truncate block">
-                                                        <span className="sm:hidden">One-Side Freeze (Cap)</span>
-                                                        <span className="hidden sm:inline">ระบบป้องกัน One-Side Freeze (ล็อกฝั่งตรงข้ามเมื่อครบทั้ง 2 ฝั่ง)</span>
-                                                    </span>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={enableCapFreeze ? 'default' : 'outline'}
-                                                    onClick={() => setEnableCapFreeze((v) => !v)}
-                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
-                                                >
-                                                    <span className="sm:hidden">{enableCapFreeze ? 'ON' : 'OFF'}</span>
-                                                    <span className="hidden sm:inline">{enableCapFreeze ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
-                                                </Button>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                        <span className="sm:hidden">ไม้เริ่ม Freeze</span>
-                                                        <span className="hidden sm:inline">จำนวนไม้ที่เริ่ม Freeze (ไม้/ฝั่ง)</span>
-                                                    </Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableCapFreeze}
-                                                        value={maxBothSidesCap}
-                                                        onClick={() => enableCapFreeze && openParamModal({
-                                                            title: 'ไม้เริ่ม FREEZE (CAP)',
-                                                            unit: 'ไม้',
-                                                            currentVal: parseInt(maxBothSidesCap, 10) || 7,
-                                                            step: 1,
-                                                            presetValues: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-                                                            quickSteps: [-5, -1, 1, 5],
-                                                            onApply: (v) => setMaxBothSidesCap(String(Math.max(1, Math.round(v)))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                        <span className="sm:hidden">สลับสิทธิ์ถ้าไม่เพิ่ม</span>
-                                                        <span className="hidden sm:inline">สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง (ไม้, 0 = ไม่สลับ)</span>
-                                                    </Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableCapFreeze}
-                                                        value={freezeFlipMaxExtra}
-                                                        onClick={() => enableCapFreeze && openParamModal({
-                                                            title: 'สลับสิทธิ์ถ้าออกเพิ่มไม่ถึง',
-                                                            unit: 'ไม้',
-                                                            currentVal: parseInt(freezeFlipMaxExtra, 10) || 3,
-                                                            step: 1,
-                                                            presetValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
-                                                            quickSteps: [-5, -1, 1, 5],
-                                                            onApply: (v) => setFreezeFlipMaxExtra(String(Math.max(0, Math.round(v)))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between gap-1 pt-1">
-                                                <span className="text-[11px] text-muted-foreground truncate">
-                                                    <span className="sm:hidden">สลับสิทธิ์เมื่อราคาตีกลับ</span>
-                                                    <span className="hidden sm:inline">รูปแบบการสลับสิทธิ์เมื่อราคาตีกลับ</span>
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={!enableCapFreeze}
-                                                    onClick={() => setFreezeFlipContinuous((v) => !v)}
-                                                    className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 shrink-0 font-mono"
-                                                >
-                                                    <span className="sm:hidden">{freezeFlipContinuous ? 'ต่อเนื่อง' : 'ครั้งเดียว'}</span>
-                                                    <span className="hidden sm:inline">{freezeFlipContinuous ? 'สลับต่อเนื่อง (Continuous)' : 'สลับครั้งเดียว (Once)'}</span>
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* 8. Streak Burst Unlock Setting Box */}
-                                        <div className="space-y-2 col-span-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 sm:p-3">
-                                            <div className="flex items-center justify-between gap-1.5">
-                                                <div className="min-w-0">
-                                                    <span className="text-xs sm:text-sm font-semibold text-amber-300 truncate block">
-                                                        <span className="sm:hidden">Streak Burst Unlock (M1)</span>
-                                                        <span className="hidden sm:inline">ปลดล็อกฝั่งตรงข้ามเมื่อออกไม้ต่อเนื่องเร็ว (Streak Unlock M1)</span>
-                                                    </span>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={enableStreakUnlock ? 'default' : 'outline'}
-                                                    onClick={() => setEnableStreakUnlock((v) => !v)}
-                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
-                                                >
-                                                    <span className="sm:hidden">{enableStreakUnlock ? 'ON' : 'OFF'}</span>
-                                                    <span className="hidden sm:inline">{enableStreakUnlock ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
-                                                </Button>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                        <span className="sm:hidden">ไม้ต่อเนื่อง (&gt;=)</span>
-                                                        <span className="hidden sm:inline">จำนวนไม้ต่อเนื่องฝั่งเดียว (ไม้)</span>
-                                                    </Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableStreakUnlock}
-                                                        value={streakUnlockTrades}
-                                                        onClick={() => enableStreakUnlock && openParamModal({
-                                                            title: 'จำนวนไม้ต่อเนื่อง (STREAK)',
-                                                            unit: 'ไม้',
-                                                            currentVal: parseInt(streakUnlockTrades, 10) || 7,
-                                                            step: 1,
-                                                            presetValues: [3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20],
-                                                            quickSteps: [-5, -1, 1, 5],
-                                                            onApply: (v) => setStreakUnlockTrades(String(Math.max(1, Math.min(50, Math.round(v))))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">
-                                                        <span className="sm:hidden">ภายในแท่ง M1 (&lt;=)</span>
-                                                        <span className="hidden sm:inline">ภายในจำนวนแท่งเทียน M1 (แท่ง)</span>
-                                                    </Label>
-                                                    <Input
-                                                        readOnly
-                                                        disabled={!enableStreakUnlock}
-                                                        value={streakUnlockCandles}
-                                                        onClick={() => enableStreakUnlock && openParamModal({
-                                                            title: 'ภายในแท่งเทียน M1',
-                                                            unit: 'แท่ง',
-                                                            currentVal: parseInt(streakUnlockCandles, 10) || 7,
-                                                            step: 1,
-                                                            presetValues: [3, 5, 7, 10, 12, 15, 20, 30, 45, 60],
-                                                            quickSteps: [-5, -1, 1, 5],
-                                                            onApply: (v) => setStreakUnlockCandles(String(Math.max(1, Math.min(100, Math.round(v))))),
-                                                        })}
-                                                        className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-sky-200 h-8 sm:h-9 cursor-pointer hover:border-sky-500/50 select-none text-center sm:text-left font-bold text-xs"
                                                     />
                                                 </div>
                                             </div>
