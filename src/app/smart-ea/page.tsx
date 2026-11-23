@@ -60,6 +60,14 @@ interface ActiveConfig {
     enable_single_side_freeze?: boolean;
     single_side_freeze_trigger?: number;
     max_orders_per_side?: number;
+    enable_armed_lock?: boolean;
+    armed_lock_trigger?: number;
+    lock_opposite_at?: number;
+    enable_dual_engine?: boolean;
+    park_breakout_pts?: number;
+    park_dd_percent?: number;
+    enable_instant_pair_cut?: boolean;
+    enable_harvest_offset?: boolean;
     enable_auto_hedge?: boolean;
     hedge_dd_percent?: number;
     base_hedge_dd_percent?: number;
@@ -356,9 +364,17 @@ function SmartEACockpitContent() {
     const [stepLotRepeat, setStepLotRepeat] = useState('2');
     const [targetProfit, setTargetProfit] = useState('20');
     const [freezeStopLoss, setFreezeStopLoss] = useState('0');
-    const [enableSingleSideFreeze, setEnableSingleSideFreeze] = useState(true);
+    const [enableSingleSideFreeze, setEnableSingleSideFreeze] = useState(false);
     const [singleSideFreezeTrigger, setSingleSideFreezeTrigger] = useState('16');
     const [maxOrdersPerSide, setMaxOrdersPerSide] = useState('24');
+    const [enableArmedLock, setEnableArmedLock] = useState(true);
+    const [armedLockTrigger, setArmedLockTrigger] = useState('7');
+    const [lockOppositeAt, setLockOppositeAt] = useState('10');
+    const [enableDualEngine, setEnableDualEngine] = useState(true);
+    const [parkBreakoutPts, setParkBreakoutPts] = useState('500');
+    const [parkDDPercent, setParkDDPercent] = useState('12');
+    const [enableInstantPairCut, setEnableInstantPairCut] = useState(true);
+    const [enableHarvestOffset, setEnableHarvestOffset] = useState(true);
     const [enableCapFreeze, setEnableCapFreeze] = useState(false);
     const [maxBothSidesCap, setMaxBothSidesCap] = useState('7');
     const [freezeFlipMaxExtra, setFreezeFlipMaxExtra] = useState('3');
@@ -472,6 +488,14 @@ function SmartEACockpitContent() {
                         if (src.enable_single_side_freeze !== undefined) setEnableSingleSideFreeze(Boolean(src.enable_single_side_freeze));
                         if (src.single_side_freeze_trigger !== undefined) setSingleSideFreezeTrigger(String(src.single_side_freeze_trigger));
                         if (src.max_orders_per_side !== undefined) setMaxOrdersPerSide(String(src.max_orders_per_side));
+                        if (src.enable_armed_lock !== undefined) setEnableArmedLock(Boolean(src.enable_armed_lock));
+                        if (src.armed_lock_trigger !== undefined) setArmedLockTrigger(String(src.armed_lock_trigger));
+                        if (src.lock_opposite_at !== undefined) setLockOppositeAt(String(src.lock_opposite_at));
+                        if (src.enable_dual_engine !== undefined) setEnableDualEngine(Boolean(src.enable_dual_engine));
+                        if (src.park_breakout_pts !== undefined) setParkBreakoutPts(String(src.park_breakout_pts));
+                        if (src.park_dd_percent !== undefined) setParkDDPercent(String(src.park_dd_percent));
+                        if (src.enable_instant_pair_cut !== undefined) setEnableInstantPairCut(Boolean(src.enable_instant_pair_cut));
+                        if (src.enable_harvest_offset !== undefined) setEnableHarvestOffset(Boolean(src.enable_harvest_offset));
                         const baseTpVal = src.base_target_profit !== undefined ? src.base_target_profit : src.target_profit;
                         const baseFslVal = src.base_freeze_stop_loss !== undefined ? src.base_freeze_stop_loss : src.freeze_stop_loss;
                         if (baseTpVal !== undefined) setTargetProfit(String(baseTpVal));
@@ -620,6 +644,10 @@ function SmartEACockpitContent() {
         const fsl = isNaN(rawFsl) ? 0 : (rawFsl > 0 ? -rawFsl : rawFsl);
         const ssfTrig = parseInt(singleSideFreezeTrigger, 10);
         const maxSide = parseInt(maxOrdersPerSide, 10);
+        const armTrig = parseInt(armedLockTrigger, 10);
+        const lckAt = parseInt(lockOppositeAt, 10);
+        const prkBo = parseInt(parkBreakoutPts, 10);
+        const prkDd = parseFloat(parkDDPercent);
         const cap = parseInt(maxBothSidesCap, 10);
         const fmax = parseInt(freezeFlipMaxExtra, 10);
         const stkTrades = parseInt(streakUnlockTrades, 10);
@@ -634,6 +662,10 @@ function SmartEACockpitContent() {
             isNaN(lot) || lot <= 0 || isNaN(inc) || inc < 0 || isNaN(slr) || slr < 1 || slr > 20 ||
             isNaN(ssfTrig) || ssfTrig < 0 || ssfTrig > 100 ||
             isNaN(maxSide) || maxSide < 0 || maxSide > 100 ||
+            isNaN(armTrig) || armTrig < 1 || armTrig > 50 ||
+            isNaN(lckAt) || lckAt < armTrig || lckAt > 100 ||
+            isNaN(prkBo) || prkBo < 0 || prkBo > 20000 ||
+            isNaN(prkDd) || prkDd < 1 || prkDd > 95 ||
             isNaN(tp) || isNaN(cap) || cap < 0 || cap > 50 ||
             isNaN(fmax) || fmax < 0 || fmax > 50 ||
             isNaN(stkTrades) || stkTrades < 1 || stkTrades > 50 ||
@@ -662,6 +694,14 @@ function SmartEACockpitContent() {
                 enable_single_side_freeze: enableSingleSideFreeze,
                 single_side_freeze_trigger: ssfTrig,
                 max_orders_per_side: maxSide,
+                enable_armed_lock: enableArmedLock,
+                armed_lock_trigger: armTrig,
+                lock_opposite_at: lckAt,
+                enable_dual_engine: enableDualEngine,
+                park_breakout_pts: prkBo,
+                park_dd_percent: prkDd,
+                enable_instant_pair_cut: enableInstantPairCut,
+                enable_harvest_offset: enableHarvestOffset,
                 enable_cap_freeze: enableCapFreeze,
                 max_both_sides_cap: cap,
                 freeze_flip_max_extra: fmax,
@@ -1484,6 +1524,154 @@ function SmartEACockpitContent() {
                                                 })}
                                                 className="font-mono bg-slate-950/80 border-slate-800 text-cyan-200 h-8 sm:h-9 cursor-pointer hover:border-cyan-500/50 select-none text-center sm:text-left font-bold text-xs sm:text-sm"
                                             />
+                                        </div>
+
+                                        {/* 7A0. Unified Armed Lock (7 -> 10) & Dual-Engine Park & Harvest (v1.17) */}
+                                        <div className="space-y-2 col-span-2 rounded-lg border border-indigo-500/35 bg-slate-950/45 p-2.5 sm:p-3">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-xs sm:text-sm font-semibold text-indigo-300 truncate block">
+                                                        <span className="sm:hidden">Armed Lock (7→10)</span>
+                                                        <span className="hidden sm:inline">ระบบล็อกแบบเดียว: ครบ 7 เตรียมล็อก → ทะลุ 10 ล็อกฝั่งตรงข้าม</span>
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableArmedLock ? 'default' : 'outline'}
+                                                    onClick={() => setEnableArmedLock((v) => !v)}
+                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{enableArmedLock ? 'ON' : 'OFF'}</span>
+                                                    <span className="hidden sm:inline">{enableArmedLock ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">เตรียมล็อกเมื่อครบ (ไม้/ฝั่ง)</Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableArmedLock}
+                                                        value={armedLockTrigger}
+                                                        onClick={() => enableArmedLock && openParamModal({
+                                                            title: 'เตรียมล็อกเมื่อครบ (ไม้/ฝั่ง)',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(armedLockTrigger, 10) || 7,
+                                                            step: 1,
+                                                            presetValues: [5, 6, 7, 8, 9, 10, 12],
+                                                            quickSteps: [-2, -1, 1, 2],
+                                                            onApply: (v) => setArmedLockTrigger(String(Math.max(1, Math.min(50, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-indigo-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">ล็อกฝั่งตรงข้ามเมื่อทะลุ (ไม้)</Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableArmedLock}
+                                                        value={lockOppositeAt}
+                                                        onClick={() => enableArmedLock && openParamModal({
+                                                            title: 'ล็อกฝั่งตรงข้ามเมื่อฝั่งนำถึง (ไม้)',
+                                                            unit: 'ไม้',
+                                                            currentVal: parseInt(lockOppositeAt, 10) || 10,
+                                                            step: 1,
+                                                            presetValues: [8, 9, 10, 11, 12, 14, 16],
+                                                            quickSteps: [-2, -1, 1, 2],
+                                                            onApply: (v) => setLockOppositeAt(String(Math.max(parseInt(armedLockTrigger, 10) || 7, Math.min(100, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-indigo-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 7A1. Dual-Engine Park & Instant Harvest-Offset (Max 2 Engines) */}
+                                        <div className="space-y-2 col-span-2 rounded-lg border border-teal-500/35 bg-slate-950/45 p-2.5 sm:p-3">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-xs sm:text-sm font-semibold text-teal-300 truncate block">
+                                                        <span className="sm:hidden">Dual-Engine Park &amp; Harvest</span>
+                                                        <span className="hidden sm:inline">ระบบ 2 เครื่องยนต์: Park ชุดแรก + ตัดหนี้ทันที (สูงสุด 2 ชุด)</span>
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={enableDualEngine ? 'default' : 'outline'}
+                                                    onClick={() => setEnableDualEngine((v) => !v)}
+                                                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs shrink-0 font-mono"
+                                                >
+                                                    <span className="sm:hidden">{enableDualEngine ? 'ON' : 'OFF'}</span>
+                                                    <span className="hidden sm:inline">{enableDualEngine ? 'เปิดใช้งาน (ON)' : 'ปิดใช้งาน (OFF)'}</span>
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">Breakout เลยไม้ตรงข้าม (pt)</Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableDualEngine}
+                                                        value={parkBreakoutPts}
+                                                        onClick={() => enableDualEngine && openParamModal({
+                                                            title: 'BREAKOUT PARK BUFFER (POINTS)',
+                                                            unit: 'pt',
+                                                            currentVal: parseInt(parkBreakoutPts, 10) || 500,
+                                                            step: 50,
+                                                            presetValues: [0, 200, 300, 350, 500, 750, 1000],
+                                                            quickSteps: [-100, -50, 50, 100],
+                                                            onApply: (v) => setParkBreakoutPts(String(Math.max(0, Math.min(20000, Math.round(v))))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-teal-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-[11px] text-muted-foreground truncate block mb-1">Safety DD% Cap (%)</Label>
+                                                    <Input
+                                                        readOnly
+                                                        disabled={!enableDualEngine}
+                                                        value={parkDDPercent}
+                                                        onClick={() => enableDualEngine && openParamModal({
+                                                            title: 'SAFETY PARK DD (%)',
+                                                            unit: '%',
+                                                            currentVal: parseFloat(parkDDPercent) || 12,
+                                                            step: 1,
+                                                            presetValues: [5, 8, 10, 12, 15, 20, 25],
+                                                            quickSteps: [-5, -1, 1, 5],
+                                                            onApply: (v) => setParkDDPercent(String(Math.max(1, Math.min(95, Math.round(v * 10) / 10)))),
+                                                        })}
+                                                        className="font-mono bg-slate-950/80 border-slate-800 text-teal-200 h-8 sm:h-9 cursor-pointer text-xs font-bold"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pt-0.5">
+                                                <div className="flex items-center justify-between gap-1 rounded border border-slate-800/80 bg-slate-900/40 px-2 h-7 sm:h-8">
+                                                    <span className="text-[10px] sm:text-[11px] text-slate-300 truncate">ตัดคู่ Balance ทันที</span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={enableInstantPairCut ? 'default' : 'outline'}
+                                                        disabled={!enableDualEngine}
+                                                        onClick={() => setEnableInstantPairCut((v) => !v)}
+                                                        className="h-5 px-1.5 text-[10px] font-mono shrink-0"
+                                                    >
+                                                        {enableInstantPairCut ? 'ON' : 'OFF'}
+                                                    </Button>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-1 rounded border border-slate-800/80 bg-slate-900/40 px-2 h-7 sm:h-8">
+                                                    <span className="text-[10px] sm:text-[11px] text-slate-300 truncate">เอากำไรชุด 2 ไถ่ถอน</span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={enableHarvestOffset ? 'default' : 'outline'}
+                                                        disabled={!enableDualEngine}
+                                                        onClick={() => setEnableHarvestOffset((v) => !v)}
+                                                        className="h-5 px-1.5 text-[10px] font-mono shrink-0"
+                                                    >
+                                                        {enableHarvestOffset ? 'ON' : 'OFF'}
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* 7A. Single-Side Freeze (16) & Hard Max Cap (24) */}
