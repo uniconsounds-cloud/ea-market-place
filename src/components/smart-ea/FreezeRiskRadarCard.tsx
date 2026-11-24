@@ -25,6 +25,7 @@ export interface FreezeRiskRadarCardProps {
     stepLotRepeat?: number;
     chart?: SmartChartData | null;
     isOnline?: boolean;
+    isScanning?: boolean;
 }
 
 function calcStepLotSum(count: number, initLot: number, inc: number, repeat: number): number {
@@ -55,6 +56,7 @@ export function FreezeRiskRadarCard({
     stepLotRepeat = 2,
     chart,
     isOnline = false,
+    isScanning = false,
 }: FreezeRiskRadarCardProps) {
     const [collapsed, setCollapsed] = useState(false);
 
@@ -266,7 +268,8 @@ export function FreezeRiskRadarCard({
                     </div>
 
                     {/* DD Forecast Curve */}
-                    <div className="rounded-lg bg-slate-950/80 border border-slate-800/90 p-2">
+                    <div className="relative overflow-hidden rounded-lg bg-slate-950/80 border border-slate-800/90 p-2">
+                        {isScanning && <div className="sv-scan-beam" aria-hidden="true" />}
                         <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
                             <span>จำลอง DD หากราคาย้อนกลับเข้าหาฝั่ง Freeze (0 → -3,000 pt)</span>
                             {!metrics.hasOrderLots && (openBuy > 0 || openSell > 0) && (

@@ -926,7 +926,7 @@ function SmartEACockpitContent() {
             ) : (
                 <>
                     {/* 🎛️ Unified Top Cockpit Card: Clock + Telemetry + Version + Tactical Status (LINK / CFG / MODE) */}
-                    <div className={`rounded-xl border border-cyan-500/30 bg-gradient-to-r from-[#070d1c] via-[#061224] to-[#070d1c] p-2.5 sm:p-3 shadow-[0_0_24px_rgba(6,182,212,0.12)] space-y-2 transition-all duration-500 ${isWaitingFreshData ? 'opacity-70 grayscale animate-pulse' : ''}`}>
+                    <div className="rounded-xl border border-cyan-500/30 bg-gradient-to-r from-[#070d1c] via-[#061224] to-[#070d1c] p-2.5 sm:p-3 shadow-[0_0_24px_rgba(6,182,212,0.12)] space-y-2 transition-all duration-500">
                         {/* 1. CLOCK & TELEMETRY ROW */}
                         <div className="flex items-center gap-2.5 sm:gap-3.5">
                             {/* Analog Live Clock */}
@@ -1074,9 +1074,9 @@ function SmartEACockpitContent() {
                                 <div className="rounded-lg px-2 py-1 bg-black/45 border border-slate-800 flex items-center justify-between gap-1 text-[10px] sm:text-[11px] min-w-0">
                                     <span className="text-slate-400 shrink-0">LINK:</span>
                                     {isWaitingFreshData ? (
-                                        <span className="text-amber-400 flex items-center gap-1 font-bold animate-pulse truncate" title="แสดงข้อมูลล่าสุดที่บันทึกไว้ และรอ Sync ข้อมูลรอบใหม่จาก MT5">
+                                        <span className="text-amber-400 flex items-center gap-1 font-bold truncate" title="แสดงข้อมูลล่าสุดที่บันทึกไว้ และกำลังปลุก EA เข้าโหมด Live 15 วินาที">
                                             <RefreshCw className="w-2.5 h-2.5 animate-spin shrink-0" />
-                                            <span className="truncate">รอซิงค์ใหม่</span>
+                                            <span className="truncate">กำลังปลุก Live</span>
                                         </span>
                                     ) : isOnline ? (
                                         <span className="text-emerald-400 flex items-center gap-1 font-bold truncate">
@@ -1136,17 +1136,21 @@ function SmartEACockpitContent() {
                     </div>
 
                     {/* 🎛️ New 3-Button Collapsible Action Bar under Card 1: Control | Setting | Exit Planner */}
-                    <div className="rounded-xl border border-cyan-500/30 bg-[#070b16]/95 overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.08)]">
+                    <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-[#070b16]/95 shadow-[0_0_20px_rgba(6,182,212,0.08)]">
+                        {isWaitingFreshData && <div className="sv-scan-beam" aria-hidden="true" />}
                         <div className="grid grid-cols-3 gap-1.5 p-1.5 sm:p-2 bg-[#050914]">
                             {/* Button 1: Control */}
                             <button
                                 type="button"
-                                onClick={() => toggleDrawer('control')}
+                                disabled={isWaitingFreshData}
+                                onClick={() => !isWaitingFreshData && toggleDrawer('control')}
                                 className={cn(
-                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all active:scale-95 border',
-                                    activeDrawer === 'control'
-                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
-                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all border',
+                                    isWaitingFreshData
+                                        ? 'bg-slate-900/60 border-slate-800/80 text-slate-400 opacity-75 cursor-not-allowed'
+                                        : activeDrawer === 'control'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)] active:scale-95'
+                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300 active:scale-95'
                                 )}
                             >
                                 <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -1154,7 +1158,7 @@ function SmartEACockpitContent() {
                                 <ChevronDown
                                     className={cn(
                                         'w-3.5 h-3.5 text-cyan-400/80 transition-transform duration-200 shrink-0',
-                                        activeDrawer === 'control' && 'rotate-180'
+                                        !isWaitingFreshData && activeDrawer === 'control' && 'rotate-180'
                                     )}
                                 />
                             </button>
@@ -1162,12 +1166,15 @@ function SmartEACockpitContent() {
                             {/* Button 2: Setting */}
                             <button
                                 type="button"
-                                onClick={() => toggleDrawer('setting')}
+                                disabled={isWaitingFreshData}
+                                onClick={() => !isWaitingFreshData && toggleDrawer('setting')}
                                 className={cn(
-                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all active:scale-95 border',
-                                    activeDrawer === 'setting'
-                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
-                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all border',
+                                    isWaitingFreshData
+                                        ? 'bg-slate-900/60 border-slate-800/80 text-slate-400 opacity-75 cursor-not-allowed'
+                                        : activeDrawer === 'setting'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)] active:scale-95'
+                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300 active:scale-95'
                                 )}
                             >
                                 <Sliders className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -1175,7 +1182,7 @@ function SmartEACockpitContent() {
                                 <ChevronDown
                                     className={cn(
                                         'w-3.5 h-3.5 text-cyan-400/80 transition-transform duration-200 shrink-0',
-                                        activeDrawer === 'setting' && 'rotate-180'
+                                        !isWaitingFreshData && activeDrawer === 'setting' && 'rotate-180'
                                     )}
                                 />
                             </button>
@@ -1183,12 +1190,15 @@ function SmartEACockpitContent() {
                             {/* Button 3: Exit Planner */}
                             <button
                                 type="button"
-                                onClick={() => toggleDrawer('planner')}
+                                disabled={isWaitingFreshData}
+                                onClick={() => !isWaitingFreshData && toggleDrawer('planner')}
                                 className={cn(
-                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all active:scale-95 border',
-                                    activeDrawer === 'planner'
-                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
-                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                                    'flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs sm:text-sm font-bold transition-all border',
+                                    isWaitingFreshData
+                                        ? 'bg-slate-900/60 border-slate-800/80 text-slate-400 opacity-75 cursor-not-allowed'
+                                        : activeDrawer === 'planner'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.25)] active:scale-95'
+                                        : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 text-slate-300 active:scale-95'
                                 )}
                             >
                                 <Target className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -1196,14 +1206,24 @@ function SmartEACockpitContent() {
                                 <ChevronDown
                                     className={cn(
                                         'w-3.5 h-3.5 text-cyan-400/80 transition-transform duration-200 shrink-0',
-                                        activeDrawer === 'planner' && 'rotate-180'
+                                        !isWaitingFreshData && activeDrawer === 'planner' && 'rotate-180'
                                     )}
                                 />
                             </button>
                         </div>
 
+                        {isWaitingFreshData && (
+                            <div className="px-2.5 py-1 border-t border-cyan-500/20 bg-cyan-950/25 flex items-center justify-between gap-2 font-mono text-[10px] text-cyan-200/90">
+                                <span className="flex items-center gap-1.5 truncate">
+                                    <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin shrink-0" />
+                                    <span className="truncate">กำลังปลุก Live Sync (15s) — ล็อกปุ่มสั่งงานชั่วคราวจนกว่าจะซิงค์ข้อมูลล่าสุด</span>
+                                </span>
+                                <span className="text-[9.5px] text-amber-300 font-bold shrink-0">LOCKED</span>
+                            </div>
+                        )}
+
                         {/* Collapsible Panel 1: Control (Flight Control) */}
-                        {activeDrawer === 'control' && (
+                        {!isWaitingFreshData && activeDrawer === 'control' && (
                             <div className="p-2.5 sm:p-3 border-t border-cyan-500/20 space-y-2 font-mono animate-in fade-in-50 duration-200">
                                 {!isRunning && (
                                     <Button
@@ -1346,7 +1366,7 @@ function SmartEACockpitContent() {
                         )}
 
                         {/* Collapsible Panel 2: Setting (Params Setting) */}
-                        {activeDrawer === 'setting' && (
+                        {!isWaitingFreshData && activeDrawer === 'setting' && (
                             <div className="p-2.5 sm:p-3 border-t border-cyan-500/20 animate-in fade-in-50 duration-200">
                                 <form onSubmit={handleUpdateSettings} className="space-y-2.5 sm:space-y-3 font-mono">
                                     <div className="grid grid-cols-2 gap-2">
@@ -1819,7 +1839,7 @@ function SmartEACockpitContent() {
                         {/* Collapsible Panel 3: Exit Planner */}
                         <FreezeExitPlanner
                             inline
-                            open={activeDrawer === 'planner'}
+                            open={!isWaitingFreshData && activeDrawer === 'planner'}
                             onOpenChange={(open) => setActiveDrawer(open ? 'planner' : null)}
                             symbol={eaState?.symbol || 'XAUUSD'}
                             currency={cur}
@@ -2135,23 +2155,23 @@ function SmartEACockpitContent() {
 
                     {/* Waiting for Fresh Data Banner */}
                     {isWaitingFreshData && (
-                        <div className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-1.5 flex items-center justify-between gap-2 font-mono text-[11px]">
-                            <div className="flex items-center gap-2 text-slate-300">
-                                <RefreshCw className="w-3 h-3 text-amber-400 animate-spin shrink-0" />
+                        <div className="rounded-xl border border-cyan-500/35 bg-cyan-950/25 px-3 py-1.5 flex items-center justify-between gap-2 font-mono text-[11px]">
+                            <div className="flex items-center gap-2 text-cyan-100">
+                                <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin shrink-0" />
                                 <span>
                                     {!isOnline
-                                        ? 'รอสัญญาณจาก MT5 (ตัวเลขเป็นค่าล่าสุดก่อนออฟไลน์)...'
-                                        : 'กำลังรอข้อมูลรอบใหม่จาก MT5 (ปลุกจากโหมด 180s → 15s)...'}
+                                        ? 'แสดงค่าล่าสุดก่อนออฟไลน์ — กำลังรอสัญญาณจาก MT5...'
+                                        : 'กำลังปลุก EA เข้าโหมด Live (60s → 15s) — แสดงตัวเลขล่าสุดระหว่างรอซิงค์'}
                                 </span>
                             </div>
-                            <Badge className="bg-slate-800 text-slate-300 border-slate-700 text-[9.5px] shrink-0 animate-pulse py-0">
-                                WAIT DATA
+                            <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-[9.5px] shrink-0 py-0">
+                                WAKING UP
                             </Badge>
                         </div>
                     )}
 
                     {/* Live M1 Candlestick Chart + Model A + Cycle History at the very bottom */}
-                    <div className={`space-y-1.5 sm:space-y-2 transition-all duration-500 ${isWaitingFreshData ? 'opacity-55 grayscale animate-pulse' : ''}`}>
+                    <div className="space-y-1.5 sm:space-y-2 transition-all duration-500">
                         <SmartVortexChart
                             symbol={eaState?.symbol || 'XAUUSD'}
                             currency={cur}
@@ -2159,6 +2179,7 @@ function SmartEACockpitContent() {
                             targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
                             frozenSide={eaState?.frozen_side}
                             isOnline={isOnline && !isWaitingFreshData}
+                            isScanning={isWaitingFreshData}
                             openBuy={eaState?.open_buy ?? 0}
                             openSell={eaState?.open_sell ?? 0}
                             pendBuy={eaState?.pending_buy ?? 0}
@@ -2178,6 +2199,7 @@ function SmartEACockpitContent() {
                             targetProfit={activeTp}
                             pnlJitter={pnlJitter}
                             isOnline={isOnline && !isWaitingFreshData}
+                            isScanning={isWaitingFreshData}
                             chart={eaState?.chart}
                         />
 
@@ -2201,6 +2223,7 @@ function SmartEACockpitContent() {
                             stepLotRepeat={eaState?.active_config?.step_lot_repeat ?? (parseInt(stepLotRepeat, 10) || 2)}
                             chart={eaState?.chart}
                             isOnline={isOnline && !isWaitingFreshData}
+                            isScanning={isWaitingFreshData}
                         />
 
                         {/* Cycle History Bar moved to the very bottom */}

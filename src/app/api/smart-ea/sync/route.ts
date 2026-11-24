@@ -61,8 +61,8 @@ export async function POST(req: Request) {
             : 0;
         const hasActiveViewer = lastViewedMs > 0 && (Date.now() - lastViewedMs) < 60000;
 
-        // Prime-style Adaptive Sync: 15s when viewer is open, 180s (3 min) in Standby
-        const adaptiveInterval = hasActiveViewer ? 15 : 180;
+        // Prime-style Adaptive Sync: 15s when viewer is open, 60s in Standby for fast wake-up
+        const adaptiveInterval = hasActiveViewer ? 15 : 60;
         const resolvedRoundHistory = body.round_history ?? existingRoundHistory ?? null;
 
         const statePayload = {

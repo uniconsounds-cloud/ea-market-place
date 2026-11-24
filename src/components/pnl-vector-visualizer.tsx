@@ -11,6 +11,7 @@ interface PnlVectorVisualizerProps {
     targetProfit: number;
     pnlJitter: number;
     isOnline?: boolean;
+    isScanning?: boolean;
     chart: SmartChartData | null | undefined;
     mode?: 'all' | 'modelA' | 'modelB';
 }
@@ -21,6 +22,7 @@ export function PnlVectorVisualizer({
     targetProfit,
     pnlJitter,
     isOnline = false,
+    isScanning = false,
     chart,
     mode = 'all',
 }: PnlVectorVisualizerProps) {
@@ -268,7 +270,8 @@ export function PnlVectorVisualizer({
     const netLot = buyLot - sellLot;
 
     const renderModelA = () => (
-        <div className="rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-2.5 sm:p-3 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
+        <div className="relative overflow-hidden rounded-xl border border-cyan-500/25 bg-[#070b16]/95 p-2.5 sm:p-3 shadow-[0_0_24px_rgba(6,182,212,0.06)]">
+            {isScanning && <div className="sv-scan-beam" aria-hidden="true" />}
             <div className="flex items-center justify-between mb-2">
                     <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
                         <GitCommitHorizontal className="w-4 h-4 text-cyan-400" />

@@ -109,6 +109,37 @@
   animation: box-shake 0.5s ease-in-out;
 }
 
+@keyframes sv-scan-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.sv-scan-beam {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.sv-scan-beam::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.06) 35%,
+    rgba(34, 211, 238, 0.24) 50%,
+    rgba(34, 211, 238, 0.06) 65%,
+    transparent 100%
+  );
+  border-right: 1px solid rgba(34, 211, 238, 0.35);
+  animation: sv-scan-sweep 2.2s linear infinite;
+}
+
 /* Faint checkerboard pattern for State 9 (Never connected / Transparent) - 10% brighter */
 .bg-checkerboard {
   background-color: #1c1c20;

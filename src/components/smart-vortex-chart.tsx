@@ -36,6 +36,7 @@ interface SmartVortexChartProps {
     targetProfit: number;
     frozenSide?: string;
     isOnline?: boolean;
+    isScanning?: boolean;
     openBuy?: number;
     openSell?: number;
     pendBuy?: number;
@@ -54,6 +55,7 @@ export function SmartVortexChart({
     targetProfit,
     frozenSide,
     isOnline = false,
+    isScanning = false,
     openBuy = 0,
     openSell = 0,
     pendBuy = 0,
@@ -165,7 +167,8 @@ export function SmartVortexChart({
 
     if (!chart || candles.length === 0 || !layout) {
         return (
-            <Card className="border bg-card/60">
+            <Card className="relative overflow-hidden border bg-card/60">
+                {isScanning && <div className="sv-scan-beam" aria-hidden="true" />}
                 <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base">
                         <CandlestickChart className="w-4 h-4 text-primary" />
@@ -524,7 +527,8 @@ export function SmartVortexChart({
 
             {/* Full-bleed Chart Area: 1:1 Square on Mobile, Wide on Desktop */}
             <CardContent className="p-0">
-                <div className="relative w-full aspect-square sm:aspect-auto bg-[#0b0f19]">
+                <div className="relative w-full aspect-square sm:aspect-auto bg-[#0b0f19] overflow-hidden">
+                    {isScanning && <div className="sv-scan-beam" aria-hidden="true" />}
                     {/* Out-of-range levels docked neatly at TOP edge */}
                     {aboveEdgeLevels.length > 0 && (
                         <div className="absolute top-1.5 left-1.5 right-1.5 z-10 flex flex-wrap gap-1 pointer-events-none font-mono">
