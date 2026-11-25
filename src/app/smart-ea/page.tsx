@@ -379,6 +379,7 @@ function SmartEACockpitContent() {
     const [latestVersion, setLatestVersion] = useState<string>('1.14');
     const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+    const [isFreezeVoteExpanded, setIsFreezeVoteExpanded] = useState(false);
     const [pnlJitter, setPnlJitter] = useState(0);
     const [sessionOpenedAt, setSessionOpenedAt] = useState<number>(() => Date.now());
     const [clockNow, setClockNow] = useState<Date>(() => new Date());
@@ -1924,267 +1925,378 @@ function SmartEACockpitContent() {
                         lastPing={eaState?.last_ping}
                     />
 
-                    {/* One-Side Cap Freeze Banner + Quick TP Rescue (Emergency Protection) */}
-                    {(eaState?.trade_status === 'FROZEN_BUY' || eaState?.trade_status === 'FROZEN_SELL' || eaState?.trade_status === 'FROZEN_7X7' || eaState?.protection_frozen) && (
-                        <div className="rounded-xl border border-rose-500/50 bg-rose-500/10 p-2.5 sm:p-3 space-y-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                <div className="flex items-center gap-2">
-                                    <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-                                    <h3 className="font-bold text-rose-300 text-xs sm:text-sm">
-                                        {eaState?.frozen_side === 'BUY' || eaState?.trade_status === 'FROZEN_BUY'
-                                            ? `One-Side Freeze (${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7}): ฝั่ง Buy ถูกหยุด • ฝั่ง Sell ออกต่อได้`
-                                            : eaState?.frozen_side === 'SELL' || eaState?.trade_status === 'FROZEN_SELL'
-                                            ? `One-Side Freeze (${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7}): ฝั่ง Sell ถูกหยุด • ฝั่ง Buy ออกต่อได้`
-                                            : `ระบบป้องกัน ${eaState?.active_config?.max_both_sides_cap ?? 7}x${eaState?.active_config?.max_both_sides_cap ?? 7} ทำงาน: เข้าสู่สถานะ Freeze`}
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    {(eaState?.freeze_flip_count ?? 0) > 0 && (
-                                        <Badge variant="outline" className="border-amber-400/50 text-amber-300 font-mono text-[10px] py-0">
-                                            Flipped x{eaState?.freeze_flip_count}
-                                        </Badge>
-                                    )}
-                                    <Badge variant="destructive" className="w-fit font-mono text-[10px] py-0">
-                                        Buy {eaState?.open_buy ?? 0} / Sell {eaState?.open_sell ?? 0}
-                                    </Badge>
-                                </div>
-                            </div>
-                            <p className="text-[11px] text-rose-200/90 leading-relaxed">
-                                ทั้งสองฝั่งเปิดครบเกณฑ์แล้ว EA ลบ Pending ฝั่งตรงข้ามออก ส่วนฝั่งที่นับครบยังออกไม้ต่อได้เพื่อลุ้นปิดรวบ หรือปรับ <strong>Target Profit</strong> ด้านล่าง
-                            </p>
-                            <div className="space-y-2 pt-0.5">
-                                {/* Row 1: Freeze SL */}
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[11px] font-mono font-bold text-amber-300 mr-1">
-                                        SL (ปัจจุบัน: {activeFreezeSl < 0 ? `${activeFreezeSl} ${cur}` : 'ปิด'}) :
-                                    </span>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
-                                        onClick={() => {
-                                            sendCommand(
-                                                { freeze_stop_loss: sl500Val, is_exit_override: true, close_all: false },
-                                                `ตั้ง Freeze SL รอบนี้ = ${sl500Val} ${cur} (-500 จุดจากปัจจุบัน, จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
-                                            );
-                                        }}
-                                    >
-                                        SL -500 จุด ({sl500Val})
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
-                                        onClick={() => {
-                                            sendCommand(
-                                                { freeze_stop_loss: slMinus3PctVal, is_exit_override: true, close_all: false },
-                                                `ตั้ง Freeze SL รอบนี้ = ${slMinus3PctVal} ${cur} (-3% พอร์ต, จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
-                                            );
-                                        }}
-                                    >
-                                        SL -3% ({slMinus3PctVal})
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-amber-400/60 text-amber-100 hover:bg-amber-500/25 flex items-center gap-1"
-                                        onClick={() => openParamModal({
-                                            title: `FREEZE STOP LOSS เฉพาะรอบนี้ (${cur})`,
-                                            unit: cur,
-                                            currentVal: Math.min(0, activeFreezeSl),
-                                            step: 50,
-                                            presetValues: [0, sl500Val, slMinus3PctVal, -100, -200, -500, -1000, -2000, -3000, -5000],
-                                            quickSteps: [-500, -100, -10, 10, 100, 500],
-                                            onApply: (v) => {
-                                                const val = v > 0 ? -v : v;
-                                                sendCommand(
-                                                    { freeze_stop_loss: val, is_exit_override: true, close_all: false },
-                                                    val === 0
-                                                        ? 'ปิด Freeze SL รอบนี้แล้ว (ใช้เฉพาะ TP ปกติ)'
-                                                        : `ตั้ง Freeze SL รอบนี้ = ${val} ${cur} แล้ว (จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
-                                                );
-                                            },
-                                        })}
-                                    >
-                                        <Sliders className="w-3 h-3 text-amber-300" />
-                                        ตั้ง SL เอง...
-                                    </Button>
-                                </div>
+                    {/* Always-Visible Compact Rectangular Card: Freeze Status + Vote Council (Expandable on Click) */}
+                    {(() => {
+                        const isFrozenNow = Boolean(
+                            eaState?.trade_status === 'FROZEN_BUY' ||
+                            eaState?.trade_status === 'FROZEN_SELL' ||
+                            eaState?.trade_status === 'FROZEN_7X7' ||
+                            eaState?.protection_frozen
+                        );
+                        const vc = eaState?.vote_council;
+                        const vcEnabled = Boolean(vc && vc.enabled);
+                        const voters = vc?.voters || [];
+                        const scorePct = vc?.score_pct ?? 0;
+                        const passPct = vc?.pass_pct ?? 70;
+                        const passedVote = vcEnabled && scorePct >= passPct;
 
-                                {/* Row 2: Target Profit (TP) */}
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[11px] font-mono font-bold text-cyan-300 mr-1">
-                                        TP (ปัจจุบัน: {activeTp > 0 ? `+${activeTp}` : activeTp} {cur}) :
-                                    </span>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
-                                        onClick={() => {
-                                            sendCommand(
-                                                { target_profit: tpHalfDdVal, is_exit_override: true, close_all: false },
-                                                `ตั้ง Target TP รอบนี้ = ${tpHalfDdVal} ${cur} (จบรอบจะกลับไปใช้ค่า Setting TP = ${targetProfit} อัตโนมัติ)`
-                                            );
-                                        }}
-                                    >
-                                        DD 50% ({tpHalfDdVal})
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
-                                        onClick={() => {
-                                            sendCommand(
-                                                { target_profit: 0, is_exit_override: true, close_all: false },
-                                                `ตั้ง Target TP รอบนี้ = 0 ${cur} (เท่าทุน) แล้ว (จบรอบจะกลับไปใช้ค่า Setting TP = ${targetProfit} อัตโนมัติ)`
-                                            );
-                                        }}
-                                    >
-                                        TP = 0 (เท่าทุน)
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={sending}
-                                        className="h-6 text-[11px] px-2 border-cyan-400/60 text-cyan-100 hover:bg-cyan-500/25 flex items-center gap-1"
-                                        onClick={openCustomTpModal}
-                                    >
-                                        <Sliders className="w-3 h-3 text-cyan-300" />
-                                        ตั้ง TP เอง...
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Vote Council Sub-Panel inside One-Side Freeze Card */}
-                            {eaState?.vote_council && eaState.vote_council.enabled && (
-                                <div className="mt-2.5 pt-2.5 border-t border-rose-500/30 space-y-2">
+                        return (
+                            <div
+                                className={cn(
+                                    'rounded-xl border transition-colors',
+                                    isFrozenNow
+                                        ? 'border-rose-500/50 bg-rose-500/10'
+                                        : 'border-cyan-500/30 bg-slate-900/60'
+                                )}
+                            >
+                                {/* Clickable Rectangular Summary Header */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFreezeVoteExpanded((prev) => !prev)}
+                                    className="w-full text-left p-2.5 sm:p-3 flex flex-col gap-2 cursor-pointer hover:bg-white/[0.02] rounded-xl transition-colors"
+                                >
                                     <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <Activity className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
-                                            <span className="text-xs font-bold text-cyan-200">
-                                                สภาโหวตยืนยันเทรน (Vote Council)
-                                            </span>
-                                            <Badge
-                                                variant="outline"
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            {isFrozenNow ? (
+                                                <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                                            ) : (
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                            )}
+                                            <span
                                                 className={cn(
-                                                    'font-mono text-[10px] py-0',
-                                                    eaState.vote_council.mode === 'BET_ACTIVE'
-                                                        ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
-                                                        : eaState.vote_council.mode === 'ARMED'
-                                                        ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
-                                                        : 'border-slate-500/50 bg-slate-800/60 text-slate-300'
+                                                    'font-bold text-xs sm:text-sm truncate',
+                                                    isFrozenNow ? 'text-rose-300' : 'text-emerald-300'
                                                 )}
                                             >
-                                                {eaState.vote_council.mode === 'BET_ACTIVE'
-                                                    ? `BET ACTIVE (${eaState.vote_council.direction} ${eaState.vote_council.bet_lot.toFixed(2)})`
-                                                    : eaState.vote_council.mode === 'ARMED'
-                                                    ? `ARMED (${eaState.vote_council.direction})`
-                                                    : eaState.vote_council.mode === 'SL_DONE'
-                                                    ? `MAX BETS (${eaState.vote_council.bets_opened}/${eaState.vote_council.max_bets})`
-                                                    : 'WAIT LOCK'}
+                                                {isFrozenNow
+                                                    ? eaState?.frozen_side === 'BUY' || eaState?.trade_status === 'FROZEN_BUY'
+                                                        ? `One-Side Freeze: ฝั่ง Buy หยุด • Sell ออกต่อ`
+                                                        : eaState?.frozen_side === 'SELL' || eaState?.trade_status === 'FROZEN_SELL'
+                                                        ? `One-Side Freeze: ฝั่ง Sell หยุด • Buy ออกต่อ`
+                                                        : `สถานะ Freeze (${activeCap}x${activeCap}) ทำงาน`
+                                                    : `สถานะปกติ (Armed ${eaState?.active_config?.armed_lock_trigger ?? 7}->${eaState?.active_config?.lock_opposite_at ?? 10})`}
+                                            </span>
+                                            <Badge
+                                                variant={isFrozenNow ? 'destructive' : 'outline'}
+                                                className={cn(
+                                                    'font-mono text-[10px] py-0 shrink-0',
+                                                    !isFrozenNow && 'border-slate-600 text-slate-300'
+                                                )}
+                                            >
+                                                B:{eaState?.open_buy ?? 0} / S:{eaState?.open_sell ?? 0}
                                             </Badge>
                                         </div>
-                                        <div className="flex items-center gap-2 font-mono text-[11px]">
-                                            <span className="text-slate-300">
-                                                คะแนน:{' '}
-                                                <strong
-                                                    className={cn(
-                                                        eaState.vote_council.score_pct >= eaState.vote_council.pass_pct
-                                                            ? 'text-emerald-300'
-                                                            : 'text-cyan-300'
-                                                    )}
-                                                >
-                                                    {eaState.vote_council.yes_w}/{eaState.vote_council.total_w} ({eaState.vote_council.score_pct.toFixed(0)}%)
-                                                </strong>
-                                            </span>
-                                            <span className="text-slate-400">
-                                                เกณฑ์ผ่าน {eaState.vote_council.pass_pct.toFixed(0)}%
-                                            </span>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {vcEnabled && vc ? (
+                                                <>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={cn(
+                                                            'font-mono text-[10px] py-0',
+                                                            vc.mode === 'BET_ACTIVE'
+                                                                ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+                                                                : vc.mode === 'ARMED'
+                                                                ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
+                                                                : 'border-slate-600 bg-slate-800/70 text-slate-300'
+                                                        )}
+                                                    >
+                                                        {vc.mode === 'BET_ACTIVE'
+                                                            ? `BET ${vc.direction} ${vc.bet_lot.toFixed(2)}`
+                                                            : vc.mode === 'ARMED'
+                                                            ? `ARMED ${vc.direction}`
+                                                            : vc.mode === 'SL_DONE'
+                                                            ? `MAX ${vc.bets_opened}/${vc.max_bets}`
+                                                            : 'WAIT'}
+                                                    </Badge>
+                                                    <span
+                                                        className={cn(
+                                                            'font-mono font-extrabold text-[11px] px-2 py-0.5 rounded-md border',
+                                                            passedVote
+                                                                ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
+                                                                : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
+                                                        )}
+                                                    >
+                                                        {vc.yes_w}/{vc.total_w} ({scorePct.toFixed(0)}% / {passPct.toFixed(0)}%)
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="text-[10px] font-mono text-slate-400">
+                                                    Vote Council (v2.01+)
+                                                </span>
+                                            )}
+                                            <ChevronDown
+                                                className={cn(
+                                                    'w-4 h-4 text-slate-400 transition-transform duration-200',
+                                                    isFreezeVoteExpanded && 'rotate-180 text-cyan-300'
+                                                )}
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* Score progress bar */}
-                                    <div className="relative h-1.5 w-full rounded-full bg-slate-800/90 overflow-hidden">
-                                        <div
-                                            className={cn(
-                                                'h-full transition-all duration-300',
-                                                eaState.vote_council.score_pct >= eaState.vote_council.pass_pct
-                                                    ? 'bg-emerald-400'
-                                                    : 'bg-cyan-400'
-                                            )}
-                                            style={{ width: `${Math.min(100, Math.max(0, eaState.vote_council.score_pct))}%` }}
-                                        />
-                                    </div>
-
-                                    {/* 6 Voters Grid */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                                        {(eaState.vote_council.voters || []).map((v) => {
-                                            const isYes = v.vote === 'YES';
-                                            const isNo = v.vote === 'NO';
-                                            const isOff = v.vote === 'OFF' || v.weight <= 0;
-                                            return (
-                                                <div
-                                                    key={v.id}
-                                                    className={cn(
-                                                        'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1 text-[11px]',
-                                                        isOff
-                                                            ? 'border-slate-700/60 bg-slate-900/50 text-slate-400'
-                                                            : isYes
-                                                            ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-200'
-                                                            : isNo
-                                                            ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                                                            : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                                                    )}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-mono font-bold leading-tight">
-                                                            {v.id} <span className="text-[10px] opacity-75">w{v.weight}</span>
-                                                        </div>
-                                                        <div className="text-[10px] opacity-80 truncate">{v.label}</div>
-                                                    </div>
+                                    {/* Always-Visible Compact Symbol Row for All 6 Voters */}
+                                    {vcEnabled && voters.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            {voters.map((v) => {
+                                                const isOff = v.vote === 'OFF' || v.weight <= 0;
+                                                const isYes = v.vote === 'YES';
+                                                const isNo = v.vote === 'NO';
+                                                return (
                                                     <span
+                                                        key={v.id}
+                                                        title={`${v.label} (w${v.weight}): ${v.vote}`}
                                                         className={cn(
-                                                            'font-mono font-extrabold text-[10px] px-1.5 py-0.5 rounded shrink-0',
+                                                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-bold',
                                                             isOff
-                                                                ? 'bg-slate-800 text-slate-400'
+                                                                ? 'border-slate-700/70 bg-slate-900/60 text-slate-500'
                                                                 : isYes
-                                                                ? 'bg-emerald-500/30 text-emerald-200'
+                                                                ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
                                                                 : isNo
-                                                                ? 'bg-rose-500/25 text-rose-200'
-                                                                : 'bg-amber-500/25 text-amber-200'
+                                                                ? 'border-rose-500/45 bg-rose-500/15 text-rose-300'
+                                                                : 'border-amber-500/45 bg-amber-500/15 text-amber-300'
                                                         )}
                                                     >
-                                                        {v.vote}
+                                                        {isOff ? (
+                                                            <span className="text-slate-500 font-black">-</span>
+                                                        ) : isYes ? (
+                                                            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                        ) : isNo ? (
+                                                            <XCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                                                        ) : (
+                                                            <Activity className="w-3 h-3 text-amber-400 shrink-0" />
+                                                        )}
+                                                        <span>{v.id}</span>
+                                                        <span className="opacity-70 font-normal">w{v.weight}</span>
+                                                    </span>
+                                                );
+                                            })}
+                                            <span className="ml-auto text-[10px] text-slate-400 hidden sm:inline">
+                                                {isFreezeVoteExpanded ? 'คลิกเพื่อย่อ' : 'คลิกดูรายละเอียด'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </button>
+
+                                {/* Expandable Details Panel */}
+                                {isFreezeVoteExpanded && (
+                                    <div className="px-2.5 sm:px-3 pb-3 pt-2 border-t border-slate-700/50 space-y-2.5">
+                                        {isFrozenNow && (
+                                            <div className="space-y-2">
+                                                <p className="text-[11px] text-rose-200/90 leading-relaxed">
+                                                    ทั้งสองฝั่งเปิดครบเกณฑ์แล้ว EA ลบ Pending ฝั่งตรงข้ามออก ส่วนฝั่งที่นับครบยังออกไม้ต่อได้เพื่อลุ้นปิดรวบ หรือปรับ <strong>Target Profit</strong> ด้านล่าง
+                                                </p>
+                                                {/* Row 1: Freeze SL */}
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className="text-[11px] font-mono font-bold text-amber-300 mr-1">
+                                                        SL (ปัจจุบัน: {activeFreezeSl < 0 ? `${activeFreezeSl} ${cur}` : 'ปิด'}) :
+                                                    </span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={sending}
+                                                        className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
+                                                        onClick={() => {
+                                                            sendCommand(
+                                                                { freeze_stop_loss: sl500Val, is_exit_override: true, close_all: false },
+                                                                `ตั้ง Freeze SL รอบนี้ = ${sl500Val} ${cur} (-500 จุดจากปัจจุบัน, จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
+                                                            );
+                                                        }}
+                                                    >
+                                                        SL -500 จุด ({sl500Val})
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={sending}
+                                                        className="h-6 text-[11px] px-2 border-amber-500/45 text-amber-200 hover:bg-amber-500/20"
+                                                        onClick={() => {
+                                                            sendCommand(
+                                                                { freeze_stop_loss: slMinus3PctVal, is_exit_override: true, close_all: false },
+                                                                `ตั้ง Freeze SL รอบนี้ = ${slMinus3PctVal} ${cur} (-3% พอร์ต, จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
+                                                            );
+                                                        }}
+                                                    >
+                                                        SL -3% ({slMinus3PctVal})
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={sending}
+                                                        className="h-6 text-[11px] px-2 border-amber-400/60 text-amber-100 hover:bg-amber-500/25 flex items-center gap-1"
+                                                        onClick={() => openParamModal({
+                                                            title: `FREEZE STOP LOSS เฉพาะรอบนี้ (${cur})`,
+                                                            unit: cur,
+                                                            currentVal: Math.min(0, activeFreezeSl),
+                                                            step: 50,
+                                                            presetValues: [0, sl500Val, slMinus3PctVal, -100, -200, -500, -1000, -2000, -3000, -5000],
+                                                            quickSteps: [-500, -100, -10, 10, 100, 500],
+                                                            onApply: (v) => {
+                                                                const val = v > 0 ? -v : v;
+                                                                sendCommand(
+                                                                    { freeze_stop_loss: val, is_exit_override: true, close_all: false },
+                                                                    val === 0
+                                                                        ? 'ปิด Freeze SL รอบนี้แล้ว (ใช้เฉพาะ TP ปกติ)'
+                                                                        : `ตั้ง Freeze SL รอบนี้ = ${val} ${cur} แล้ว (จบรอบจะรีเซ็ตตาม Setting อัตโนมัติ)`
+                                                                );
+                                                            },
+                                                        })}
+                                                    >
+                                                        <Sliders className="w-3 h-3 text-amber-300" />
+                                                        ตั้ง SL เอง...
+                                                    </Button>
+                                                </div>
+
+                                                {/* Row 2: Target Profit (TP) */}
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className="text-[11px] font-mono font-bold text-cyan-300 mr-1">
+                                                        TP (ปัจจุบัน: {activeTp > 0 ? `+${activeTp}` : activeTp} {cur}) :
+                                                    </span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={sending}
+                                                        className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
+                                                        onClick={() => {
+                                                            sendCommand(
+                                                                { target_profit: tpHalfDdVal, is_exit_override: true, close_all: false },
+                                                                `ตั้ง Target TP รอบนี้ = ${tpHalfDdVal} ${cur} (จบรอบจะกลับไปใช้ค่า Setting TP = ${targetProfit} อัตโนมัติ)`
+                                                            );
+                                                        }}
+                                                    >
+                                                        DD 50% ({tpHalfDdVal})
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={sending}
+                                                        className="h-6 text-[11px] px-2 border-cyan-500/45 text-cyan-200 hover:bg-cyan-500/20"
+                                                        onClick={() => {
+                                                            sendCommand(
+                                                                { target_profit: 0, is_exit_override: true, close_all: false },
+                                                                `ตั้ง Target TP รอบนี้ = 0 ${cur} (เท่าทุน) แล้ว (จบรอบจะกลับไปใช้ค่า Setting TP = ${targetProfit} อัตโนมัติ)`
+                                                            );
+                                                        }}
+                                                    >
+                                                        TP = 0 (เท่าทุน)
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={sending}
+                                                        className="h-6 text-[11px] px-2 border-cyan-400/60 text-cyan-100 hover:bg-cyan-500/25 flex items-center gap-1"
+                                                        onClick={openCustomTpModal}
+                                                    >
+                                                        <Sliders className="w-3 h-3 text-cyan-300" />
+                                                        ตั้ง TP เอง...
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Detailed Vote Council Grid */}
+                                        {vcEnabled && vc ? (
+                                            <div className={cn('space-y-2', isFrozenNow && 'pt-2 border-t border-rose-500/25')}>
+                                                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                                                    <span className="text-cyan-200 font-bold">
+                                                        รายละเอียดสภา Vote Council (เกณฑ์ผ่าน {passPct.toFixed(0)}%)
+                                                    </span>
+                                                    <span className="text-slate-300">
+                                                        คะแนนรวม:{' '}
+                                                        <strong className={passedVote ? 'text-emerald-300' : 'text-cyan-300'}>
+                                                            {vc.yes_w} / {vc.total_w} ({scorePct.toFixed(0)}%)
+                                                        </strong>
                                                     </span>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
 
-                                    {/* Price Levels Strip */}
-                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-slate-300 pt-0.5">
-                                        {eaState.vote_council.mirror_px > 0 && (
-                                            <span>Mirror: <strong className="text-cyan-300">{eaState.vote_council.mirror_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
-                                        )}
-                                        {eaState.vote_council.trigger_px > 0 && (
-                                            <span>Trigger: <strong className="text-amber-300">{eaState.vote_council.trigger_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
-                                        )}
-                                        {eaState.vote_council.entry_px > 0 && eaState.vote_council.mode === 'BET_ACTIVE' && (
-                                            <span>Entry: <strong className="text-emerald-300">{eaState.vote_council.entry_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
-                                        )}
-                                        {eaState.vote_council.stop_px > 0 && eaState.vote_council.mode === 'BET_ACTIVE' && (
-                                            <span>Smart SL: <strong className="text-rose-300">{eaState.vote_council.stop_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
+                                                <div className="relative h-1.5 w-full rounded-full bg-slate-800/90 overflow-hidden">
+                                                    <div
+                                                        className={cn(
+                                                            'h-full transition-all duration-300',
+                                                            passedVote ? 'bg-emerald-400' : 'bg-cyan-400'
+                                                        )}
+                                                        style={{ width: `${Math.min(100, Math.max(0, scorePct))}%` }}
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                                    {voters.map((v) => {
+                                                        const isYes = v.vote === 'YES';
+                                                        const isNo = v.vote === 'NO';
+                                                        const isOff = v.vote === 'OFF' || v.weight <= 0;
+                                                        return (
+                                                            <div
+                                                                key={v.id}
+                                                                className={cn(
+                                                                    'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1.5 text-[11px]',
+                                                                    isOff
+                                                                        ? 'border-slate-700/60 bg-slate-900/50 text-slate-400'
+                                                                        : isYes
+                                                                        ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-200'
+                                                                        : isNo
+                                                                        ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                                                        : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                                                                )}
+                                                            >
+                                                                <div className="min-w-0">
+                                                                    <div className="font-mono font-bold leading-tight flex items-center gap-1">
+                                                                        {isOff ? (
+                                                                            <span className="text-slate-500">-</span>
+                                                                        ) : isYes ? (
+                                                                            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                                        ) : isNo ? (
+                                                                            <XCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                                                                        ) : (
+                                                                            <Activity className="w-3 h-3 text-amber-400 shrink-0" />
+                                                                        )}
+                                                                        <span>{v.id}</span>
+                                                                        <span className="text-[10px] opacity-75">w{v.weight}</span>
+                                                                    </div>
+                                                                    <div className="text-[10px] opacity-80 truncate">{v.label}</div>
+                                                                </div>
+                                                                <span
+                                                                    className={cn(
+                                                                        'font-mono font-extrabold text-[10px] px-1.5 py-0.5 rounded shrink-0',
+                                                                        isOff
+                                                                            ? 'bg-slate-800 text-slate-400'
+                                                                            : isYes
+                                                                            ? 'bg-emerald-500/30 text-emerald-200'
+                                                                            : isNo
+                                                                            ? 'bg-rose-500/25 text-rose-200'
+                                                                            : 'bg-amber-500/25 text-amber-200'
+                                                                    )}
+                                                                >
+                                                                    {v.vote}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-slate-300 pt-0.5">
+                                                    {vc.mirror_px > 0 && (
+                                                        <span>Mirror: <strong className="text-cyan-300">{vc.mirror_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                    )}
+                                                    {vc.trigger_px > 0 && (
+                                                        <span>Trigger: <strong className="text-amber-300">{vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                    )}
+                                                    {vc.entry_px > 0 && vc.mode === 'BET_ACTIVE' && (
+                                                        <span>Entry: <strong className="text-emerald-300">{vc.entry_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                    )}
+                                                    {vc.stop_px > 0 && vc.mode === 'BET_ACTIVE' && (
+                                                        <span>Smart SL: <strong className="text-rose-300">{vc.stop_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-[11px] text-slate-400">
+                                                รอรับข้อมูลสภา Vote Council จาก EA (รองรับตั้งแต่เวอร์ชัน v2.01 ขึ้นไป)
+                                            </p>
                                         )}
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Custom Target Profit Dialog with Interactive Scroll Wheel */}
                     <Dialog open={customTpModalOpen} onOpenChange={setCustomTpModalOpen}>
