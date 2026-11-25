@@ -99,6 +99,7 @@ export async function POST(req: Request) {
             last_ack_seq: Number(body.last_ack_seq || 0),
             active_config: body.active_config || {},
             chart: body.chart || null,
+            vote_council: body.vote_council || null,
             round_history: resolvedRoundHistory,
             last_ping: nowIso,
         };

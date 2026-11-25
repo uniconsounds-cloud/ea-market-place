@@ -83,6 +83,31 @@ interface ActiveConfig {
     stop_mode: string;
 }
 
+interface VoteCouncilVoter {
+    id: string;
+    label: string;
+    weight: number;
+    vote: 'YES' | 'NO' | 'WAIT' | 'OFF' | string;
+}
+
+interface VoteCouncilState {
+    enabled: boolean;
+    mode: string;
+    direction: string;
+    mirror_px: number;
+    trigger_px: number;
+    entry_px: number;
+    stop_px: number;
+    bet_lot: number;
+    bets_opened: number;
+    max_bets: number;
+    score_pct: number;
+    pass_pct: number;
+    yes_w: number;
+    total_w: number;
+    voters: VoteCouncilVoter[];
+}
+
 interface EAState {
     port_number: string;
     ea_name: string;
@@ -108,6 +133,7 @@ interface EAState {
     last_ack_seq: number;
     active_config: ActiveConfig;
     chart?: SmartChartData | null;
+    vote_council?: VoteCouncilState | null;
     round_history?: RoundHistoryTuple[] | null;
     last_ping: string;
 }
@@ -2033,6 +2059,130 @@ function SmartEACockpitContent() {
                                     </Button>
                                 </div>
                             </div>
+
+                            {/* Vote Council Sub-Panel inside One-Side Freeze Card */}
+                            {eaState?.vote_council && eaState.vote_council.enabled && (
+                                <div className="mt-2.5 pt-2.5 border-t border-rose-500/30 space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Activity className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
+                                            <span className="text-xs font-bold text-cyan-200">
+                                                สภาโหวตยืนยันเทรน (Vote Council)
+                                            </span>
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    'font-mono text-[10px] py-0',
+                                                    eaState.vote_council.mode === 'BET_ACTIVE'
+                                                        ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+                                                        : eaState.vote_council.mode === 'ARMED'
+                                                        ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
+                                                        : 'border-slate-500/50 bg-slate-800/60 text-slate-300'
+                                                )}
+                                            >
+                                                {eaState.vote_council.mode === 'BET_ACTIVE'
+                                                    ? `BET ACTIVE (${eaState.vote_council.direction} ${eaState.vote_council.bet_lot.toFixed(2)})`
+                                                    : eaState.vote_council.mode === 'ARMED'
+                                                    ? `ARMED (${eaState.vote_council.direction})`
+                                                    : eaState.vote_council.mode === 'SL_DONE'
+                                                    ? `MAX BETS (${eaState.vote_council.bets_opened}/${eaState.vote_council.max_bets})`
+                                                    : 'WAIT LOCK'}
+                                            </Badge>
+                                        </div>
+                                        <div className="flex items-center gap-2 font-mono text-[11px]">
+                                            <span className="text-slate-300">
+                                                คะแนน:{' '}
+                                                <strong
+                                                    className={cn(
+                                                        eaState.vote_council.score_pct >= eaState.vote_council.pass_pct
+                                                            ? 'text-emerald-300'
+                                                            : 'text-cyan-300'
+                                                    )}
+                                                >
+                                                    {eaState.vote_council.yes_w}/{eaState.vote_council.total_w} ({eaState.vote_council.score_pct.toFixed(0)}%)
+                                                </strong>
+                                            </span>
+                                            <span className="text-slate-400">
+                                                เกณฑ์ผ่าน {eaState.vote_council.pass_pct.toFixed(0)}%
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Score progress bar */}
+                                    <div className="relative h-1.5 w-full rounded-full bg-slate-800/90 overflow-hidden">
+                                        <div
+                                            className={cn(
+                                                'h-full transition-all duration-300',
+                                                eaState.vote_council.score_pct >= eaState.vote_council.pass_pct
+                                                    ? 'bg-emerald-400'
+                                                    : 'bg-cyan-400'
+                                            )}
+                                            style={{ width: `${Math.min(100, Math.max(0, eaState.vote_council.score_pct))}%` }}
+                                        />
+                                    </div>
+
+                                    {/* 6 Voters Grid */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                        {(eaState.vote_council.voters || []).map((v) => {
+                                            const isYes = v.vote === 'YES';
+                                            const isNo = v.vote === 'NO';
+                                            const isOff = v.vote === 'OFF' || v.weight <= 0;
+                                            return (
+                                                <div
+                                                    key={v.id}
+                                                    className={cn(
+                                                        'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1 text-[11px]',
+                                                        isOff
+                                                            ? 'border-slate-700/60 bg-slate-900/50 text-slate-400'
+                                                            : isYes
+                                                            ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-200'
+                                                            : isNo
+                                                            ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                                            : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                                                    )}
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="font-mono font-bold leading-tight">
+                                                            {v.id} <span className="text-[10px] opacity-75">w{v.weight}</span>
+                                                        </div>
+                                                        <div className="text-[10px] opacity-80 truncate">{v.label}</div>
+                                                    </div>
+                                                    <span
+                                                        className={cn(
+                                                            'font-mono font-extrabold text-[10px] px-1.5 py-0.5 rounded shrink-0',
+                                                            isOff
+                                                                ? 'bg-slate-800 text-slate-400'
+                                                                : isYes
+                                                                ? 'bg-emerald-500/30 text-emerald-200'
+                                                                : isNo
+                                                                ? 'bg-rose-500/25 text-rose-200'
+                                                                : 'bg-amber-500/25 text-amber-200'
+                                                        )}
+                                                    >
+                                                        {v.vote}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Price Levels Strip */}
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-slate-300 pt-0.5">
+                                        {eaState.vote_council.mirror_px > 0 && (
+                                            <span>Mirror: <strong className="text-cyan-300">{eaState.vote_council.mirror_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
+                                        )}
+                                        {eaState.vote_council.trigger_px > 0 && (
+                                            <span>Trigger: <strong className="text-amber-300">{eaState.vote_council.trigger_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
+                                        )}
+                                        {eaState.vote_council.entry_px > 0 && eaState.vote_council.mode === 'BET_ACTIVE' && (
+                                            <span>Entry: <strong className="text-emerald-300">{eaState.vote_council.entry_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
+                                        )}
+                                        {eaState.vote_council.stop_px > 0 && eaState.vote_council.mode === 'BET_ACTIVE' && (
+                                            <span>Smart SL: <strong className="text-rose-300">{eaState.vote_council.stop_px.toFixed(eaState.chart?.digits ?? 2)}</strong></span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
