@@ -108,6 +108,12 @@ interface VoteCouncilState {
     reached_trigger?: boolean;
     approved?: boolean;
     voters: VoteCouncilVoter[];
+    trend_council?: {
+        direction: string;
+        yes_w: number;
+        total_w: number;
+        voters: VoteCouncilVoter[];
+    } | null;
 }
 
 interface EAState {
@@ -1938,6 +1944,17 @@ function SmartEACockpitContent() {
                         const vc = eaState?.vote_council;
                         const vcEnabled = Boolean(vc && vc.enabled);
                         const voters = vc?.voters || [];
+                        const activeEntryVoters = voters.filter((v) => v.weight > 0);
+                        const displayEntryVoters = activeEntryVoters.length > 0 ? activeEntryVoters : voters;
+                        const tc = vc?.trend_council;
+                        const tcVoters = tc?.voters || [];
+                        const frozenDir = eaState?.frozen_side === 'BUY' || eaState?.trade_status === 'FROZEN_BUY'
+                            ? 'BUY'
+                            : eaState?.frozen_side === 'SELL' || eaState?.trade_status === 'FROZEN_SELL'
+                            ? 'SELL'
+                            : 'NONE';
+                        const trendHelpsRescue = isFrozenNow && tc && tc.yes_w >= 3 && tc.direction === frozenDir;
+                        const trendDragsFreeze = isFrozenNow && tc && tc.yes_w >= 3 && tc.direction !== 'NONE' && tc.direction !== frozenDir;
                         const scorePct = vc?.score_pct ?? 0;
                         const passPct = vc?.pass_pct ?? 70;
                         const passedVote = vcEnabled && scorePct >= passPct;
@@ -1987,6 +2004,16 @@ function SmartEACockpitContent() {
                                             >
                                                 B:{eaState?.open_buy ?? 0} / S:{eaState?.open_sell ?? 0}
                                             </Badge>
+                                            {trendHelpsRescue && (
+                                                <Badge variant="outline" className="border-emerald-400/60 bg-emerald-500/20 text-emerald-200 text-[10px] py-0 shrink-0">
+                                                    เทรนหนุนแก้พอร์ต
+                                                </Badge>
+                                            )}
+                                            {trendDragsFreeze && (
+                                                <Badge variant="outline" className="border-amber-400/60 bg-amber-500/20 text-amber-200 text-[10px] py-0 shrink-0">
+                                                    เทรนยังลากต่อ (ดูจังหวะ TP/SL)
+                                                </Badge>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center gap-1.5 shrink-0">
@@ -2036,27 +2063,52 @@ function SmartEACockpitContent() {
                                         </div>
                                     </div>
 
-                                    {/* Always-Visible Compact Symbol Row: Direction + All 6 Voters + Freeze Approval */}
+                                    {/* Always-Visible Compact Symbol Row: Live Trend Bias (4) + Entry Vote (3) + Freeze Approval */}
                                     {vcEnabled && vc && voters.length > 0 && (
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            {/* Vote Direction Pill */}
-                                            <span
-                                                className={cn(
-                                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-extrabold',
-                                                    vc.direction === 'BUY'
-                                                        ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                            {/* Live 4-Voter Trend Bias Pill */}
+                                            {tc ? (
+                                                <span
+                                                    title={`เทรนหลัก 4 ตัว (HL15, HL5, EMA5, MOM): ${tc.direction} ${tc.yes_w}/${tc.total_w}`}
+                                                    className={cn(
+                                                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-extrabold',
+                                                        tc.direction === 'BUY'
+                                                            ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                                            : tc.direction === 'SELL'
+                                                            ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
+                                                            : 'border-slate-600 bg-slate-800/70 text-slate-300'
+                                                    )}
+                                                >
+                                                    <span className="opacity-75 font-normal">เทรน:</span>
+                                                    {tc.direction === 'BUY'
+                                                        ? `▲ BUY ${tc.yes_w}/${tc.total_w}`
+                                                        : tc.direction === 'SELL'
+                                                        ? `▼ SELL ${tc.yes_w}/${tc.total_w}`
+                                                        : `• NEUTRAL`}
+                                                </span>
+                                            ) : (
+                                                <span
+                                                    className={cn(
+                                                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-extrabold',
+                                                        vc.direction === 'BUY'
+                                                            ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                                            : vc.direction === 'SELL'
+                                                            ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
+                                                            : 'border-slate-600 bg-slate-800/70 text-slate-300'
+                                                    )}
+                                                >
+                                                    {vc.direction === 'BUY'
+                                                        ? '▲ BUY'
                                                         : vc.direction === 'SELL'
-                                                        ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
-                                                        : 'border-slate-600 bg-slate-800/70 text-slate-300'
-                                                )}
-                                            >
-                                                {vc.direction === 'BUY'
-                                                    ? '▲ BUY'
-                                                    : vc.direction === 'SELL'
-                                                    ? '▼ SELL'
-                                                    : '• NEUTRAL'}
+                                                        ? '▼ SELL'
+                                                        : '• NEUTRAL'}
+                                                </span>
+                                            )}
+                                            <span className="text-slate-600 text-xs">|</span>
+                                            <span className="text-[10px] font-mono text-slate-400">
+                                                เปิดไม้ ({vc.direction}):
                                             </span>
-                                            {voters.map((v) => {
+                                            {displayEntryVoters.map((v) => {
                                                 const isOff = v.vote === 'OFF' || v.weight <= 0;
                                                 const isYes = v.vote === 'YES';
                                                 const isNo = v.vote === 'NO';
@@ -2085,7 +2137,6 @@ function SmartEACockpitContent() {
                                                             <Activity className="w-3 h-3 text-amber-400 shrink-0" />
                                                         )}
                                                         <span>{v.id}</span>
-                                                        <span className="opacity-70 font-normal">w{v.weight}</span>
                                                     </span>
                                                 );
                                             })}
@@ -2327,6 +2378,50 @@ function SmartEACockpitContent() {
                                                         <span>Smart SL: <strong className="text-rose-300">{vc.stop_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
                                                     )}
                                                 </div>
+
+                                                {/* Trend Council (4 Trend Voters / BE Hold) */}
+                                                {tc && tcVoters.length > 0 && (
+                                                    <div className="pt-2 border-t border-slate-700/50 space-y-1.5">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                                                            <span className="text-slate-200 font-bold">
+                                                                ตัววัดเทรนหลัก / BE Hold (4 ตัว: {tc.direction})
+                                                            </span>
+                                                            <span className="text-slate-300">
+                                                                คะแนนเทรน:{' '}
+                                                                <strong className={tc.yes_w >= 3 ? 'text-emerald-300' : 'text-slate-300'}>
+                                                                    {tc.yes_w} / {tc.total_w} ({Math.round((tc.yes_w / Math.max(1, tc.total_w)) * 100)}%)
+                                                                </strong>
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                                            {tcVoters.map((tv) => {
+                                                                const isYes = tv.vote === 'YES';
+                                                                const isNo = tv.vote === 'NO';
+                                                                return (
+                                                                    <div
+                                                                        key={tv.id}
+                                                                        className={cn(
+                                                                            'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1 text-[11px]',
+                                                                            isYes
+                                                                                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                                                                                : isNo
+                                                                                ? 'border-rose-500/35 bg-rose-500/10 text-rose-200'
+                                                                                : 'border-slate-700 bg-slate-900/50 text-slate-300'
+                                                                        )}
+                                                                    >
+                                                                        <div className="min-w-0">
+                                                                            <div className="font-mono font-bold leading-tight">
+                                                                                {tv.id} <span className="text-[10px] opacity-70">w{tv.weight}</span>
+                                                                            </div>
+                                                                            <div className="text-[10px] opacity-75 truncate">{tv.label}</div>
+                                                                        </div>
+                                                                        <span className="font-mono font-bold text-[10px] shrink-0">{tv.vote}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             <p className="text-[11px] text-slate-400">
