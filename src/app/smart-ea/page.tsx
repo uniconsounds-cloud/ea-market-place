@@ -105,6 +105,8 @@ interface VoteCouncilState {
     pass_pct: number;
     yes_w: number;
     total_w: number;
+    reached_trigger?: boolean;
+    approved?: boolean;
     voters: VoteCouncilVoter[];
 }
 
@@ -2034,9 +2036,26 @@ function SmartEACockpitContent() {
                                         </div>
                                     </div>
 
-                                    {/* Always-Visible Compact Symbol Row for All 6 Voters */}
-                                    {vcEnabled && voters.length > 0 && (
+                                    {/* Always-Visible Compact Symbol Row: Direction + All 6 Voters + Freeze Approval */}
+                                    {vcEnabled && vc && voters.length > 0 && (
                                         <div className="flex flex-wrap items-center gap-1.5">
+                                            {/* Vote Direction Pill */}
+                                            <span
+                                                className={cn(
+                                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-extrabold',
+                                                    vc.direction === 'BUY'
+                                                        ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                                        : vc.direction === 'SELL'
+                                                        ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
+                                                        : 'border-slate-600 bg-slate-800/70 text-slate-300'
+                                                )}
+                                            >
+                                                {vc.direction === 'BUY'
+                                                    ? '▲ BUY'
+                                                    : vc.direction === 'SELL'
+                                                    ? '▼ SELL'
+                                                    : '• NEUTRAL'}
+                                            </span>
                                             {voters.map((v) => {
                                                 const isOff = v.vote === 'OFF' || v.weight <= 0;
                                                 const isYes = v.vote === 'YES';
@@ -2070,6 +2089,28 @@ function SmartEACockpitContent() {
                                                     </span>
                                                 );
                                             })}
+                                            {isFrozenNow && (
+                                                <span
+                                                    className={cn(
+                                                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-bold',
+                                                        vc.mode === 'BET_ACTIVE'
+                                                            ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+                                                            : vc.approved
+                                                            ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                                            : vc.reached_trigger
+                                                            ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-200'
+                                                            : 'border-slate-600/70 bg-slate-800/70 text-slate-300'
+                                                    )}
+                                                >
+                                                    {vc.mode === 'BET_ACTIVE'
+                                                        ? `ออกไม้ช่วยแล้ว @ ${vc.entry_px > 0 ? vc.entry_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`
+                                                        : vc.approved
+                                                        ? `Vote อนุญาตออกไม้ช่วยแล้ว @ ${vc.trigger_px > 0 ? vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`
+                                                        : vc.reached_trigger
+                                                        ? `ถึงจุด Mirror แล้ว • รอ Vote`
+                                                        : `รอถึง Mirror @ ${vc.trigger_px > 0 ? vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`}
+                                                </span>
+                                            )}
                                             <span className="ml-auto text-[10px] text-slate-400 hidden sm:inline">
                                                 {isFreezeVoteExpanded ? 'คลิกเพื่อย่อ' : 'คลิกดูรายละเอียด'}
                                             </span>
