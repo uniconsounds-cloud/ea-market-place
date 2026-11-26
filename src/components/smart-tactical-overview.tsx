@@ -20,6 +20,7 @@ interface VoteCouncilOverview {
     trigger_px?: number;
     entry_px?: number;
     stop_px?: number;
+    bets_opened?: number;
     score_pct?: number;
     pass_pct?: number;
     voters?: VoteCouncilVoterOverview[];
@@ -406,9 +407,19 @@ export default function SmartTacticalOverview({
             estSl = bid + dTp * ratio;
         }
 
+        const hasRescueEntry = Boolean(
+            (isBuyFrozen || isSellFrozen) &&
+                voteCouncil &&
+                (voteCouncil.mode === 'BET_ACTIVE' || (voteCouncil.bets_opened ?? 0) > 0) &&
+                (voteCouncil.entry_px ?? 0) > 0
+        );
+        const rcEntryPx = hasRescueEntry ? Number(voteCouncil?.entry_px || 0) : 0;
+
         const rcPrice =
             isBuyFrozen || isSellFrozen
-                ? voteCouncil?.trigger_px && voteCouncil.trigger_px > 0
+                ? hasRescueEntry
+                    ? rcEntryPx
+                    : voteCouncil?.trigger_px && voteCouncil.trigger_px > 0
                     ? voteCouncil.trigger_px
                     : voteCouncil?.mirror_px && voteCouncil.mirror_px > 0
                     ? voteCouncil.mirror_px
@@ -423,7 +434,7 @@ export default function SmartTacticalOverview({
         minP -= pad;
         maxP += pad;
 
-        return { closes, bid, minP, maxP, estTp, estSl, rcPrice, openOrders };
+        return { closes, bid, minP, maxP, estTp, estSl, rcPrice, rcEntryPx, openOrders };
     }, [chart, voteCouncil, isBuyFrozen, isSellFrozen, pointSize, freezeStopLoss, targetProfit, liveCyclePnl]);
 
     // =========================================================================
@@ -978,6 +989,11 @@ export default function SmartTacticalOverview({
                         <span className="text-emerald-400">
                             TP:{spark.estTp > 0 ? spark.estTp.toFixed(digits) : '--'}
                         </span>
+                        {spark.rcEntryPx > 0 && (
+                            <span className="text-rose-300 font-bold">
+                                RC:{spark.rcEntryPx.toFixed(digits)}
+                            </span>
+                        )}
                         <span className={freezeStopLoss < 0 ? 'text-amber-400' : 'text-slate-600'}>
                             SL:{freezeStopLoss < 0 && spark.estSl > 0 ? spark.estSl.toFixed(digits) : '-'}
                         </span>
