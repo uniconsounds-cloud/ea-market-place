@@ -736,7 +736,7 @@ export default function SmartTacticalOverview({
                                                     stroke={isBuy ? '#38bdf8' : '#fb923c'}
                                                     strokeWidth="0.7"
                                                     vectorEffect="non-scaling-stroke"
-                                                    opacity="0.45"
+                                                    opacity="0.35"
                                                 />
                                             );
                                         })}
@@ -900,17 +900,17 @@ export default function SmartTacticalOverview({
                                                 Now
                                             </span>
                                             {trendDir === 'BUY' && (
-                                                <div className="flex items-center gap-[2px] bg-[#030710]/70 px-0.5 rounded">
-                                                    <svg viewBox="0 0 8 7" className="w-2 h-2 text-emerald-400 shrink-0">
+                                                <div className="flex items-center gap-[1.5px] bg-[#030710]/70 px-0.5 rounded">
+                                                    <svg viewBox="0 0 8 7" className="w-1.5 h-1.5 text-emerald-400 shrink-0">
                                                         <polygon points="4,0 8,7 0,7" fill="currentColor" />
                                                     </svg>
-                                                    <div className="flex items-center gap-[2px]">
+                                                    <div className="flex items-center gap-[1.5px]">
                                                         {[1, 2, 3, 4, 5].map((lv) => (
                                                             <span
                                                                 key={`t-dot-${lv}`}
-                                                                className={`w-[5px] h-[5px] rounded-full ${
+                                                                className={`w-[3.5px] h-[3.5px] rounded-full ${
                                                                     lv <= trendLevel
-                                                                        ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.75)]'
+                                                                        ? 'bg-emerald-400 shadow-[0_0_3px_rgba(52,211,153,0.75)]'
                                                                         : 'bg-slate-600/80'
                                                                 }`}
                                                             />
@@ -919,17 +919,17 @@ export default function SmartTacticalOverview({
                                                 </div>
                                             )}
                                             {trendDir === 'SELL' && (
-                                                <div className="flex items-center gap-[2px] translate-y-[calc(100%+2px)] bg-[#030710]/70 px-0.5 rounded">
-                                                    <svg viewBox="0 0 8 7" className="w-2 h-2 text-rose-400 shrink-0">
+                                                <div className="flex items-center gap-[1.5px] translate-y-[calc(100%+2px)] bg-[#030710]/70 px-0.5 rounded">
+                                                    <svg viewBox="0 0 8 7" className="w-1.5 h-1.5 text-rose-400 shrink-0">
                                                         <polygon points="0,0 8,0 4,7" fill="currentColor" />
                                                     </svg>
-                                                    <div className="flex items-center gap-[2px]">
+                                                    <div className="flex items-center gap-[1.5px]">
                                                         {[1, 2, 3, 4, 5].map((lv) => (
                                                             <span
                                                                 key={`t-dot-${lv}`}
-                                                                className={`w-[5px] h-[5px] rounded-full ${
+                                                                className={`w-[3.5px] h-[3.5px] rounded-full ${
                                                                     lv <= trendLevel
-                                                                        ? 'bg-rose-400 shadow-[0_0_4px_rgba(251,113,133,0.75)]'
+                                                                        ? 'bg-rose-400 shadow-[0_0_3px_rgba(251,113,133,0.75)]'
                                                                         : 'bg-slate-600/80'
                                                                 }`}
                                                             />
