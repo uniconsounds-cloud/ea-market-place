@@ -736,7 +736,7 @@ export default function SmartTacticalOverview({
                                                     stroke={isBuy ? '#38bdf8' : '#fb923c'}
                                                     strokeWidth="0.7"
                                                     vectorEffect="non-scaling-stroke"
-                                                    opacity="0.7"
+                                                    opacity="0.45"
                                                 />
                                             );
                                         })}
@@ -810,73 +810,35 @@ export default function SmartTacticalOverview({
 
                                     {/* Crisp Non-Stretched HTML Markers & Labels */}
                                     <div className="pointer-events-none absolute inset-0">
-                                        {/* TP Label + Trend Direction Triangle + 5 Level Dots */}
+                                        {/* TP Label (sitting on top of TP line) */}
                                         {tpPct !== null && (
                                             <div
                                                 style={{ top: `${tpPct}%` }}
-                                                className="absolute left-0.5 flex items-center gap-1 -translate-y-1/2"
+                                                className="absolute left-0.5 -translate-y-full pb-[1px]"
                                             >
-                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-emerald-400 leading-none bg-[#030710]/80 px-0.5 rounded">
+                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-emerald-400 leading-none bg-[#030710]/80 px-0.5 rounded block">
                                                     TP
                                                 </span>
-                                                {trendDir === 'BUY' && (
-                                                    <div className="flex items-center gap-[2px] -translate-y-[5px] bg-[#030710]/70 px-0.5 rounded">
-                                                        <svg viewBox="0 0 8 7" className="w-2 h-2 text-emerald-400 shrink-0">
-                                                            <polygon points="4,0 8,7 0,7" fill="currentColor" />
-                                                        </svg>
-                                                        <div className="flex items-center gap-[2px]">
-                                                            {[1, 2, 3, 4, 5].map((lv) => (
-                                                                <span
-                                                                    key={`t-dot-${lv}`}
-                                                                    className={`w-[5px] h-[5px] rounded-full ${
-                                                                        lv <= trendLevel
-                                                                            ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.75)]'
-                                                                            : 'bg-slate-600/80'
-                                                                    }`}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {trendDir === 'SELL' && (
-                                                    <div className="flex items-center gap-[2px] translate-y-[6px] bg-[#030710]/70 px-0.5 rounded">
-                                                        <svg viewBox="0 0 8 7" className="w-2 h-2 text-rose-400 shrink-0">
-                                                            <polygon points="0,0 8,0 4,7" fill="currentColor" />
-                                                        </svg>
-                                                        <div className="flex items-center gap-[2px]">
-                                                            {[1, 2, 3, 4, 5].map((lv) => (
-                                                                <span
-                                                                    key={`t-dot-${lv}`}
-                                                                    className={`w-[5px] h-[5px] rounded-full ${
-                                                                        lv <= trendLevel
-                                                                            ? 'bg-rose-400 shadow-[0_0_4px_rgba(251,113,133,0.75)]'
-                                                                            : 'bg-slate-600/80'
-                                                                    }`}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         )}
 
-                                        {/* SL Label (only when SL is set) */}
+                                        {/* SL Label (sitting on top of SL line, only when SL is set) */}
                                         {slPct !== null && (
                                             <div
                                                 style={{ top: `${slPct}%` }}
-                                                className="absolute left-0.5 -translate-y-1/2"
+                                                className="absolute left-0.5 -translate-y-full pb-[1px]"
                                             >
-                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-amber-400 leading-none bg-[#030710]/85 px-0.5 rounded">
+                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-amber-400 leading-none bg-[#030710]/85 px-0.5 rounded block">
                                                     SL
                                                 </span>
                                             </div>
                                         )}
 
-                                        {/* Rescue (RC) Label + 3 Larger Vote Signal Circles */}
+                                        {/* Rescue (RC) Label + 3 Larger Vote Signal Circles (sitting on top of RC line) */}
                                         {rcPct !== null && (
                                             <div
                                                 style={{ top: `${rcPct}%` }}
-                                                className="absolute left-0.5 -translate-y-1/2 flex items-center gap-1"
+                                                className="absolute left-0.5 -translate-y-full pb-[1px] flex items-center gap-1"
                                             >
                                                 <span className="font-mono text-[8px] sm:text-[9px] font-extrabold text-rose-300 leading-none bg-[#030710]/90 px-0.5 rounded">
                                                     RC
@@ -929,14 +891,52 @@ export default function SmartTacticalOverview({
                                             </div>
                                         )}
 
-                                        {/* Current Price (Now) Label */}
+                                        {/* Current Price (Now) Label (sitting on top of Now line) + Trend Direction Triangle & 5 Level Dots */}
                                         <div
                                             style={{ top: `${bidPct}%` }}
-                                            className="absolute left-0.5 -translate-y-1/2"
+                                            className="absolute left-0.5 -translate-y-full pb-[1px] flex items-center gap-1"
                                         >
                                             <span className="font-mono text-[8px] sm:text-[9px] font-bold text-sky-400 leading-none bg-[#030710]/85 px-0.5 rounded">
                                                 Now
                                             </span>
+                                            {trendDir === 'BUY' && (
+                                                <div className="flex items-center gap-[2px] bg-[#030710]/70 px-0.5 rounded">
+                                                    <svg viewBox="0 0 8 7" className="w-2 h-2 text-emerald-400 shrink-0">
+                                                        <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                    </svg>
+                                                    <div className="flex items-center gap-[2px]">
+                                                        {[1, 2, 3, 4, 5].map((lv) => (
+                                                            <span
+                                                                key={`t-dot-${lv}`}
+                                                                className={`w-[5px] h-[5px] rounded-full ${
+                                                                    lv <= trendLevel
+                                                                        ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.75)]'
+                                                                        : 'bg-slate-600/80'
+                                                                }`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {trendDir === 'SELL' && (
+                                                <div className="flex items-center gap-[2px] translate-y-[calc(100%+2px)] bg-[#030710]/70 px-0.5 rounded">
+                                                    <svg viewBox="0 0 8 7" className="w-2 h-2 text-rose-400 shrink-0">
+                                                        <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                    </svg>
+                                                    <div className="flex items-center gap-[2px]">
+                                                        {[1, 2, 3, 4, 5].map((lv) => (
+                                                            <span
+                                                                key={`t-dot-${lv}`}
+                                                                className={`w-[5px] h-[5px] rounded-full ${
+                                                                    lv <= trendLevel
+                                                                        ? 'bg-rose-400 shadow-[0_0_4px_rgba(251,113,133,0.75)]'
+                                                                        : 'bg-slate-600/80'
+                                                                }`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Current Bid Dot */}
