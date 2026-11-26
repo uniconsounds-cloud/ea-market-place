@@ -229,6 +229,34 @@ export default function SmartTacticalOverview({
         const totalLot = buyLot + sellLot;
         const totalTrades = openBuy + openSell;
 
+        // Elapsed time since first open order of current round (in HH:MM, using MT5 server time)
+        let roundElapsedLabel = '--:--';
+        if (totalTrades > 0) {
+            const orderTimes = orders.map((o) => o.tm || 0).filter((t) => t > 0);
+            const earliestOrderTm = orderTimes.length > 0 ? Math.min(...orderTimes) : 0;
+            const roundStartUnix =
+                earliestOrderTm > 0
+                    ? earliestOrderTm
+                    : Number(chart?.round_started || 0) > 0
+                    ? Number(chart?.round_started)
+                    : 0;
+            const candles = chart?.candles || [];
+            const latestCandleTime =
+                candles.length > 0 ? Number(candles[candles.length - 1][0]) || 0 : 0;
+
+            if (roundStartUnix > 0) {
+                const refNowUnix =
+                    latestCandleTime >= roundStartUnix
+                        ? latestCandleTime
+                        : Math.floor(Date.now() / 1000);
+                const elapsedSec = Math.max(0, refNowUnix - roundStartUnix);
+                const totalMins = Math.floor(elapsedSec / 60);
+                const hh = Math.floor(totalMins / 60);
+                const mm = totalMins % 60;
+                roundElapsedLabel = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+            }
+        }
+
         const hasExactSidePnl =
             typeof chart?.buy_pnl === 'number' && typeof chart?.sell_pnl === 'number';
         const buyPnl = hasExactSidePnl ? (chart?.buy_pnl ?? 0) : sumBuyOrderPnl;
@@ -301,6 +329,7 @@ export default function SmartTacticalOverview({
             buyPnl,
             sellPnl,
             totalTrades,
+            roundElapsedLabel,
             todayProfit,
             activeSide,
             beTradeLevel,
@@ -1056,12 +1085,22 @@ export default function SmartTacticalOverview({
                     </div>
                 </div>
 
-                {/* 3. Total Open Trades */}
-                <div className="flex flex-col justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
-                    <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ไม้ออกรวม</span>
-                    <span className="text-base sm:text-2xl font-extrabold text-white leading-none tabular-nums">
-                        {metrics.totalTrades}
-                    </span>
+                {/* 3. Total Open Trades + Round Elapsed Time (HH:MM) */}
+                <div className="flex flex-col items-center justify-center gap-0.5 border-l border-slate-800 pl-1 sm:pl-2 min-w-0">
+                    <div className="flex items-baseline justify-center gap-1 leading-tight">
+                        <span className="text-[8px] sm:text-[10px] text-slate-400 truncate">ไม้รวม</span>
+                        <span className="text-xs sm:text-base font-extrabold text-white leading-tight tabular-nums">
+                            {metrics.totalTrades}
+                        </span>
+                    </div>
+                    <div
+                        title="ระยะเวลาตั้งแต่เปิดไม้แรกของรอบนี้ (ชั่วโมง:นาที)"
+                        className={`text-xs sm:text-base font-extrabold leading-tight tabular-nums ${
+                            metrics.totalTrades > 0 ? 'text-slate-200' : 'text-slate-500'
+                        }`}
+                    >
+                        {metrics.roundElapsedLabel}
+                    </div>
                 </div>
 
                 {/* 4. Total Lots (Same number size as TP/SL + 2 stacked horizontal bars for Buy & Sell Lots) */}
