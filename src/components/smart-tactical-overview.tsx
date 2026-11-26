@@ -384,24 +384,7 @@ export default function SmartTacticalOverview({
 
         const openOrders = (chart?.orders || []).filter((o) => (o.t === 'B' || o.t === 'S') && o.p > 0);
 
-        if (estTp > 0) {
-            minP = Math.min(minP, estTp);
-            maxP = Math.max(maxP, estTp);
-        }
-        if (rcPrice > 0) {
-            minP = Math.min(minP, rcPrice);
-            maxP = Math.max(maxP, rcPrice);
-        }
-        if (estSl > 0 && freezeStopLoss < 0) {
-            minP = Math.min(minP, estSl);
-            maxP = Math.max(maxP, estSl);
-        }
-        for (const o of openOrders) {
-            minP = Math.min(minP, o.p);
-            maxP = Math.max(maxP, o.p);
-        }
-
-        const pad = Math.max((maxP - minP) * 0.08, pointSize * 20);
+        const pad = Math.max((maxP - minP) * 0.12, pointSize * 20);
         minP -= pad;
         maxP += pad;
 
@@ -810,11 +793,13 @@ export default function SmartTacticalOverview({
 
                                     {/* Crisp Non-Stretched HTML Markers & Labels */}
                                     <div className="pointer-events-none absolute inset-0">
-                                        {/* TP Label (sitting on top of TP line) */}
+                                        {/* TP Label (sitting on top of TP line, or just below if pinned at top edge) */}
                                         {tpPct !== null && (
                                             <div
                                                 style={{ top: `${tpPct}%` }}
-                                                className="absolute left-0.5 -translate-y-full pb-[1px]"
+                                                className={`absolute left-0.5 ${
+                                                    tpPct <= 14 ? 'translate-y-[1px]' : '-translate-y-full pb-[1px]'
+                                                }`}
                                             >
                                                 <span className="font-mono text-[8px] sm:text-[9px] font-bold text-emerald-400 leading-none bg-[#030710]/80 px-0.5 rounded block">
                                                     TP
@@ -822,11 +807,13 @@ export default function SmartTacticalOverview({
                                             </div>
                                         )}
 
-                                        {/* SL Label (sitting on top of SL line, only when SL is set) */}
+                                        {/* SL Label (sitting on top of SL line, or just below if pinned at top edge) */}
                                         {slPct !== null && (
                                             <div
                                                 style={{ top: `${slPct}%` }}
-                                                className="absolute left-0.5 -translate-y-full pb-[1px]"
+                                                className={`absolute left-0.5 ${
+                                                    slPct <= 14 ? 'translate-y-[1px]' : '-translate-y-full pb-[1px]'
+                                                }`}
                                             >
                                                 <span className="font-mono text-[8px] sm:text-[9px] font-bold text-amber-400 leading-none bg-[#030710]/85 px-0.5 rounded block">
                                                     SL
@@ -834,16 +821,18 @@ export default function SmartTacticalOverview({
                                             </div>
                                         )}
 
-                                        {/* Rescue (RC) Label + 3 Larger Vote Signal Circles (sitting on top of RC line) */}
+                                        {/* Rescue (RC) Label + 3 Vote Signal Circles (40% smaller) */}
                                         {rcPct !== null && (
                                             <div
                                                 style={{ top: `${rcPct}%` }}
-                                                className="absolute left-0.5 -translate-y-full pb-[1px] flex items-center gap-1"
+                                                className={`absolute left-0.5 flex items-center gap-1 ${
+                                                    rcPct <= 14 ? 'translate-y-[1px]' : '-translate-y-full pb-[1px]'
+                                                }`}
                                             >
                                                 <span className="font-mono text-[8px] sm:text-[9px] font-extrabold text-rose-300 leading-none bg-[#030710]/90 px-0.5 rounded">
                                                     RC
                                                 </span>
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-0.5">
                                                     {rcSignals.map((sig, idx) => {
                                                         const vote = sig?.vote || 'WAIT';
                                                         const isYes = vote === 'YES';
@@ -852,37 +841,37 @@ export default function SmartTacticalOverview({
                                                             <span
                                                                 key={`rc-sig-${idx}`}
                                                                 title={sig ? `${sig.id}: ${vote}` : 'Signal'}
-                                                                className={`w-3 h-3 rounded-full border flex items-center justify-center shadow-sm ${
+                                                                className={`w-[7.5px] h-[7.5px] rounded-full border flex items-center justify-center shadow-sm ${
                                                                     isYes
-                                                                        ? 'bg-emerald-500/90 border-emerald-300 text-white shadow-[0_0_5px_rgba(16,185,129,0.7)]'
+                                                                        ? 'bg-emerald-500/90 border-emerald-300 text-white shadow-[0_0_4px_rgba(16,185,129,0.7)]'
                                                                         : isNo
-                                                                        ? 'bg-rose-500/90 border-rose-300 text-white shadow-[0_0_5px_rgba(244,63,94,0.6)]'
+                                                                        ? 'bg-rose-500/90 border-rose-300 text-white shadow-[0_0_4px_rgba(244,63,94,0.6)]'
                                                                         : 'bg-slate-700/90 border-slate-500 text-slate-300'
                                                                 }`}
                                                             >
                                                                 {isYes ? (
-                                                                    <svg viewBox="0 0 10 10" className="w-2 h-2">
+                                                                    <svg viewBox="0 0 10 10" className="w-[5px] h-[5px]">
                                                                         <path
                                                                             d="M2 5.2 L4.2 7.4 L8.2 2.8"
                                                                             fill="none"
                                                                             stroke="currentColor"
-                                                                            strokeWidth="1.6"
+                                                                            strokeWidth="2"
                                                                             strokeLinecap="round"
                                                                             strokeLinejoin="round"
                                                                         />
                                                                     </svg>
                                                                 ) : isNo ? (
-                                                                    <svg viewBox="0 0 10 10" className="w-2 h-2">
+                                                                    <svg viewBox="0 0 10 10" className="w-[5px] h-[5px]">
                                                                         <path
-                                                                            d="M2.6 2.6 L7.4 7.4 M7.4 2.6 L2.6 7.4"
+                                                                            d="M2.5 2.5 L7.5 7.5 M7.5 2.5 L2.5 7.5"
                                                                             fill="none"
                                                                             stroke="currentColor"
-                                                                            strokeWidth="1.6"
+                                                                            strokeWidth="2"
                                                                             strokeLinecap="round"
                                                                         />
                                                                     </svg>
                                                                 ) : (
-                                                                    <span className="w-1 h-1 rounded-full bg-current" />
+                                                                    <span className="w-[2.5px] h-[2.5px] rounded-full bg-current" />
                                                                 )}
                                                             </span>
                                                         );
@@ -891,7 +880,7 @@ export default function SmartTacticalOverview({
                                             </div>
                                         )}
 
-                                        {/* Current Price (Now) Label (sitting on top of Now line) + Trend Direction Triangle & 5 Level Dots */}
+                                        {/* Current Price (Now) Label (sitting on top of Now line) + Trend Direction Triangle (2x) & 5 Level Dots */}
                                         <div
                                             style={{ top: `${bidPct}%` }}
                                             className="absolute left-0.5 -translate-y-full pb-[1px] flex items-center gap-1"
@@ -901,7 +890,7 @@ export default function SmartTacticalOverview({
                                             </span>
                                             {trendDir === 'BUY' && (
                                                 <div className="flex items-center gap-[1.5px] bg-[#030710]/70 px-0.5 rounded">
-                                                    <svg viewBox="0 0 8 7" className="w-1.5 h-1.5 text-emerald-400 shrink-0">
+                                                    <svg viewBox="0 0 8 7" className="w-3 h-3 text-emerald-400 shrink-0">
                                                         <polygon points="4,0 8,7 0,7" fill="currentColor" />
                                                     </svg>
                                                     <div className="flex items-center gap-[1.5px]">
@@ -920,7 +909,7 @@ export default function SmartTacticalOverview({
                                             )}
                                             {trendDir === 'SELL' && (
                                                 <div className="flex items-center gap-[1.5px] translate-y-[calc(100%+2px)] bg-[#030710]/70 px-0.5 rounded">
-                                                    <svg viewBox="0 0 8 7" className="w-1.5 h-1.5 text-rose-400 shrink-0">
+                                                    <svg viewBox="0 0 8 7" className="w-3 h-3 text-rose-400 shrink-0">
                                                         <polygon points="0,0 8,0 4,7" fill="currentColor" />
                                                     </svg>
                                                     <div className="flex items-center gap-[1.5px]">
