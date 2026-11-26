@@ -75,6 +75,7 @@ export async function POST(req: Request) {
             balance: Number(body.balance || 0),
             equity: Number(body.equity || 0),
             cycle_pnl: Number(body.cycle_pnl || 0),
+            today_profit: body.today_profit !== undefined && body.today_profit !== null ? Number(body.today_profit) : null,
             anchor: Number(body.anchor || 0),
             open_pos: Number(body.open_pos || 0),
             open_buy: Number(body.open_buy || 0),

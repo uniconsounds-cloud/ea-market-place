@@ -125,6 +125,7 @@ interface EAState {
     balance: number;
     equity: number;
     cycle_pnl: number;
+    today_profit?: number | null;
     anchor: number;
     open_pos: number;
     open_buy: number;
@@ -1922,6 +1923,7 @@ function SmartEACockpitContent() {
                         frozenSide={eaState?.frozen_side}
                         protectionFrozen={Boolean(eaState?.protection_frozen || eaState?.trade_status?.startsWith('FROZEN_'))}
                         liveCyclePnl={liveCyclePnl}
+                        todayProfit={eaState?.today_profit}
                         targetProfit={activeTp}
                         freezeStopLoss={activeFreezeSl}
                         spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}

@@ -41,6 +41,7 @@ interface SmartTacticalOverviewProps {
     frozenSide?: string;
     protectionFrozen?: boolean;
     liveCyclePnl: number;
+    todayProfit?: number | null;
     targetProfit: number;
     freezeStopLoss: number;
     spacingPoints: number;
@@ -65,6 +66,7 @@ export default function SmartTacticalOverview({
     frozenSide = 'NONE',
     protectionFrozen = false,
     liveCyclePnl,
+    todayProfit: todayProfitProp,
     targetProfit,
     freezeStopLoss,
     spacingPoints,
@@ -232,18 +234,22 @@ export default function SmartTacticalOverview({
         const buyPnl = hasExactSidePnl ? (chart?.buy_pnl ?? 0) : sumBuyOrderPnl;
         const sellPnl = hasExactSidePnl ? (chart?.sell_pnl ?? 0) : sumSellOrderPnl;
 
-        // Today's closed profit (since 05:00 AM Bangkok time)
-        const now = new Date();
-        const bkkNowMs = now.getTime() + 7 * 3600 * 1000;
-        const bkkDate = new Date(bkkNowMs);
-        const minsSince0500 = ((bkkDate.getUTCHours() * 60 + bkkDate.getUTCMinutes()) - 300 + 1440) % 1440;
-        const startOfTradingDayUnix = Math.floor((now.getTime() - minsSince0500 * 60 * 1000) / 1000);
-
+        // Today's real closed profit from MT5 (falls back to roundHistory if older EA doesn't send today_profit)
         let todayProfit = 0;
-        if (Array.isArray(roundHistory)) {
-            for (const r of roundHistory) {
-                if (Array.isArray(r) && Number(r[0]) >= startOfTradingDayUnix) {
-                    todayProfit += Number(r[2]) || 0;
+        if (typeof todayProfitProp === 'number' && !Number.isNaN(todayProfitProp)) {
+            todayProfit = todayProfitProp;
+        } else {
+            const now = new Date();
+            const bkkNowMs = now.getTime() + 7 * 3600 * 1000;
+            const bkkDate = new Date(bkkNowMs);
+            const minsSince0500 = ((bkkDate.getUTCHours() * 60 + bkkDate.getUTCMinutes()) - 300 + 1440) % 1440;
+            const startOfTradingDayUnix = Math.floor((now.getTime() - minsSince0500 * 60 * 1000) / 1000);
+
+            if (Array.isArray(roundHistory)) {
+                for (const r of roundHistory) {
+                    if (Array.isArray(r) && Number(r[0]) >= startOfTradingDayUnix) {
+                        todayProfit += Number(r[2]) || 0;
+                    }
                 }
             }
         }
@@ -950,19 +956,11 @@ export default function SmartTacticalOverview({
                 </div>
 
                 {/* =========================================================
-                    SECTION 4 (1/6 width): Vertical PnL Bar + Big Number + Per-Round Peak Tick
+                    SECTION 4 (1/6 width): Vertical PnL Bar + Bottom PnL Number + Per-Round Peak Tick
                    ========================================================= */}
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1 sm:p-1.5">
                     <div className="text-center">
-                        <div className="text-[8px] font-mono text-slate-400 uppercase leading-none">PnL</div>
-                        <div
-                            className={`font-mono text-sm sm:text-lg font-extrabold leading-tight tabular-nums truncate ${
-                                liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                        >
-                            {liveCyclePnl >= 0 ? '+' : ''}
-                            {Math.abs(liveCyclePnl) >= 100 ? liveCyclePnl.toFixed(0) : liveCyclePnl.toFixed(1)}
-                        </div>
+                        <div className="text-[8px] sm:text-[9px] font-mono font-bold text-slate-400 uppercase leading-none">PnL</div>
                     </div>
 
                     {/* Vertical Bar + Per-Round Peak Tick */}
@@ -992,22 +990,26 @@ export default function SmartTacticalOverview({
                             })()}
                         </div>
 
-                        <div className="flex flex-col justify-between h-full font-mono text-[7.5px] sm:text-[8.5px] text-left leading-none py-0.5">
+                        <div className="flex flex-col justify-start h-full font-mono text-[7.5px] sm:text-[8.5px] text-left leading-none py-0.5">
                             <div>
                                 <div className="text-amber-300/90 font-bold" title="Peak สูงสุดของรอบปัจจุบัน">
-                                    PK
+                                    Peak
                                 </div>
-                                <div className="text-amber-200 tabular-nums">
+                                <div className="text-amber-200 tabular-nums mt-0.5">
                                     {peakPnlRound >= 0 ? '+' : ''}
                                     {peakPnlRound.toFixed(0)}
                                 </div>
                             </div>
-                            <div className="text-slate-500">0</div>
                         </div>
                     </div>
 
-                    <div className="text-center font-mono text-[8px] text-slate-400 leading-none">
-                        {currency}
+                    <div
+                        className={`text-center font-mono text-sm sm:text-lg font-extrabold leading-tight tabular-nums truncate ${
+                            liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                    >
+                        {liveCyclePnl >= 0 ? '+' : ''}
+                        {Math.abs(liveCyclePnl) >= 100 ? liveCyclePnl.toFixed(0) : liveCyclePnl.toFixed(1)}
                     </div>
                 </div>
             </div>
