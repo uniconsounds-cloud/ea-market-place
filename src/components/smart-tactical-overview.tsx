@@ -840,18 +840,35 @@ export default function SmartTacticalOverview({
                                     {/* Crisp Non-Stretched HTML Markers & Labels */}
                                     <div className="pointer-events-none absolute inset-0">
                                         {/* TP Label (sitting on top of TP line, or just below if pinned at top edge) */}
-                                        {tpPct !== null && (
-                                            <div
-                                                style={{ top: `${tpPct}%` }}
-                                                className={`absolute left-0.5 ${
-                                                    tpPct <= 14 ? 'translate-y-[1px]' : '-translate-y-full pb-[1px]'
-                                                }`}
-                                            >
-                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-emerald-400 leading-none bg-[#030710]/80 px-0.5 rounded block">
-                                                    TP
-                                                </span>
-                                            </div>
-                                        )}
+                                        {tpPct !== null && (() => {
+                                            const rescueOpened = Boolean(
+                                                voteCouncil &&
+                                                    ((voteCouncil.bets_opened ?? 0) > 0 ||
+                                                        voteCouncil.mode === 'BET_ACTIVE' ||
+                                                        voteCouncil.mode === 'SL_DONE')
+                                            );
+                                            const effTpVal = Math.round(
+                                                rescueOpened ? Math.min(targetProfit, -300) : targetProfit
+                                            );
+                                            const tpLabel =
+                                                effTpVal > 0
+                                                    ? `TP+${effTpVal}`
+                                                    : effTpVal < 0
+                                                    ? `TP${effTpVal}`
+                                                    : 'TP 0';
+                                            return (
+                                                <div
+                                                    style={{ top: `${tpPct}%` }}
+                                                    className={`absolute left-0.5 ${
+                                                        tpPct <= 14 ? 'translate-y-[1px]' : '-translate-y-full pb-[1px]'
+                                                    }`}
+                                                >
+                                                    <span className="font-mono text-[8px] sm:text-[9px] font-bold text-emerald-400 leading-none bg-[#030710]/80 px-0.5 rounded block">
+                                                        {tpLabel}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
 
                                         {/* SL Label (sitting on top of SL line, or just below if pinned at top edge) */}
                                         {slPct !== null && (
