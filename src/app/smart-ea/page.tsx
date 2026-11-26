@@ -2034,7 +2034,7 @@ function SmartEACockpitContent() {
                                                         )}
                                                     >
                                                         {vc.mode === 'BET_ACTIVE'
-                                                            ? `BET ${vc.direction} ${vc.bet_lot.toFixed(2)}`
+                                                            ? `RESCUE ${vc.direction} ${vc.bet_lot.toFixed(2)}`
                                                             : vc.mode === 'ARMED'
                                                             ? `ARMED ${vc.direction}`
                                                             : vc.mode === 'SL_DONE'
@@ -2066,15 +2066,15 @@ function SmartEACockpitContent() {
                                         </div>
                                     </div>
 
-                                    {/* Always-Visible Compact Symbol Row: Live Trend Bias (4) + Entry Vote (3) + Freeze Approval */}
+                                    {/* Always-Visible Compact Symbol Row: Live Trend Bias (4) + Rescue Vote (3) + Freeze Approval */}
                                     {vcEnabled && vc && voters.length > 0 && (
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            {/* Live 4-Voter Trend Bias Pill */}
+                                            {/* Live 4-Voter Trend Bias Pill (matching Overview Chart: Triangle + 5 dots) */}
                                             {tc ? (
                                                 <span
                                                     title={`เทรนหลัก 4 ตัว (HL15, HL5, EMA5, MOM): ${tc.direction} ${tc.yes_w}/${tc.total_w}`}
                                                     className={cn(
-                                                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-extrabold',
+                                                        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border font-mono text-[10px] font-extrabold',
                                                         tc.direction === 'BUY'
                                                             ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
                                                             : tc.direction === 'SELL'
@@ -2083,11 +2083,37 @@ function SmartEACockpitContent() {
                                                     )}
                                                 >
                                                     <span className="opacity-75 font-normal">เทรน:</span>
-                                                    {tc.direction === 'BUY'
-                                                        ? `▲ BUY ${tc.yes_w}/${tc.total_w}`
-                                                        : tc.direction === 'SELL'
-                                                        ? `▼ SELL ${tc.yes_w}/${tc.total_w}`
-                                                        : `• NEUTRAL`}
+                                                    {tc.direction === 'BUY' ? (
+                                                        <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-400 shrink-0">
+                                                            <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                        </svg>
+                                                    ) : tc.direction === 'SELL' ? (
+                                                        <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-rose-400 shrink-0">
+                                                            <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                        </svg>
+                                                    ) : (
+                                                        <span>•</span>
+                                                    )}
+                                                    <span className="inline-flex items-center gap-[2px]">
+                                                        {[1, 2, 3, 4, 5].map((lv) => (
+                                                            <span
+                                                                key={`c-tdot-${lv}`}
+                                                                className={cn(
+                                                                    'w-[4px] h-[4px] rounded-full',
+                                                                    lv <= tc.yes_w
+                                                                        ? tc.direction === 'BUY'
+                                                                            ? 'bg-emerald-400'
+                                                                            : tc.direction === 'SELL'
+                                                                            ? 'bg-rose-400'
+                                                                            : 'bg-slate-400'
+                                                                        : 'bg-slate-600/80'
+                                                                )}
+                                                            />
+                                                        ))}
+                                                    </span>
+                                                    <span>
+                                                        {tc.yes_w}/{tc.total_w} {tc.direction !== 'NONE' ? tc.direction : ''}
+                                                    </span>
                                                 </span>
                                             ) : (
                                                 <span
@@ -2108,8 +2134,15 @@ function SmartEACockpitContent() {
                                                 </span>
                                             )}
                                             <span className="text-slate-600 text-xs">|</span>
-                                            <span className="text-[10px] font-mono text-slate-400">
-                                                เปิดไม้ ({vc.direction}):
+                                            <span className="text-[10px] font-mono text-slate-300 inline-flex items-center gap-1">
+                                                <span>Rescue</span>
+                                                {vc.direction === 'BUY' ? (
+                                                    <span className="text-emerald-300 font-bold">(▲ BUY):</span>
+                                                ) : vc.direction === 'SELL' ? (
+                                                    <span className="text-rose-300 font-bold">(▼ SELL):</span>
+                                                ) : (
+                                                    <span>({vc.direction}):</span>
+                                                )}
                                             </span>
                                             {displayEntryVoters.map((v) => {
                                                 const isOff = v.vote === 'OFF' || v.weight <= 0;
@@ -2118,7 +2151,7 @@ function SmartEACockpitContent() {
                                                 return (
                                                     <span
                                                         key={v.id}
-                                                        title={`${v.label} (w${v.weight}): ${v.vote}`}
+                                                        title={`${v.label} (w${v.weight}): ${isYes ? `${vc.direction} ผ่าน` : v.vote}`}
                                                         className={cn(
                                                             'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] font-bold',
                                                             isOff
@@ -2133,7 +2166,17 @@ function SmartEACockpitContent() {
                                                         {isOff ? (
                                                             <span className="text-slate-500 font-black">-</span>
                                                         ) : isYes ? (
-                                                            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                            vc.direction === 'BUY' ? (
+                                                                <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-400 shrink-0">
+                                                                    <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                                </svg>
+                                                            ) : vc.direction === 'SELL' ? (
+                                                                <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-400 shrink-0">
+                                                                    <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                                </svg>
+                                                            ) : (
+                                                                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                            )
                                                         ) : isNo ? (
                                                             <XCircle className="w-3 h-3 text-rose-400 shrink-0" />
                                                         ) : (
@@ -2157,9 +2200,9 @@ function SmartEACockpitContent() {
                                                     )}
                                                 >
                                                     {vc.mode === 'BET_ACTIVE'
-                                                        ? `ออกไม้ช่วยแล้ว @ ${vc.entry_px > 0 ? vc.entry_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`
+                                                        ? `เปิดไม้ Rescue แล้ว @ ${vc.entry_px > 0 ? vc.entry_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`
                                                         : vc.approved
-                                                        ? `Vote อนุญาตออกไม้ช่วยแล้ว @ ${vc.trigger_px > 0 ? vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`
+                                                        ? `Vote อนุญาตออกไม้ Rescue แล้ว @ ${vc.trigger_px > 0 ? vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`
                                                         : vc.reached_trigger
                                                         ? `ถึงจุด Mirror แล้ว • รอ Vote`
                                                         : `รอถึง Mirror @ ${vc.trigger_px > 0 ? vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2) : '-'}`}
@@ -2172,131 +2215,239 @@ function SmartEACockpitContent() {
                                     )}
                                 </button>
 
-                                {/* Expandable Details Panel */}
+                                {/* Expandable Details Panel: 2 Distinct Framed Boxes (Vote Rescue + Trend Strength) */}
                                 {isFreezeVoteExpanded && (
                                     <div className="px-2.5 sm:px-3 pb-3 pt-2 border-t border-slate-700/50 space-y-2.5">
-                                        {/* Detailed Vote Council Grid */}
                                         {vcEnabled && vc ? (
-                                            <div className="space-y-2">
-                                                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
-                                                    <span className="text-cyan-200 font-bold">
-                                                        รายละเอียดสภา Vote Council (เกณฑ์ผ่าน {passPct.toFixed(0)}%)
-                                                    </span>
-                                                    <span className="text-slate-300">
-                                                        คะแนนรวม:{' '}
-                                                        <strong className={passedVote ? 'text-emerald-300' : 'text-cyan-300'}>
-                                                            {vc.yes_w} / {vc.total_w} ({scorePct.toFixed(0)}%)
-                                                        </strong>
-                                                    </span>
-                                                </div>
-
-                                                <div className="relative h-1.5 w-full rounded-full bg-slate-800/90 overflow-hidden">
-                                                    <div
-                                                        className={cn(
-                                                            'h-full transition-all duration-300',
-                                                            passedVote ? 'bg-emerald-400' : 'bg-cyan-400'
-                                                        )}
-                                                        style={{ width: `${Math.min(100, Math.max(0, scorePct))}%` }}
-                                                    />
-                                                </div>
-
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                                                    {voters.map((v) => {
-                                                        const isYes = v.vote === 'YES';
-                                                        const isNo = v.vote === 'NO';
-                                                        const isOff = v.vote === 'OFF' || v.weight <= 0;
-                                                        return (
-                                                            <div
-                                                                key={v.id}
+                                            <div className="space-y-2.5">
+                                                {/* BOX A: Rescue Vote Council */}
+                                                <div className="rounded-lg border border-cyan-500/25 bg-slate-950/60 p-2.5 space-y-2">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className="text-cyan-200 font-bold">
+                                                                ระบบ Vote ออกไม้ Rescue
+                                                            </span>
+                                                            <span
                                                                 className={cn(
-                                                                    'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1.5 text-[11px]',
-                                                                    isOff
-                                                                        ? 'border-slate-700/60 bg-slate-900/50 text-slate-400'
-                                                                        : isYes
-                                                                        ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-200'
-                                                                        : isNo
-                                                                        ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                                                                        : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                                                                    'inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-extrabold',
+                                                                    vc.direction === 'BUY'
+                                                                        ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-300'
+                                                                        : vc.direction === 'SELL'
+                                                                        ? 'border-rose-400/50 bg-rose-500/15 text-rose-300'
+                                                                        : 'border-slate-600 bg-slate-800/70 text-slate-300'
                                                                 )}
                                                             >
-                                                                <div className="min-w-0">
-                                                                    <div className="font-mono font-bold leading-tight flex items-center gap-1">
-                                                                        {isOff ? (
-                                                                            <span className="text-slate-500">-</span>
-                                                                        ) : isYes ? (
-                                                                            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                                                                        ) : isNo ? (
-                                                                            <XCircle className="w-3 h-3 text-rose-400 shrink-0" />
-                                                                        ) : (
-                                                                            <Activity className="w-3 h-3 text-amber-400 shrink-0" />
-                                                                        )}
-                                                                        <span>{v.id}</span>
-                                                                        <span className="text-[10px] opacity-75">w{v.weight}</span>
-                                                                    </div>
-                                                                    <div className="text-[10px] opacity-80 truncate">{v.label}</div>
-                                                                </div>
-                                                                <span
+                                                                เป้าหมาย:{' '}
+                                                                {vc.direction === 'BUY'
+                                                                    ? '▲ BUY'
+                                                                    : vc.direction === 'SELL'
+                                                                    ? '▼ SELL'
+                                                                    : 'รอ Freeze'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {/* 3 RC Circles matching Overview Chart */}
+                                                            <div className="flex items-center gap-1">
+                                                                {displayEntryVoters.slice(0, 3).map((v) => {
+                                                                    const isYes = v.vote === 'YES';
+                                                                    const isNo = v.vote === 'NO';
+                                                                    return (
+                                                                        <span
+                                                                            key={`rc-hd-${v.id}`}
+                                                                            title={`${v.id}: ${v.vote}`}
+                                                                            className={cn(
+                                                                                'w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px] font-bold',
+                                                                                isYes
+                                                                                    ? 'bg-emerald-500/90 border-emerald-300 text-white'
+                                                                                    : isNo
+                                                                                    ? 'bg-rose-500/90 border-rose-300 text-white'
+                                                                                    : 'bg-slate-700 border-slate-500 text-slate-300'
+                                                                            )}
+                                                                        >
+                                                                            {isYes ? '✓' : isNo ? '✕' : '•'}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            <span className="text-slate-300">
+                                                                <strong className={passedVote ? 'text-emerald-300' : 'text-cyan-300'}>
+                                                                    {vc.yes_w}/{vc.total_w} ({scorePct.toFixed(0)}% / {passPct.toFixed(0)}%)
+                                                                </strong>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="relative h-1.5 w-full rounded-full bg-slate-800/90 overflow-hidden">
+                                                        <div
+                                                            className={cn(
+                                                                'h-full transition-all duration-300',
+                                                                passedVote ? 'bg-emerald-400' : 'bg-cyan-400'
+                                                            )}
+                                                            style={{ width: `${Math.min(100, Math.max(0, scorePct))}%` }}
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                                                        {displayEntryVoters.map((v) => {
+                                                            const isYes = v.vote === 'YES';
+                                                            const isNo = v.vote === 'NO';
+                                                            const isOff = v.vote === 'OFF' || v.weight <= 0;
+                                                            return (
+                                                                <div
+                                                                    key={v.id}
                                                                     className={cn(
-                                                                        'font-mono font-extrabold text-[10px] px-1.5 py-0.5 rounded shrink-0',
+                                                                        'flex items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px]',
                                                                         isOff
-                                                                            ? 'bg-slate-800 text-slate-400'
+                                                                            ? 'border-slate-700/60 bg-slate-900/50 text-slate-400'
                                                                             : isYes
-                                                                            ? 'bg-emerald-500/30 text-emerald-200'
+                                                                            ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-200'
                                                                             : isNo
-                                                                            ? 'bg-rose-500/25 text-rose-200'
-                                                                            : 'bg-amber-500/25 text-amber-200'
+                                                                            ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                                                            : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
                                                                     )}
                                                                 >
-                                                                    {v.vote}
+                                                                    <div className="min-w-0">
+                                                                        <div className="font-mono font-bold leading-tight flex items-center gap-1">
+                                                                            <span>{v.id}</span>
+                                                                            <span className="text-[10px] opacity-70">w{v.weight}</span>
+                                                                        </div>
+                                                                        <div className="text-[10px] opacity-80 truncate">{v.label}</div>
+                                                                    </div>
+                                                                    <span
+                                                                        className={cn(
+                                                                            'inline-flex items-center gap-1 font-mono font-extrabold text-[10px] px-2 py-0.5 rounded shrink-0',
+                                                                            isOff
+                                                                                ? 'bg-slate-800 text-slate-400'
+                                                                                : isYes
+                                                                                ? 'bg-emerald-500/30 text-emerald-200'
+                                                                                : isNo
+                                                                                ? 'bg-rose-500/25 text-rose-200'
+                                                                                : 'bg-amber-500/25 text-amber-200'
+                                                                        )}
+                                                                    >
+                                                                        {isOff ? (
+                                                                            'OFF'
+                                                                        ) : isYes ? (
+                                                                            <>
+                                                                                {vc.direction === 'BUY' ? (
+                                                                                    <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-300 shrink-0">
+                                                                                        <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                                                    </svg>
+                                                                                ) : vc.direction === 'SELL' ? (
+                                                                                    <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-300 shrink-0">
+                                                                                        <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                                                    </svg>
+                                                                                ) : null}
+                                                                                <span>ผ่าน</span>
+                                                                            </>
+                                                                        ) : isNo ? (
+                                                                            '✕ รอ'
+                                                                        ) : (
+                                                                            '• รอ'
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-slate-300 pt-0.5">
+                                                        {vc.mirror_px > 0 && (
+                                                            <span>Mirror: <strong className="text-cyan-300">{vc.mirror_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                        )}
+                                                        {vc.trigger_px > 0 && (
+                                                            <span>Trigger: <strong className="text-amber-300">{vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                        )}
+                                                        {vc.entry_px > 0 && vc.mode === 'BET_ACTIVE' && (
+                                                            <span>RC Entry: <strong className="text-emerald-300">{vc.entry_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                        )}
+                                                        {vc.stop_px > 0 && vc.mode === 'BET_ACTIVE' && (
+                                                            <span>Smart SL: <strong className="text-rose-300">{vc.stop_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* BOX B: Trend Strength Council (4 Trend Voters + 5-dot Meter) */}
+                                                {tc && tcVoters.length > 0 && (
+                                                    <div className="rounded-lg border border-slate-700/60 bg-slate-950/60 p-2.5 space-y-2">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="text-slate-200 font-bold">
+                                                                    ตัววัดเทรนหลัก (4 ตัว)
+                                                                </span>
+                                                                <span
+                                                                    className={cn(
+                                                                        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-extrabold',
+                                                                        tc.direction === 'BUY'
+                                                                            ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-300'
+                                                                            : tc.direction === 'SELL'
+                                                                            ? 'border-rose-400/50 bg-rose-500/15 text-rose-300'
+                                                                            : 'border-slate-600 bg-slate-800/70 text-slate-300'
+                                                                    )}
+                                                                >
+                                                                    {tc.direction === 'BUY' ? (
+                                                                        <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-400 shrink-0">
+                                                                            <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                                        </svg>
+                                                                    ) : tc.direction === 'SELL' ? (
+                                                                        <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-rose-400 shrink-0">
+                                                                            <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <span>•</span>
+                                                                    )}
+                                                                    <span>{tc.direction}</span>
+                                                                    <span className="inline-flex items-center gap-[2px]">
+                                                                        {[1, 2, 3, 4, 5].map((lv) => (
+                                                                            <span
+                                                                                key={`exp-tdot-${lv}`}
+                                                                                className={cn(
+                                                                                    'w-[4.5px] h-[4.5px] rounded-full',
+                                                                                    lv <= tc.yes_w
+                                                                                        ? tc.direction === 'BUY'
+                                                                                            ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.75)]'
+                                                                                            : tc.direction === 'SELL'
+                                                                                            ? 'bg-rose-400 shadow-[0_0_4px_rgba(251,113,133,0.75)]'
+                                                                                            : 'bg-slate-400'
+                                                                                        : 'bg-slate-600/80'
+                                                                                )}
+                                                                            />
+                                                                        ))}
+                                                                    </span>
                                                                 </span>
                                                             </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-slate-300 pt-0.5">
-                                                    {vc.mirror_px > 0 && (
-                                                        <span>Mirror: <strong className="text-cyan-300">{vc.mirror_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
-                                                    )}
-                                                    {vc.trigger_px > 0 && (
-                                                        <span>Trigger: <strong className="text-amber-300">{vc.trigger_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
-                                                    )}
-                                                    {vc.entry_px > 0 && vc.mode === 'BET_ACTIVE' && (
-                                                        <span>Entry: <strong className="text-emerald-300">{vc.entry_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
-                                                    )}
-                                                    {vc.stop_px > 0 && vc.mode === 'BET_ACTIVE' && (
-                                                        <span>Smart SL: <strong className="text-rose-300">{vc.stop_px.toFixed(eaState?.chart?.digits ?? 2)}</strong></span>
-                                                    )}
-                                                </div>
-
-                                                {/* Trend Council (4 Trend Voters / BE Hold) */}
-                                                {tc && tcVoters.length > 0 && (
-                                                    <div className="pt-2 border-t border-slate-700/50 space-y-1.5">
-                                                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
-                                                            <span className="text-slate-200 font-bold">
-                                                                ตัววัดเทรนหลัก / BE Hold (4 ตัว: {tc.direction})
-                                                            </span>
                                                             <span className="text-slate-300">
-                                                                คะแนนเทรน:{' '}
-                                                                <strong className={tc.yes_w >= 3 ? 'text-emerald-300' : 'text-slate-300'}>
+                                                                คะแนนรวม:{' '}
+                                                                <strong
+                                                                    className={
+                                                                        tc.direction === 'BUY'
+                                                                            ? 'text-emerald-300'
+                                                                            : tc.direction === 'SELL'
+                                                                            ? 'text-rose-300'
+                                                                            : 'text-slate-300'
+                                                                    }
+                                                                >
                                                                     {tc.yes_w} / {tc.total_w} ({Math.round((tc.yes_w / Math.max(1, tc.total_w)) * 100)}%)
                                                                 </strong>
                                                             </span>
                                                         </div>
+
                                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                                                             {tcVoters.map((tv) => {
                                                                 const isYes = tv.vote === 'YES';
-                                                                const isNo = tv.vote === 'NO';
+                                                                const isBuyTrend = tc.direction === 'BUY';
+                                                                const isSellTrend = tc.direction === 'SELL';
+                                                                const dotsCount = Math.max(1, tv.weight || 1);
                                                                 return (
                                                                     <div
                                                                         key={tv.id}
                                                                         className={cn(
-                                                                            'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1 text-[11px]',
-                                                                            isYes
+                                                                            'flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1.5 text-[11px]',
+                                                                            isYes && isBuyTrend
                                                                                 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                                                                                : isNo
-                                                                                ? 'border-rose-500/35 bg-rose-500/10 text-rose-200'
-                                                                                : 'border-slate-700 bg-slate-900/50 text-slate-300'
+                                                                                : isYes && isSellTrend
+                                                                                ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                                                                : 'border-slate-700/70 bg-slate-900/50 text-slate-400'
                                                                         )}
                                                                     >
                                                                         <div className="min-w-0">
@@ -2305,7 +2456,34 @@ function SmartEACockpitContent() {
                                                                             </div>
                                                                             <div className="text-[10px] opacity-75 truncate">{tv.label}</div>
                                                                         </div>
-                                                                        <span className="font-mono font-bold text-[10px] shrink-0">{tv.vote}</span>
+                                                                        <div className="flex items-center gap-1 shrink-0">
+                                                                            {isYes && isBuyTrend ? (
+                                                                                <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-emerald-400 shrink-0">
+                                                                                    <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                                                </svg>
+                                                                            ) : isYes && isSellTrend ? (
+                                                                                <svg viewBox="0 0 8 7" className="w-2.5 h-2.5 text-rose-400 shrink-0">
+                                                                                    <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                                                </svg>
+                                                                            ) : (
+                                                                                <span className="font-mono text-[10px] text-slate-500">—</span>
+                                                                            )}
+                                                                            <span className="inline-flex items-center gap-[2px]">
+                                                                                {Array.from({ length: dotsCount }).map((_, idx) => (
+                                                                                    <span
+                                                                                        key={`tv-dot-${tv.id}-${idx}`}
+                                                                                        className={cn(
+                                                                                            'w-[4px] h-[4px] rounded-full',
+                                                                                            isYes && isBuyTrend
+                                                                                                ? 'bg-emerald-400'
+                                                                                                : isYes && isSellTrend
+                                                                                                ? 'bg-rose-400'
+                                                                                                : 'bg-slate-600/80'
+                                                                                        )}
+                                                                                    />
+                                                                                ))}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
                                                                 );
                                                             })}
