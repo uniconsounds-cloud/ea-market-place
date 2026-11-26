@@ -399,7 +399,27 @@ export default function SmartTacticalOverview({
             maxP = Math.max(maxP, bid);
         }
 
-        const estTp = chart?.est_tp_price && chart.est_tp_price > 0 ? chart.est_tp_price : 0;
+        let estTp = chart?.est_tp_price && chart.est_tp_price > 0 ? chart.est_tp_price : 0;
+        const hasEffectiveTp = typeof (chart as any)?.effective_tp === 'number';
+        const rescueOpenedForTp = Boolean(
+            voteCouncil &&
+                ((voteCouncil.bets_opened ?? 0) > 0 ||
+                    voteCouncil.mode === 'BET_ACTIVE' ||
+                    voteCouncil.mode === 'SL_DONE')
+        );
+        const effTpMoney = hasEffectiveTp
+            ? Number((chart as any).effective_tp)
+            : rescueOpenedForTp
+            ? Math.min(targetProfit, -300)
+            : targetProfit;
+
+        // If EA hasn't sent effective_tp yet while Rescue is open, scale estTp from base targetProfit -> effTpMoney
+        if (!hasEffectiveTp && rescueOpenedForTp && estTp > 0 && bid > 0 && Math.abs(targetProfit - liveCyclePnl) > 0.01) {
+            const dTp = estTp - bid;
+            const ratio = (effTpMoney - liveCyclePnl) / (targetProfit - liveCyclePnl);
+            estTp = bid + dTp * ratio;
+        }
+
         let estSl = (chart as any)?.est_sl_price > 0 ? (chart as any).est_sl_price : 0;
         if (estSl <= 0 && freezeStopLoss < 0 && estTp > 0 && bid > 0 && Math.abs(targetProfit - liveCyclePnl) > 0.01) {
             const dTp = estTp - bid;
@@ -434,7 +454,7 @@ export default function SmartTacticalOverview({
         minP -= pad;
         maxP += pad;
 
-        return { closes, bid, minP, maxP, estTp, estSl, rcPrice, rcEntryPx, openOrders };
+        return { closes, bid, minP, maxP, estTp, effTpMoney, estSl, rcPrice, rcEntryPx, openOrders };
     }, [chart, voteCouncil, isBuyFrozen, isSellFrozen, pointSize, freezeStopLoss, targetProfit, liveCyclePnl]);
 
     // =========================================================================
@@ -841,15 +861,7 @@ export default function SmartTacticalOverview({
                                     <div className="pointer-events-none absolute inset-0">
                                         {/* TP Label (sitting on top of TP line, or just below if pinned at top edge) */}
                                         {tpPct !== null && (() => {
-                                            const rescueOpened = Boolean(
-                                                voteCouncil &&
-                                                    ((voteCouncil.bets_opened ?? 0) > 0 ||
-                                                        voteCouncil.mode === 'BET_ACTIVE' ||
-                                                        voteCouncil.mode === 'SL_DONE')
-                                            );
-                                            const effTpVal = Math.round(
-                                                rescueOpened ? Math.min(targetProfit, -300) : targetProfit
-                                            );
+                                            const effTpVal = Math.round(spark.effTpMoney);
                                             const tpLabel =
                                                 effTpVal > 0
                                                     ? `TP+${effTpVal}`
