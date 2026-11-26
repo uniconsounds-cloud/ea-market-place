@@ -1928,6 +1928,7 @@ function SmartEACockpitContent() {
                         initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
                         lotIncrement={eaState?.active_config?.lot_increment ?? (parseFloat(lotIncrement) || 0.01)}
                         chart={eaState?.chart}
+                        voteCouncil={eaState?.vote_council}
                         roundHistory={eaState?.round_history}
                         isWaitingFreshData={isWaitingFreshData}
                         lastPing={eaState?.last_ping}

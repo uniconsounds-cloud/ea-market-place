@@ -5,6 +5,32 @@ import { Lock, RefreshCw } from 'lucide-react';
 import type { SmartChartData } from '@/components/smart-vortex-chart';
 import type { RoundHistoryTuple } from '@/components/round-history-bar';
 
+interface VoteCouncilVoterOverview {
+    id: string;
+    label: string;
+    weight: number;
+    vote: 'YES' | 'NO' | 'WAIT' | 'OFF' | string;
+}
+
+interface VoteCouncilOverview {
+    enabled: boolean;
+    mode?: string;
+    direction?: string;
+    mirror_px?: number;
+    trigger_px?: number;
+    entry_px?: number;
+    stop_px?: number;
+    score_pct?: number;
+    pass_pct?: number;
+    voters?: VoteCouncilVoterOverview[];
+    trend_council?: {
+        direction: string;
+        yes_w: number;
+        total_w: number;
+        voters?: VoteCouncilVoterOverview[];
+    } | null;
+}
+
 interface SmartTacticalOverviewProps {
     port: string;
     symbol: string;
@@ -21,6 +47,7 @@ interface SmartTacticalOverviewProps {
     initialLot: number;
     lotIncrement: number;
     chart?: SmartChartData | null;
+    voteCouncil?: VoteCouncilOverview | null;
     roundHistory?: RoundHistoryTuple[] | null;
     isWaitingFreshData?: boolean;
     lastPing?: string;
@@ -44,6 +71,7 @@ export default function SmartTacticalOverview({
     initialLot,
     lotIncrement,
     chart,
+    voteCouncil,
     roundHistory,
     isWaitingFreshData = false,
     lastPing,
@@ -334,9 +362,6 @@ export default function SmartTacticalOverview({
             minP = Math.min(minP, bid);
             maxP = Math.max(maxP, bid);
         }
-        const pad = Math.max((maxP - minP) * 0.18, pointSize * 35);
-        minP -= pad;
-        maxP += pad;
 
         const estTp = chart?.est_tp_price && chart.est_tp_price > 0 ? chart.est_tp_price : 0;
         let estSl = (chart as any)?.est_sl_price > 0 ? (chart as any).est_sl_price : 0;
@@ -346,8 +371,42 @@ export default function SmartTacticalOverview({
             estSl = bid + dTp * ratio;
         }
 
-        return { closes, bid, minP, maxP, estTp, estSl };
-    }, [chart, pointSize, freezeStopLoss, targetProfit, liveCyclePnl]);
+        const rcPrice =
+            isBuyFrozen || isSellFrozen
+                ? voteCouncil?.trigger_px && voteCouncil.trigger_px > 0
+                    ? voteCouncil.trigger_px
+                    : voteCouncil?.mirror_px && voteCouncil.mirror_px > 0
+                    ? voteCouncil.mirror_px
+                    : chart?.freeze_price && chart.freeze_price > 0
+                    ? chart.freeze_price
+                    : 0
+                : 0;
+
+        const openOrders = (chart?.orders || []).filter((o) => (o.t === 'B' || o.t === 'S') && o.p > 0);
+
+        if (estTp > 0) {
+            minP = Math.min(minP, estTp);
+            maxP = Math.max(maxP, estTp);
+        }
+        if (rcPrice > 0) {
+            minP = Math.min(minP, rcPrice);
+            maxP = Math.max(maxP, rcPrice);
+        }
+        if (estSl > 0 && freezeStopLoss < 0) {
+            minP = Math.min(minP, estSl);
+            maxP = Math.max(maxP, estSl);
+        }
+        for (const o of openOrders) {
+            minP = Math.min(minP, o.p);
+            maxP = Math.max(maxP, o.p);
+        }
+
+        const pad = Math.max((maxP - minP) * 0.08, pointSize * 20);
+        minP -= pad;
+        maxP += pad;
+
+        return { closes, bid, minP, maxP, estTp, estSl, rcPrice, openOrders };
+    }, [chart, voteCouncil, isBuyFrozen, isSellFrozen, pointSize, freezeStopLoss, targetProfit, liveCyclePnl]);
 
     // =========================================================================
     // SECTION 4: Vertical PnL Bar + Per-Round Peak Excursion Marker
@@ -597,8 +656,8 @@ export default function SmartTacticalOverview({
                 {/* =========================================================
                     SECTION 3 (3/6 = 50% width): Full-Window Price Line Chart
                    ========================================================= */}
-                <div className="col-span-3 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 sm:p-2 relative overflow-hidden">
-                    <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono">
+                <div className="col-span-3 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 px-1.5 py-1 sm:px-2 sm:py-1.5 relative overflow-hidden">
+                    <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono leading-none shrink-0 z-10">
                         <span className="text-cyan-300 font-bold">
                             {symbol} {spark.bid > 0 ? spark.bid.toFixed(digits) : ''}
                         </span>
@@ -613,34 +672,46 @@ export default function SmartTacticalOverview({
                         </div>
                     </div>
 
-                    {/* SVG Full-Window Price Line */}
-                    <div className="my-0.5 flex-1 flex items-center justify-center min-h-0">
-                        <svg viewBox="0 0 220 96" className="w-full h-full overflow-visible">
-                            {(() => {
-                                const span = Math.max(pointSize * 10, spark.maxP - spark.minP);
-                                const yOf = (p: number) => {
-                                    const clamped = Math.max(spark.minP, Math.min(spark.maxP, p));
-                                    return 8 + ((spark.maxP - clamped) / span) * 80;
-                                };
+                    {/* Full-Height Stretched Price Line + Crisp HTML Overlay */}
+                    <div className="relative my-0.5 flex-1 min-h-0 w-full">
+                        {(() => {
+                            const span = Math.max(pointSize * 10, spark.maxP - spark.minP);
+                            const pctOf = (p: number) => {
+                                const clamped = Math.max(spark.minP, Math.min(spark.maxP, p));
+                                return 3 + ((spark.maxP - clamped) / span) * 94;
+                            };
 
-                                const pts = spark.closes
-                                    .map((c, i) => {
-                                        const x = spark.closes.length > 1 ? (i / (spark.closes.length - 1)) * 212 + 4 : 110;
-                                        return `${x.toFixed(1)},${yOf(c).toFixed(1)}`;
-                                    })
-                                    .join(' ');
+                            const pts = spark.closes
+                                .map((c, i) => {
+                                    const x = spark.closes.length > 1 ? (i / (spark.closes.length - 1)) * 216 + 2 : 110;
+                                    return `${x.toFixed(1)},${pctOf(c).toFixed(1)}`;
+                                })
+                                .join(' ');
 
-                                const areaPts =
-                                    spark.closes.length > 1
-                                        ? `4,88 ${pts} 216,88`
-                                        : '';
+                            const areaPts =
+                                spark.closes.length > 1
+                                    ? `2,99 ${pts} 218,99`
+                                    : '';
 
-                                const bidY = spark.bid > 0 ? yOf(spark.bid) : 48;
-                                const tpY = spark.estTp > 0 ? yOf(spark.estTp) : null;
-                                const slY = spark.estSl > 0 ? yOf(spark.estSl) : null;
+                            const bidPct = spark.bid > 0 ? pctOf(spark.bid) : 50;
+                            const tpPct = spark.estTp > 0 ? pctOf(spark.estTp) : null;
+                            const slPct = spark.estSl > 0 && freezeStopLoss < 0 ? pctOf(spark.estSl) : null;
+                            const rcPct = (isBuyFrozen || isSellFrozen) && spark.rcPrice > 0 ? pctOf(spark.rcPrice) : null;
 
-                                return (
-                                    <>
+                            const tc = voteCouncil?.trend_council;
+                            const trendDir = tc?.direction === 'BUY' || tc?.direction === 'SELL' ? tc.direction : 'NONE';
+                            const trendLevel = Math.max(0, Math.min(5, tc?.yes_w ?? 0));
+
+                            const activeEntryVoters = (voteCouncil?.voters || []).filter((v) => v.weight > 0).slice(0, 3);
+                            const rcSignals = [0, 1, 2].map((idx) => activeEntryVoters[idx] || null);
+
+                            return (
+                                <>
+                                    <svg
+                                        viewBox="0 0 220 100"
+                                        preserveAspectRatio="none"
+                                        className="absolute inset-0 w-full h-full overflow-visible"
+                                    >
                                         <defs>
                                             <linearGradient id="svSparkGrad" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.22" />
@@ -648,64 +719,238 @@ export default function SmartTacticalOverview({
                                             </linearGradient>
                                         </defs>
 
-                                        {/* Frozen side lock zone + icon */}
-                                        {isBuyFrozen && (
-                                            <g>
-                                                <rect x="0" y="0" width="220" height="12" fill="rgba(244,63,94,0.14)" />
-                                                <text x="110" y="9" fill="#fda4af" fontSize="7.5" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
-                                                    🔒 BUY FROZEN
-                                                </text>
-                                            </g>
-                                        )}
-                                        {isSellFrozen && (
-                                            <g>
-                                                <rect x="0" y="84" width="220" height="12" fill="rgba(244,63,94,0.14)" />
-                                                <text x="110" y="93" fill="#fda4af" fontSize="7.5" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
-                                                    🔒 SELL FROZEN
-                                                </text>
-                                            </g>
-                                        )}
-
                                         {/* Area fill under price curve */}
                                         {areaPts && <polygon points={areaPts} fill="url(#svSparkGrad)" />}
 
+                                        {/* Open Order Level Lines (Center -> Far Right, thin Buy/Sell colored lines) */}
+                                        {spark.openOrders.map((o, idx) => {
+                                            const oy = pctOf(o.p);
+                                            const isBuy = o.t === 'B';
+                                            return (
+                                                <line
+                                                    key={`ord-${idx}`}
+                                                    x1="110"
+                                                    y1={oy}
+                                                    x2="220"
+                                                    y2={oy}
+                                                    stroke={isBuy ? '#38bdf8' : '#fb923c'}
+                                                    strokeWidth="0.7"
+                                                    vectorEffect="non-scaling-stroke"
+                                                    opacity="0.7"
+                                                />
+                                            );
+                                        })}
+
                                         {/* TP Line */}
-                                        {tpY !== null && (
-                                            <g>
-                                                <line x1="0" y1={tpY} x2="220" y2={tpY} stroke="#10b981" strokeWidth="1" strokeDasharray="3 2" />
-                                                <text x="3" y={Math.max(9, tpY - 2)} fill="#34d399" fontSize="8" fontFamily="monospace" fontWeight="bold">
-                                                    TP {spark.estTp.toFixed(digits)}
-                                                </text>
-                                            </g>
+                                        {tpPct !== null && (
+                                            <line
+                                                x1="0"
+                                                y1={tpPct}
+                                                x2="220"
+                                                y2={tpPct}
+                                                stroke="#10b981"
+                                                strokeWidth="1"
+                                                strokeDasharray="3 2"
+                                                vectorEffect="non-scaling-stroke"
+                                            />
                                         )}
 
-                                        {/* SL Line */}
-                                        {slY !== null && freezeStopLoss < 0 && (
-                                            <g>
-                                                <line x1="0" y1={slY} x2="220" y2={slY} stroke="#f59e0b" strokeWidth="1" strokeDasharray="2 2" />
-                                                <text x="3" y={Math.min(92, slY + 8)} fill="#fbbf24" fontSize="8" fontFamily="monospace" fontWeight="bold">
-                                                    SL {spark.estSl.toFixed(digits)}
-                                                </text>
-                                            </g>
+                                        {/* SL Line (only if SL is configured) */}
+                                        {slPct !== null && (
+                                            <line
+                                                x1="0"
+                                                y1={slPct}
+                                                x2="220"
+                                                y2={slPct}
+                                                stroke="#f59e0b"
+                                                strokeWidth="1"
+                                                strokeDasharray="2 2"
+                                                vectorEffect="non-scaling-stroke"
+                                            />
                                         )}
 
-                                        {/* Current Price Line */}
-                                        <line x1="0" y1={bidY} x2="220" y2={bidY} stroke="#38bdf8" strokeWidth="0.8" strokeDasharray="2 2" opacity="0.7" />
+                                        {/* Rescue (RC) Line (only when Frozen) */}
+                                        {rcPct !== null && (
+                                            <line
+                                                x1="0"
+                                                y1={rcPct}
+                                                x2="220"
+                                                y2={rcPct}
+                                                stroke="#fb7185"
+                                                strokeWidth="1"
+                                                strokeDasharray="3 2"
+                                                vectorEffect="non-scaling-stroke"
+                                            />
+                                        )}
+
+                                        {/* Current Price (Now) Line */}
+                                        <line
+                                            x1="0"
+                                            y1={bidPct}
+                                            x2="220"
+                                            y2={bidPct}
+                                            stroke="#38bdf8"
+                                            strokeWidth="0.8"
+                                            strokeDasharray="2 2"
+                                            vectorEffect="non-scaling-stroke"
+                                            opacity="0.75"
+                                        />
 
                                         {/* Full Price Polyline */}
                                         {spark.closes.length > 1 && (
-                                            <polyline fill="none" stroke="#22d3ee" strokeWidth="1.6" points={pts} />
+                                            <polyline
+                                                fill="none"
+                                                stroke="#22d3ee"
+                                                strokeWidth="1.6"
+                                                vectorEffect="non-scaling-stroke"
+                                                points={pts}
+                                            />
+                                        )}
+                                    </svg>
+
+                                    {/* Crisp Non-Stretched HTML Markers & Labels */}
+                                    <div className="pointer-events-none absolute inset-0">
+                                        {/* TP Label + Trend Direction Triangle + 5 Level Dots */}
+                                        {tpPct !== null && (
+                                            <div
+                                                style={{ top: `${tpPct}%` }}
+                                                className="absolute left-0.5 flex items-center gap-1 -translate-y-1/2"
+                                            >
+                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-emerald-400 leading-none bg-[#030710]/80 px-0.5 rounded">
+                                                    TP
+                                                </span>
+                                                {trendDir === 'BUY' && (
+                                                    <div className="flex items-center gap-[2px] -translate-y-[5px] bg-[#030710]/70 px-0.5 rounded">
+                                                        <svg viewBox="0 0 8 7" className="w-2 h-2 text-emerald-400 shrink-0">
+                                                            <polygon points="4,0 8,7 0,7" fill="currentColor" />
+                                                        </svg>
+                                                        <div className="flex items-center gap-[2px]">
+                                                            {[1, 2, 3, 4, 5].map((lv) => (
+                                                                <span
+                                                                    key={`t-dot-${lv}`}
+                                                                    className={`w-[5px] h-[5px] rounded-full ${
+                                                                        lv <= trendLevel
+                                                                            ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.75)]'
+                                                                            : 'bg-slate-600/80'
+                                                                    }`}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {trendDir === 'SELL' && (
+                                                    <div className="flex items-center gap-[2px] translate-y-[6px] bg-[#030710]/70 px-0.5 rounded">
+                                                        <svg viewBox="0 0 8 7" className="w-2 h-2 text-rose-400 shrink-0">
+                                                            <polygon points="0,0 8,0 4,7" fill="currentColor" />
+                                                        </svg>
+                                                        <div className="flex items-center gap-[2px]">
+                                                            {[1, 2, 3, 4, 5].map((lv) => (
+                                                                <span
+                                                                    key={`t-dot-${lv}`}
+                                                                    className={`w-[5px] h-[5px] rounded-full ${
+                                                                        lv <= trendLevel
+                                                                            ? 'bg-rose-400 shadow-[0_0_4px_rgba(251,113,133,0.75)]'
+                                                                            : 'bg-slate-600/80'
+                                                                    }`}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
 
+                                        {/* SL Label (only when SL is set) */}
+                                        {slPct !== null && (
+                                            <div
+                                                style={{ top: `${slPct}%` }}
+                                                className="absolute left-0.5 -translate-y-1/2"
+                                            >
+                                                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-amber-400 leading-none bg-[#030710]/85 px-0.5 rounded">
+                                                    SL
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Rescue (RC) Label + 3 Larger Vote Signal Circles */}
+                                        {rcPct !== null && (
+                                            <div
+                                                style={{ top: `${rcPct}%` }}
+                                                className="absolute left-0.5 -translate-y-1/2 flex items-center gap-1"
+                                            >
+                                                <span className="font-mono text-[8px] sm:text-[9px] font-extrabold text-rose-300 leading-none bg-[#030710]/90 px-0.5 rounded">
+                                                    RC
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    {rcSignals.map((sig, idx) => {
+                                                        const vote = sig?.vote || 'WAIT';
+                                                        const isYes = vote === 'YES';
+                                                        const isNo = vote === 'NO';
+                                                        return (
+                                                            <span
+                                                                key={`rc-sig-${idx}`}
+                                                                title={sig ? `${sig.id}: ${vote}` : 'Signal'}
+                                                                className={`w-3 h-3 rounded-full border flex items-center justify-center shadow-sm ${
+                                                                    isYes
+                                                                        ? 'bg-emerald-500/90 border-emerald-300 text-white shadow-[0_0_5px_rgba(16,185,129,0.7)]'
+                                                                        : isNo
+                                                                        ? 'bg-rose-500/90 border-rose-300 text-white shadow-[0_0_5px_rgba(244,63,94,0.6)]'
+                                                                        : 'bg-slate-700/90 border-slate-500 text-slate-300'
+                                                                }`}
+                                                            >
+                                                                {isYes ? (
+                                                                    <svg viewBox="0 0 10 10" className="w-2 h-2">
+                                                                        <path
+                                                                            d="M2 5.2 L4.2 7.4 L8.2 2.8"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            strokeWidth="1.6"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                        />
+                                                                    </svg>
+                                                                ) : isNo ? (
+                                                                    <svg viewBox="0 0 10 10" className="w-2 h-2">
+                                                                        <path
+                                                                            d="M2.6 2.6 L7.4 7.4 M7.4 2.6 L2.6 7.4"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            strokeWidth="1.6"
+                                                                            strokeLinecap="round"
+                                                                        />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <span className="w-1 h-1 rounded-full bg-current" />
+                                                                )}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Current Price (Now) Label */}
+                                        <div
+                                            style={{ top: `${bidPct}%` }}
+                                            className="absolute left-0.5 -translate-y-1/2"
+                                        >
+                                            <span className="font-mono text-[8px] sm:text-[9px] font-bold text-sky-400 leading-none bg-[#030710]/85 px-0.5 rounded">
+                                                Now
+                                            </span>
+                                        </div>
+
                                         {/* Current Bid Dot */}
-                                        <circle cx="216" cy={bidY} r="2.8" fill="#ffffff" stroke="#22d3ee" strokeWidth="1.4" />
-                                    </>
-                                );
-                            })()}
-                        </svg>
+                                        <span
+                                            style={{ top: `${bidPct}%`, right: '1px' }}
+                                            className="absolute -translate-y-1/2 w-[6px] h-[6px] rounded-full bg-white border-[1.5px] border-cyan-400 shadow-[0_0_5px_#22d3ee]"
+                                        />
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
 
-                    <div className="flex items-center justify-between font-mono text-[8px] text-slate-400 leading-none">
+                    <div className="flex items-center justify-between font-mono text-[8px] text-slate-400 leading-none shrink-0 z-10">
                         <span className="text-emerald-400">
                             TP:{spark.estTp > 0 ? spark.estTp.toFixed(digits) : '--'}
                         </span>
