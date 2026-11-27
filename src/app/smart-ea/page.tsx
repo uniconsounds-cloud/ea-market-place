@@ -783,9 +783,24 @@ function SmartEACockpitContent() {
     const cur = eaState?.currency || 'USD';
     const liveCyclePnl = (eaState?.cycle_pnl || 0) + pnlJitter;
     const liveEquity = (eaState?.equity || 0) + pnlJitter;
-    const activeTp = isPendingAck && lastCommand?.target_profit !== undefined
+    const baseActiveTp = isPendingAck && lastCommand?.target_profit !== undefined
         ? Number(lastCommand.target_profit)
         : (eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20));
+    const chartEffectiveTp = (eaState?.chart as any)?.effective_tp;
+    const hasChartEffectiveTp = typeof chartEffectiveTp === 'number' && !Number.isNaN(chartEffectiveTp);
+    const rescueOpenedNow = Boolean(
+        eaState?.vote_council &&
+            ((eaState.vote_council.bets_opened ?? 0) > 0 ||
+                eaState.vote_council.mode === 'BET_ACTIVE' ||
+                eaState.vote_council.mode === 'SL_DONE')
+    );
+    const activeTp = isPendingAck && lastCommand?.target_profit !== undefined
+        ? Number(lastCommand.target_profit)
+        : hasChartEffectiveTp
+        ? chartEffectiveTp
+        : rescueOpenedNow
+        ? Math.min(baseActiveTp, -300)
+        : baseActiveTp;
     const activeFreezeSl = isPendingAck && lastCommand?.freeze_stop_loss !== undefined
         ? Number(lastCommand.freeze_stop_loss)
         : (eaState?.active_config?.freeze_stop_loss ?? (parseFloat(freezeStopLoss) || 0));
@@ -1925,6 +1940,7 @@ function SmartEACockpitContent() {
                         liveCyclePnl={liveCyclePnl}
                         todayProfit={eaState?.today_profit}
                         targetProfit={activeTp}
+                        baseTargetProfit={baseActiveTp}
                         freezeStopLoss={activeFreezeSl}
                         spacingPoints={eaState?.active_config?.spacing ?? (parseInt(spacing, 10) || 100)}
                         initialLot={eaState?.active_config?.initial_lot ?? (parseFloat(initialLot) || 0.01)}
@@ -2642,7 +2658,7 @@ function SmartEACockpitContent() {
                             symbol={eaState?.symbol || 'XAUUSD'}
                             currency={cur}
                             anchor={eaState?.anchor || 0}
-                            targetProfit={eaState?.active_config?.target_profit ?? (parseFloat(targetProfit) || 20)}
+                            targetProfit={activeTp}
                             frozenSide={eaState?.frozen_side}
                             isOnline={isOnline && !isWaitingFreshData}
                             isScanning={isWaitingFreshData}

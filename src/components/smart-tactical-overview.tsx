@@ -44,6 +44,7 @@ interface SmartTacticalOverviewProps {
     liveCyclePnl: number;
     todayProfit?: number | null;
     targetProfit: number;
+    baseTargetProfit?: number;
     freezeStopLoss: number;
     spacingPoints: number;
     initialLot: number;
@@ -69,6 +70,7 @@ export default function SmartTacticalOverview({
     liveCyclePnl,
     todayProfit: todayProfitProp,
     targetProfit,
+    baseTargetProfit,
     freezeStopLoss,
     spacingPoints,
     initialLot,
@@ -413,10 +415,11 @@ export default function SmartTacticalOverview({
             ? Math.min(targetProfit, -300)
             : targetProfit;
 
-        // If EA hasn't sent effective_tp yet while Rescue is open, scale estTp from base targetProfit -> effTpMoney
-        if (!hasEffectiveTp && rescueOpenedForTp && estTp > 0 && bid > 0 && Math.abs(targetProfit - liveCyclePnl) > 0.01) {
+        // If EA hasn't sent effective_tp yet while Rescue is open, scale estTp from baseTargetProfit -> effTpMoney
+        const scaleBaseTp = baseTargetProfit ?? targetProfit;
+        if (!hasEffectiveTp && rescueOpenedForTp && estTp > 0 && bid > 0 && Math.abs(scaleBaseTp - liveCyclePnl) > 0.01) {
             const dTp = estTp - bid;
-            const ratio = (effTpMoney - liveCyclePnl) / (targetProfit - liveCyclePnl);
+            const ratio = (effTpMoney - liveCyclePnl) / (scaleBaseTp - liveCyclePnl);
             estTp = bid + dTp * ratio;
         }
 
