@@ -418,6 +418,7 @@ export default function SmartTacticalOverview({
         profit: number;
         trades: number;
         durationSec: number;
+        prefixCount: number;
         closes: number[];
         tpPrice: number;
         tpMoney: number;
@@ -498,7 +499,7 @@ export default function SmartTacticalOverview({
             localStorage.setItem(
                 `sv_last_active_chart_${port}`,
                 JSON.stringify({
-                    candles: chart.candles.slice(-20),
+                    candles: chart.candles.slice(-60),
                     estTp,
                     effTp: targetProfit,
                     bid,
@@ -579,25 +580,40 @@ export default function SmartTacticalOverview({
                 tpPrice = lastReal;
             }
 
-            // Interpolate smoothly between real pre-close points so 1-3 min history plays smoothly in 3s
-            const interpCloses: number[] = [];
-            const rawPts = [...recentCloses, tpPrice];
-            for (let i = 0; i < rawPts.length - 1; i++) {
-                const a = rawPts[i];
-                const b = rawPts[i + 1];
+            // Keep full 60M candle view (same scale & context as live chart), animating the last 1-3m approach to TP
+            const full60Candles = srcCandles.slice(-60);
+            const full60Closes = full60Candles.map((c) => c[4]);
+            const tailCandlesCount = Math.min(3, Math.max(1, Math.floor(full60Closes.length / 4)));
+            const prefixCloses =
+                full60Closes.length > tailCandlesCount
+                    ? full60Closes.slice(0, full60Closes.length - tailCandlesCount)
+                    : [];
+
+            const interpTail: number[] = [];
+            const rawTail = [...recentCloses, tpPrice];
+            for (let i = 0; i < rawTail.length - 1; i++) {
+                const a = rawTail[i];
+                const b = rawTail[i + 1];
                 const steps = 4;
                 for (let s = 0; s < steps; s++) {
-                    interpCloses.push(a + ((b - a) * s) / steps);
+                    interpTail.push(a + ((b - a) * s) / steps);
                 }
             }
-            interpCloses.push(tpPrice);
+            interpTail.push(tpPrice);
 
+            const combinedCloses = [...prefixCloses, ...interpTail];
             const replayOrders: { t: 'B' | 'S'; p: number }[] = Array.isArray(replayRecord?.orders)
                 ? replayRecord.orders
                 : [];
-            const cMin = Math.min(...interpCloses);
-            const cMax = Math.max(...interpCloses);
-            const pad = Math.max((cMax - cMin) * 0.16, pointSize * 25);
+            const cMin =
+                full60Candles.length > 0
+                    ? Math.min(...full60Candles.map((c) => c[3]), ...combinedCloses)
+                    : Math.min(...combinedCloses);
+            const cMax =
+                full60Candles.length > 0
+                    ? Math.max(...full60Candles.map((c) => c[2]), ...combinedCloses)
+                    : Math.max(...combinedCloses);
+            const pad = Math.max((cMax - cMin) * 0.12, pointSize * 20);
 
             const recBuy = Number(replayRecord?.openBuy || 0);
             const recSell = Number(replayRecord?.openSell || 0);
@@ -621,7 +637,8 @@ export default function SmartTacticalOverview({
                     profit,
                     trades,
                     durationSec,
-                    closes: interpCloses,
+                    prefixCount: prefixCloses.length,
+                    closes: combinedCloses,
                     tpPrice,
                     tpMoney: typeof replayRecord?.effTp === 'number' ? replayRecord.effTp : targetProfit,
                     minP: cMin - pad,
@@ -1078,7 +1095,7 @@ export default function SmartTacticalOverview({
                             const activeCloses = closeReplay
                                 ? (() => {
                                       const moveP = Math.min(1, closeReplay.progress / 0.72);
-                                      const baseLen = Math.max(4, closeReplay.closes.length - 8);
+                                      const baseLen = Math.max(1, closeReplay.prefixCount);
                                       const visibleCount = Math.max(
                                           baseLen,
                                           Math.round(baseLen + (closeReplay.closes.length - baseLen) * moveP)
@@ -1101,14 +1118,20 @@ export default function SmartTacticalOverview({
 
                             const pts = activeCloses
                                 .map((c, i) => {
-                                    const x = activeCloses.length > 1 ? (i / (activeCloses.length - 1)) * 216 + 2 : 110;
+                                    const denom = isReplaying
+                                        ? Math.max(1, closeReplay!.closes.length - 1)
+                                        : Math.max(1, activeCloses.length - 1);
+                                    const x = activeCloses.length > 1 ? (i / denom) * 216 + 2 : 110;
                                     return `${x.toFixed(1)},${pctOf(c).toFixed(1)}`;
                                 })
                                 .join(' ');
 
+                            const areaLastX = isReplaying && closeReplay && closeReplay.closes.length > 1
+                                ? ((activeCloses.length - 1) / (closeReplay.closes.length - 1)) * 216 + 2
+                                : 218;
                             const areaPts =
                                 activeCloses.length > 1
-                                    ? `2,99 ${pts} 218,99`
+                                    ? `2,99 ${pts} ${areaLastX.toFixed(1)},99`
                                     : '';
 
                             const bidPct = activeBid > 0 ? pctOf(activeBid) : 50;
@@ -1426,8 +1449,14 @@ export default function SmartTacticalOverview({
                                             </div>
                                         ) : (
                                             <span
-                                                style={{ top: `${bidPct}%`, right: '1px' }}
-                                                className="absolute -translate-y-1/2 w-[6px] h-[6px] rounded-full bg-white border-[1.5px] border-cyan-400 shadow-[0_0_5px_#22d3ee] transition-[top] duration-300"
+                                                style={
+                                                    isReplaying
+                                                        ? { top: `${bidPct}%`, left: `${(areaLastX / 220) * 100}%` }
+                                                        : { top: `${bidPct}%`, right: '1px' }
+                                                }
+                                                className={`absolute -translate-y-1/2 ${
+                                                    isReplaying ? '-translate-x-1/2' : 'transition-[top] duration-300'
+                                                } w-[6px] h-[6px] rounded-full bg-white border-[1.5px] border-cyan-400 shadow-[0_0_5px_#22d3ee]`}
                                             />
                                         )}
                                     </div>
