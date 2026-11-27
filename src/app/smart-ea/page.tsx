@@ -22,6 +22,7 @@ import { FreezeWhatIfSimulator } from '@/components/smart-ea/FreezeWhatIfSimulat
 import RoundHistoryBar, { RoundHistoryTuple } from '@/components/round-history-bar';
 import FreezeExitPlanner from '@/components/freeze-exit-planner';
 import SmartTacticalOverview from '@/components/smart-tactical-overview';
+import HedgeShieldPanel from '@/components/hedge-shield-panel';
 import { PnlVectorVisualizer } from '@/components/pnl-vector-visualizer';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -80,6 +81,7 @@ interface ActiveConfig {
     hedge_partial_pct?: number;
     hedge_rebound_pts?: number;
     enable_hedge_offset?: boolean;
+    pause_after_hedge?: boolean;
     stop_mode: string;
 }
 
@@ -135,6 +137,12 @@ interface EAState {
     protection_frozen?: boolean;
     frozen_side?: string;
     freeze_flip_count?: number;
+    hedge_active?: boolean;
+    hedge_side?: string;
+    hedge_lot?: number;
+    hedge_pnl?: number;
+    hedge_entry_px?: number;
+    hedge_cycle_locked?: boolean;
     conn_status: string;
     config_status: string;
     trade_status: string;
@@ -2517,6 +2525,39 @@ function SmartEACockpitContent() {
                             </div>
                         );
                     })()}
+
+                    {/* Simple Hedge Shield + User-Controlled Unwind Panel */}
+                    <HedgeShieldPanel
+                        currency={cur}
+                        balance={balanceVal}
+                        cyclePnl={liveCyclePnl}
+                        openPos={eaState?.open_pos ?? ((eaState?.open_buy ?? 0) + (eaState?.open_sell ?? 0))}
+                        hedgeActive={Boolean(eaState?.hedge_active)}
+                        hedgeSide={eaState?.hedge_side || 'NONE'}
+                        hedgeLot={Number(eaState?.hedge_lot || 0)}
+                        hedgePnl={Number(eaState?.hedge_pnl || 0)}
+                        hedgeEntryPx={Number(eaState?.hedge_entry_px || 0)}
+                        hedgeCycleLocked={Boolean(eaState?.hedge_cycle_locked)}
+                        enableAutoHedge={eaState?.active_config?.enable_auto_hedge ?? true}
+                        hedgeDdPercent={eaState?.active_config?.hedge_dd_percent ?? 15}
+                        pauseAfterHedge={eaState?.active_config?.pause_after_hedge ?? true}
+                        chart={eaState?.chart}
+                        sending={sending}
+                        onUpdateSettings={(enable, ddPct, pauseAfter) => {
+                            sendCommand(
+                                {
+                                    enable_auto_hedge: enable,
+                                    hedge_dd_percent: ddPct,
+                                    base_hedge_dd_percent: ddPct,
+                                    pause_after_hedge: pauseAfter,
+                                },
+                                `อัปเดต Hedge Shield: ${enable ? 'เปิด' : 'ปิด'} | จุดทำงาน -${ddPct}% | หลังจบ Hedge: ${pauseAfter ? 'หยุดเทรดก่อน' : 'ทำงานต่อเลย'}`
+                            );
+                        }}
+                        onHedgeAction={(payload, successMsg) => {
+                            sendCommand(payload, successMsg);
+                        }}
+                    />
 
                     {/* Custom Target Profit Dialog with Interactive Scroll Wheel */}
                     <Dialog open={customTpModalOpen} onOpenChange={setCustomTpModalOpen}>
