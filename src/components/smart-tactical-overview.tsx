@@ -410,22 +410,30 @@ export default function SmartTacticalOverview({
     const sec2SellLabelSlot = animOpenSell <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, animOpenSell + 1);
 
     // =========================================================================
-    // SYNCHRONIZED 1-SECOND LIVE TICK + 3-SECOND CLOSE-MOMENT REPLAY ANIMATION
+    // SYNCHRONIZED 1-SECOND LIVE TICK + 3-SECOND TIME-LAPSE CLOSE REPLAY (1-3m)
     // =========================================================================
     const [tickOffset, setTickOffset] = useState(0);
     const [closeReplay, setCloseReplay] = useState<{
         progress: number; // 0..1 over 3000ms
         profit: number;
         trades: number;
+        durationSec: number;
         closes: number[];
         tpPrice: number;
         tpMoney: number;
         minP: number;
         maxP: number;
+        openBuyCount: number;
+        openSellCount: number;
+        startPnl: number;
+        orders: { t: 'B' | 'S'; p: number }[];
     } | null>(null);
 
     const lastSeenCloseTsRef = useRef<number | null>(null);
     const replayRafRef = useRef<number | null>(null);
+    const preCloseBufferRef = useRef<
+        { ts: number; bid: number; openBuy: number; openSell: number; cyclePnl: number }[]
+    >([]);
 
     // Reset live tick offset whenever a real MT5 snapshot arrives
     useEffect(() => {
@@ -463,82 +471,145 @@ export default function SmartTacticalOverview({
         return best;
     }, [roundHistory]);
 
-    // Persist active chart snapshot while round is open so Replay can reconstruct the closing moment
+    // Record rolling 3-minute snapshots & active chart state while a round is open
     useEffect(() => {
         if (!port || openBuy + openSell <= 0 || !chart?.candles?.length) return;
-        const closes = chart.candles.map((c) => c[4]);
-        const highs = chart.candles.map((c) => c[2]);
-        const lows = chart.candles.map((c) => c[3]);
-        const bid = chart.bid > 0 ? chart.bid : closes[closes.length - 1] || 0;
+        const nowSec = Math.floor(Date.now() / 1000);
+        const bid = chart.bid > 0 ? chart.bid : chart.candles[chart.candles.length - 1][4] || 0;
+        if (bid > 0) {
+            const buf = preCloseBufferRef.current;
+            const last = buf[buf.length - 1];
+            if (!last || nowSec - last.ts >= 5) {
+                buf.push({ ts: nowSec, bid, openBuy, openSell, cyclePnl: liveCyclePnl });
+                // Keep last ~4 minutes of snapshots
+                while (buf.length > 0 && nowSec - buf[0].ts > 240) {
+                    buf.shift();
+                }
+            }
+        }
+
         const estTp = chart.est_tp_price > 0 ? chart.est_tp_price : bid;
-        const minP = Math.min(...lows, bid) - Math.max((Math.max(...highs, bid) - Math.min(...lows, bid)) * 0.12, pointSize * 20);
-        const maxP = Math.max(...highs, bid) + Math.max((Math.max(...highs, bid) - Math.min(...lows, bid)) * 0.12, pointSize * 20);
+        const rawOrders = (chart.orders || [])
+            .filter((o) => (o.t === 'B' || o.t === 'S') && o.p > 0)
+            .map((o) => ({ t: o.t as 'B' | 'S', p: o.p }));
+        const startSnap = preCloseBufferRef.current[0];
+
         try {
             localStorage.setItem(
                 `sv_last_active_chart_${port}`,
-                JSON.stringify({ closes: closes.slice(-45), estTp, effTp: targetProfit, bid, minP, maxP })
+                JSON.stringify({
+                    candles: chart.candles.slice(-20),
+                    estTp,
+                    effTp: targetProfit,
+                    bid,
+                    openBuy,
+                    openSell,
+                    startPnl: startSnap ? startSnap.cyclePnl : liveCyclePnl,
+                    orders: rawOrders,
+                    trailBids: preCloseBufferRef.current.slice(-18).map((s) => s.bid),
+                })
             );
         } catch {
             // ignore storage errors
         }
-    }, [port, openBuy, openSell, chart, targetProfit, pointSize]);
+    }, [port, openBuy, openSell, chart, targetProfit, liveCyclePnl]);
 
     const startCloseReplay = useCallback(
         (roundTuple: RoundHistoryTuple) => {
             if (replayRafRef.current) cancelAnimationFrame(replayRafRef.current);
 
-            const profit = Number(roundTuple[2]) || 0;
+            const closeTime = Number(roundTuple[0]) || 0;
             const trades = Number(roundTuple[1]) || 0;
+            const profit = Number(roundTuple[2]) || 0;
+            const durationSec = Number(roundTuple[3]) || 0;
 
-            let snapCloses: number[] = (chart?.candles || []).map((c) => c[4]).slice(-45);
-            let tpPrice = chart?.est_tp_price && chart.est_tp_price > 0 ? chart.est_tp_price : 0;
-            let tpMoney = targetProfit;
-            let snapMinP = 0;
-            let snapMaxP = 0;
-
+            let replayRecord: any = null;
             try {
-                const raw = port ? localStorage.getItem(`sv_last_active_chart_${port}`) : null;
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed?.closes) && parsed.closes.length > 3) {
-                        snapCloses = parsed.closes;
-                        if (parsed.estTp > 0) tpPrice = parsed.estTp;
-                        if (typeof parsed.effTp === 'number') tpMoney = parsed.effTp;
-                        snapMinP = Number(parsed.minP) || 0;
-                        snapMaxP = Number(parsed.maxP) || 0;
+                const exactRaw = port ? localStorage.getItem(`sv_last_close_replay_v2_${port}`) : null;
+                if (exactRaw) {
+                    const parsed = JSON.parse(exactRaw);
+                    if (parsed && Number(parsed.closeTime) === closeTime) {
+                        replayRecord = parsed;
+                    }
+                }
+                if (!replayRecord) {
+                    const activeRaw = port ? localStorage.getItem(`sv_last_active_chart_${port}`) : null;
+                    if (activeRaw) {
+                        replayRecord = JSON.parse(activeRaw);
                     }
                 }
             } catch {
                 // ignore
             }
 
-            if (snapCloses.length < 4) {
+            // Pick real candles from the last 1-3 minutes before close (or full short round)
+            const windowSec = Math.min(180, Math.max(60, durationSec || 120));
+            const srcCandles: [number, number, number, number, number][] =
+                (Array.isArray(replayRecord?.candles) && replayRecord.candles.length > 0
+                    ? replayRecord.candles
+                    : chart?.candles) || [];
+
+            let recentCloses: number[] = [];
+            if (srcCandles.length > 0 && closeTime > 0) {
+                const inWindow = srcCandles.filter(
+                    (c) => Number(c[0]) <= closeTime + 60 && Number(c[0]) >= closeTime - windowSec
+                );
+                if (inWindow.length >= 2) {
+                    recentCloses = inWindow.map((c) => c[4]);
+                }
+            }
+            if (recentCloses.length < 3 && Array.isArray(replayRecord?.trailBids) && replayRecord.trailBids.length >= 3) {
+                recentCloses = replayRecord.trailBids.map(Number).filter((n: number) => n > 0);
+            }
+            if (recentCloses.length < 3 && srcCandles.length > 0) {
+                // Use last 3-6 real candles (~3 mins)
+                recentCloses = srcCandles.slice(-Math.min(6, srcCandles.length)).map((c) => c[4]);
+            }
+            if (recentCloses.length < 2) {
                 const base = chart?.bid && chart.bid > 0 ? chart.bid : 3500;
-                snapCloses = Array.from({ length: 18 }, (_, i) => base + Math.sin(i * 0.45) * pointSize * 80);
+                recentCloses = [base - pointSize * 40, base - pointSize * 15, base];
             }
 
-            const lastC = snapCloses[snapCloses.length - 1];
-            if (tpPrice <= 0 || Math.abs(tpPrice - lastC) < pointSize * 5) {
-                tpPrice = lastC + (profit >= 0 ? pointSize * 120 : -pointSize * 120);
+            let tpPrice = Number(replayRecord?.estTp || 0);
+            if (tpPrice <= 0 && chart?.est_tp_price && chart.est_tp_price > 0) {
+                tpPrice = chart.est_tp_price;
+            }
+            const lastReal = recentCloses[recentCloses.length - 1];
+            if (tpPrice <= 0) {
+                tpPrice = lastReal;
             }
 
-            // Build smooth closing tail reaching tpPrice
-            const tailCount = 8;
-            const prefix = snapCloses.slice(0, Math.max(4, snapCloses.length - 2));
-            const startTail = prefix[prefix.length - 1];
-            const approachPts: number[] = [];
-            for (let i = 1; i <= tailCount; i++) {
-                const t = i / tailCount;
-                const eased = 1 - Math.pow(1 - t, 2.2);
-                const wobble = (1 - t) * Math.sin(t * Math.PI * 2.5) * Math.abs(tpPrice - startTail) * 0.14;
-                approachPts.push(startTail + (tpPrice - startTail) * eased + wobble);
+            // Interpolate smoothly between real pre-close points so 1-3 min history plays smoothly in 3s
+            const interpCloses: number[] = [];
+            const rawPts = [...recentCloses, tpPrice];
+            for (let i = 0; i < rawPts.length - 1; i++) {
+                const a = rawPts[i];
+                const b = rawPts[i + 1];
+                const steps = 4;
+                for (let s = 0; s < steps; s++) {
+                    interpCloses.push(a + ((b - a) * s) / steps);
+                }
             }
-            const fullCloses = [...prefix, ...approachPts];
-            const cMin = Math.min(...fullCloses);
-            const cMax = Math.max(...fullCloses);
-            const pad = Math.max((cMax - cMin) * 0.14, pointSize * 25);
-            const minP = snapMinP > 0 ? Math.min(snapMinP, cMin - pad) : cMin - pad;
-            const maxP = snapMaxP > 0 ? Math.max(snapMaxP, cMax + pad) : cMax + pad;
+            interpCloses.push(tpPrice);
+
+            const replayOrders: { t: 'B' | 'S'; p: number }[] = Array.isArray(replayRecord?.orders)
+                ? replayRecord.orders
+                : [];
+            const cMin = Math.min(...interpCloses);
+            const cMax = Math.max(...interpCloses);
+            const pad = Math.max((cMax - cMin) * 0.16, pointSize * 25);
+
+            const recBuy = Number(replayRecord?.openBuy || 0);
+            const recSell = Number(replayRecord?.openSell || 0);
+            const fallbackHalf = Math.max(1, Math.floor(trades / 2));
+            const openBuyCount = recBuy + recSell > 0 ? recBuy : Math.max(1, trades - fallbackHalf);
+            const openSellCount = recBuy + recSell > 0 ? recSell : Math.max(0, fallbackHalf);
+            const startPnl =
+                typeof replayRecord?.startPnl === 'number'
+                    ? replayRecord.startPnl
+                    : profit > 0
+                    ? -Math.max(10, profit * 0.6)
+                    : profit * 1.2;
 
             const startTime = performance.now();
             const durationMs = 3000;
@@ -549,11 +620,16 @@ export default function SmartTacticalOverview({
                     progress: p,
                     profit,
                     trades,
-                    closes: fullCloses,
+                    durationSec,
+                    closes: interpCloses,
                     tpPrice,
-                    tpMoney,
-                    minP,
-                    maxP,
+                    tpMoney: typeof replayRecord?.effTp === 'number' ? replayRecord.effTp : targetProfit,
+                    minP: cMin - pad,
+                    maxP: cMax + pad,
+                    openBuyCount,
+                    openSellCount,
+                    startPnl,
+                    orders: replayOrders,
                 });
                 if (p < 1) {
                     replayRafRef.current = requestAnimationFrame(stepFrame);
@@ -568,7 +644,7 @@ export default function SmartTacticalOverview({
         [chart, port, targetProfit, pointSize]
     );
 
-    // Auto-trigger 3-second Close-Moment Animation whenever a new round closes
+    // Auto-trigger 3-second Close-Moment Animation & lock in real pre-close snapshot whenever a new round closes
     useEffect(() => {
         const ts = latestClosedRound ? Number(latestClosedRound[0]) || 0 : 0;
         if (lastSeenCloseTsRef.current === null) {
@@ -577,9 +653,22 @@ export default function SmartTacticalOverview({
         }
         if (ts > lastSeenCloseTsRef.current && latestClosedRound) {
             lastSeenCloseTsRef.current = ts;
+            try {
+                const activeRaw = port ? localStorage.getItem(`sv_last_active_chart_${port}`) : null;
+                if (activeRaw && port) {
+                    const parsed = JSON.parse(activeRaw);
+                    localStorage.setItem(
+                        `sv_last_close_replay_v2_${port}`,
+                        JSON.stringify({ ...parsed, closeTime: ts })
+                    );
+                }
+            } catch {
+                // ignore
+            }
+            preCloseBufferRef.current = [];
             startCloseReplay(latestClosedRound);
         }
-    }, [latestClosedRound, startCloseReplay]);
+    }, [latestClosedRound, port, startCloseReplay]);
 
     useEffect(() => {
         return () => {
@@ -587,12 +676,12 @@ export default function SmartTacticalOverview({
         };
     }, []);
 
-    // Synchronized PnL driven by live tickOffset (or interpolated during 3s Close Replay)
+    // Synchronized PnL driven by live tickOffset (or interpolated from real pre-close PnL during 3s Close Replay)
     const syncedCyclePnl = useMemo(() => {
         if (closeReplay) {
             const moveP = Math.min(1, closeReplay.progress / 0.72);
-            const eased = 1 - Math.pow(1 - moveP, 2.2);
-            return liveCyclePnl + (closeReplay.profit - liveCyclePnl) * eased;
+            const eased = 1 - Math.pow(1 - moveP, 2.0);
+            return closeReplay.startPnl + (closeReplay.profit - closeReplay.startPnl) * eased;
         }
         if (!tickOffset) return liveCyclePnl;
         const netLot = metrics.buyLot - metrics.sellLot;
@@ -743,8 +832,18 @@ export default function SmartTacticalOverview({
                             const sellIdx = safeCap + 1 - y; // 1..maxSell top-down
                             const maxBuySlots = sec1TopY;
                             const maxSellSlots = safeCap + 1 - sec1BotY;
-                            const clampedOpenBuy = Math.min(maxBuySlots, animOpenBuy);
-                            const clampedOpenSell = Math.min(maxSellSlots, animOpenSell);
+                            const vuBuyVal = closeReplay
+                                ? closeReplay.progress < 0.72
+                                    ? closeReplay.openBuyCount
+                                    : 0
+                                : animOpenBuy;
+                            const vuSellVal = closeReplay
+                                ? closeReplay.progress < 0.72
+                                    ? closeReplay.openSellCount
+                                    : 0
+                                : animOpenSell;
+                            const clampedOpenBuy = Math.min(maxBuySlots, vuBuyVal);
+                            const clampedOpenSell = Math.min(maxSellSlots, vuSellVal);
 
                             const hasBuySlot = buyIdx >= 1;
                             const hasSellSlot = sellIdx >= 1;
@@ -826,8 +925,18 @@ export default function SmartTacticalOverview({
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
                     <div className="flex-1 flex flex-col justify-between gap-[1px] px-1 relative min-h-0">
                         {sec2Levels.map((lv) => {
-                            const buyLit = animOpenBuy >= lv;
-                            const sellLit = animOpenSell >= lv;
+                            const vuBuyVal2 = closeReplay
+                                ? closeReplay.progress < 0.72
+                                    ? closeReplay.openBuyCount
+                                    : 0
+                                : animOpenBuy;
+                            const vuSellVal2 = closeReplay
+                                ? closeReplay.progress < 0.72
+                                    ? closeReplay.openSellCount
+                                    : 0
+                                : animOpenSell;
+                            const buyLit = vuBuyVal2 >= lv;
+                            const sellLit = vuSellVal2 >= lv;
                             const isBuyTopLabel = lv === sec2BuyLabelSlot;
                             const isSellTopLabel = lv === sec2SellLabelSlot;
                             const isTpRow = clampedTpSlot === lv;
@@ -1034,8 +1143,13 @@ export default function SmartTacticalOverview({
                                         {/* Area fill under price curve */}
                                         {areaPts && <polygon points={areaPts} fill="url(#svSparkGrad)" />}
 
-                                        {/* Open Order Level Lines (Center -> Far Right, thin Buy/Sell colored lines) */}
-                                        {spark.openOrders.map((o, idx) => {
+                                        {/* Open Order Level Lines (Center -> Far Right, thin Buy/Sell colored lines; cleared on close hit!) */}
+                                        {(isReplaying
+                                            ? replayHitPhase <= 0
+                                                ? closeReplay!.orders
+                                                : []
+                                            : spark.openOrders
+                                        ).map((o, idx) => {
                                             const oy = pctOf(o.p);
                                             const isBuy = o.t === 'B';
                                             return (
@@ -1300,7 +1414,7 @@ export default function SmartTacticalOverview({
                                                     }`}
                                                 >
                                                     ✓ ปิดรวบ {closeReplay.profit >= 0 ? '+' : ''}
-                                                    {closeReplay.profit.toFixed(1)}
+                                                    {closeReplay.profit.toFixed(1)} ({closeReplay.trades} ไม้)
                                                 </span>
                                                 <span
                                                     className={`w-2.5 h-2.5 rounded-full border-2 border-white ${
