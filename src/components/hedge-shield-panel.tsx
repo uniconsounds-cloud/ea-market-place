@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Shield, Lock, Unlock, Scissors, Play, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Shield, Lock, Unlock, Scissors, Play, CheckCircle2, AlertTriangle, ChevronDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { ChartOrderItem, SmartChartData } from '@/components/smart-vortex-chart';
@@ -27,6 +27,7 @@ interface HedgeShieldPanelProps {
     pauseAfterHedge: boolean;
     chart?: SmartChartData | null;
     sending?: boolean;
+    isPendingAck?: boolean;
     onUpdateSettings: (enable: boolean, ddPct: number, pauseAfter: boolean) => void;
     onHedgeAction: (payload: Record<string, any>, successMsg: string) => void;
 }
@@ -47,6 +48,7 @@ export default function HedgeShieldPanel({
     pauseAfterHedge,
     chart,
     sending = false,
+    isPendingAck = false,
     onUpdateSettings,
     onHedgeAction,
 }: HedgeShieldPanelProps) {
@@ -56,6 +58,7 @@ export default function HedgeShieldPanel({
     const [cutWithMatchHedge, setCutWithMatchHedge] = useState<boolean>(true);
     const [showOrderList, setShowOrderList] = useState<boolean>(false);
 
+    const isWaitingEa = sending || isPendingAck;
     const isOpen = expanded || hedgeActive || hedgeCycleLocked;
     const digits = chart?.digits ?? 2;
     const ddTriggerMoney = balance > 0 ? -(balance * (hedgeDdPercent / 100)) : 0;
@@ -73,8 +76,10 @@ export default function HedgeShieldPanel({
 
     return (
         <div
-            className={`rounded-xl border transition-colors ${
-                hedgeActive
+            className={`rounded-xl border transition-all duration-300 ${
+                isWaitingEa
+                    ? 'border-amber-400/60 bg-amber-500/10 opacity-80 animate-pulse'
+                    : hedgeActive
                     ? 'border-amber-400/60 bg-amber-500/10'
                     : hedgeCycleLocked
                     ? 'border-cyan-400/60 bg-cyan-500/10'
@@ -126,7 +131,13 @@ export default function HedgeShieldPanel({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                    {!hedgeActive && enableAutoHedge && ddTriggerMoney < 0 && (
+                    {isWaitingEa && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/50 bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            รอ EA ตอบกลับ...
+                        </span>
+                    )}
+                    {!isWaitingEa && !hedgeActive && enableAutoHedge && ddTriggerMoney < 0 && (
                         <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">
                             จุดทำงาน: {ddTriggerMoney.toFixed(0)} {currency} (ตอนนี้ -{currentDdPct.toFixed(1)}%)
                         </span>
@@ -139,9 +150,19 @@ export default function HedgeShieldPanel({
                 </div>
             </button>
 
+            {/* Waiting for EA ACK Banner */}
+            {isWaitingEa && (
+                <div className="mx-2.5 sm:mx-3 mb-2 flex items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 font-mono text-[10px] sm:text-[11px] text-amber-300">
+                    <div className="flex items-center gap-1.5">
+                        <RefreshCw className="w-3 h-3 animate-spin text-amber-400 shrink-0" />
+                        <span className="font-bold">กำลังส่งคำสั่ง & รอ EA ตอบรับ (Sync)...</span>
+                    </div>
+                </div>
+            )}
+
             {/* Expandable Body */}
             {isOpen && (
-                <div className="px-2.5 sm:px-3 pb-3 pt-2 border-t border-slate-700/50 space-y-3">
+                <div className={`px-2.5 sm:px-3 pb-3 pt-2 border-t border-slate-700/50 space-y-3 ${isWaitingEa ? 'pointer-events-none opacity-65' : ''}`}>
                     {/* 1. Simple 2-Setting Bar + Post-Hedge Behavior */}
                     <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-2.5 space-y-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">

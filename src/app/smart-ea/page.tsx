@@ -2538,11 +2538,20 @@ function SmartEACockpitContent() {
                         hedgePnl={Number(eaState?.hedge_pnl || 0)}
                         hedgeEntryPx={Number(eaState?.hedge_entry_px || 0)}
                         hedgeCycleLocked={Boolean(eaState?.hedge_cycle_locked)}
-                        enableAutoHedge={eaState?.active_config?.enable_auto_hedge ?? true}
-                        hedgeDdPercent={eaState?.active_config?.hedge_dd_percent ?? 15}
-                        pauseAfterHedge={eaState?.active_config?.pause_after_hedge ?? true}
+                        enableAutoHedge={
+                            isPendingAck && (lastCommand as any)?.enable_auto_hedge !== undefined
+                                ? Boolean((lastCommand as any).enable_auto_hedge)
+                                : (eaState?.active_config?.enable_auto_hedge ?? true)
+                        }
+                        hedgeDdPercent={activeHedgeDdPct}
+                        pauseAfterHedge={
+                            isPendingAck && (lastCommand as any)?.pause_after_hedge !== undefined
+                                ? Boolean((lastCommand as any).pause_after_hedge)
+                                : (eaState?.active_config?.pause_after_hedge ?? true)
+                        }
                         chart={eaState?.chart}
                         sending={sending}
+                        isPendingAck={isPendingAck}
                         onUpdateSettings={(enable, ddPct, pauseAfter) => {
                             sendCommand(
                                 {
