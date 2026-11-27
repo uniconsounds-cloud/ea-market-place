@@ -340,7 +340,6 @@ export function SmartVortexChart({
                                     y2={y}
                                     stroke={o.t === 'B' ? '#22d3ee' : '#f97316'}
                                     strokeWidth={0.55}
-                                    strokeDasharray="2 2"
                                     opacity={0.32}
                                 />
                             );
