@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Lock, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Lock, RefreshCw, RotateCcw } from 'lucide-react';
 import type { SmartChartData } from '@/components/smart-vortex-chart';
 import type { RoundHistoryTuple } from '@/components/round-history-bar';
 
@@ -52,6 +52,7 @@ interface SmartTacticalOverviewProps {
     chart?: SmartChartData | null;
     voteCouncil?: VoteCouncilOverview | null;
     roundHistory?: RoundHistoryTuple[] | null;
+    isOnline?: boolean;
     isWaitingFreshData?: boolean;
     lastPing?: string;
 }
@@ -78,6 +79,7 @@ export default function SmartTacticalOverview({
     chart,
     voteCouncil,
     roundHistory,
+    isOnline = true,
     isWaitingFreshData = false,
     lastPing,
 }: SmartTacticalOverviewProps) {
@@ -384,15 +386,213 @@ export default function SmartTacticalOverview({
     const sec2SellLabelSlot = openSell <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, openSell + 1);
 
     // =========================================================================
+    // SYNCHRONIZED 1-SECOND LIVE TICK + 3-SECOND CLOSE-MOMENT REPLAY ANIMATION
+    // =========================================================================
+    const [tickOffset, setTickOffset] = useState(0);
+    const [closeReplay, setCloseReplay] = useState<{
+        progress: number; // 0..1 over 3000ms
+        profit: number;
+        trades: number;
+        closes: number[];
+        tpPrice: number;
+        tpMoney: number;
+        minP: number;
+        maxP: number;
+    } | null>(null);
+
+    const lastSeenCloseTsRef = useRef<number | null>(null);
+    const replayRafRef = useRef<number | null>(null);
+
+    // Reset live tick offset whenever a real MT5 snapshot arrives
+    useEffect(() => {
+        setTickOffset(0);
+    }, [chart?.bid, chart?.candles?.length, lastPing]);
+
+    // Every ~900ms micro-tick for live market feel (synchronized between Line Chart & PnL Bar)
+    useEffect(() => {
+        if (!isOnline || isWaitingFreshData || closeReplay || !chart?.bid || chart.bid <= 0) {
+            setTickOffset(0);
+            return;
+        }
+        const step = pointSize * (digits <= 2 ? 12 : 6);
+        const timer = setInterval(() => {
+            setTickOffset((prev) => {
+                const delta = (Math.random() - 0.49) * step * 1.9;
+                const next = prev + delta;
+                const maxDrift = step * 5;
+                if (next > maxDrift) return maxDrift * 0.8;
+                if (next < -maxDrift) return -maxDrift * 0.8;
+                return next;
+            });
+        }, 900);
+        return () => clearInterval(timer);
+    }, [isOnline, isWaitingFreshData, closeReplay, chart?.bid, pointSize, digits]);
+
+    const latestClosedRound = useMemo(() => {
+        if (!Array.isArray(roundHistory) || roundHistory.length === 0) return null;
+        let best: RoundHistoryTuple | null = null;
+        for (const r of roundHistory) {
+            if (Array.isArray(r) && Number(r[0]) > (best ? Number(best[0]) : 0)) {
+                best = r;
+            }
+        }
+        return best;
+    }, [roundHistory]);
+
+    // Persist active chart snapshot while round is open so Replay can reconstruct the closing moment
+    useEffect(() => {
+        if (!port || openBuy + openSell <= 0 || !chart?.candles?.length) return;
+        const closes = chart.candles.map((c) => c[4]);
+        const highs = chart.candles.map((c) => c[2]);
+        const lows = chart.candles.map((c) => c[3]);
+        const bid = chart.bid > 0 ? chart.bid : closes[closes.length - 1] || 0;
+        const estTp = chart.est_tp_price > 0 ? chart.est_tp_price : bid;
+        const minP = Math.min(...lows, bid) - Math.max((Math.max(...highs, bid) - Math.min(...lows, bid)) * 0.12, pointSize * 20);
+        const maxP = Math.max(...highs, bid) + Math.max((Math.max(...highs, bid) - Math.min(...lows, bid)) * 0.12, pointSize * 20);
+        try {
+            localStorage.setItem(
+                `sv_last_active_chart_${port}`,
+                JSON.stringify({ closes: closes.slice(-45), estTp, effTp: targetProfit, bid, minP, maxP })
+            );
+        } catch {
+            // ignore storage errors
+        }
+    }, [port, openBuy, openSell, chart, targetProfit, pointSize]);
+
+    const startCloseReplay = useCallback(
+        (roundTuple: RoundHistoryTuple) => {
+            if (replayRafRef.current) cancelAnimationFrame(replayRafRef.current);
+
+            const profit = Number(roundTuple[2]) || 0;
+            const trades = Number(roundTuple[1]) || 0;
+
+            let snapCloses: number[] = (chart?.candles || []).map((c) => c[4]).slice(-45);
+            let tpPrice = chart?.est_tp_price && chart.est_tp_price > 0 ? chart.est_tp_price : 0;
+            let tpMoney = targetProfit;
+            let snapMinP = 0;
+            let snapMaxP = 0;
+
+            try {
+                const raw = port ? localStorage.getItem(`sv_last_active_chart_${port}`) : null;
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed?.closes) && parsed.closes.length > 3) {
+                        snapCloses = parsed.closes;
+                        if (parsed.estTp > 0) tpPrice = parsed.estTp;
+                        if (typeof parsed.effTp === 'number') tpMoney = parsed.effTp;
+                        snapMinP = Number(parsed.minP) || 0;
+                        snapMaxP = Number(parsed.maxP) || 0;
+                    }
+                }
+            } catch {
+                // ignore
+            }
+
+            if (snapCloses.length < 4) {
+                const base = chart?.bid && chart.bid > 0 ? chart.bid : 3500;
+                snapCloses = Array.from({ length: 18 }, (_, i) => base + Math.sin(i * 0.45) * pointSize * 80);
+            }
+
+            const lastC = snapCloses[snapCloses.length - 1];
+            if (tpPrice <= 0 || Math.abs(tpPrice - lastC) < pointSize * 5) {
+                tpPrice = lastC + (profit >= 0 ? pointSize * 120 : -pointSize * 120);
+            }
+
+            // Build smooth closing tail reaching tpPrice
+            const tailCount = 8;
+            const prefix = snapCloses.slice(0, Math.max(4, snapCloses.length - 2));
+            const startTail = prefix[prefix.length - 1];
+            const approachPts: number[] = [];
+            for (let i = 1; i <= tailCount; i++) {
+                const t = i / tailCount;
+                const eased = 1 - Math.pow(1 - t, 2.2);
+                const wobble = (1 - t) * Math.sin(t * Math.PI * 2.5) * Math.abs(tpPrice - startTail) * 0.14;
+                approachPts.push(startTail + (tpPrice - startTail) * eased + wobble);
+            }
+            const fullCloses = [...prefix, ...approachPts];
+            const cMin = Math.min(...fullCloses);
+            const cMax = Math.max(...fullCloses);
+            const pad = Math.max((cMax - cMin) * 0.14, pointSize * 25);
+            const minP = snapMinP > 0 ? Math.min(snapMinP, cMin - pad) : cMin - pad;
+            const maxP = snapMaxP > 0 ? Math.max(snapMaxP, cMax + pad) : cMax + pad;
+
+            const startTime = performance.now();
+            const durationMs = 3000;
+
+            const stepFrame = (now: number) => {
+                const p = Math.min(1, (now - startTime) / durationMs);
+                setCloseReplay({
+                    progress: p,
+                    profit,
+                    trades,
+                    closes: fullCloses,
+                    tpPrice,
+                    tpMoney,
+                    minP,
+                    maxP,
+                });
+                if (p < 1) {
+                    replayRafRef.current = requestAnimationFrame(stepFrame);
+                } else {
+                    setCloseReplay(null);
+                    replayRafRef.current = null;
+                }
+            };
+
+            replayRafRef.current = requestAnimationFrame(stepFrame);
+        },
+        [chart, port, targetProfit, pointSize]
+    );
+
+    // Auto-trigger 3-second Close-Moment Animation whenever a new round closes
+    useEffect(() => {
+        const ts = latestClosedRound ? Number(latestClosedRound[0]) || 0 : 0;
+        if (lastSeenCloseTsRef.current === null) {
+            lastSeenCloseTsRef.current = ts;
+            return;
+        }
+        if (ts > lastSeenCloseTsRef.current && latestClosedRound) {
+            lastSeenCloseTsRef.current = ts;
+            startCloseReplay(latestClosedRound);
+        }
+    }, [latestClosedRound, startCloseReplay]);
+
+    useEffect(() => {
+        return () => {
+            if (replayRafRef.current) cancelAnimationFrame(replayRafRef.current);
+        };
+    }, []);
+
+    // Synchronized PnL driven by live tickOffset (or interpolated during 3s Close Replay)
+    const syncedCyclePnl = useMemo(() => {
+        if (closeReplay) {
+            const moveP = Math.min(1, closeReplay.progress / 0.72);
+            const eased = 1 - Math.pow(1 - moveP, 2.2);
+            return liveCyclePnl + (closeReplay.profit - liveCyclePnl) * eased;
+        }
+        if (!tickOffset) return liveCyclePnl;
+        const netLot = metrics.buyLot - metrics.sellLot;
+        const tickPts = tickOffset / pointSize;
+        const deltaUsd = (netLot / 0.01) * tickPts * 0.01;
+        return liveCyclePnl + deltaUsd;
+    }, [closeReplay, liveCyclePnl, tickOffset, metrics.buyLot, metrics.sellLot, pointSize]);
+
+    // =========================================================================
     // SECTION 3: Mini Price Sparkline (Full candle history window, 50% width)
     // =========================================================================
     const spark = useMemo(() => {
         const candles = chart?.candles || [];
-        const closes = candles.map((c) => c[4]);
+        const baseCloses = candles.map((c) => c[4]);
         const highs = candles.map((c) => c[2]);
         const lows = candles.map((c) => c[3]);
-        const bid = chart?.bid && chart.bid > 0 ? chart.bid : closes[closes.length - 1] || 0;
-        if (closes.length === 0 && bid > 0) closes.push(bid);
+        const rawBid = chart?.bid && chart.bid > 0 ? chart.bid : baseCloses[baseCloses.length - 1] || 0;
+        const bid = rawBid > 0 ? rawBid + tickOffset : 0;
+        const closes = baseCloses.slice();
+        if (closes.length === 0 && bid > 0) {
+            closes.push(bid);
+        } else if (closes.length > 0 && tickOffset !== 0) {
+            closes[closes.length - 1] = closes[closes.length - 1] + tickOffset;
+        }
 
         let minP = lows.length > 0 ? Math.min(...lows) : bid - 1;
         let maxP = highs.length > 0 ? Math.max(...highs) : bid + 1;
@@ -458,7 +658,7 @@ export default function SmartTacticalOverview({
         maxP += pad;
 
         return { closes, bid, minP, maxP, estTp, effTpMoney, estSl, rcPrice, rcEntryPx, openOrders };
-    }, [chart, voteCouncil, isBuyFrozen, isSellFrozen, pointSize, freezeStopLoss, targetProfit, liveCyclePnl]);
+    }, [chart, tickOffset, voteCouncil, isBuyFrozen, isSellFrozen, pointSize, freezeStopLoss, targetProfit, baseTargetProfit, liveCyclePnl]);
 
     // =========================================================================
     // SECTION 4: Vertical PnL Bar + Per-Round Peak Excursion Marker
@@ -715,6 +915,20 @@ export default function SmartTacticalOverview({
                         </span>
                         <div className="flex items-center gap-1.5">
                             <span className="text-[8px] text-slate-500">{spark.closes.length}M</span>
+                            {latestClosedRound && (
+                                <button
+                                    type="button"
+                                    onClick={() => startCloseReplay(latestClosedRound)}
+                                    title={`Replay จังหวะปิดรวบรอบล่าสุด (${Number(latestClosedRound[2]) >= 0 ? '+' : ''}${Number(latestClosedRound[2]).toFixed(1)} ${currency})`}
+                                    className={`p-0.5 rounded transition-colors ${
+                                        closeReplay
+                                            ? 'text-emerald-300 bg-emerald-500/20 animate-spin'
+                                            : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80'
+                                    }`}
+                                >
+                                    <RotateCcw className="w-3 h-3" />
+                                </button>
+                            )}
                             {(isBuyFrozen || isSellFrozen) && (
                                 <span className="flex items-center gap-0.5 rounded bg-rose-500/15 border border-rose-500/40 px-1 py-0.2 text-[8px] text-rose-300 font-bold">
                                     <Lock className="w-2.5 h-2.5" />
@@ -727,28 +941,50 @@ export default function SmartTacticalOverview({
                     {/* Full-Height Stretched Price Line + Crisp HTML Overlay */}
                     <div className="relative my-0.5 flex-1 min-h-0 w-full">
                         {(() => {
-                            const span = Math.max(pointSize * 10, spark.maxP - spark.minP);
+                            const isReplaying = Boolean(closeReplay);
+                            const activeCloses = closeReplay
+                                ? (() => {
+                                      const moveP = Math.min(1, closeReplay.progress / 0.72);
+                                      const baseLen = Math.max(4, closeReplay.closes.length - 8);
+                                      const visibleCount = Math.max(
+                                          baseLen,
+                                          Math.round(baseLen + (closeReplay.closes.length - baseLen) * moveP)
+                                      );
+                                      return closeReplay.closes.slice(0, visibleCount);
+                                  })()
+                                : spark.closes;
+                            const activeMinP = closeReplay ? closeReplay.minP : spark.minP;
+                            const activeMaxP = closeReplay ? closeReplay.maxP : spark.maxP;
+                            const activeBid = closeReplay
+                                ? activeCloses[activeCloses.length - 1] || spark.bid
+                                : spark.bid;
+                            const activeEstTp = closeReplay ? closeReplay.tpPrice : spark.estTp;
+
+                            const span = Math.max(pointSize * 10, activeMaxP - activeMinP);
                             const pctOf = (p: number) => {
-                                const clamped = Math.max(spark.minP, Math.min(spark.maxP, p));
-                                return 3 + ((spark.maxP - clamped) / span) * 94;
+                                const clamped = Math.max(activeMinP, Math.min(activeMaxP, p));
+                                return 3 + ((activeMaxP - clamped) / span) * 94;
                             };
 
-                            const pts = spark.closes
+                            const pts = activeCloses
                                 .map((c, i) => {
-                                    const x = spark.closes.length > 1 ? (i / (spark.closes.length - 1)) * 216 + 2 : 110;
+                                    const x = activeCloses.length > 1 ? (i / (activeCloses.length - 1)) * 216 + 2 : 110;
                                     return `${x.toFixed(1)},${pctOf(c).toFixed(1)}`;
                                 })
                                 .join(' ');
 
                             const areaPts =
-                                spark.closes.length > 1
+                                activeCloses.length > 1
                                     ? `2,99 ${pts} 218,99`
                                     : '';
 
-                            const bidPct = spark.bid > 0 ? pctOf(spark.bid) : 50;
-                            const tpPct = spark.estTp > 0 ? pctOf(spark.estTp) : null;
-                            const slPct = spark.estSl > 0 && freezeStopLoss < 0 ? pctOf(spark.estSl) : null;
-                            const rcPct = (isBuyFrozen || isSellFrozen) && spark.rcPrice > 0 ? pctOf(spark.rcPrice) : null;
+                            const bidPct = activeBid > 0 ? pctOf(activeBid) : 50;
+                            const tpPct = activeEstTp > 0 ? pctOf(activeEstTp) : null;
+                            const slPct = !isReplaying && spark.estSl > 0 && freezeStopLoss < 0 ? pctOf(spark.estSl) : null;
+                            const rcPct = !isReplaying && (isBuyFrozen || isSellFrozen) && spark.rcPrice > 0 ? pctOf(spark.rcPrice) : null;
+                            const replayHitPhase = closeReplay && closeReplay.progress >= 0.72
+                                ? (closeReplay.progress - 0.72) / 0.28
+                                : 0;
 
                             const tc = voteCouncil?.trend_council;
                             const trendDir = tc?.direction === 'BUY' || tc?.direction === 'SELL' ? tc.direction : 'NONE';
@@ -849,11 +1085,11 @@ export default function SmartTacticalOverview({
                                         />
 
                                         {/* Full Price Polyline */}
-                                        {spark.closes.length > 1 && (
+                                        {activeCloses.length > 1 && (
                                             <polyline
                                                 fill="none"
-                                                stroke="#22d3ee"
-                                                strokeWidth="1.6"
+                                                stroke={isReplaying && replayHitPhase > 0 ? '#34d399' : '#22d3ee'}
+                                                strokeWidth={isReplaying ? '2.1' : '1.6'}
                                                 vectorEffect="non-scaling-stroke"
                                                 points={pts}
                                             />
@@ -1006,11 +1242,56 @@ export default function SmartTacticalOverview({
                                             )}
                                         </div>
 
-                                        {/* Current Bid Dot */}
-                                        <span
-                                            style={{ top: `${bidPct}%`, right: '1px' }}
-                                            className="absolute -translate-y-1/2 w-[6px] h-[6px] rounded-full bg-white border-[1.5px] border-cyan-400 shadow-[0_0_5px_#22d3ee]"
-                                        />
+                                        {/* Current Bid Dot (or Close-Moment Burst Effect during 3s Replay) */}
+                                        {isReplaying && replayHitPhase > 0 && closeReplay ? (
+                                            <div
+                                                style={{ top: `${bidPct}%`, right: '2px' }}
+                                                className="absolute -translate-y-1/2 flex items-center justify-end"
+                                            >
+                                                {/* Expanding Shockwave Rings */}
+                                                <span
+                                                    style={{
+                                                        transform: `scale(${1 + replayHitPhase * 3.4})`,
+                                                        opacity: Math.max(0, 1 - replayHitPhase * 0.9),
+                                                    }}
+                                                    className={`absolute right-0 w-4 h-4 rounded-full border-2 ${
+                                                        closeReplay.profit >= 0 ? 'border-emerald-300' : 'border-rose-400'
+                                                    }`}
+                                                />
+                                                <span
+                                                    style={{
+                                                        transform: `scale(${1 + replayHitPhase * 2.1})`,
+                                                        opacity: Math.max(0, 0.9 - replayHitPhase * 0.8),
+                                                    }}
+                                                    className={`absolute right-0 w-3 h-3 rounded-full ${
+                                                        closeReplay.profit >= 0 ? 'bg-emerald-400/50' : 'bg-rose-400/50'
+                                                    }`}
+                                                />
+                                                {/* Floating Close-Moment Badge */}
+                                                <span
+                                                    className={`mr-3 rounded-md border px-1.5 py-0.5 font-mono text-[9px] font-extrabold shadow-lg whitespace-nowrap ${
+                                                        closeReplay.profit >= 0
+                                                            ? 'border-emerald-300 bg-emerald-500/90 text-slate-950 shadow-[0_0_12px_rgba(52,211,153,0.9)]'
+                                                            : 'border-rose-300 bg-rose-500/90 text-white shadow-[0_0_12px_rgba(244,63,94,0.8)]'
+                                                    }`}
+                                                >
+                                                    ✓ ปิดรวบ {closeReplay.profit >= 0 ? '+' : ''}
+                                                    {closeReplay.profit.toFixed(1)}
+                                                </span>
+                                                <span
+                                                    className={`w-2.5 h-2.5 rounded-full border-2 border-white ${
+                                                        closeReplay.profit >= 0
+                                                            ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]'
+                                                            : 'bg-rose-400 shadow-[0_0_10px_#fb7185]'
+                                                    }`}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span
+                                                style={{ top: `${bidPct}%`, right: '1px' }}
+                                                className="absolute -translate-y-1/2 w-[6px] h-[6px] rounded-full bg-white border-[1.5px] border-cyan-400 shadow-[0_0_5px_#22d3ee] transition-[top] duration-300"
+                                            />
+                                        )}
                                     </div>
                                 </>
                             );
@@ -1044,7 +1325,7 @@ export default function SmartTacticalOverview({
                     <div className="my-0.5 flex-1 flex items-center justify-center gap-1 min-h-0">
                         <div className="relative h-full w-3.5 sm:w-4 rounded bg-slate-900 border border-slate-800 overflow-hidden flex flex-col justify-end">
                             {(() => {
-                                const curRatio = Math.min(100, Math.round((Math.abs(liveCyclePnl) / pnlScaleMax) * 100));
+                                const curRatio = Math.min(100, Math.round((Math.abs(syncedCyclePnl) / pnlScaleMax) * 100));
                                 const peakRatio = Math.min(97, Math.max(4, Math.round((Math.abs(peakPnlRound) / pnlScaleMax) * 100)));
 
                                 return (
@@ -1052,7 +1333,7 @@ export default function SmartTacticalOverview({
                                         <div
                                             style={{ height: `${curRatio}%` }}
                                             className={`w-full transition-all duration-300 ${
-                                                liveCyclePnl >= 0
+                                                syncedCyclePnl >= 0
                                                     ? 'bg-gradient-to-t from-emerald-600 to-cyan-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
                                                     : 'bg-gradient-to-t from-rose-700 to-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
                                             }`}
@@ -1082,11 +1363,11 @@ export default function SmartTacticalOverview({
 
                     <div
                         className={`text-center font-mono text-sm sm:text-lg font-extrabold leading-tight tabular-nums truncate ${
-                            liveCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                            syncedCyclePnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                     >
-                        {liveCyclePnl >= 0 ? '+' : ''}
-                        {Math.abs(liveCyclePnl) >= 100 ? liveCyclePnl.toFixed(0) : liveCyclePnl.toFixed(1)}
+                        {syncedCyclePnl >= 0 ? '+' : ''}
+                        {Math.abs(syncedCyclePnl) >= 100 ? syncedCyclePnl.toFixed(0) : syncedCyclePnl.toFixed(1)}
                     </div>
                 </div>
             </div>

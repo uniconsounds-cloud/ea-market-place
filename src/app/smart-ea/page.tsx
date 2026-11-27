@@ -1956,6 +1956,7 @@ function SmartEACockpitContent() {
                         chart={eaState?.chart}
                         voteCouncil={eaState?.vote_council}
                         roundHistory={eaState?.round_history}
+                        isOnline={isOnline}
                         isWaitingFreshData={isWaitingFreshData}
                         lastPing={eaState?.last_ping}
                     />
