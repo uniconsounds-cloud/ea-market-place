@@ -377,13 +377,37 @@ export default function SmartTacticalOverview({
         };
     }, [safeCap]);
 
+    // Smooth step-by-step VU bar animation (1 bar at a time instead of jumping abruptly)
+    const [animOpenBuy, setAnimOpenBuy] = useState<number>(openBuy);
+    const [animOpenSell, setAnimOpenSell] = useState<number>(openSell);
+
+    useEffect(() => {
+        if (animOpenBuy === openBuy) return;
+        const diff = Math.abs(openBuy - animOpenBuy);
+        const stepMs = Math.max(55, Math.min(130, Math.floor(650 / diff)));
+        const timer = setTimeout(() => {
+            setAnimOpenBuy((prev) => (prev < openBuy ? prev + 1 : prev - 1));
+        }, stepMs);
+        return () => clearTimeout(timer);
+    }, [animOpenBuy, openBuy]);
+
+    useEffect(() => {
+        if (animOpenSell === openSell) return;
+        const diff = Math.abs(openSell - animOpenSell);
+        const stepMs = Math.max(55, Math.min(130, Math.floor(650 / diff)));
+        const timer = setTimeout(() => {
+            setAnimOpenSell((prev) => (prev < openSell ? prev + 1 : prev - 1));
+        }, stepMs);
+        return () => clearTimeout(timer);
+    }, [animOpenSell, openSell]);
+
     // Clamped display slots for Section 2 (1..30)
     const clampedTpSlot =
         metrics.tpTradeLevel !== null ? Math.min(FIXED_VU_SLOTS, Math.max(1, metrics.tpTradeLevel)) : null;
     const clampedBeSlot =
         metrics.beTradeLevel !== null ? Math.min(FIXED_VU_SLOTS, Math.max(1, metrics.beTradeLevel)) : null;
-    const sec2BuyLabelSlot = openBuy <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, openBuy + 1);
-    const sec2SellLabelSlot = openSell <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, openSell + 1);
+    const sec2BuyLabelSlot = animOpenBuy <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, animOpenBuy + 1);
+    const sec2SellLabelSlot = animOpenSell <= 0 ? 1 : Math.min(FIXED_VU_SLOTS, animOpenSell + 1);
 
     // =========================================================================
     // SYNCHRONIZED 1-SECOND LIVE TICK + 3-SECOND CLOSE-MOMENT REPLAY ANIMATION
@@ -719,8 +743,8 @@ export default function SmartTacticalOverview({
                             const sellIdx = safeCap + 1 - y; // 1..maxSell top-down
                             const maxBuySlots = sec1TopY;
                             const maxSellSlots = safeCap + 1 - sec1BotY;
-                            const clampedOpenBuy = Math.min(maxBuySlots, openBuy);
-                            const clampedOpenSell = Math.min(maxSellSlots, openSell);
+                            const clampedOpenBuy = Math.min(maxBuySlots, animOpenBuy);
+                            const clampedOpenSell = Math.min(maxSellSlots, animOpenSell);
 
                             const hasBuySlot = buyIdx >= 1;
                             const hasSellSlot = sellIdx >= 1;
@@ -736,11 +760,11 @@ export default function SmartTacticalOverview({
                                     <div className="relative h-full flex items-center justify-center">
                                         {isBuyLabelRow ? (
                                             <span className="absolute top-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums">
-                                                {openBuy}
+                                                {animOpenBuy}
                                             </span>
                                         ) : (
                                             <div
-                                                className={`w-full h-full max-h-[5px] rounded-[1px] transition-all ${
+                                                className={`w-full h-full max-h-[5px] rounded-[1px] transition-all duration-150 ${
                                                     !hasBuySlot
                                                         ? 'bg-transparent'
                                                         : buyLit
@@ -759,11 +783,11 @@ export default function SmartTacticalOverview({
                                     <div className="relative h-full flex items-center justify-center">
                                         {isSellLabelRow ? (
                                             <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums">
-                                                {openSell}
+                                                {animOpenSell}
                                             </span>
                                         ) : (
                                             <div
-                                                className={`w-full h-full max-h-[5px] rounded-[1px] transition-all ${
+                                                className={`w-full h-full max-h-[5px] rounded-[1px] transition-all duration-150 ${
                                                     !hasSellSlot
                                                         ? 'bg-transparent'
                                                         : sellLit
@@ -802,8 +826,8 @@ export default function SmartTacticalOverview({
                 <div className="col-span-1 flex flex-col justify-between rounded-lg border border-slate-800/90 bg-[#030710]/90 p-1.5 relative overflow-hidden">
                     <div className="flex-1 flex flex-col justify-between gap-[1px] px-1 relative min-h-0">
                         {sec2Levels.map((lv) => {
-                            const buyLit = openBuy >= lv;
-                            const sellLit = openSell >= lv;
+                            const buyLit = animOpenBuy >= lv;
+                            const sellLit = animOpenSell >= lv;
                             const isBuyTopLabel = lv === sec2BuyLabelSlot;
                             const isSellTopLabel = lv === sec2SellLabelSlot;
                             const isTpRow = clampedTpSlot === lv;
@@ -846,11 +870,11 @@ export default function SmartTacticalOverview({
                                     <div className="relative h-full flex items-center justify-center">
                                         {isBuyTopLabel && (
                                             <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-sky-400 leading-none tabular-nums bg-[#030710]/80 px-0.5 rounded">
-                                                {openBuy}
+                                                {animOpenBuy}
                                             </span>
                                         )}
                                         <div
-                                            className={`w-full h-full max-h-[5px] rounded-[1px] ${
+                                            className={`w-full h-full max-h-[5px] rounded-[1px] transition-colors duration-150 ${
                                                 buyLit
                                                     ? isBuyFrozen
                                                         ? 'bg-rose-500/80'
@@ -866,11 +890,11 @@ export default function SmartTacticalOverview({
                                     <div className="relative h-full flex items-center justify-center">
                                         {isSellTopLabel && (
                                             <span className="absolute bottom-0 z-20 font-mono text-[10px] sm:text-xs font-extrabold text-orange-400 leading-none tabular-nums bg-[#030710]/80 px-0.5 rounded">
-                                                {openSell}
+                                                {animOpenSell}
                                             </span>
                                         )}
                                         <div
-                                            className={`w-full h-full max-h-[5px] rounded-[1px] ${
+                                            className={`w-full h-full max-h-[5px] rounded-[1px] transition-colors duration-150 ${
                                                 sellLit
                                                     ? isSellFrozen
                                                         ? 'bg-rose-500/80'
