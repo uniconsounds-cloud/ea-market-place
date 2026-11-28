@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -255,10 +255,73 @@ export default function FreezeExitPlanner({
             bePoint,
             buyOrderPts,
             sellOrderPts,
+            evalAt,
             minPnl: Math.min(minPnl, -100, draftSl < 0 ? draftSl * 1.1 : 0),
             maxPnl: Math.max(maxPnl, 100, draftTp > 0 ? draftTp * 1.2 : 100),
         };
-    }, [chart, currentPrice, currentTp, cyclePnl, digits, pointSize, rangePts, frozenSide, openBuy, openSell, spacingPoints, initialLot, lotIncrement, draftSl, draftTp]);
+    }, [chart, currentPrice, currentTp, cyclePnl, digits, pointSize, rangePts, frozenSide, openBuy, openSell, spacingPoints, initialLot, lotIncrement, stepLotRepeat, draftSl, draftTp]);
+
+    // Smart Distance TP Recommendation (300-400 pts): locked per (frozenSide, openBuy, openSell), NEVER drifts on every tick!
+    const [smartTpRec, setSmartTpRec] = useState<{
+        tp: number;
+        pts: number;
+        extra: number;
+        dir: 'UP' | 'DOWN';
+        stateKey: string;
+    } | null>(null);
+    const smartTpKeyRef = useRef<string>('');
+
+    useEffect(() => {
+        if (openBuy + openSell <= 0 || currentPrice <= 0) {
+            smartTpKeyRef.current = '';
+            setSmartTpRec(null);
+            return;
+        }
+
+        const stateKey = `${frozenSide}_${openBuy}_${openSell}`;
+        if (smartTpKeyRef.current === stateKey) {
+            return; // Locked for this exact trade-count / Freeze state (does NOT recalculate every tick)
+        }
+        smartTpKeyRef.current = stateKey;
+
+        const dirSign =
+            frozenSide === 'BUY'
+                ? -1
+                : frozenSide === 'SELL'
+                ? 1
+                : sim.netLot >= 0
+                ? 1
+                : -1;
+
+        const eval300 = sim.evalAt(sim.basePrice + dirSign * 300 * pointSize);
+        const eval350 = sim.evalAt(sim.basePrice + dirSign * 350 * pointSize);
+        const eval400 = sim.evalAt(sim.basePrice + dirSign * 400 * pointSize);
+
+        let chosenPts = 350;
+        let chosenEval = eval350;
+        let chosenTp = Math.round(eval350.pnl);
+
+        if (eval300.pnl >= 20) {
+            chosenPts = 300;
+            chosenEval = eval300;
+            chosenTp = 20;
+        } else if (eval400.pnl >= 0 && eval350.pnl < 0) {
+            // If 400 pts reaches breakeven or small profit cleanly, prefer ~380-400 pts at TP=0/+20
+            chosenPts = 400;
+            chosenEval = eval400;
+            chosenTp = Math.min(20, Math.round(eval400.pnl));
+        } else {
+            chosenTp = Math.min(20, Math.round(eval350.pnl));
+        }
+
+        setSmartTpRec({
+            tp: chosenTp,
+            pts: chosenPts,
+            extra: chosenEval.extra,
+            dir: dirSign > 0 ? 'UP' : 'DOWN',
+            stateKey,
+        });
+    }, [frozenSide, openBuy, openSell, currentPrice, pointSize, sim]);
 
     // SVG dimensions (Portrait-friendly Price-vs-PnL Curve)
     const W = 360;
@@ -753,6 +816,50 @@ export default function FreezeExitPlanner({
                         className="w-full accent-emerald-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
                     />
                     <div className="flex flex-wrap gap-1.5">
+                        {smartTpRec && (
+                            <div className="w-full rounded-lg border border-cyan-400/40 bg-cyan-950/30 px-2.5 py-2 flex flex-wrap items-center justify-between gap-2 mb-0.5">
+                                <div className="font-mono text-[10px] sm:text-[11px] leading-tight">
+                                    <div className="text-cyan-200 font-bold flex items-center gap-1">
+                                        <Sparkles className="w-3 h-3 text-cyan-300 shrink-0" />
+                                        Smart TP แนะนำ (ระยะสวิง {smartTpRec.pts} จุด):{' '}
+                                        <span className="text-emerald-300 font-extrabold">
+                                            {smartTpRec.tp >= 0 ? `+${smartTpRec.tp}` : smartTpRec.tp} {currency}
+                                        </span>
+                                    </div>
+                                    <div className="text-[9.5px] text-slate-400">
+                                        คำนวณสดตามสถานะ B:{openBuy}/S:{openSell} (ล็อกค่าจนกว่าจำนวนไม้จะเปลี่ยน
+                                        {smartTpRec.extra > 0 ? ` • +${smartTpRec.extra} ไม้` : ''})
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setDraftTp(smartTpRec.tp)}
+                                        className="h-7 text-[10px] px-2 border-cyan-400/50 text-cyan-200 hover:bg-cyan-500/20"
+                                    >
+                                        ดูบนกราฟ
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={sending}
+                                        onClick={() => {
+                                            setDraftTp(smartTpRec.tp);
+                                            onApply(
+                                                smartTpRec.tp,
+                                                draftSl,
+                                                enableAutoHedge ? draftHedgeDd : undefined
+                                            );
+                                        }}
+                                        className="h-7 text-[10px] px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                                    >
+                                        ยืนยันใช้ TP นี้
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                         <Button
                             type="button"
                             size="sm"
