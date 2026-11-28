@@ -21,6 +21,7 @@ interface VoteCouncilOverview {
     entry_px?: number;
     stop_px?: number;
     bets_opened?: number;
+    reached_trigger?: boolean;
     score_pct?: number;
     pass_pct?: number;
     voters?: VoteCouncilVoterOverview[];
@@ -1469,11 +1470,37 @@ export default function SmartTacticalOverview({
                         <span className="text-emerald-400">
                             TP:{spark.estTp > 0 ? spark.estTp.toFixed(digits) : '--'}
                         </span>
-                        {spark.rcEntryPx > 0 && (
-                            <span className="text-rose-300 font-bold">
-                                RC:{spark.rcEntryPx.toFixed(digits)}
-                            </span>
-                        )}
+                        {(isBuyFrozen || isSellFrozen) && (() => {
+                            if (spark.rcEntryPx > 0) {
+                                // Vote approved & Rescue order opened -> stop blinking, show locked entry price
+                                return (
+                                    <span className="text-emerald-300 font-bold" title="เปิดไม้ Rescue แล้วที่ราคานี้">
+                                        RC:{spark.rcEntryPx.toFixed(digits)}
+                                    </span>
+                                );
+                            }
+                            if (voteCouncil?.reached_trigger && spark.bid > 0) {
+                                // Passed Rescue trigger, waiting for Vote -> slow blink + live running price
+                                return (
+                                    <span
+                                        className="text-amber-300 font-bold animate-pulse"
+                                        style={{ animationDuration: '2s' }}
+                                        title="เลยจุดเข้า Rescue แล้ว • กำลังรอผล Vote"
+                                    >
+                                        RC:{spark.bid.toFixed(digits)}
+                                    </span>
+                                );
+                            }
+                            if (spark.rcPrice > 0) {
+                                // Waiting to reach Mirror/Trigger -> steady target price
+                                return (
+                                    <span className="text-rose-300 font-bold" title="จุดเตรียมออกไม้ Rescue (Mirror)">
+                                        RC:{spark.rcPrice.toFixed(digits)}
+                                    </span>
+                                );
+                            }
+                            return null;
+                        })()}
                         <span className={freezeStopLoss < 0 ? 'text-amber-400' : 'text-slate-600'}>
                             SL:{freezeStopLoss < 0 && spark.estSl > 0 ? spark.estSl.toFixed(digits) : '-'}
                         </span>
